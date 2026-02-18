@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { db, nodes, nodeInvestorConnections } from '../db/index.js';
+import { db, nodes, nodeInvestorConnections, founderNodeRelationships, introRequests } from '../db/index.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -92,14 +92,24 @@ app.put('/:id', async (c) => {
   return c.json(result[0]);
 });
 
-// Delete node
+// Delete node (and cascade to related records)
 app.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
-  const result = await db.delete(nodes).where(eq(nodes.id, id)).returning();
 
-  if (result.length === 0) {
+  // First check if node exists
+  const node = await db.select().from(nodes).where(eq(nodes.id, id));
+  if (node.length === 0) {
     return c.json({ error: 'Node not found' }, 404);
   }
+
+  // Delete related records first (cascade)
+  await db.delete(nodeInvestorConnections).where(eq(nodeInvestorConnections.nodeId, id));
+  await db.delete(founderNodeRelationships).where(eq(founderNodeRelationships.nodeId, id));
+  await db.delete(introRequests).where(eq(introRequests.nodeId, id));
+
+  // Now delete the node
+  await db.delete(nodes).where(eq(nodes.id, id));
+
   return c.json({ success: true });
 });
 

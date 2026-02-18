@@ -346,6 +346,128 @@ app.get('/views/circle-back', async (c) => {
   return c.json(results);
 });
 
+// Trends/Stats Over Time
+app.get('/stats/trends', async (c) => {
+  const allRequests = await db.select().from(introRequests);
+
+  // Group by month using dateRequested (YYYY-MM)
+  const monthlyData: Record<string, {
+    total: number;
+    introduced: number;
+    meetings: number; // first_meeting_complete or beyond
+    passed: number;
+    ignored: number;
+    invested: number;
+  }> = {};
+
+  for (const req of allRequests) {
+    const dateStr = req.dateRequested || req.createdAt;
+    if (!dateStr) continue;
+
+    const month = dateStr.substring(0, 7); // YYYY-MM
+
+    if (!monthlyData[month]) {
+      monthlyData[month] = { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0 };
+    }
+
+    monthlyData[month].total++;
+
+    // Count statuses
+    if (req.status === 'introduced' || ['first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'circle_back_round_opens', 'invested'].includes(req.status)) {
+      monthlyData[month].introduced++;
+    }
+    if (['first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'circle_back_round_opens', 'invested'].includes(req.status)) {
+      monthlyData[month].meetings++;
+    }
+    if (req.status === 'passed') {
+      monthlyData[month].passed++;
+    }
+    if (req.status === 'ignored') {
+      monthlyData[month].ignored++;
+    }
+    if (req.status === 'invested') {
+      monthlyData[month].invested++;
+    }
+  }
+
+  // Sort months and get last 6
+  const sortedMonths = Object.keys(monthlyData).sort().reverse().slice(0, 6);
+
+  // Calculate rates and format for response
+  const monthlyStats = sortedMonths.map(month => {
+    const data = monthlyData[month];
+    const completedIntros = data.introduced + data.passed + data.ignored;
+    return {
+      month,
+      label: formatMonthLabel(month),
+      total: data.total,
+      introduced: data.introduced,
+      meetings: data.meetings,
+      passed: data.passed,
+      ignored: data.ignored,
+      invested: data.invested,
+      introRate: completedIntros > 0 ? Math.round((data.introduced / completedIntros) * 100) : 0,
+      meetingRate: data.introduced > 0 ? Math.round((data.meetings / data.introduced) * 100) : 0,
+    };
+  });
+
+  // Current vs previous month comparison
+  const current = monthlyStats[0] || { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0, introRate: 0, meetingRate: 0 };
+  const previous = monthlyStats[1] || { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0, introRate: 0, meetingRate: 0 };
+
+  const comparison = {
+    intros: {
+      current: current.total,
+      previous: previous.total,
+      change: current.total - previous.total,
+      direction: current.total > previous.total ? 'up' : current.total < previous.total ? 'down' : 'same',
+    },
+    meetings: {
+      current: current.meetings,
+      previous: previous.meetings,
+      change: current.meetings - previous.meetings,
+      direction: current.meetings > previous.meetings ? 'up' : current.meetings < previous.meetings ? 'down' : 'same',
+    },
+    introRate: {
+      current: current.introRate,
+      previous: previous.introRate,
+      change: current.introRate - previous.introRate,
+      direction: current.introRate > previous.introRate ? 'up' : current.introRate < previous.introRate ? 'down' : 'same',
+    },
+    meetingRate: {
+      current: current.meetingRate,
+      previous: previous.meetingRate,
+      change: current.meetingRate - previous.meetingRate,
+      direction: current.meetingRate > previous.meetingRate ? 'up' : current.meetingRate < previous.meetingRate ? 'down' : 'same',
+    },
+    invested: {
+      current: current.invested,
+      previous: previous.invested,
+      change: current.invested - previous.invested,
+      direction: current.invested > previous.invested ? 'up' : current.invested < previous.invested ? 'down' : 'same',
+    },
+    ignored: {
+      current: current.ignored,
+      previous: previous.ignored,
+      change: current.ignored - previous.ignored,
+      direction: current.ignored < previous.ignored ? 'up' : current.ignored > previous.ignored ? 'down' : 'same', // Lower is better
+    },
+  };
+
+  return c.json({
+    monthlyStats: monthlyStats.reverse(), // Oldest first for charting
+    comparison,
+    currentMonth: current.label || 'This Month',
+    previousMonth: previous.label || 'Last Month',
+  });
+});
+
+function formatMonthLabel(month: string): string {
+  const [year, m] = month.split('-');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[parseInt(m) - 1]} ${year}`;
+}
+
 // Pipeline Stats
 app.get('/stats/pipeline', async (c) => {
   const allRequests = await db.select().from(introRequests);

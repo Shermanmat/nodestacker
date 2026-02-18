@@ -63,6 +63,67 @@
           </div>
         </div>
 
+        <!-- Trends Over Time -->
+        <div v-if="trends.comparison" class="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 class="font-medium mb-3">Trends ({{ trends.currentMonth }} vs {{ trends.previousMonth }})</h3>
+          <div class="grid grid-cols-6 gap-4">
+            <div class="text-center p-3 rounded bg-gray-50">
+              <div class="text-xs text-gray-500 mb-1">Intros</div>
+              <div class="text-xl font-bold">{{ trends.comparison.intros?.current || 0 }}</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.intros?.direction)">
+                {{ trendArrow(trends.comparison.intros?.direction) }} {{ Math.abs(trends.comparison.intros?.change || 0) }}
+              </div>
+            </div>
+            <div class="text-center p-3 rounded bg-gray-50">
+              <div class="text-xs text-gray-500 mb-1">Meetings</div>
+              <div class="text-xl font-bold">{{ trends.comparison.meetings?.current || 0 }}</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.meetings?.direction)">
+                {{ trendArrow(trends.comparison.meetings?.direction) }} {{ Math.abs(trends.comparison.meetings?.change || 0) }}
+              </div>
+            </div>
+            <div class="text-center p-3 rounded bg-gray-50">
+              <div class="text-xs text-gray-500 mb-1">Intro Rate</div>
+              <div class="text-xl font-bold">{{ trends.comparison.introRate?.current || 0 }}%</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.introRate?.direction)">
+                {{ trendArrow(trends.comparison.introRate?.direction) }} {{ Math.abs(trends.comparison.introRate?.change || 0) }}%
+              </div>
+            </div>
+            <div class="text-center p-3 rounded bg-gray-50">
+              <div class="text-xs text-gray-500 mb-1">Meeting Rate</div>
+              <div class="text-xl font-bold">{{ trends.comparison.meetingRate?.current || 0 }}%</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.meetingRate?.direction)">
+                {{ trendArrow(trends.comparison.meetingRate?.direction) }} {{ Math.abs(trends.comparison.meetingRate?.change || 0) }}%
+              </div>
+            </div>
+            <div class="text-center p-3 rounded bg-gray-50">
+              <div class="text-xs text-gray-500 mb-1">Invested</div>
+              <div class="text-xl font-bold text-green-600">{{ trends.comparison.invested?.current || 0 }}</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.invested?.direction)">
+                {{ trendArrow(trends.comparison.invested?.direction) }} {{ Math.abs(trends.comparison.invested?.change || 0) }}
+              </div>
+            </div>
+            <div class="text-center p-3 rounded bg-gray-50">
+              <div class="text-xs text-gray-500 mb-1">Ignored</div>
+              <div class="text-xl font-bold text-gray-600">{{ trends.comparison.ignored?.current || 0 }}</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.ignored?.direction, true)">
+                {{ trendArrow(trends.comparison.ignored?.direction, true) }} {{ Math.abs(trends.comparison.ignored?.change || 0) }}
+              </div>
+            </div>
+          </div>
+          <!-- Simple Chart -->
+          <div v-if="trends.monthlyStats?.length > 1" class="mt-4 pt-4 border-t">
+            <div class="text-xs text-gray-500 mb-2">Monthly Intros (last 6 months)</div>
+            <div class="flex items-end gap-2 h-24">
+              <div v-for="month in trends.monthlyStats" :key="month.month" class="flex-1 flex flex-col items-center">
+                <div class="w-full bg-blue-100 rounded-t relative" :style="{ height: getBarHeight(month.total) + 'px' }">
+                  <div class="absolute -top-5 left-0 right-0 text-center text-xs font-medium">{{ month.total }}</div>
+                </div>
+                <div class="text-xs text-gray-400 mt-1">{{ month.label?.split(' ')[0] }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- My Tasks (Node Tasks) - Grouped by Founder -->
         <div v-if="nodeTasks.length > 0" class="bg-white rounded-lg shadow p-4 mb-6">
           <h3 class="font-medium mb-3">My Follow-ups</h3>
@@ -867,6 +928,7 @@
         const stats = ref({});
         const overdueRequests = ref([]);
         const nodeTasks = ref([]);
+        const trends = ref({});
         const adminNodeId = 2; // Mat Sherman's node ID
         const expandedFounderTasks = ref({});
 
@@ -963,6 +1025,29 @@
         const loadStats = async () => {
           stats.value = await api('/intro-requests/stats/pipeline');
           overdueRequests.value = await api('/intro-requests/views/overdue');
+        };
+
+        const loadTrends = async () => {
+          trends.value = await api('/intro-requests/stats/trends');
+        };
+
+        const trendArrow = (direction, inverted = false) => {
+          if (inverted) {
+            return direction === 'up' ? '▼' : direction === 'down' ? '▲' : '–';
+          }
+          return direction === 'up' ? '▲' : direction === 'down' ? '▼' : '–';
+        };
+
+        const trendClass = (direction, inverted = false) => {
+          if (direction === 'same') return 'text-gray-400';
+          const isGood = inverted ? direction === 'down' : direction === 'up';
+          return isGood ? 'text-green-600' : 'text-red-600';
+        };
+
+        const getBarHeight = (value) => {
+          if (!trends.value.monthlyStats?.length) return 0;
+          const maxValue = Math.max(...trends.value.monthlyStats.map(m => m.total), 1);
+          return Math.max((value / maxValue) * 80, 4);
         };
 
         const loadNodeTasks = async () => {
@@ -1350,17 +1435,18 @@
           loadRelationships();
           loadStats();
           loadNodeTasks();
+          loadTrends();
         });
 
         return {
           tabs, activeTab, introStatuses,
-          founders, nodes, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, expandedFounderTasks,
+          founders, nodes, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, trends, expandedFounderTasks,
           showFounderModal, showNodeModal, showInvestorModal, showIntroModal, showFollowupModal, showFNRelModal, showNIConnModal,
           showLoginLinkModal, loginLinkData, linkCopied,
           editingFounder, editingNode, editingInvestor, editingIntro,
           founderForm, nodeForm, investorForm, introForm, followupForm, fnRelForm, niConnForm,
           introFilter, investorSearchQuery, filteredAdminInvestors,
-          formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue,
+          formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight,
           loadIntroRequests, markNodeTaskDone, toggleFounderTasks, formatTaskType,
           saveFounder, editFounder, deleteFounder, closeFounderModal,
           saveNode, editNode, deleteNode, closeNodeModal,

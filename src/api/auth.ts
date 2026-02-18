@@ -3,8 +3,14 @@ import { eq } from 'drizzle-orm';
 import { db, founders } from '../db/index.js';
 import { z } from 'zod';
 import crypto from 'crypto';
+import * as postmark from 'postmark';
 
 const app = new Hono();
+
+// Initialize Postmark client
+const postmarkClient = process.env.POSTMARK_API_KEY
+  ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
+  : null;
 
 // In-memory token store (use Redis in production)
 const tokens = new Map<string, { founderId: number; expires: Date }>();
@@ -35,19 +41,42 @@ app.post('/magic-link', async (c) => {
 
   tokens.set(token, { founderId: founder.id, expires });
 
-  // In production, send email here
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
   const magicLink = `${baseUrl}/founder?token=${token}`;
 
   console.log(`\n🔐 Magic link for ${founder.email}:\n${magicLink}\n`);
 
-  // DEV MODE: Return the magic link directly (remove in production!)
-  // In production, send email instead
+  // Send email via Postmark
+  if (postmarkClient) {
+    try {
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: founder.email,
+        Subject: 'Your NodeStacker Login Link',
+        HtmlBody: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Hi ${founder.name},</h2>
+            <p>Click the button below to log in to your NodeStacker founder portal:</p>
+            <p style="margin: 30px 0;">
+              <a href="${magicLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Log In to NodeStacker
+              </a>
+            </p>
+            <p style="color: #666; font-size: 14px;">This link expires in 15 minutes.</p>
+            <p style="color: #666; font-size: 14px;">If you didn't request this, you can ignore this email.</p>
+          </div>
+        `,
+        TextBody: `Hi ${founder.name},\n\nClick here to log in to NodeStacker: ${magicLink}\n\nThis link expires in 15 minutes.`,
+      });
+      console.log(`✅ Email sent to ${founder.email}`);
+    } catch (err) {
+      console.error('Failed to send email:', err);
+    }
+  }
+
   return c.json({
     success: true,
     message: 'If this email exists, a magic link has been sent.',
-    // DEV ONLY - remove in production
-    devMagicLink: magicLink,
   });
 });
 
@@ -142,6 +171,8 @@ app.post('/logout', async (c) => {
 // Admin: Generate login link for any founder (for impersonation/invites)
 app.post('/admin/generate-link/:founderId', async (c) => {
   const founderId = parseInt(c.req.param('founderId'));
+  const body = await c.req.json().catch(() => ({}));
+  const sendEmail = body.sendEmail === true;
 
   const founder = await db.query.founders.findFirst({
     where: eq(founders.id, founderId),
@@ -162,6 +193,38 @@ app.post('/admin/generate-link/:founderId', async (c) => {
 
   console.log(`\n🔐 Admin generated link for ${founder.name} (${founder.email}):\n${magicLink}\n`);
 
+  let emailSent = false;
+
+  // Optionally send invite email
+  if (sendEmail && postmarkClient) {
+    try {
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: founder.email,
+        Subject: `You're invited to NodeStacker`,
+        HtmlBody: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2>Hi ${founder.name},</h2>
+            <p>You've been invited to NodeStacker - your founder portal for managing investor intros.</p>
+            <p>Click the button below to access your dashboard:</p>
+            <p style="margin: 30px 0;">
+              <a href="${magicLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Access Your Portal
+              </a>
+            </p>
+            <p style="color: #666; font-size: 14px;">This link expires in 7 days. You can always request a new one from the login page.</p>
+            <p>Best,<br>Mat</p>
+          </div>
+        `,
+        TextBody: `Hi ${founder.name},\n\nYou've been invited to NodeStacker - your founder portal for managing investor intros.\n\nClick here to access your dashboard: ${magicLink}\n\nThis link expires in 7 days.\n\nBest,\nMat`,
+      });
+      emailSent = true;
+      console.log(`✅ Invite email sent to ${founder.email}`);
+    } catch (err) {
+      console.error('Failed to send invite email:', err);
+    }
+  }
+
   return c.json({
     success: true,
     founder: {
@@ -171,6 +234,7 @@ app.post('/admin/generate-link/:founderId', async (c) => {
     },
     magicLink,
     expiresAt: expires.toISOString(),
+    emailSent,
   });
 });
 

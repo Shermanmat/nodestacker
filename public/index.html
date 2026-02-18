@@ -842,9 +842,14 @@
           >
         </div>
         <div class="flex justify-between">
-          <button @click="copyLoginLink" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">
-            {{ linkCopied ? 'Copied!' : 'Copy Link' }}
-          </button>
+          <div class="flex space-x-2">
+            <button @click="copyLoginLink" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm">
+              {{ linkCopied ? 'Copied!' : 'Copy Link' }}
+            </button>
+            <button @click="sendInviteEmail" :disabled="emailSending" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm disabled:opacity-50">
+              {{ emailSent ? 'Email Sent!' : emailSending ? 'Sending...' : 'Email Invite' }}
+            </button>
+          </div>
           <div class="flex space-x-2">
             <button @click="impersonateFounder" class="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700 text-sm">
               Open as Founder
@@ -1103,6 +1108,8 @@
         const showLoginLinkModal = ref(false);
         const loginLinkData = reactive({ founderId: null, founderName: '', magicLink: '' });
         const linkCopied = ref(false);
+        const emailSending = ref(false);
+        const emailSent = ref(false);
 
         // Portfolio modal
         const showPortfolioModal = ref(false);
@@ -1573,11 +1580,12 @@
         };
 
         const generateLoginLink = async (founder) => {
-          const result = await api(`/auth/admin/generate-link/${founder.id}`, { method: 'POST' });
+          const result = await api(`/auth/admin/generate-link/${founder.id}`, { method: 'POST', body: {} });
           loginLinkData.founderId = founder.id;
           loginLinkData.founderName = founder.name;
           loginLinkData.magicLink = result.magicLink;
           linkCopied.value = false;
+          emailSent.value = false;
           showLoginLinkModal.value = true;
         };
 
@@ -1598,6 +1606,26 @@
 
         const impersonateFounder = () => {
           window.open(loginLinkData.magicLink, '_blank');
+        };
+
+        const sendInviteEmail = async () => {
+          if (!loginLinkData.founderId) return;
+          emailSending.value = true;
+          try {
+            const result = await api(`/auth/admin/generate-link/${loginLinkData.founderId}`, {
+              method: 'POST',
+              body: { sendEmail: true }
+            });
+            if (result.emailSent) {
+              emailSent.value = true;
+              setTimeout(() => { emailSent.value = false; }, 3000);
+            } else {
+              alert('Email could not be sent. Check Postmark configuration.');
+            }
+          } catch (err) {
+            alert('Failed to send email');
+          }
+          emailSending.value = false;
         };
 
         // Research functions
@@ -1732,7 +1760,7 @@
           showAddFollowup, saveFollowup,
           saveFNRelationship, deleteFNRelationship,
           saveNIConnection, deleteNIConnection,
-          generateLoginLink, copyLoginLink, impersonateFounder,
+          generateLoginLink, copyLoginLink, impersonateFounder, sendInviteEmail, emailSending, emailSent,
           showResearchModal, researchState, researchError, researchData, researchModalTitle, canRefreshResearch,
           openResearchModal, closeResearchModal, triggerResearch, getUrlDomain, formatDate,
         };

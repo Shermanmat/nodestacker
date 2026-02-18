@@ -14,6 +14,7 @@ import digestRoutes from './api/digest.js';
 import authRoutes from './api/auth.js';
 import founderPortalRoutes from './api/founder-portal.js';
 import investorResearchRoutes from './api/investor-research.js';
+import portfolioRoutes from './api/portfolio.js';
 
 const app = new Hono();
 
@@ -31,6 +32,7 @@ app.route('/api/relationships', relationshipsRoutes);
 app.route('/api/digest', digestRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/portal', founderPortalRoutes);
+app.route('/api/portfolio', portfolioRoutes);
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

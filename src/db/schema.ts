@@ -203,6 +203,29 @@ export const followupLogsRelations = relations(followupLogs, ({ one }) => ({
   }),
 }));
 
+// Portfolio Companies Table
+export const portfolioCompanies = sqliteTable('portfolio_companies', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id).unique(),
+  investmentDate: text('investment_date'),
+  equityPercent: text('equity_percent'), // stored as text to handle decimals like "0.5%"
+  currentValuation: integer('current_valuation'), // in dollars
+  advisorySigned: integer('advisory_signed', { mode: 'boolean' }).notNull().default(false),
+  equitySigned: integer('equity_signed', { mode: 'boolean' }).notNull().default(false),
+  sharesPaid: integer('shares_paid', { mode: 'boolean' }).notNull().default(false),
+  certificateReceived: integer('certificate_received', { mode: 'boolean' }).notNull().default(false),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const portfolioCompaniesRelations = relations(portfolioCompanies, ({ one }) => ({
+  founder: one(founders, {
+    fields: [portfolioCompanies.founderId],
+    references: [founders.id],
+  }),
+}));
+
 // Investor Research Table (AI-powered research)
 export const investorResearch = sqliteTable('investor_research', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -243,3 +266,5 @@ export type FollowupLog = typeof followupLogs.$inferSelect;
 export type NewFollowupLog = typeof followupLogs.$inferInsert;
 export type InvestorResearch = typeof investorResearch.$inferSelect;
 export type NewInvestorResearch = typeof investorResearch.$inferInsert;
+export type PortfolioCompany = typeof portfolioCompanies.$inferSelect;
+export type NewPortfolioCompany = typeof portfolioCompanies.$inferInsert;

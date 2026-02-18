@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NodeStacker - Founder Portal</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app" v-cloak>
+    <!-- Login Screen -->
+    <div v-if="!session" class="min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
+        <h1 class="text-2xl font-bold text-center mb-2">NodeStacker</h1>
+        <p class="text-gray-500 text-center mb-6">Founder Portal</p>
+
+        <div v-if="!magicLinkSent">
+          <form @submit.prevent="requestMagicLink">
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input v-model="loginEmail" type="email" required
+                class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="you@company.com">
+            </div>
+            <button type="submit" :disabled="loggingIn"
+              class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {{ loggingIn ? 'Sending...' : 'Send Magic Link' }}
+            </button>
+          </form>
+        </div>
+
+        <div v-else class="text-center">
+          <div class="text-5xl mb-4">📧</div>
+          <p class="text-gray-600">Check your email for a login link!</p>
+          <button @click="magicLinkSent = false" class="mt-4 text-blue-600 hover:underline text-sm">
+            Try a different email
+          </button>
+        </div>
+
+        <div v-if="loginError" class="mt-4 p-3 bg-red-100 text-red-700 rounded text-sm">
+          {{ loginError }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div v-else>
+      <!-- Header -->
+      <header class="bg-white shadow-sm border-b">
+        <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">NodeStacker</h1>
+            <p class="text-sm text-gray-500">{{ session.founder.companyName }}</p>
+          </div>
+          <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-600">{{ session.founder.name }}</span>
+            <button @click="logout" class="text-sm text-red-600 hover:underline">Logout</button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Navigation -->
+      <nav class="bg-white border-b">
+        <div class="max-w-5xl mx-auto px-4">
+          <div class="flex space-x-8">
+            <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id"
+              :class="['py-4 px-1 text-sm font-medium', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']">
+              {{ tab.label }}
+              <span v-if="tab.id === 'tasks' && tasks.length > 0"
+                class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{{ tasks.length }}</span>
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Content -->
+      <main class="max-w-5xl mx-auto px-4 py-6">
+        <!-- Dashboard -->
+        <div v-if="activeTab === 'dashboard'">
+          <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
+
+          <div class="grid grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Active Intros</div>
+              <div class="text-2xl font-bold">{{ dashboard.stats?.activeIntros || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Total Intros</div>
+              <div class="text-2xl font-bold">{{ dashboard.stats?.totalIntros || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Invested</div>
+              <div class="text-2xl font-bold text-green-600">{{ dashboard.stats?.invested || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Overdue Tasks</div>
+              <div class="text-2xl font-bold" :class="dashboard.stats?.overdueFollowups > 0 ? 'text-red-600' : ''">
+                {{ dashboard.stats?.overdueFollowups || 0 }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Tasks -->
+          <div v-if="tasks.length > 0" class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-medium mb-3">Tasks Needing Attention</h3>
+            <div class="space-y-2">
+              <div v-for="task in tasks.slice(0, 5)" :key="task.intro.id + task.type"
+                class="flex items-center justify-between p-3 rounded"
+                :class="task.priority === 'high' ? 'bg-red-50' : task.priority === 'medium' ? 'bg-yellow-50' : 'bg-gray-50'">
+                <span class="text-sm">{{ task.message }}</span>
+                <span class="text-xs px-2 py-1 rounded"
+                  :class="task.priority === 'high' ? 'bg-red-100 text-red-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'">
+                  {{ task.priority }}
+                </span>
+              </div>
+            </div>
+            <button v-if="tasks.length > 5" @click="activeTab = 'tasks'" class="mt-3 text-blue-600 text-sm hover:underline">
+              View all {{ tasks.length }} tasks →
+            </button>
+          </div>
+        </div>
+
+        <!-- Tasks -->
+        <div v-if="activeTab === 'tasks'">
+          <h2 class="text-xl font-semibold mb-4">Tasks</h2>
+
+          <div v-if="tasks.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No tasks right now. Nice work!
+          </div>
+
+          <div v-else class="bg-white rounded-lg shadow">
+            <div v-for="task in tasks" :key="task.intro.id + task.type"
+              class="p-4 border-b last:border-b-0 flex items-center justify-between hover:bg-gray-50">
+              <div>
+                <div class="flex items-center space-x-2">
+                  <span class="text-xs px-2 py-0.5 rounded"
+                    :class="task.priority === 'high' ? 'bg-red-100 text-red-700' : task.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'">
+                    {{ task.type.replace(/_/g, ' ') }}
+                  </span>
+                </div>
+                <p class="mt-1">{{ task.message }}</p>
+              </div>
+              <button @click="showTaskAction(task)" class="text-blue-600 text-sm hover:underline">
+                Take Action
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nodes -->
+        <div v-if="activeTab === 'nodes'">
+          <h2 class="text-xl font-semibold mb-4">Nodes</h2>
+
+          <!-- Working With -->
+          <div v-if="nodesData.workingWith.length > 0" class="mb-8">
+            <h3 class="text-lg font-medium mb-3 text-gray-700">Working With</h3>
+            <div class="bg-white rounded-lg shadow">
+              <div v-for="node in nodesData.workingWith" :key="node.id"
+                class="p-4 border-b last:border-b-0">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h4 class="font-medium">{{ node.name }}</h4>
+                    <p class="text-sm text-gray-500">{{ node.role }} @ {{ node.company }}</p>
+                  </div>
+                  <div class="text-right text-sm">
+                    <div class="text-gray-600">{{ node.totalIntros }} intro{{ node.totalIntros !== 1 ? 's' : '' }}</div>
+                    <div v-if="node.activeIntros > 0" class="text-blue-600">{{ node.activeIntros }} active</div>
+                    <div v-if="node.invested > 0" class="text-green-600">{{ node.invested }} invested</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Available Nodes -->
+          <div>
+            <h3 class="text-lg font-medium mb-3 text-gray-700">Available Nodes</h3>
+            <p class="text-gray-500 text-sm mb-3">
+              Interested in working with any of these? Reach out to Mat.
+            </p>
+            <div v-if="nodesData.available.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+              No additional nodes available.
+            </div>
+            <div v-else class="bg-white rounded-lg shadow">
+              <div v-for="node in nodesData.available" :key="node.id"
+                class="p-4 border-b last:border-b-0">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <h4 class="font-medium">{{ node.name }}</h4>
+                    <p class="text-sm text-gray-500">{{ node.role }} @ {{ node.company }}</p>
+                  </div>
+                  <span class="text-sm text-gray-500">
+                    {{ node.investorCount }} investor{{ node.investorCount !== 1 ? 's' : '' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Available Investors -->
+        <div v-if="activeTab === 'network'">
+          <h2 class="text-xl font-semibold mb-4">Available Investors</h2>
+          <p class="text-gray-500 text-sm mb-4">
+            Investors you can potentially reach through your nodes.
+            Reach out to your node directly to request an introduction.
+          </p>
+
+          <div class="bg-white rounded-lg shadow p-4 mb-4 space-y-3">
+            <input v-model="investorSearch" type="text"
+              placeholder="Search by name, firm, thesis, portfolio, or preferences..."
+              class="w-full border rounded-lg px-4 py-2">
+
+            <!-- Founder Type Filters -->
+            <div class="flex flex-wrap gap-2">
+              <span class="text-sm text-gray-500 py-1">Founder filters:</span>
+              <button v-for="filter in founderTypeFilters" :key="filter.value"
+                @click="toggleFounderFilter(filter.value)"
+                :class="['text-xs px-3 py-1 rounded-full border transition-colors',
+                  activeFounderFilters.includes(filter.value)
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-gray-600 border-gray-300 hover:border-blue-400']">
+                {{ filter.label }}
+              </button>
+            </div>
+
+            <!-- Active filter summary -->
+            <div v-if="activeFounderFilters.length > 0 || investorSearch" class="text-xs text-gray-500">
+              Showing {{ filteredInvestors.length }} of {{ availableInvestors.length }} investors
+              <button v-if="activeFounderFilters.length > 0" @click="clearFounderFilters"
+                class="ml-2 text-blue-600 hover:underline">Clear filters</button>
+            </div>
+          </div>
+
+          <div v-if="myNodes.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No network connections yet. Ask your admin to add your nodes.
+          </div>
+
+          <div v-else-if="filteredInvestors.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            {{ investorSearch ? 'No matching investors found' : 'No investors available' }}
+          </div>
+
+          <div v-else class="space-y-4">
+            <div v-for="item in filteredInvestors.slice(0, 50)" :key="item.investor.id"
+              class="bg-white rounded-lg shadow overflow-hidden">
+              <!-- Investor Header -->
+              <div class="p-4 flex justify-between items-start">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2">
+                    <h3 class="font-semibold text-lg">{{ item.investor.name }}</h3>
+                    <span v-if="item.research" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                      AI Researched
+                    </span>
+                  </div>
+                  <p class="text-gray-500">{{ item.investor.firm }}</p>
+
+                  <!-- Connection badges -->
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    <span v-for="node in item.nodes" :key="node.nodeId"
+                      class="text-xs px-2 py-0.5 rounded"
+                      :class="node.connectionStrength === 'strong' ? 'bg-green-50 text-green-700' : node.connectionStrength === 'medium' ? 'bg-yellow-50 text-yellow-700' : 'bg-gray-50 text-gray-600'">
+                      via {{ node.nodeName }}
+                    </span>
+                  </div>
+                </div>
+                <span v-if="item.hasActiveIntro" class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                  Intro in progress
+                </span>
+              </div>
+
+              <!-- Research Summary (visible paragraph) -->
+              <div v-if="item.research" class="px-4 pb-4 text-sm space-y-3 border-t pt-3 bg-gray-50">
+                <div v-if="item.research.investmentThesis">
+                  <span class="font-medium text-gray-700">Investment Thesis: </span>
+                  <span class="text-gray-600">{{ item.research.investmentThesis }}</span>
+                </div>
+                <div v-if="item.research.founderPreferences">
+                  <span class="font-medium text-gray-700">Founder Preferences: </span>
+                  <span class="text-gray-600">{{ item.research.founderPreferences }}</span>
+                  <!-- Founder preference badges -->
+                  <div class="mt-1 flex flex-wrap gap-1">
+                    <span v-for="pref in extractFounderPrefs(item.research.founderPreferences)" :key="pref"
+                      class="text-xs px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                      {{ pref }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="item.research.portfolioCompanies">
+                  <span class="font-medium text-gray-700">Portfolio: </span>
+                  <span class="text-gray-600">{{ item.research.portfolioCompanies }}</span>
+                </div>
+                <div v-if="item.research.recentActivity">
+                  <span class="font-medium text-gray-700">Recent Activity: </span>
+                  <span class="text-gray-600">{{ item.research.recentActivity }}</span>
+                </div>
+              </div>
+
+              <!-- No Research Yet -->
+              <div v-else class="px-4 pb-4 text-sm text-gray-400 italic border-t pt-3 bg-gray-50">
+                No AI research available for this investor yet.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- My Intros -->
+        <div v-if="activeTab === 'intros'">
+          <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-semibold">My Intros</h2>
+            <select v-model="introStatusFilter" class="border rounded px-3 py-2 text-sm">
+              <option value="">All Statuses</option>
+              <option value="intro_request_sent">Request Sent</option>
+              <option value="introduced">Introduced</option>
+              <option value="first_meeting_complete">1st Meeting Complete</option>
+              <option value="second_meeting_complete">2nd Meeting Complete</option>
+              <option value="follow_up_questions">Follow-up Questions</option>
+              <option value="circle_back_round_opens">Circle Back</option>
+              <option value="invested">Invested</option>
+              <option value="not_a_fit">Not a Fit</option>
+              <option value="passed">Passed</option>
+              <option value="ignored">Ignored</option>
+            </select>
+          </div>
+
+          <div v-if="filteredIntros.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No intros yet. Check "My Network" to see who you can reach through your nodes.
+          </div>
+
+          <div v-else class="bg-white rounded-lg shadow">
+            <div v-for="intro in filteredIntros" :key="intro.id"
+              class="p-4 border-b last:border-b-0 hover:bg-gray-50">
+              <div class="flex justify-between items-start">
+                <div>
+                  <h3 class="font-medium">{{ intro.investor.name }} @ {{ intro.investor.firm }}</h3>
+                  <p class="text-sm text-gray-500">via {{ intro.node.name }}</p>
+                  <div class="mt-2 flex items-center space-x-2">
+                    <span class="text-xs px-2 py-1 rounded" :class="statusClass(intro.status)">
+                      {{ formatStatus(intro.status) }}
+                    </span>
+                    <span v-if="intro.nextFollowupDate" class="text-xs"
+                      :class="isOverdue(intro.nextFollowupDate) ? 'text-red-600' : 'text-gray-500'">
+                      Follow-up: {{ intro.nextFollowupDate }}
+                    </span>
+                  </div>
+                </div>
+                <button @click="showIntroDetail(intro)" class="text-blue-600 text-sm hover:underline">
+                  Update
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Update Intro Modal -->
+      <div v-if="showIntroModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Update Intro</h3>
+          <div class="mb-4 p-3 bg-gray-50 rounded">
+            <p class="font-medium">{{ selectedIntro?.investor.name }} @ {{ selectedIntro?.investor.firm }}</p>
+            <p class="text-sm text-gray-500">via {{ selectedIntro?.node.name }}</p>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select v-model="introUpdate.status" class="w-full border rounded px-3 py-2">
+              <option value="">No change</option>
+              <option value="first_meeting_complete">First Meeting Complete</option>
+              <option value="second_meeting_complete">Second Meeting Complete</option>
+              <option value="follow_up_questions">Follow-up Questions</option>
+              <option value="circle_back_round_opens">Circle Back When Round Opens</option>
+              <option value="invested">Invested!</option>
+              <option value="not_a_fit">Not a Fit</option>
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Next Follow-up Date</label>
+            <input v-model="introUpdate.nextFollowupDate" type="date" class="w-full border rounded px-3 py-2">
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea v-model="introUpdate.notes" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+          </div>
+          <div class="flex justify-end space-x-3">
+            <button @click="showIntroModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+            <button @click="submitIntroUpdate" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+
+    createApp({
+      setup() {
+        const tabs = [
+          { id: 'dashboard', label: 'Dashboard' },
+          { id: 'tasks', label: 'Tasks' },
+          { id: 'intros', label: 'My Intros' },
+          { id: 'nodes', label: 'Nodes' },
+          { id: 'network', label: 'Investors' },
+        ];
+
+        const activeTab = ref('dashboard');
+        const session = ref(null);
+        const loginEmail = ref('');
+        const loggingIn = ref(false);
+        const loginError = ref('');
+        const magicLinkSent = ref(false);
+
+        // Data
+        const dashboard = ref({});
+        const tasks = ref([]);
+        const myNodes = ref([]);
+        const availableInvestors = ref([]);
+        const myIntros = ref([]);
+        const nodesData = ref({ workingWith: [], available: [] });
+
+        // Filters
+        const investorSearch = ref('');
+        const introStatusFilter = ref('');
+
+        // Founder type filters
+        const founderTypeFilters = [
+          { value: 'technical', label: 'Technical Founders' },
+          { value: 'first-time', label: 'First-time Founders' },
+          { value: 'repeat', label: 'Repeat Founders' },
+          { value: 'solo', label: 'Solo Founders' },
+          { value: 'diverse', label: 'Diverse Founders' },
+          { value: 'domain-expert', label: 'Domain Experts' },
+        ];
+        const activeFounderFilters = ref([]);
+        const expandedResearch = ref({});
+
+        // Modals
+        const showIntroModal = ref(false);
+        const selectedIntro = ref(null);
+        const introUpdate = reactive({ status: '', nextFollowupDate: '', notes: '' });
+
+        const getSessionId = () => localStorage.getItem('nodestacker_session');
+        const setSessionId = (id) => localStorage.setItem('nodestacker_session', id);
+        const clearSession = () => localStorage.removeItem('nodestacker_session');
+
+        const api = async (url, options = {}) => {
+          const sessionId = getSessionId();
+          const res = await fetch(`/api${url}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(sessionId ? { 'X-Session-Id': sessionId } : {}),
+            },
+            ...options,
+            body: options.body ? JSON.stringify(options.body) : undefined,
+          });
+          if (res.status === 401) {
+            clearSession();
+            session.value = null;
+            return null;
+          }
+          if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.error || 'An error occurred');
+          }
+          return res.json();
+        };
+
+        const checkSession = async () => {
+          // Check for token in URL
+          const params = new URLSearchParams(window.location.search);
+          const token = params.get('token');
+          if (token) {
+            try {
+              const result = await fetch('/api/auth/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token }),
+              }).then(r => r.json());
+
+              if (result.success) {
+                setSessionId(result.sessionId);
+                session.value = result;
+                window.history.replaceState({}, '', '/founder.html');
+                loadData();
+                return;
+              }
+            } catch (e) {
+              loginError.value = 'Invalid or expired link';
+            }
+          }
+
+          // Check existing session
+          const sessionId = getSessionId();
+          if (sessionId) {
+            try {
+              const result = await api('/auth/session');
+              if (result) {
+                session.value = result;
+                loadData();
+              }
+            } catch (e) {
+              clearSession();
+            }
+          }
+        };
+
+        const requestMagicLink = async () => {
+          loggingIn.value = true;
+          loginError.value = '';
+          try {
+            await fetch('/api/auth/magic-link', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: loginEmail.value }),
+            });
+            magicLinkSent.value = true;
+          } catch (e) {
+            loginError.value = 'Failed to send login link';
+          }
+          loggingIn.value = false;
+        };
+
+        const logout = async () => {
+          await api('/auth/logout', { method: 'POST' });
+          clearSession();
+          session.value = null;
+        };
+
+        const loadData = async () => {
+          dashboard.value = await api('/portal/dashboard') || {};
+          tasks.value = await api('/portal/tasks') || [];
+          myNodes.value = await api('/portal/my-nodes') || [];
+          availableInvestors.value = await api('/portal/available-investors') || [];
+          myIntros.value = await api('/portal/my-intros') || [];
+          nodesData.value = await api('/portal/nodes') || { workingWith: [], available: [] };
+        };
+
+        const filteredInvestors = computed(() => {
+          let results = availableInvestors.value;
+          const q = investorSearch.value.toLowerCase();
+
+          // Text search across name, firm, and research fields
+          if (q) {
+            results = results.filter(item => {
+              // Basic search
+              if (item.investor.name.toLowerCase().includes(q)) return true;
+              if (item.investor.firm && item.investor.firm.toLowerCase().includes(q)) return true;
+
+              // Search research fields
+              if (item.research) {
+                if (item.research.investmentThesis?.toLowerCase().includes(q)) return true;
+                if (item.research.portfolioCompanies?.toLowerCase().includes(q)) return true;
+                if (item.research.founderPreferences?.toLowerCase().includes(q)) return true;
+                if (item.research.recentActivity?.toLowerCase().includes(q)) return true;
+              }
+              return false;
+            });
+          }
+
+          // Apply founder type filters (OR logic - match any selected filter)
+          if (activeFounderFilters.value.length > 0) {
+            results = results.filter(item => {
+              if (!item.research?.founderPreferences) return false;
+              const prefs = item.research.founderPreferences.toLowerCase();
+              return activeFounderFilters.value.some(filter => {
+                switch (filter) {
+                  case 'technical': return prefs.includes('technical') || prefs.includes('engineer');
+                  case 'first-time': return prefs.includes('first-time') || prefs.includes('first time') || prefs.includes('new founder');
+                  case 'repeat': return prefs.includes('repeat') || prefs.includes('serial') || prefs.includes('experienced');
+                  case 'solo': return prefs.includes('solo');
+                  case 'diverse': return prefs.includes('diverse') || prefs.includes('underrepresented') || prefs.includes('women') || prefs.includes('minority');
+                  case 'domain-expert': return prefs.includes('domain') || prefs.includes('expert') || prefs.includes('industry');
+                  default: return false;
+                }
+              });
+            });
+          }
+
+          return results;
+        });
+
+        const toggleFounderFilter = (filter) => {
+          const idx = activeFounderFilters.value.indexOf(filter);
+          if (idx === -1) {
+            activeFounderFilters.value.push(filter);
+          } else {
+            activeFounderFilters.value.splice(idx, 1);
+          }
+        };
+
+        const clearFounderFilters = () => {
+          activeFounderFilters.value = [];
+        };
+
+        const toggleResearchExpand = (investorId) => {
+          expandedResearch.value[investorId] = !expandedResearch.value[investorId];
+        };
+
+        const truncateText = (text, maxLength) => {
+          if (!text || text.length <= maxLength) return text;
+          return text.substring(0, maxLength) + '...';
+        };
+
+        const extractFounderPrefs = (prefsText) => {
+          if (!prefsText) return [];
+          const prefs = [];
+          const lower = prefsText.toLowerCase();
+
+          if (lower.includes('technical') || lower.includes('engineer')) prefs.push('Technical');
+          if (lower.includes('first-time') || lower.includes('first time')) prefs.push('First-time OK');
+          if (lower.includes('repeat') || lower.includes('serial')) prefs.push('Repeat');
+          if (lower.includes('solo')) prefs.push('Solo OK');
+          if (lower.includes('diverse') || lower.includes('underrepresented')) prefs.push('Diverse');
+          if (lower.includes('domain') || lower.includes('expert')) prefs.push('Domain Expert');
+
+          return prefs.slice(0, 4); // Limit to 4 badges
+        };
+
+        const filteredIntros = computed(() => {
+          if (!introStatusFilter.value) return myIntros.value;
+          return myIntros.value.filter(i => i.status === introStatusFilter.value);
+        });
+
+        const formatStatus = (status) => status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
+
+        const statusClass = (status) => {
+          const classes = {
+            intro_request_sent: 'bg-yellow-100 text-yellow-800',
+            introduced: 'bg-blue-100 text-blue-800',
+            passed: 'bg-red-100 text-red-800',
+            ignored: 'bg-gray-100 text-gray-800',
+            not_a_fit: 'bg-red-100 text-red-800',
+            first_meeting_complete: 'bg-green-100 text-green-800',
+            second_meeting_complete: 'bg-green-100 text-green-800',
+            follow_up_questions: 'bg-purple-100 text-purple-800',
+            circle_back_round_opens: 'bg-orange-100 text-orange-800',
+            invested: 'bg-emerald-100 text-emerald-800 font-medium',
+          };
+          return classes[status] || 'bg-gray-100 text-gray-800';
+        };
+
+        const isOverdue = (date) => date && new Date(date) < new Date(new Date().toDateString());
+
+        const showIntroDetail = (intro) => {
+          selectedIntro.value = intro;
+          introUpdate.status = '';
+          introUpdate.nextFollowupDate = intro.nextFollowupDate || '';
+          introUpdate.notes = intro.notes || '';
+          showIntroModal.value = true;
+        };
+
+        const submitIntroUpdate = async () => {
+          try {
+            const body = {};
+            if (introUpdate.status) body.status = introUpdate.status;
+            if (introUpdate.nextFollowupDate) body.nextFollowupDate = introUpdate.nextFollowupDate;
+            if (introUpdate.notes) body.notes = introUpdate.notes;
+
+            await api(`/portal/my-intros/${selectedIntro.value.id}`, {
+              method: 'PUT',
+              body,
+            });
+            showIntroModal.value = false;
+            loadData();
+          } catch (e) {
+            alert(e.message);
+          }
+        };
+
+        const showTaskAction = (task) => {
+          selectedIntro.value = task.intro;
+          introUpdate.status = '';
+          introUpdate.nextFollowupDate = '';
+          introUpdate.notes = '';
+          showIntroModal.value = true;
+        };
+
+        onMounted(checkSession);
+
+        return {
+          tabs, activeTab, session,
+          loginEmail, loggingIn, loginError, magicLinkSent,
+          dashboard, tasks, myNodes, availableInvestors, myIntros, nodesData,
+          investorSearch, introStatusFilter,
+          founderTypeFilters, activeFounderFilters, expandedResearch,
+          filteredInvestors, filteredIntros,
+          showIntroModal,
+          selectedIntro, introUpdate,
+          requestMagicLink, logout,
+          formatStatus, statusClass, isOverdue,
+          showIntroDetail, submitIntroUpdate, showTaskAction,
+          toggleFounderFilter, clearFounderFilters, toggleResearchExpand,
+          truncateText, extractFounderPrefs,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

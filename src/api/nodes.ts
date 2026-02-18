@@ -8,10 +8,10 @@ const app = new Hono();
 const createNodeSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  company: z.string().optional(),
-  role: z.string().optional(),
-  geography: z.string().optional(),
-  notes: z.string().optional(),
+  company: z.string().nullable().optional(),
+  role: z.string().nullable().optional(),
+  geography: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 const updateNodeSchema = createNodeSchema.partial();

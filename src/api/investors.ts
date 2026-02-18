@@ -7,11 +7,11 @@ const app = new Hono();
 
 const createInvestorSchema = z.object({
   name: z.string().min(1),
-  firm: z.string().optional(),
-  role: z.string().optional(),
-  focusAreas: z.array(z.string()).optional(),
-  checkSize: z.string().optional(),
-  geography: z.string().optional(),
+  firm: z.string().nullable().optional(),
+  role: z.string().nullable().optional(),
+  focusAreas: z.array(z.string()).nullable().optional(),
+  checkSize: z.string().nullable().optional(),
+  geography: z.string().nullable().optional(),
 });
 
 const updateInvestorSchema = createInvestorSchema.partial();

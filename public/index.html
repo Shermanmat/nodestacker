@@ -203,7 +203,13 @@
       <!-- Founders Tab -->
       <div v-if="activeTab === 'founders'">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold">Founders</h2>
+          <div class="flex items-center gap-4">
+            <h2 class="text-xl font-semibold">Founders</h2>
+            <label class="flex items-center text-sm text-gray-500 cursor-pointer">
+              <input type="checkbox" v-model="showHiddenFounders" class="mr-2">
+              Show hidden ({{ hiddenFounderCount }})
+            </label>
+          </div>
           <button @click="showFounderModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
             Add Founder
           </button>
@@ -222,8 +228,13 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="founder in founders" :key="founder.id" class="border-t hover:bg-gray-50">
-                <td class="py-3 px-4 font-medium">{{ founder.name }}</td>
+              <tr v-for="founder in filteredFounders" :key="founder.id"
+                class="border-t hover:bg-gray-50"
+                :class="founder.hidden ? 'opacity-50' : ''">
+                <td class="py-3 px-4 font-medium">
+                  {{ founder.name }}
+                  <span v-if="founder.hidden" class="text-xs text-gray-400 ml-1">(hidden)</span>
+                </td>
                 <td class="px-4">{{ founder.email }}</td>
                 <td class="px-4">{{ founder.companyName }}</td>
                 <td class="px-4">{{ formatStage(founder.companyStage) }}</td>
@@ -231,6 +242,9 @@
                 <td class="px-4">
                   <button @click="generateLoginLink(founder)" class="text-green-600 hover:underline mr-2">Login Link</button>
                   <button @click="editFounder(founder)" class="text-blue-600 hover:underline mr-2">Edit</button>
+                  <button @click="toggleFounderHidden(founder)" class="text-gray-500 hover:underline mr-2">
+                    {{ founder.hidden ? 'Show' : 'Hide' }}
+                  </button>
                   <button @click="deleteFounder(founder.id)" class="text-red-600 hover:underline">Delete</button>
                 </td>
               </tr>
@@ -978,6 +992,19 @@
         // Filters
         const introFilter = reactive({ status: '', founderId: '' });
         const investorSearchQuery = ref('');
+        const showHiddenFounders = ref(false);
+
+        // Computed: filtered founders (hide hidden unless toggled)
+        const filteredFounders = computed(() => {
+          if (showHiddenFounders.value) {
+            return founders.value;
+          }
+          return founders.value.filter(f => !f.hidden);
+        });
+
+        const hiddenFounderCount = computed(() => {
+          return founders.value.filter(f => f.hidden).length;
+        });
 
         // Computed: filtered investors for admin
         const filteredAdminInvestors = computed(() => {
@@ -1146,6 +1173,14 @@
             await api(`/founders/${id}`, { method: 'DELETE' });
             loadFounders();
           }
+        };
+
+        const toggleFounderHidden = async (founder) => {
+          await api(`/founders/${founder.id}`, {
+            method: 'PUT',
+            body: { hidden: !founder.hidden }
+          });
+          loadFounders();
         };
 
         const closeFounderModal = () => {
@@ -1448,7 +1483,8 @@
           introFilter, investorSearchQuery, filteredAdminInvestors,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight,
           loadIntroRequests, markNodeTaskDone, toggleFounderTasks, formatTaskType,
-          saveFounder, editFounder, deleteFounder, closeFounderModal,
+          showHiddenFounders, filteredFounders, hiddenFounderCount,
+          saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, closeInvestorModal,
           saveIntro, editIntro, closeIntroModal,

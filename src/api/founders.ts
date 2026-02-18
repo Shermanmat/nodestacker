@@ -11,6 +11,7 @@ const createFounderSchema = z.object({
   companyName: z.string().min(1),
   companyStage: z.enum(['idea', 'pre_seed', 'seed', 'series_a']),
   roundStatus: z.enum(['pre_round', 'round_open', 'round_closed']).optional(),
+  hidden: z.boolean().optional(),
 });
 
 const updateFounderSchema = createFounderSchema.partial();

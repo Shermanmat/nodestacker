@@ -59,6 +59,7 @@ export const founders = sqliteTable('founders', {
   companyName: text('company_name').notNull(),
   companyStage: text('company_stage').notNull(),
   roundStatus: text('round_status').notNull().default('pre_round'),
+  hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

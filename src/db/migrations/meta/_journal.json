@@ -15,6 +15,13 @@
       "when": 1771388086483,
       "tag": "0001_magical_captain_midlands",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771455900000,
+      "tag": "0002_founder_hidden",
+      "breakpoints": true
     }
   ]
 }

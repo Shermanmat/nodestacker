@@ -115,7 +115,25 @@ Important:
     throw new Error('Failed to parse Claude response as JSON');
   }
 
-  const parsed = JSON.parse(jsonMatch[0]);
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    // Try to fix common JSON issues
+    let cleanedJson = jsonMatch[0]
+      .replace(/,\s*}/g, '}')  // Remove trailing commas before }
+      .replace(/,\s*]/g, ']')  // Remove trailing commas before ]
+      .replace(/[\u0000-\u001F]+/g, ' ')  // Remove control characters
+      .replace(/\n/g, ' ')  // Replace newlines with spaces
+      .replace(/\r/g, '');  // Remove carriage returns
+
+    try {
+      parsed = JSON.parse(cleanedJson);
+    } catch (e2) {
+      console.error('JSON parse error. Raw content:', content.substring(0, 500));
+      throw new Error('Failed to parse Claude response as JSON');
+    }
+  }
 
   return {
     bio: parsed.bio || null,

@@ -207,7 +207,10 @@
                     <span class="text-sm">{{ task.intro.investor.name }} @ {{ task.intro.investor.firm }}</span>
                     <span class="text-xs ml-2 text-gray-500">{{ formatTaskType(task.type) }}</span>
                   </div>
-                  <button @click="markNodeTaskDone(task)" class="text-green-600 hover:underline text-sm ml-4">
+                  <button @click="goToIntro(task.intro)" class="text-blue-600 hover:underline text-sm ml-4">
+                    Edit
+                  </button>
+                  <button @click="markNodeTaskDone(task)" class="text-green-600 hover:underline text-sm ml-2">
                     Done
                   </button>
                 </div>
@@ -1720,6 +1723,12 @@
           await loadNodeTasks();
         };
 
+        // Navigate to intro request and open edit modal
+        const goToIntro = (intro) => {
+          activeTab.value = 'intros';
+          editIntro(intro);
+        };
+
         const toggleFounderTasks = (founderId) => {
           expandedFounderTasks.value[founderId] = !expandedFounderTasks.value[founderId];
         };
@@ -2145,7 +2154,7 @@
           founderForm, nodeForm, investorForm, introForm, followupForm, fnRelForm, niConnForm,
           introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight,
-          loadIntroRequests, markNodeTaskDone, toggleFounderTasks, formatTaskType,
+          loadIntroRequests, markNodeTaskDone, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,

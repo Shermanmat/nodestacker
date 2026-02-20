@@ -10,6 +10,7 @@ const introStatusValues = [
   'introduced',
   'passed',
   'ignored',
+  'not_a_fit',
   'first_meeting_complete',
   'second_meeting_complete',
   'follow_up_questions',

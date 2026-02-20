@@ -30,12 +30,20 @@ app.route('/api/auth', authRoutes);
 app.route('/api/portal', founderPortalRoutes);
 
 // Protected Admin API Routes (require admin session)
+// Need both patterns: base path for POST/GET list, and /* for individual resources
+app.use('/api/founders', adminGuard);
 app.use('/api/founders/*', adminGuard);
+app.use('/api/nodes', adminGuard);
 app.use('/api/nodes/*', adminGuard);
+app.use('/api/investors', adminGuard);
 app.use('/api/investors/*', adminGuard);
+app.use('/api/intro-requests', adminGuard);
 app.use('/api/intro-requests/*', adminGuard);
+app.use('/api/relationships', adminGuard);
 app.use('/api/relationships/*', adminGuard);
+app.use('/api/digest', adminGuard);
 app.use('/api/digest/*', adminGuard);
+app.use('/api/portfolio', adminGuard);
 app.use('/api/portfolio/*', adminGuard);
 
 app.route('/api/founders', foundersRoutes);

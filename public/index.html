@@ -260,80 +260,112 @@
       <!-- Portfolio Tab -->
       <div v-if="activeTab === 'portfolio'">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="text-xl font-semibold">Portfolio</h2>
-          <button @click="showPortfolioModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+          <div class="flex items-center gap-4">
+            <h2 class="text-xl font-semibold">Portfolio</h2>
+            <div class="flex bg-gray-100 rounded-lg p-1">
+              <button @click="portfolioView = 'admin'"
+                :class="portfolioView === 'admin' ? 'bg-white shadow text-gray-900' : 'text-gray-500'"
+                class="px-3 py-1 rounded text-sm font-medium">
+                Admin
+              </button>
+              <button @click="portfolioView = 'share'"
+                :class="portfolioView === 'share' ? 'bg-white shadow text-gray-900' : 'text-gray-500'"
+                class="px-3 py-1 rounded text-sm font-medium">
+                Share View
+              </button>
+            </div>
+          </div>
+          <button v-if="portfolioView === 'admin'" @click="showPortfolioModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
             Add Company
           </button>
         </div>
 
-        <!-- Portfolio Summary -->
-        <div class="grid grid-cols-3 gap-4 mb-6">
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Total Companies</div>
-            <div class="text-2xl font-bold">{{ portfolio.summary?.totalCompanies || 0 }}</div>
+        <!-- Share View (Clean, screenshot-friendly) -->
+        <div v-if="portfolioView === 'share'" class="bg-white rounded-lg shadow p-6">
+          <h3 class="text-lg font-bold text-gray-900 mb-4">My Portfolio</h3>
+          <div v-if="portfolio.companies?.length === 0" class="text-gray-500 text-center py-8">
+            No portfolio companies yet.
           </div>
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Portfolio Value (Paper)</div>
-            <div class="text-2xl font-bold text-green-600">{{ formatCurrency(portfolio.summary?.totalPortfolioValue) }}</div>
-          </div>
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-sm text-gray-500">Fully Completed</div>
-            <div class="text-2xl font-bold">{{ portfolio.summary?.fullyCompleted || 0 }} / {{ portfolio.summary?.totalCompanies || 0 }}</div>
+          <div v-else class="space-y-4">
+            <div v-for="company in portfolio.companies" :key="company.id" class="border-b pb-4 last:border-b-0 last:pb-0">
+              <div class="font-semibold text-gray-900">{{ company.founder?.companyName }}</div>
+              <div v-if="company.oneLiner" class="text-gray-600 mt-1">{{ company.oneLiner }}</div>
+              <div v-if="company.notes" class="text-sm text-gray-500 italic mt-1">{{ company.notes }}</div>
+            </div>
           </div>
         </div>
 
-        <!-- Portfolio Companies List -->
-        <div v-if="portfolio.companies?.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
-          No portfolio companies yet. Click "Add Company" to get started.
-        </div>
+        <!-- Admin View -->
+        <template v-if="portfolioView === 'admin'">
+          <!-- Portfolio Summary -->
+          <div class="grid grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Total Companies</div>
+              <div class="text-2xl font-bold">{{ portfolio.summary?.totalCompanies || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Portfolio Value (Paper)</div>
+              <div class="text-2xl font-bold text-green-600">{{ formatCurrency(portfolio.summary?.totalPortfolioValue) }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Fully Completed</div>
+              <div class="text-2xl font-bold">{{ portfolio.summary?.fullyCompleted || 0 }} / {{ portfolio.summary?.totalCompanies || 0 }}</div>
+            </div>
+          </div>
 
-        <div v-else class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr class="text-left text-gray-500">
-                <th class="py-3 px-4">Company</th>
-                <th class="px-4">Investment Date</th>
-                <th class="px-4">Equity %</th>
-                <th class="px-4">Valuation</th>
-                <th class="px-4">Paper Value</th>
-                <th class="px-4">Status</th>
-                <th class="px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="company in portfolio.companies" :key="company.id" class="border-t hover:bg-gray-50">
-                <td class="py-3 px-4">
-                  <div class="font-medium">{{ company.founder?.companyName }}</div>
-                  <div v-if="company.oneLiner" class="text-sm text-gray-600">{{ company.oneLiner }}</div>
-                  <div v-if="company.notes" class="text-xs text-gray-400 italic mt-1">{{ company.notes }}</div>
-                  <div class="text-xs text-gray-500 mt-1">{{ company.founder?.name }}</div>
-                </td>
-                <td class="px-4">{{ company.investmentDate || '-' }}</td>
-                <td class="px-4">{{ company.equityPercent ? company.equityPercent + '%' : '-' }}</td>
-                <td class="px-4">{{ formatCurrency(company.currentValuation) }}</td>
-                <td class="px-4 font-medium text-green-600">{{ formatCurrency(calculatePaperValue(company)) }}</td>
-                <td class="px-4">
-                  <div class="flex items-center gap-1">
-                    <span :class="company.advisorySigned ? 'text-green-500' : 'text-gray-300'" title="Advisory Signed">A</span>
-                    <span :class="company.equitySigned ? 'text-green-500' : 'text-gray-300'" title="Equity Signed">E</span>
-                    <span :class="company.sharesPaid ? 'text-green-500' : 'text-gray-300'" title="Shares Paid">P</span>
-                    <span :class="company.certificateReceived ? 'text-green-500' : 'text-gray-300'" title="Certificate Received">C</span>
-                    <span class="text-xs text-gray-400 ml-1">({{ getCompletionStatus(company) }}/4)</span>
-                  </div>
-                </td>
-                <td class="px-4">
-                  <button @click="editPortfolioCompany(company)" class="text-blue-600 hover:underline mr-2">Edit</button>
-                  <button @click="deletePortfolioCompany(company.id)" class="text-red-600 hover:underline">Remove</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+          <!-- Portfolio Companies List -->
+          <div v-if="portfolio.companies?.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+            No portfolio companies yet. Click "Add Company" to get started.
+          </div>
 
-        <!-- Status Legend -->
-        <div class="mt-4 text-xs text-gray-500">
-          Status: A = Advisory Signed, E = Equity Signed, P = Shares Paid, C = Certificate Received
-        </div>
+          <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50">
+                <tr class="text-left text-gray-500">
+                  <th class="py-3 px-4">Company</th>
+                  <th class="px-4">Investment Date</th>
+                  <th class="px-4">Equity %</th>
+                  <th class="px-4">Valuation</th>
+                  <th class="px-4">Paper Value</th>
+                  <th class="px-4">Status</th>
+                  <th class="px-4">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="company in portfolio.companies" :key="company.id" class="border-t hover:bg-gray-50">
+                  <td class="py-3 px-4">
+                    <div class="font-medium">{{ company.founder?.companyName }}</div>
+                    <div v-if="company.oneLiner" class="text-sm text-gray-600">{{ company.oneLiner }}</div>
+                    <div v-if="company.notes" class="text-xs text-gray-400 italic mt-1">{{ company.notes }}</div>
+                    <div class="text-xs text-gray-500 mt-1">{{ company.founder?.name }}</div>
+                  </td>
+                  <td class="px-4">{{ company.investmentDate || '-' }}</td>
+                  <td class="px-4">{{ company.equityPercent ? company.equityPercent + '%' : '-' }}</td>
+                  <td class="px-4">{{ formatCurrency(company.currentValuation) }}</td>
+                  <td class="px-4 font-medium text-green-600">{{ formatCurrency(calculatePaperValue(company)) }}</td>
+                  <td class="px-4">
+                    <div class="flex items-center gap-1">
+                      <span :class="company.advisorySigned ? 'text-green-500' : 'text-gray-300'" title="Advisory Signed">A</span>
+                      <span :class="company.equitySigned ? 'text-green-500' : 'text-gray-300'" title="Equity Signed">E</span>
+                      <span :class="company.sharesPaid ? 'text-green-500' : 'text-gray-300'" title="Shares Paid">P</span>
+                      <span :class="company.certificateReceived ? 'text-green-500' : 'text-gray-300'" title="Certificate Received">C</span>
+                      <span class="text-xs text-gray-400 ml-1">({{ getCompletionStatus(company) }}/4)</span>
+                    </div>
+                  </td>
+                  <td class="px-4">
+                    <button @click="editPortfolioCompany(company)" class="text-blue-600 hover:underline mr-2">Edit</button>
+                    <button @click="deletePortfolioCompany(company.id)" class="text-red-600 hover:underline">Remove</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Status Legend -->
+          <div class="mt-4 text-xs text-gray-500">
+            Status: A = Advisory Signed, E = Equity Signed, P = Shares Paid, C = Certificate Received
+          </div>
+        </template>
       </div>
 
       <!-- Founders Tab -->
@@ -1246,6 +1278,7 @@
         // Portfolio modal
         const showPortfolioModal = ref(false);
         const editingPortfolio = ref(null);
+        const portfolioView = ref('admin'); // 'admin' or 'share'
         const portfolioForm = reactive({
           founderId: '',
           oneLiner: '',
@@ -2300,7 +2333,7 @@
           founders, nodes, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, trends, portfolio, eligibleFounders, expandedFounderTasks,
           showFounderModal, showNodeModal, showInvestorModal, showIntroModal, showFollowupModal, showFNRelModal, showNIConnModal,
           showLoginLinkModal, loginLinkData, linkCopied,
-          showPortfolioModal, editingPortfolio, portfolioForm,
+          showPortfolioModal, editingPortfolio, portfolioView, portfolioForm,
           savePortfolio, editPortfolioCompany, deletePortfolioCompany, closePortfolioModal,
           formatCurrency, calculatePaperValue, getCompletionStatus,
           editingFounder, editingNode, editingInvestor, editingIntro,

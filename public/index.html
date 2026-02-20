@@ -304,7 +304,9 @@
               <tr v-for="company in portfolio.companies" :key="company.id" class="border-t hover:bg-gray-50">
                 <td class="py-3 px-4">
                   <div class="font-medium">{{ company.founder?.companyName }}</div>
-                  <div class="text-xs text-gray-500">{{ company.founder?.name }}</div>
+                  <div v-if="company.oneLiner" class="text-sm text-gray-600">{{ company.oneLiner }}</div>
+                  <div v-if="company.notes" class="text-xs text-gray-400 italic mt-1">{{ company.notes }}</div>
+                  <div class="text-xs text-gray-500 mt-1">{{ company.founder?.name }}</div>
                 </td>
                 <td class="px-4">{{ company.investmentDate || '-' }}</td>
                 <td class="px-4">{{ company.equityPercent ? company.equityPercent + '%' : '-' }}</td>
@@ -1035,6 +1037,14 @@
             <div v-else class="p-3 bg-gray-50 rounded text-sm font-medium">
               {{ portfolio.companies.find(c => c.id === editingPortfolio)?.founder?.companyName }}
             </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">One-Liner</label>
+              <input v-model="portfolioForm.oneLiner" type="text" placeholder="Brief description of the company" class="w-full border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">My Notes</label>
+              <textarea v-model="portfolioForm.notes" rows="2" placeholder="Personal notes about this investment" class="w-full border rounded px-3 py-2"></textarea>
+            </div>
             <div class="grid grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Investment Date</label>
@@ -1069,10 +1079,6 @@
                   <span class="text-sm">Stock Certificate Received</span>
                 </label>
               </div>
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-              <textarea v-model="portfolioForm.notes" rows="2" class="w-full border rounded px-3 py-2"></textarea>
             </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
@@ -1242,6 +1248,7 @@
         const editingPortfolio = ref(null);
         const portfolioForm = reactive({
           founderId: '',
+          oneLiner: '',
           investmentDate: '',
           equityPercent: '',
           currentValuation: '',
@@ -1737,6 +1744,7 @@
           editingPortfolio.value = company.id;
           Object.assign(portfolioForm, {
             founderId: company.founderId,
+            oneLiner: company.oneLiner || '',
             investmentDate: company.investmentDate || '',
             equityPercent: company.equityPercent || '',
             currentValuation: company.currentValuation || '',
@@ -1761,6 +1769,7 @@
           editingPortfolio.value = null;
           Object.assign(portfolioForm, {
             founderId: '',
+            oneLiner: '',
             investmentDate: '',
             equityPercent: '',
             currentValuation: '',

@@ -7,6 +7,7 @@ const app = new Hono();
 
 const portfolioSchema = z.object({
   founderId: z.number(),
+  oneLiner: z.string().nullable().optional(),
   investmentDate: z.string().nullable().optional(),
   equityPercent: z.string().nullable().optional(),
   currentValuation: z.number().nullable().optional(),

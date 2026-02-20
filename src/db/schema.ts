@@ -207,6 +207,7 @@ export const followupLogsRelations = relations(followupLogs, ({ one }) => ({
 export const portfolioCompanies = sqliteTable('portfolio_companies', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   founderId: integer('founder_id').notNull().references(() => founders.id).unique(),
+  oneLiner: text('one_liner'), // brief description of the company
   investmentDate: text('investment_date'),
   equityPercent: text('equity_percent'), // stored as text to handle decimals like "0.5%"
   currentValuation: integer('current_valuation'), // in dollars

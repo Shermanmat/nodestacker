@@ -373,6 +373,10 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Investors</h2>
           <div class="flex items-center gap-4">
+            <select v-model="filterByNodeId" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="">All Nodes</option>
+              <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }}</option>
+            </select>
             <input v-model="investorSearchQuery" type="text" placeholder="Search investors..."
               class="border rounded-lg px-3 py-2 text-sm w-64">
             <button @click="showInvestorModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
@@ -1195,6 +1199,7 @@
         // Intro Planning
         const planningFounderId = ref('');
         const shuffleSeed = ref(Date.now());
+        const filterByNodeId = ref('');
 
         // Computed: filtered founders (hide hidden unless toggled)
         const filteredFounders = computed(() => {
@@ -1368,16 +1373,33 @@
 
         // Computed: filtered investors for admin
         const filteredAdminInvestors = computed(() => {
-          if (!investorSearchQuery.value) return investors.value;
-          const q = investorSearchQuery.value.toLowerCase();
-          return investors.value.filter(inv => {
-            if (inv.name?.toLowerCase().includes(q)) return true;
-            if (inv.firm?.toLowerCase().includes(q)) return true;
-            if (inv.research?.investmentThesis?.toLowerCase().includes(q)) return true;
-            if (inv.research?.founderPreferences?.toLowerCase().includes(q)) return true;
-            if (inv.research?.portfolioCompanies?.toLowerCase().includes(q)) return true;
-            return false;
-          });
+          let results = investors.value;
+
+          // Filter by node
+          if (filterByNodeId.value) {
+            const nodeId = parseInt(filterByNodeId.value);
+            const nodeInvestorIds = new Set(
+              niConnections.value
+                .filter(nc => nc.nodeId === nodeId)
+                .map(nc => nc.investorId)
+            );
+            results = results.filter(inv => nodeInvestorIds.has(inv.id));
+          }
+
+          // Filter by search query
+          if (investorSearchQuery.value) {
+            const q = investorSearchQuery.value.toLowerCase();
+            results = results.filter(inv => {
+              if (inv.name?.toLowerCase().includes(q)) return true;
+              if (inv.firm?.toLowerCase().includes(q)) return true;
+              if (inv.research?.investmentThesis?.toLowerCase().includes(q)) return true;
+              if (inv.research?.founderPreferences?.toLowerCase().includes(q)) return true;
+              if (inv.research?.portfolioCompanies?.toLowerCase().includes(q)) return true;
+              return false;
+            });
+          }
+
+          return results;
         });
 
         // API helpers
@@ -1941,7 +1963,7 @@
           formatCurrency, calculatePaperValue, getCompletionStatus,
           editingFounder, editingNode, editingInvestor, editingIntro,
           founderForm, nodeForm, investorForm, introForm, followupForm, fnRelForm, niConnForm,
-          introFilter, investorSearchQuery, filteredAdminInvestors,
+          introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight,
           loadIntroRequests, markNodeTaskDone, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,

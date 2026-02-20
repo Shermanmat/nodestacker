@@ -473,7 +473,11 @@
                   <!-- Fit indicators (only in planning mode) -->
                   <span v-if="planningFounderId && item.fitReasons?.includes('strong_connection')" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Strong connection</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('stage_match')" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Stage fit</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('thesis_stage_match')" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">Thesis match</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('sector_match')" class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">Sector match</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('founder_pref')" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Founder fit</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('active_investor')" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Active</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('first_time_friendly')" class="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded">1st-time friendly</span>
                 </div>
                 <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
                 <p v-if="item.checkSize || item.investor?.checkSize" class="text-sm text-gray-400">Check: {{ item.checkSize || item.investor?.checkSize }}</p>
@@ -1350,23 +1354,84 @@
               fitReasons.push('stage_match');
             }
 
-            // Founder preferences match (from AI research)
-            if (inv.research?.founderPreferences) {
-              const prefs = inv.research.founderPreferences.toLowerCase();
-              // Check for technical founder preference
-              if (prefs.includes('technical') || prefs.includes('engineer')) {
-                score += 10;
-                fitReasons.push('founder_pref');
-              }
-              // First-time friendly
-              if (prefs.includes('first-time') || prefs.includes('first time') || prefs.includes('new founder')) {
-                score += 5;
-              }
-            }
-
-            // Has research bonus (more info available)
+            // === RESEARCH-BASED SCORING ===
             if (inv.research) {
+              // Investment thesis stage matching (+25 points)
+              if (inv.research.investmentThesis) {
+                const thesis = inv.research.investmentThesis.toLowerCase();
+                const stageKeywords = {
+                  'pre_seed': ['pre-seed', 'preseed', 'pre seed', 'earliest', 'idea stage', 'day zero', 'day one', 'formation'],
+                  'seed': ['seed', 'early stage', 'early-stage', 'first check', 'first institutional'],
+                  'series_a': ['series a', 'series-a', 'growth', 'scaling', 'product-market fit'],
+                  'series_b': ['series b', 'series-b', 'expansion', 'scale']
+                };
+                const founderStageKeywords = stageKeywords[stage] || [];
+                if (founderStageKeywords.some(kw => thesis.includes(kw))) {
+                  score += 25;
+                  fitReasons.push('thesis_stage_match');
+                }
+
+                // Sector/focus matching from thesis (+20 points)
+                const companyName = founder.companyName.toLowerCase();
+                const sectorKeywords = ['saas', 'fintech', 'healthtech', 'health tech', 'ai', 'artificial intelligence',
+                  'machine learning', 'developer', 'devtools', 'infrastructure', 'enterprise', 'consumer',
+                  'marketplace', 'ecommerce', 'e-commerce', 'crypto', 'web3', 'blockchain', 'climate',
+                  'sustainability', 'biotech', 'deeptech', 'hardware', 'robotics', 'edtech', 'proptech'];
+                for (const sector of sectorKeywords) {
+                  if (thesis.includes(sector) && companyName.includes(sector.split(' ')[0])) {
+                    score += 20;
+                    fitReasons.push('sector_match');
+                    break;
+                  }
+                }
+              }
+
+              // Founder preferences match (+15 points)
+              if (inv.research.founderPreferences) {
+                const prefs = inv.research.founderPreferences.toLowerCase();
+                // Check for technical founder preference
+                if (prefs.includes('technical') || prefs.includes('engineer') || prefs.includes('product')) {
+                  score += 15;
+                  fitReasons.push('founder_pref');
+                }
+                // First-time founder friendly
+                if (prefs.includes('first-time') || prefs.includes('first time') || prefs.includes('new founder') || prefs.includes('emerging')) {
+                  score += 10;
+                  fitReasons.push('first_time_friendly');
+                }
+                // Repeat founder preference (check founder history if available)
+                if (prefs.includes('repeat') || prefs.includes('serial') || prefs.includes('experienced')) {
+                  score += 5;
+                }
+              }
+
+              // Recent activity bonus - actively deploying (+15 points)
+              if (inv.research.recentActivity) {
+                const activity = inv.research.recentActivity.toLowerCase();
+                const recentTerms = ['2024', '2025', '2026', 'recently', 'just', 'new fund', 'actively investing', 'latest'];
+                if (recentTerms.some(term => activity.includes(term))) {
+                  score += 15;
+                  fitReasons.push('active_investor');
+                }
+              }
+
+              // Portfolio company diversity bonus (+10 points)
+              // Having a diverse portfolio suggests they're open to different types of companies
+              if (inv.research.portfolioCompanies) {
+                try {
+                  const portfolio = typeof inv.research.portfolioCompanies === 'string'
+                    ? JSON.parse(inv.research.portfolioCompanies)
+                    : inv.research.portfolioCompanies;
+                  if (Array.isArray(portfolio) && portfolio.length >= 3) {
+                    score += 10;
+                    fitReasons.push('active_portfolio');
+                  }
+                } catch (e) {}
+              }
+
+              // Base research bonus (has data available)
               score += 5;
+              fitReasons.push('has_research');
             }
 
             // Add randomization (0-20 points based on shuffle seed)

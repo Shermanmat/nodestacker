@@ -439,6 +439,27 @@
             <button @click="showInvestorModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               Add Investor
             </button>
+            <button @click="startBulkResearch" :disabled="bulkResearch.running"
+              class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50">
+              {{ bulkResearch.running ? 'Researching...' : 'Bulk Research' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Bulk Research Progress -->
+        <div v-if="bulkResearch.running || bulkResearch.completedAt" class="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="font-medium text-purple-900">Bulk Research Progress</h3>
+            <button v-if="!bulkResearch.running" @click="bulkResearch.completedAt = null" class="text-purple-600 hover:text-purple-800 text-sm">Dismiss</button>
+          </div>
+          <div class="flex items-center gap-4 text-sm">
+            <span class="text-purple-700">{{ bulkResearch.completed }} / {{ bulkResearch.total }} completed</span>
+            <span v-if="bulkResearch.failed > 0" class="text-red-600">{{ bulkResearch.failed }} failed</span>
+            <span v-if="bulkResearch.running && bulkResearch.current" class="text-gray-600">Currently: {{ bulkResearch.current }}</span>
+            <span v-if="bulkResearch.completedAt" class="text-green-600">Done!</span>
+          </div>
+          <div class="mt-2 bg-purple-200 rounded-full h-2">
+            <div class="bg-purple-600 h-2 rounded-full transition-all" :style="{ width: (bulkResearch.total ? (bulkResearch.completed / bulkResearch.total * 100) : 0) + '%' }"></div>
           </div>
         </div>
 
@@ -1261,6 +1282,17 @@
         const followupForm = reactive({ followupType: 'node_check', completedBy: 'admin', notes: '', nextAction: '' });
         const fnRelForm = reactive({ founderId: '', nodeId: '', relationshipStrength: 'medium', howConnected: '' });
         const niConnForm = reactive({ nodeId: '', investorId: '', connectionStrength: 'medium', validated: false });
+
+        // Bulk research state
+        const bulkResearch = reactive({
+          running: false,
+          total: 0,
+          completed: 0,
+          failed: 0,
+          current: '',
+          completedAt: null,
+        });
+        let bulkResearchPollInterval = null;
 
         // Filters
         const introFilter = reactive({ status: '', founderId: '' });
@@ -2175,6 +2207,53 @@
           }
         };
 
+        // Bulk research functions
+        const startBulkResearch = async () => {
+          if (bulkResearch.running) return;
+
+          if (!confirm('This will research all investors without existing research. This may take 30-45 minutes and cost ~$2. Continue?')) {
+            return;
+          }
+
+          try {
+            const result = await api('/investors/bulk-research', { method: 'POST' });
+            if (result.message === 'All investors already have research') {
+              alert('All investors already have research data.');
+              return;
+            }
+            bulkResearch.running = true;
+            bulkResearch.total = result.total;
+            bulkResearch.completed = 0;
+            bulkResearch.failed = 0;
+            bulkResearch.current = '';
+            bulkResearch.completedAt = null;
+
+            // Start polling for status
+            bulkResearchPollInterval = setInterval(async () => {
+              try {
+                const status = await api('/investors/bulk-research/status');
+                bulkResearch.running = status.running;
+                bulkResearch.total = status.total;
+                bulkResearch.completed = status.completed;
+                bulkResearch.failed = status.failed;
+                bulkResearch.current = status.current;
+                bulkResearch.completedAt = status.completedAt;
+
+                if (!status.running) {
+                  clearInterval(bulkResearchPollInterval);
+                  bulkResearchPollInterval = null;
+                  // Reload investors to get updated research data
+                  loadInvestors();
+                }
+              } catch (err) {
+                console.error('Failed to check bulk research status:', err);
+              }
+            }, 5000);
+          } catch (err) {
+            console.error('Failed to start bulk research:', err);
+          }
+        };
+
         const getUrlDomain = (url) => {
           try {
             return new URL(url).hostname.replace('www.', '');
@@ -2232,6 +2311,7 @@
           generateLoginLink, copyLoginLink, impersonateFounder, sendInviteEmail, emailSending, emailSent,
           showResearchModal, researchState, researchError, researchData, researchModalTitle, canRefreshResearch,
           openResearchModal, closeResearchModal, triggerResearch, getUrlDomain, formatDate,
+          bulkResearch, startBulkResearch,
         };
       }
     }).mount('#app');

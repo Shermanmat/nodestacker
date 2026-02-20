@@ -15,6 +15,8 @@ import authRoutes from './api/auth.js';
 import founderPortalRoutes from './api/founder-portal.js';
 import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
+import adminAuthRoutes from './api/admin-auth.js';
+import { adminGuard } from './api/middleware/admin-guard.js';
 
 const app = new Hono();
 
@@ -22,7 +24,20 @@ const app = new Hono();
 app.use('*', logger());
 app.use('/api/*', cors());
 
-// API Routes
+// Public API Routes (no auth required)
+app.route('/api/admin-auth', adminAuthRoutes);
+app.route('/api/auth', authRoutes);
+app.route('/api/portal', founderPortalRoutes);
+
+// Protected Admin API Routes (require admin session)
+app.use('/api/founders/*', adminGuard);
+app.use('/api/nodes/*', adminGuard);
+app.use('/api/investors/*', adminGuard);
+app.use('/api/intro-requests/*', adminGuard);
+app.use('/api/relationships/*', adminGuard);
+app.use('/api/digest/*', adminGuard);
+app.use('/api/portfolio/*', adminGuard);
+
 app.route('/api/founders', foundersRoutes);
 app.route('/api/nodes', nodesRoutes);
 app.route('/api/investors', investorsRoutes);
@@ -30,8 +45,6 @@ app.route('/api/investors', investorResearchRoutes);
 app.route('/api/intro-requests', introRequestsRoutes);
 app.route('/api/relationships', relationshipsRoutes);
 app.route('/api/digest', digestRoutes);
-app.route('/api/auth', authRoutes);
-app.route('/api/portal', founderPortalRoutes);
 app.route('/api/portfolio', portfolioRoutes);
 
 // Health check

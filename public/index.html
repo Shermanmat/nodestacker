@@ -13,11 +13,65 @@
 </head>
 <body class="bg-gray-50">
   <div id="app" v-cloak>
+    <!-- Login Screen -->
+    <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
+        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">NodeStacker</h1>
+        <p class="text-gray-500 text-center mb-6">Admin Dashboard</p>
+
+        <div v-if="loginState === 'form'">
+          <form @submit.prevent="requestMagicLink">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+            <input
+              type="email"
+              v-model="loginEmail"
+              placeholder="admin@example.com"
+              class="w-full border rounded px-3 py-2 mb-4"
+              required
+            />
+            <button
+              type="submit"
+              :disabled="loginLoading"
+              class="w-full bg-blue-600 text-white rounded py-2 font-medium hover:bg-blue-700 disabled:opacity-50"
+            >
+              {{ loginLoading ? 'Sending...' : 'Send Magic Link' }}
+            </button>
+          </form>
+        </div>
+
+        <div v-else-if="loginState === 'sent'" class="text-center">
+          <div class="text-green-600 text-4xl mb-4">✉️</div>
+          <p class="text-gray-600">Check your email for a login link.</p>
+          <button @click="loginState = 'form'" class="text-blue-600 text-sm mt-4 hover:underline">
+            Try a different email
+          </button>
+        </div>
+
+        <div v-else-if="loginState === 'verifying'" class="text-center">
+          <div class="text-blue-600 text-4xl mb-4">⏳</div>
+          <p class="text-gray-600">Verifying your login...</p>
+        </div>
+
+        <div v-else-if="loginState === 'error'" class="text-center">
+          <div class="text-red-600 text-4xl mb-4">⚠️</div>
+          <p class="text-red-600 mb-4">{{ loginError }}</p>
+          <button @click="loginState = 'form'" class="text-blue-600 text-sm hover:underline">
+            Try again
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main App (shown when authenticated) -->
+    <template v-else>
     <!-- Header -->
     <header class="bg-white shadow-sm border-b">
       <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
         <h1 class="text-2xl font-bold text-gray-900">NodeStacker</h1>
-        <div class="text-sm text-gray-500">Relationship Building Platform</div>
+        <div class="flex items-center gap-4">
+          <span class="text-sm text-gray-500">{{ adminEmail }}</span>
+          <button @click="logout" class="text-sm text-red-600 hover:text-red-700">Logout</button>
+        </div>
       </div>
     </header>
 
@@ -1083,6 +1137,7 @@
         </div>
       </div>
     </div>
+    </template>
   </div>
 
   <script>
@@ -1090,6 +1145,15 @@
 
     createApp({
       setup() {
+        // Authentication state
+        const isAuthenticated = ref(false);
+        const adminEmail = ref('');
+        const adminSessionId = ref(localStorage.getItem('adminSessionId') || '');
+        const loginState = ref('form'); // form, sent, verifying, error
+        const loginEmail = ref('');
+        const loginLoading = ref(false);
+        const loginError = ref('');
+
         const tabs = [
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'portfolio', label: 'Portfolio' },
@@ -1405,16 +1469,124 @@
         // API helpers
         const api = async (url, options = {}) => {
           const res = await fetch(`/api${url}`, {
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Admin-Session': adminSessionId.value,
+            },
             ...options,
             body: options.body ? JSON.stringify(options.body) : undefined,
           });
           if (!res.ok) {
+            if (res.status === 401) {
+              // Session expired, log out
+              logout();
+              return;
+            }
             const error = await res.json();
             alert(error.error || 'An error occurred');
             throw new Error(error.error);
           }
           return res.json();
+        };
+
+        // Auth functions
+        const requestMagicLink = async () => {
+          loginLoading.value = true;
+          try {
+            const res = await fetch('/api/admin-auth/magic-link', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: loginEmail.value }),
+            });
+            if (res.ok) {
+              loginState.value = 'sent';
+            } else {
+              const data = await res.json();
+              loginError.value = data.error || 'Failed to send magic link';
+              loginState.value = 'error';
+            }
+          } catch (e) {
+            loginError.value = 'Network error';
+            loginState.value = 'error';
+          } finally {
+            loginLoading.value = false;
+          }
+        };
+
+        const verifyToken = async (token) => {
+          loginState.value = 'verifying';
+          try {
+            const res = await fetch('/api/admin-auth/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token }),
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+              adminSessionId.value = data.sessionId;
+              adminEmail.value = data.admin.email;
+              localStorage.setItem('adminSessionId', data.sessionId);
+              isAuthenticated.value = true;
+              // Remove token from URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+              // Load data
+              loadAllData();
+            } else {
+              loginError.value = data.error || 'Invalid or expired link';
+              loginState.value = 'error';
+            }
+          } catch (e) {
+            loginError.value = 'Network error';
+            loginState.value = 'error';
+          }
+        };
+
+        const checkSession = async () => {
+          if (!adminSessionId.value) return false;
+          try {
+            const res = await fetch('/api/admin-auth/session', {
+              headers: { 'X-Admin-Session': adminSessionId.value },
+            });
+            const data = await res.json();
+            if (res.ok && data.admin) {
+              adminEmail.value = data.admin.email;
+              isAuthenticated.value = true;
+              return true;
+            }
+          } catch (e) {
+            // Session invalid
+          }
+          localStorage.removeItem('adminSessionId');
+          adminSessionId.value = '';
+          return false;
+        };
+
+        const logout = async () => {
+          try {
+            await fetch('/api/admin-auth/logout', {
+              method: 'POST',
+              headers: { 'X-Admin-Session': adminSessionId.value },
+            });
+          } catch (e) {
+            // Ignore errors
+          }
+          localStorage.removeItem('adminSessionId');
+          adminSessionId.value = '';
+          adminEmail.value = '';
+          isAuthenticated.value = false;
+          loginState.value = 'form';
+        };
+
+        const loadAllData = () => {
+          loadFounders();
+          loadNodes();
+          loadInvestors();
+          loadIntroRequests();
+          loadRelationships();
+          loadStats();
+          loadNodeTasks();
+          loadTrends();
+          loadPortfolio();
         };
 
         // Load functions
@@ -1941,19 +2113,27 @@
           return new Date(dateStr).toLocaleDateString();
         };
 
-        onMounted(() => {
-          loadFounders();
-          loadNodes();
-          loadInvestors();
-          loadIntroRequests();
-          loadRelationships();
-          loadStats();
-          loadNodeTasks();
-          loadTrends();
-          loadPortfolio();
+        onMounted(async () => {
+          // Check for admin_token in URL (magic link)
+          const params = new URLSearchParams(window.location.search);
+          const token = params.get('admin_token');
+
+          if (token) {
+            await verifyToken(token);
+          } else {
+            // Check existing session
+            const hasSession = await checkSession();
+            if (hasSession) {
+              loadAllData();
+            }
+          }
         });
 
         return {
+          // Auth
+          isAuthenticated, adminEmail, loginState, loginEmail, loginLoading, loginError,
+          requestMagicLink, logout,
+          // Data
           tabs, activeTab, introStatuses,
           founders, nodes, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, trends, portfolio, eligibleFounders, expandedFounderTasks,
           showFounderModal, showNodeModal, showInvestorModal, showIntroModal, showFollowupModal, showFNRelModal, showNIConnModal,

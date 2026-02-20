@@ -381,47 +381,77 @@
           </div>
         </div>
 
+        <!-- Intro Planning Mode -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex items-center gap-4">
+            <label class="text-sm font-medium text-gray-700">Plan intros for:</label>
+            <select v-model="planningFounderId" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="">-- Select founder --</option>
+              <option v-for="f in filteredFounders" :key="f.id" :value="f.id">
+                {{ f.companyName }} ({{ f.name }})
+              </option>
+            </select>
+            <button v-if="planningFounderId" @click="shuffleInvestors" class="text-sm text-gray-500 hover:text-gray-700">
+              Shuffle
+            </button>
+            <span v-if="planningFounderId" class="text-sm text-gray-500 ml-auto">
+              {{ plannedInvestors.length }} investors available
+            </span>
+          </div>
+        </div>
+
         <div class="space-y-4">
-          <div v-for="investor in filteredAdminInvestors" :key="investor.id"
+          <div v-for="item in (planningFounderId ? plannedInvestors : filteredAdminInvestors)" :key="item.id || item.investor?.id"
             class="bg-white rounded-lg shadow overflow-hidden">
             <!-- Investor Header -->
             <div class="p-4 border-b flex justify-between items-start">
               <div>
                 <div class="flex items-center gap-2">
-                  <h3 class="font-semibold text-lg">{{ investor.name }}</h3>
-                  <span v-if="investor.research" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">AI Researched</span>
+                  <h3 class="font-semibold text-lg">{{ item.name || item.investor?.name }}</h3>
+                  <span v-if="(item.research || item.investor?.research)" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">AI Researched</span>
+                  <!-- Fit indicators (only in planning mode) -->
+                  <span v-if="planningFounderId && item.fitReasons?.includes('strong_connection')" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Strong connection</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('stage_match')" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Stage fit</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('founder_pref')" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Founder fit</span>
                 </div>
-                <p class="text-gray-500">{{ investor.firm }} {{ investor.role ? '• ' + investor.role : '' }}</p>
-                <p v-if="investor.checkSize" class="text-sm text-gray-400">Check: {{ investor.checkSize }}</p>
+                <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
+                <p v-if="item.checkSize || item.investor?.checkSize" class="text-sm text-gray-400">Check: {{ item.checkSize || item.investor?.checkSize }}</p>
+                <!-- Node connection info in planning mode -->
+                <p v-if="planningFounderId && item.nodeConnection" class="text-sm text-green-600 mt-1">
+                  via {{ item.nodeConnection.nodeName }} ({{ item.nodeConnection.strength }})
+                </p>
               </div>
               <div class="flex gap-2">
-                <button @click="openResearchModal(investor)" class="text-purple-600 hover:underline text-sm">Research</button>
-                <button @click="editInvestor(investor)" class="text-blue-600 hover:underline text-sm">Edit</button>
-                <button @click="deleteInvestor(investor.id)" class="text-red-600 hover:underline text-sm">Delete</button>
+                <button v-if="planningFounderId" @click="requestIntroFor(item)" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
+                  Request Intro
+                </button>
+                <button @click="openResearchModal(item.investor || item)" class="text-purple-600 hover:underline text-sm">Research</button>
+                <button @click="editInvestor(item.investor || item)" class="text-blue-600 hover:underline text-sm">Edit</button>
+                <button @click="deleteInvestor((item.investor || item).id)" class="text-red-600 hover:underline text-sm">Delete</button>
               </div>
             </div>
 
             <!-- Research Summary (visible paragraph) -->
-            <div v-if="investor.research" class="p-4 bg-gray-50 text-sm space-y-3">
-              <div v-if="investor.research.investmentThesis">
+            <div v-if="(item.research || item.investor?.research)" class="p-4 bg-gray-50 text-sm space-y-3">
+              <div v-if="(item.research || item.investor?.research)?.investmentThesis">
                 <span class="font-medium text-gray-700">Investment Thesis: </span>
-                <span class="text-gray-600">{{ investor.research.investmentThesis }}</span>
+                <span class="text-gray-600">{{ (item.research || item.investor?.research).investmentThesis }}</span>
               </div>
-              <div v-if="investor.research.founderPreferences">
+              <div v-if="(item.research || item.investor?.research)?.founderPreferences">
                 <span class="font-medium text-gray-700">Founder Preferences: </span>
-                <span class="text-gray-600">{{ investor.research.founderPreferences }}</span>
+                <span class="text-gray-600">{{ (item.research || item.investor?.research).founderPreferences }}</span>
               </div>
-              <div v-if="investor.research.portfolioCompanies">
+              <div v-if="(item.research || item.investor?.research)?.portfolioCompanies">
                 <span class="font-medium text-gray-700">Portfolio: </span>
-                <span class="text-gray-600">{{ investor.research.portfolioCompanies }}</span>
+                <span class="text-gray-600">{{ (item.research || item.investor?.research).portfolioCompanies }}</span>
               </div>
               <div class="text-xs text-gray-400 pt-2 border-t border-gray-200">
-                Researched {{ formatDate(investor.research.researchedAt) }}
+                Researched {{ formatDate((item.research || item.investor?.research).researchedAt) }}
               </div>
             </div>
 
             <!-- No Research Yet -->
-            <div v-else class="p-4 bg-gray-50 text-sm text-gray-400 italic">
+            <div v-else-if="!(item.research || item.investor?.research)" class="p-4 bg-gray-50 text-sm text-gray-400 italic">
               No AI research yet. Click "Research" above to generate.
             </div>
           </div>
@@ -1162,6 +1192,10 @@
         const investorSearchQuery = ref('');
         const showHiddenFounders = ref(false);
 
+        // Intro Planning
+        const planningFounderId = ref('');
+        const shuffleSeed = ref(Date.now());
+
         // Computed: filtered founders (hide hidden unless toggled)
         const filteredFounders = computed(() => {
           if (showHiddenFounders.value) {
@@ -1173,6 +1207,154 @@
         const hiddenFounderCount = computed(() => {
           return founders.value.filter(f => f.hidden).length;
         });
+
+        // Computed: investors filtered and sorted for intro planning
+        const plannedInvestors = computed(() => {
+          if (!planningFounderId.value) return [];
+
+          const founderId = parseInt(planningFounderId.value);
+          const founder = founders.value.find(f => f.id === founderId);
+          if (!founder) return [];
+
+          // Get existing intro requests for this founder
+          const existingIntroInvestorIds = new Set(
+            introRequests.value
+              .filter(ir => ir.founderId === founderId)
+              .map(ir => ir.investorId)
+          );
+
+          // Get founder's node relationships
+          const founderNodeIds = new Set(
+            fnRelationships.value
+              .filter(r => r.founderId === founderId)
+              .map(r => r.nodeId)
+          );
+
+          // Build investor list with fit scoring
+          const investorList = [];
+
+          for (const inv of investors.value) {
+            // Skip if already has intro
+            if (existingIntroInvestorIds.has(inv.id)) continue;
+
+            // Find node connections to this investor
+            const nodeConnections = niConnections.value.filter(
+              nc => nc.investorId === inv.id && founderNodeIds.has(nc.nodeId)
+            );
+
+            // Skip if no connection through founder's nodes
+            if (nodeConnections.length === 0) continue;
+
+            // Calculate fit score
+            let score = 0;
+            const fitReasons = [];
+
+            // Strong connection bonus
+            const strongConnection = nodeConnections.find(nc => nc.connectionStrength === 'strong');
+            if (strongConnection) {
+              score += 30;
+              fitReasons.push('strong_connection');
+            } else if (nodeConnections.find(nc => nc.connectionStrength === 'medium')) {
+              score += 15;
+            }
+
+            // Stage match (check size vs founder stage)
+            const checkSize = inv.checkSize || '';
+            const stage = founder.companyStage;
+            if ((stage === 'pre_seed' && (checkSize.includes('25K') || checkSize.includes('100K'))) ||
+                (stage === 'seed' && (checkSize.includes('100K') || checkSize.includes('500K') || checkSize.includes('2M'))) ||
+                (stage === 'series_a' && (checkSize.includes('2M') || checkSize.includes('5M')))) {
+              score += 20;
+              fitReasons.push('stage_match');
+            }
+
+            // Founder preferences match (from AI research)
+            if (inv.research?.founderPreferences) {
+              const prefs = inv.research.founderPreferences.toLowerCase();
+              // Check for technical founder preference
+              if (prefs.includes('technical') || prefs.includes('engineer')) {
+                score += 10;
+                fitReasons.push('founder_pref');
+              }
+              // First-time friendly
+              if (prefs.includes('first-time') || prefs.includes('first time') || prefs.includes('new founder')) {
+                score += 5;
+              }
+            }
+
+            // Has research bonus (more info available)
+            if (inv.research) {
+              score += 5;
+            }
+
+            // Add randomization (0-20 points based on shuffle seed)
+            const randomFactor = ((inv.id * shuffleSeed.value) % 20);
+            score += randomFactor;
+
+            // Get best node connection info
+            const bestConnection = strongConnection || nodeConnections[0];
+            const nodeName = nodes.value.find(n => n.id === bestConnection.nodeId)?.name || 'Unknown';
+
+            investorList.push({
+              ...inv,
+              investor: inv,
+              score,
+              fitReasons,
+              nodeConnection: {
+                nodeName,
+                strength: bestConnection.connectionStrength,
+              },
+            });
+          }
+
+          // Sort by score descending
+          return investorList.sort((a, b) => b.score - a.score);
+        });
+
+        const shuffleInvestors = () => {
+          shuffleSeed.value = Date.now();
+        };
+
+        const requestIntroFor = (item) => {
+          const investor = item.investor || item;
+          const founderId = parseInt(planningFounderId.value);
+          const founder = founders.value.find(f => f.id === founderId);
+
+          // Find the node ID from the connection
+          const founderNodeIds = fnRelationships.value
+            .filter(r => r.founderId === founderId)
+            .map(r => r.nodeId);
+
+          const nodeConnection = niConnections.value.find(
+            nc => nc.investorId === investor.id && founderNodeIds.includes(nc.nodeId)
+          );
+
+          if (!nodeConnection) {
+            alert('No node connection found');
+            return;
+          }
+
+          // Pre-fill the intro form
+          editingIntro.value = null;
+          Object.assign(introForm, {
+            founderId: founderId,
+            nodeId: nodeConnection.nodeId,
+            investorId: investor.id,
+            status: 'intro_request_sent',
+            dateRequested: new Date().toISOString().split('T')[0],
+            dateNodeAsked: '',
+            dateIntroduced: '',
+            firstMeetingDate: '',
+            nextFollowupDate: '',
+            followupOwner: 'founder',
+            passReason: '',
+            notes: '',
+            founderName: founder?.name,
+            nodeName: nodes.value.find(n => n.id === nodeConnection.nodeId)?.name,
+            investorName: `${investor.name} @ ${investor.firm}`,
+          });
+          showIntroModal.value = true;
+        };
 
         // Computed: filtered investors for admin
         const filteredAdminInvestors = computed(() => {
@@ -1753,6 +1935,7 @@
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight,
           loadIntroRequests, markNodeTaskDone, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
+          planningFounderId, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, closeInvestorModal,

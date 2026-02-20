@@ -1223,6 +1223,13 @@
               .map(ir => ir.investorId)
           );
 
+          // Get firms that already have intros with this founder (exclude other members)
+          const existingIntroFirms = new Set(
+            introRequests.value
+              .filter(ir => ir.founderId === founderId && ir.investor?.firm)
+              .map(ir => ir.investor.firm.toLowerCase().trim())
+          );
+
           // Get founder's node relationships
           const founderNodeIds = new Set(
             fnRelationships.value
@@ -1236,6 +1243,9 @@
           for (const inv of investors.value) {
             // Skip if already has intro
             if (existingIntroInvestorIds.has(inv.id)) continue;
+
+            // Skip if another member of the same firm already has intro
+            if (inv.firm && existingIntroFirms.has(inv.firm.toLowerCase().trim())) continue;
 
             // Find node connections to this investor
             const nodeConnections = niConnections.value.filter(

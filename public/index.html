@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NodeStacker - Admin Dashboard</title>
+  <title>Matcap - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -16,7 +16,7 @@
     <!-- Login Screen -->
     <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center">
       <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full">
-        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">NodeStacker</h1>
+        <h1 class="text-2xl font-bold text-gray-900 text-center mb-2">Matcap</h1>
         <p class="text-gray-500 text-center mb-6">Admin Dashboard</p>
 
         <div v-if="loginState === 'form'">
@@ -67,7 +67,7 @@
     <!-- Header -->
     <header class="bg-white shadow-sm border-b">
       <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-900">NodeStacker</h1>
+        <h1 class="text-2xl font-bold text-gray-900">Matcap</h1>
         <div class="flex items-center gap-4">
           <span class="text-sm text-gray-500">{{ adminEmail }}</span>
           <button @click="logout" class="text-sm text-red-600 hover:text-red-700">Logout</button>
@@ -82,10 +82,11 @@
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="activeTab = tab.id"
+            @click="activeTab = tab.id; if (tab.id === 'inbound') loadInboundLogs(); if (tab.id === 'onboarding') loadOnboardingWorkflows();"
             :class="['py-4 px-1 text-sm font-medium', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']"
           >
             {{ tab.label }}
+            <span v-if="tab.id === 'inbound' && pendingInboundCount > 0" class="ml-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">{{ pendingInboundCount }}</span>
           </button>
         </div>
       </div>
@@ -120,33 +121,26 @@
         <!-- Trends Over Time -->
         <div v-if="trends.comparison" class="bg-white rounded-lg shadow p-4 mb-6">
           <h3 class="font-medium mb-3">Trends ({{ trends.currentMonth }} vs {{ trends.previousMonth }})</h3>
-          <div class="grid grid-cols-6 gap-4">
+          <div class="grid grid-cols-5 gap-4">
             <div class="text-center p-3 rounded bg-gray-50">
-              <div class="text-xs text-gray-500 mb-1">Intros</div>
+              <div class="text-xs text-gray-500 mb-1">Requests</div>
               <div class="text-xl font-bold">{{ trends.comparison.intros?.current || 0 }}</div>
               <div class="text-xs" :class="trendClass(trends.comparison.intros?.direction)">
                 {{ trendArrow(trends.comparison.intros?.direction) }} {{ Math.abs(trends.comparison.intros?.change || 0) }}
               </div>
             </div>
             <div class="text-center p-3 rounded bg-gray-50">
-              <div class="text-xs text-gray-500 mb-1">Meetings</div>
-              <div class="text-xl font-bold">{{ trends.comparison.meetings?.current || 0 }}</div>
-              <div class="text-xs" :class="trendClass(trends.comparison.meetings?.direction)">
-                {{ trendArrow(trends.comparison.meetings?.direction) }} {{ Math.abs(trends.comparison.meetings?.change || 0) }}
+              <div class="text-xs text-gray-500 mb-1">Intros</div>
+              <div class="text-xl font-bold">{{ trends.comparison.introduced?.current || 0 }}</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.introduced?.direction)">
+                {{ trendArrow(trends.comparison.introduced?.direction) }} {{ Math.abs(trends.comparison.introduced?.change || 0) }}
               </div>
             </div>
             <div class="text-center p-3 rounded bg-gray-50">
-              <div class="text-xs text-gray-500 mb-1">Intro Rate</div>
-              <div class="text-xl font-bold">{{ trends.comparison.introRate?.current || 0 }}%</div>
-              <div class="text-xs" :class="trendClass(trends.comparison.introRate?.direction)">
-                {{ trendArrow(trends.comparison.introRate?.direction) }} {{ Math.abs(trends.comparison.introRate?.change || 0) }}%
-              </div>
-            </div>
-            <div class="text-center p-3 rounded bg-gray-50">
-              <div class="text-xs text-gray-500 mb-1">Meeting Rate</div>
-              <div class="text-xl font-bold">{{ trends.comparison.meetingRate?.current || 0 }}%</div>
-              <div class="text-xs" :class="trendClass(trends.comparison.meetingRate?.direction)">
-                {{ trendArrow(trends.comparison.meetingRate?.direction) }} {{ Math.abs(trends.comparison.meetingRate?.change || 0) }}%
+              <div class="text-xs text-gray-500 mb-1">Accept Rate</div>
+              <div class="text-xl font-bold">{{ trends.comparison.acceptRate?.current || 0 }}%</div>
+              <div class="text-xs" :class="trendClass(trends.comparison.acceptRate?.direction)">
+                {{ trendArrow(trends.comparison.acceptRate?.direction) }} {{ Math.abs(trends.comparison.acceptRate?.change || 0) }}%
               </div>
             </div>
             <div class="text-center p-3 rounded bg-gray-50">
@@ -166,11 +160,29 @@
           </div>
           <!-- Simple Chart -->
           <div v-if="trends.monthlyStats?.length > 1" class="mt-4 pt-4 border-t">
-            <div class="text-xs text-gray-500 mb-2">Monthly Intros (last 6 months)</div>
+            <div class="flex items-center gap-2 mb-2 flex-wrap">
+              <span class="text-xs text-gray-500">Show:</span>
+              <button @click="chartMetric = 'requests'"
+                :class="chartMetric === 'requests' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
+                class="text-xs px-2 py-1 rounded">Requests</button>
+              <button @click="chartMetric = 'intros'"
+                :class="chartMetric === 'intros' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
+                class="text-xs px-2 py-1 rounded">Intros</button>
+              <button @click="chartMetric = 'acceptRate'"
+                :class="chartMetric === 'acceptRate' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
+                class="text-xs px-2 py-1 rounded">Accept Rate</button>
+              <span class="text-xs text-gray-500 ml-2">Node:</span>
+              <select v-model="chartNodeId" @change="loadTrends()" class="text-xs border rounded px-2 py-1">
+                <option value="">All Nodes</option>
+                <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }}</option>
+              </select>
+            </div>
             <div class="flex items-end gap-2 h-24">
               <div v-for="month in trends.monthlyStats" :key="month.month" class="flex-1 flex flex-col items-center">
-                <div class="w-full bg-blue-100 rounded-t relative" :style="{ height: getBarHeight(month.total) + 'px' }">
-                  <div class="absolute -top-5 left-0 right-0 text-center text-xs font-medium">{{ month.total }}</div>
+                <div class="w-full bg-blue-100 rounded-t relative" :style="{ height: getBarHeight(getChartValue(month)) + 'px' }">
+                  <div class="absolute -top-5 left-0 right-0 text-center text-xs font-medium">
+                    {{ chartMetric === 'acceptRate' ? getChartValue(month) + '%' : getChartValue(month) }}
+                  </div>
                 </div>
                 <div class="text-xs text-gray-400 mt-1">{{ month.label?.split(' ')[0] }}</div>
               </div>
@@ -368,6 +380,270 @@
         </template>
       </div>
 
+      <!-- Onboarding Tab -->
+      <div v-if="activeTab === 'onboarding'">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold">Founder Onboarding</h2>
+          <button @click="openStartOnboardingModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+            Start Onboarding
+          </button>
+        </div>
+
+        <!-- Status Summary -->
+        <div class="grid grid-cols-5 gap-4 mb-6">
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Offer Stage</div>
+            <div class="text-2xl font-bold text-yellow-600">{{ (onboardingSummary.offer_pending || 0) + (onboardingSummary.offer_accepted || 0) }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Agreement Stage</div>
+            <div class="text-2xl font-bold text-blue-600">{{ (onboardingSummary.entity_info_pending || 0) + (onboardingSummary.entity_info_received || 0) + (onboardingSummary.advisory_agreement_sent || 0) + (onboardingSummary.admin_signed || 0) + (onboardingSummary.founder_signed || 0) }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Equity Stage</div>
+            <div class="text-2xl font-bold text-purple-600">{{ (onboardingSummary.equity_agreement_pending || 0) + (onboardingSummary.equity_agreement_signed || 0) + (onboardingSummary.shares_purchased || 0) }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Certificate Stage</div>
+            <div class="text-2xl font-bold text-orange-600">{{ (onboardingSummary['83b_filed'] || 0) + (onboardingSummary.certificate_pending || 0) }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-sm text-gray-500">Completed</div>
+            <div class="text-2xl font-bold text-green-600">{{ onboardingSummary.completed || 0 }}</div>
+          </div>
+        </div>
+
+        <!-- Workflows List -->
+        <div v-if="onboardingWorkflows.length === 0" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          No onboarding workflows yet. Click "Start Onboarding" to begin with a portfolio company.
+        </div>
+
+        <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-gray-500">
+                <th class="py-3 px-4">Company</th>
+                <th class="px-4">Founder</th>
+                <th class="px-4">Terms</th>
+                <th class="px-4">Status</th>
+                <th class="px-4">Last Updated</th>
+                <th class="px-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="workflow in onboardingWorkflows" :key="workflow.id" class="border-t hover:bg-gray-50">
+                <td class="py-3 px-4">
+                  <div class="font-medium">{{ workflow.portfolioCompany?.founder?.companyName }}</div>
+                  <div v-if="workflow.entityName" class="text-xs text-gray-500">{{ workflow.entityName }}</div>
+                </td>
+                <td class="px-4">{{ workflow.portfolioCompany?.founder?.name }}</td>
+                <td class="px-4">
+                  <div class="font-medium">{{ workflow.offerEquityPercent }}%</div>
+                  <div class="text-xs text-gray-500">{{ formatVestingSchedule(workflow.vestingMonths, workflow.vestingCliffMonths) }}</div>
+                </td>
+                <td class="px-4">
+                  <span :class="['px-2 py-1 rounded text-xs font-medium', onboardingStatusClass(workflow.status)]">
+                    {{ formatOnboardingStatus(workflow.status) }}
+                  </span>
+                </td>
+                <td class="px-4 text-gray-500">{{ workflow.updatedAt?.split('T')[0] }}</td>
+                <td class="px-4">
+                  <div class="flex gap-2">
+                    <button v-if="getNextOnboardingAction(workflow)"
+                      @click="getNextOnboardingAction(workflow).action()"
+                      class="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">
+                      {{ getNextOnboardingAction(workflow).label }}
+                    </button>
+                    <button @click="openWorkflowModal(workflow)" class="text-blue-600 hover:underline text-xs">Details</button>
+                    <button v-if="workflow.status !== 'completed'" @click="sendReminder(workflow.id)" class="text-gray-500 hover:underline text-xs">Remind</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Start Onboarding Modal -->
+      <div v-if="showStartOnboardingModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+          <h3 class="text-lg font-semibold mb-4">Start Onboarding</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Portfolio Company</label>
+              <select v-model="startOnboardingForm.portfolioCompanyId" class="w-full border rounded px-3 py-2">
+                <option value="">Select a company...</option>
+                <option v-for="c in getEligibleForOnboarding()" :key="c.id" :value="c.id">
+                  {{ c.founder?.companyName }} ({{ c.founder?.name }})
+                </option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Equity Percent</label>
+              <input v-model="startOnboardingForm.equityPercent" type="text" class="w-full border rounded px-3 py-2" placeholder="0.5" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Vesting Schedule</label>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <select v-model="startOnboardingForm.vestingMonths" class="w-full border rounded px-3 py-2">
+                    <option :value="12">1 year</option>
+                    <option :value="24">2 years</option>
+                    <option :value="36">3 years</option>
+                    <option :value="48">4 years (standard)</option>
+                  </select>
+                </div>
+                <div>
+                  <select v-model="startOnboardingForm.vestingCliffMonths" class="w-full border rounded px-3 py-2">
+                    <option :value="0">No cliff</option>
+                    <option :value="6">6-month cliff</option>
+                    <option :value="12">12-month cliff</option>
+                  </select>
+                </div>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Standard advisory: 4-year vest, no cliff</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+              <textarea v-model="startOnboardingForm.notes" class="w-full border rounded px-3 py-2" rows="2"></textarea>
+            </div>
+          </div>
+          <div class="flex justify-end gap-2 mt-6">
+            <button @click="showStartOnboardingModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+            <button @click="startOnboarding" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Start</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Workflow Details Modal -->
+      <div v-if="showWorkflowModal && workflowDetails" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-lg font-semibold">{{ workflowDetails.workflow?.portfolioCompany?.founder?.companyName }}</h3>
+              <p class="text-sm text-gray-500">{{ workflowDetails.workflow?.portfolioCompany?.founder?.name }}</p>
+            </div>
+            <button @click="closeWorkflowModal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+          </div>
+
+          <!-- Status Badge -->
+          <div class="mb-4">
+            <span :class="['px-3 py-1 rounded text-sm font-medium', onboardingStatusClass(workflowDetails.workflow?.status)]">
+              {{ formatOnboardingStatus(workflowDetails.workflow?.status) }}
+            </span>
+          </div>
+
+          <!-- Offer Terms -->
+          <div class="mb-4 p-4 bg-blue-50 rounded-lg">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <div class="text-xs text-gray-500">Equity</div>
+                <div class="text-lg font-bold text-blue-600">{{ workflowDetails.workflow?.offerEquityPercent }}%</div>
+              </div>
+              <div>
+                <div class="text-xs text-gray-500">Vesting</div>
+                <div class="text-sm font-medium text-gray-800">{{ formatVestingSchedule(workflowDetails.workflow?.vestingMonths, workflowDetails.workflow?.vestingCliffMonths) }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Progress Steps -->
+          <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-medium mb-3">Progress</h4>
+            <div class="space-y-2 text-sm">
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.offerSentAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Offer Sent</span>
+                <span v-if="workflowDetails.workflow?.offerSentAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.offerSentAt?.split('T')[0] }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.offerAcceptedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Offer Accepted</span>
+                <span v-if="workflowDetails.workflow?.offerAcceptedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.offerAcceptedAt?.split('T')[0] }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.entityInfoReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Entity Info Received</span>
+                <span v-if="workflowDetails.workflow?.entityName" class="text-gray-400 text-xs">({{ workflowDetails.workflow?.entityName }})</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.adminSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Admin Signed Advisory</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.founderSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Founder Signed Advisory</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.equityAgreementReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Equity Agreement Received</span>
+                <a v-if="workflowDetails.workflow?.equityAgreementUrl" :href="workflowDetails.workflow?.equityAgreementUrl" target="_blank" class="text-blue-600 text-xs hover:underline">View</a>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.equityAgreementSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Equity Agreement Signed</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.sharePurchaseDate ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Shares Purchased</span>
+                <span v-if="workflowDetails.workflow?.sharePurchaseAmount" class="text-gray-400 text-xs">(${{ workflowDetails.workflow?.sharePurchaseAmount }})</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.election83bFiledAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>83(b) Election Filed</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.certificateReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Certificate Received</span>
+                <a v-if="workflowDetails.workflow?.certificateUrl" :href="workflowDetails.workflow?.certificateUrl" target="_blank" class="text-blue-600 text-xs hover:underline">View</a>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.equityVerifiedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Completed</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Share Details -->
+          <div v-if="workflowDetails.shareDetails" class="mb-6 p-4 bg-blue-50 rounded-lg">
+            <h4 class="font-medium mb-2">Share Details</h4>
+            <div class="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <div class="text-gray-500">Shares</div>
+                <div class="font-medium">{{ workflowDetails.shareDetails.shareCount?.toLocaleString() }}</div>
+              </div>
+              <div>
+                <div class="text-gray-500">Price/Share</div>
+                <div class="font-medium">${{ workflowDetails.shareDetails.sharePrice }}</div>
+              </div>
+              <div>
+                <div class="text-gray-500">Total</div>
+                <div class="font-medium">${{ workflowDetails.shareDetails.totalAmount }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Drive Link -->
+          <div v-if="workflowDetails.workflow?.driveFolderUrl" class="mb-6">
+            <a :href="workflowDetails.workflow?.driveFolderUrl" target="_blank" class="text-blue-600 hover:underline text-sm flex items-center gap-1">
+              📁 Open Google Drive Folder
+            </a>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex gap-2">
+            <button v-if="getNextOnboardingAction(workflowDetails.workflow)"
+              @click="getNextOnboardingAction(workflowDetails.workflow).action()"
+              class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+              {{ getNextOnboardingAction(workflowDetails.workflow).label }}
+            </button>
+            <button v-if="workflowDetails.workflow?.status !== 'completed'" @click="sendReminder(workflowDetails.workflow?.id)" class="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">
+              Send Reminder
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- Founders Tab -->
       <div v-if="activeTab === 'founders'">
         <div class="flex justify-between items-center mb-4">
@@ -408,6 +684,7 @@
                 <td class="px-4">{{ formatStage(founder.companyStage) }}</td>
                 <td class="px-4"><span :class="roundStatusClass(founder.roundStatus)">{{ formatRoundStatus(founder.roundStatus) }}</span></td>
                 <td class="px-4">
+                  <button @click="openFounderNodesModal(founder)" class="text-purple-600 hover:underline mr-2">Nodes</button>
                   <button @click="generateLoginLink(founder)" class="text-green-600 hover:underline mr-2">Login Link</button>
                   <button @click="editFounder(founder)" class="text-blue-600 hover:underline mr-2">Edit</button>
                   <button @click="toggleFounderHidden(founder)" class="text-gray-500 hover:underline mr-2">
@@ -430,32 +707,54 @@
           </button>
         </div>
 
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="bg-gray-50">
-              <tr class="text-left text-gray-500">
-                <th class="py-3 px-4">Name</th>
-                <th class="px-4">Email</th>
-                <th class="px-4">Company</th>
-                <th class="px-4">Role</th>
-                <th class="px-4">Geography</th>
-                <th class="px-4">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="node in nodes" :key="node.id" class="border-t hover:bg-gray-50">
-                <td class="py-3 px-4 font-medium">{{ node.name }}</td>
-                <td class="px-4">{{ node.email }}</td>
-                <td class="px-4">{{ node.company }}</td>
-                <td class="px-4">{{ node.role }}</td>
-                <td class="px-4">{{ node.geography }}</td>
-                <td class="px-4">
-                  <button @click="editNode(node)" class="text-blue-600 hover:underline mr-2">Edit</button>
-                  <button @click="deleteNode(node.id)" class="text-red-600 hover:underline">Delete</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="grid gap-4">
+          <div v-for="node in nodes" :key="node.id" class="bg-white rounded-lg shadow p-4">
+            <div class="flex justify-between items-start">
+              <div>
+                <h3 class="font-semibold text-lg">{{ node.name }}</h3>
+                <p class="text-gray-500 text-sm">{{ node.email }}</p>
+                <p v-if="node.company || node.role" class="text-gray-500 text-sm">
+                  {{ node.company }}{{ node.company && node.role ? ' • ' : '' }}{{ node.role }}
+                </p>
+              </div>
+              <div class="flex gap-2">
+                <button @click="editNode(node)" class="text-blue-600 hover:underline text-sm">Edit</button>
+                <button @click="deleteNode(node.id)" class="text-red-600 hover:underline text-sm">Delete</button>
+              </div>
+            </div>
+
+            <!-- Node Stats -->
+            <div v-if="nodeStats[node.name]" class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="bg-gray-50 rounded p-3">
+                <div class="text-2xl font-bold text-blue-600">{{ nodeStats[node.name].network.total }}</div>
+                <div class="text-xs text-gray-500">Investors in Network</div>
+                <div class="text-xs text-gray-400 mt-1">
+                  {{ nodeStats[node.name].network.strong }} strong •
+                  {{ nodeStats[node.name].network.medium }} medium •
+                  {{ nodeStats[node.name].network.weak }} weak
+                </div>
+              </div>
+              <div class="bg-gray-50 rounded p-3">
+                <div class="text-2xl font-bold text-purple-600">{{ nodeStats[node.name].intros.total }}</div>
+                <div class="text-xs text-gray-500">Total Intro Requests</div>
+              </div>
+              <div class="bg-gray-50 rounded p-3">
+                <div class="text-2xl font-bold text-green-600">{{ nodeStats[node.name].intros.accepted }}</div>
+                <div class="text-xs text-gray-500">Intros Made</div>
+              </div>
+              <div class="bg-gray-50 rounded p-3">
+                <div class="text-2xl font-bold" :class="parseInt(nodeStats[node.name].intros.acceptRate) >= 30 ? 'text-green-600' : parseInt(nodeStats[node.name].intros.acceptRate) >= 15 ? 'text-yellow-600' : 'text-red-600'">
+                  {{ nodeStats[node.name].intros.acceptRate }}
+                </div>
+                <div class="text-xs text-gray-500">Accept Rate</div>
+                <div class="text-xs text-gray-400 mt-1">
+                  {{ nodeStats[node.name].intros.passed }} passed •
+                  {{ nodeStats[node.name].intros.ignored }} ignored
+                </div>
+              </div>
+            </div>
+            <div v-else class="mt-4 text-gray-400 text-sm italic">Loading stats...</div>
+          </div>
         </div>
       </div>
 
@@ -476,6 +775,10 @@
             <button @click="startBulkResearch" :disabled="bulkResearch.running"
               class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50">
               {{ bulkResearch.running ? 'Researching...' : 'Bulk Research' }}
+            </button>
+            <button @click="generateAllTags"
+              class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700">
+              Gen All Tags
             </button>
           </div>
         </div>
@@ -499,7 +802,7 @@
 
         <!-- Intro Planning Mode -->
         <div class="bg-white rounded-lg shadow p-4 mb-4">
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-4 flex-wrap">
             <label class="text-sm font-medium text-gray-700">Plan intros for:</label>
             <select v-model="planningFounderId" class="border rounded-lg px-3 py-2 text-sm">
               <option value="">-- Select founder --</option>
@@ -507,6 +810,10 @@
                 {{ f.companyName }} ({{ f.name }})
               </option>
             </select>
+            <label v-if="planningFounderId" class="flex items-center gap-2 text-sm text-gray-600">
+              <input type="checkbox" v-model="planningFilterStale" class="rounded">
+              Not contacted in 6+ weeks
+            </label>
             <button v-if="planningFounderId" @click="shuffleInvestors" class="text-sm text-gray-500 hover:text-gray-700">
               Shuffle
             </button>
@@ -524,7 +831,24 @@
               <div>
                 <div class="flex items-center gap-2">
                   <h3 class="font-semibold text-lg">{{ item.name || item.investor?.name }}</h3>
+                  <span v-if="(item.active === false || item.investor?.active === false)" class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
                   <span v-if="(item.research || item.investor?.research)" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">AI Researched</span>
+                  <!-- Auto-generated tags -->
+                  <span v-for="tag in parseTags(item.tags || item.investor?.tags)" :key="tag"
+                    :class="{
+                      'bg-red-100 text-red-700': tag === 'deep-tech' || tag === 'hardware',
+                      'bg-blue-100 text-blue-700': tag === 'pro-america' || tag === 'defense',
+                      'bg-green-100 text-green-700': tag === 'climate',
+                      'bg-purple-100 text-purple-700': tag === 'ai-ml',
+                      'bg-yellow-100 text-yellow-700': tag === 'fintech',
+                      'bg-pink-100 text-pink-700': tag === 'healthcare',
+                      'bg-indigo-100 text-indigo-700': tag === 'enterprise' || tag === 'infrastructure',
+                      'bg-orange-100 text-orange-700': tag === 'consumer',
+                      'bg-slate-100 text-slate-700': tag === 'crypto-web3',
+                      'bg-teal-100 text-teal-700': tag === 'seed-focus' || tag === 'series-a',
+                      'bg-cyan-100 text-cyan-700': tag === 'technical-founders' || tag === 'repeat-founders' || tag === 'first-time-friendly',
+                    }"
+                    class="text-xs px-2 py-0.5 rounded">{{ tag }}</span>
                   <!-- Fit indicators (only in planning mode) -->
                   <span v-if="planningFounderId && item.fitReasons?.includes('strong_connection')" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Strong connection</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('stage_match')" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Stage fit</span>
@@ -533,6 +857,7 @@
                   <span v-if="planningFounderId && item.fitReasons?.includes('founder_pref')" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Founder fit</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('active_investor')" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Active</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('first_time_friendly')" class="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded">1st-time friendly</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('not_recent')" class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Not recently contacted</span>
                 </div>
                 <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
                 <p v-if="item.checkSize || item.investor?.checkSize" class="text-sm text-gray-400">Check: {{ item.checkSize || item.investor?.checkSize }}</p>
@@ -546,7 +871,13 @@
                   Request Intro
                 </button>
                 <button @click="openResearchModal(item.investor || item)" class="text-purple-600 hover:underline text-sm">Research</button>
+                <button v-if="(item.research || item.investor?.research)" @click="generateTags((item.investor || item).id)" class="text-teal-600 hover:underline text-sm">Gen Tags</button>
                 <button @click="editInvestor(item.investor || item)" class="text-blue-600 hover:underline text-sm">Edit</button>
+                <button @click="toggleInvestorActive((item.investor || item))"
+                  :class="(item.investor || item).active === false ? 'text-green-600' : 'text-orange-600'"
+                  class="hover:underline text-sm">
+                  {{ (item.investor || item).active === false ? 'Activate' : 'Deactivate' }}
+                </button>
                 <button @click="deleteInvestor((item.investor || item).id)" class="text-red-600 hover:underline text-sm">Delete</button>
               </div>
             </div>
@@ -573,6 +904,25 @@
             <!-- No Research Yet -->
             <div v-else-if="!(item.research || item.investor?.research)" class="p-4 bg-gray-50 text-sm text-gray-400 italic">
               No AI research yet. Click "Research" above to generate.
+            </div>
+
+            <!-- Recent Intro Requests (only in planning mode) -->
+            <div v-if="planningFounderId && item.recentIntros && item.recentIntros.length > 0" class="p-3 border-t bg-slate-50">
+              <div class="text-xs font-medium text-gray-500 mb-2">Recent Intros ({{ item.recentIntros.length }})</div>
+              <div class="space-y-1">
+                <div v-for="intro in item.recentIntros" :key="intro.id" class="flex items-center gap-2 text-sm">
+                  <span :class="{
+                    'bg-green-100 text-green-700': intro.status === 'meeting_scheduled' || intro.status === 'in_discussions' || intro.status === 'invested',
+                    'bg-blue-100 text-blue-700': intro.status === 'introduced' || intro.status === 'intro_request_sent',
+                    'bg-yellow-100 text-yellow-700': intro.status === 'waiting_on_node' || intro.status === 'waiting_on_investor',
+                    'bg-red-100 text-red-700': intro.status === 'passed',
+                    'bg-gray-100 text-gray-600': !intro.status || intro.status === 'stale'
+                  }" class="px-2 py-0.5 rounded text-xs">{{ formatStatus(intro.status) }}</span>
+                  <span class="text-gray-700">{{ intro.founderName }}</span>
+                  <span v-if="intro.companyName" class="text-gray-400">({{ intro.companyName }})</span>
+                  <span class="text-gray-400 text-xs ml-auto">{{ intro.dateRequested ? formatDate(intro.dateRequested) : '' }}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -678,6 +1028,82 @@
           </div>
         </div>
       </div>
+
+      <!-- Inbound Logs Tab -->
+      <div v-if="activeTab === 'inbound'">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold">Inbound Intro Logs</h2>
+          <div class="flex items-center gap-4">
+            <select v-model="inboundFilterStatus" @change="loadInboundLogs" class="border rounded px-3 py-1">
+              <option value="pending">Pending</option>
+              <option value="">All</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="dismissed">Dismissed</option>
+            </select>
+            <button @click="loadInboundLogs" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          </div>
+        </div>
+        <p class="text-gray-500 text-sm mb-4">Emails received via BCC. Review and confirm to log intro requests.</p>
+
+        <div v-if="inboundLogs.length === 0" class="text-center py-12 text-gray-500">
+          No inbound logs found
+        </div>
+
+        <div v-else class="space-y-3">
+          <div v-for="log in inboundLogs" :key="log.id"
+               class="bg-white rounded-lg shadow p-4"
+               :class="{ 'opacity-60': log.status !== 'pending', 'border-l-4 border-green-500': log.status === 'confirmed', 'border-l-4 border-red-500': log.status === 'dismissed' }">
+            <div class="flex justify-between items-start">
+              <div class="flex-1">
+                <div class="font-medium text-lg">{{ log.subject || '(No subject)' }}</div>
+                <div class="text-sm text-gray-500 mt-1">
+                  From: {{ log.fromEmail }} &bull; {{ new Date(log.createdAt).toLocaleString() }}
+                </div>
+                <div class="text-sm text-gray-500">
+                  To: {{ (log.toEmails || []).join(', ') }}
+                  <span v-if="log.ccEmails && log.ccEmails.length > 0"> &bull; CC: {{ log.ccEmails.join(', ') }}</span>
+                </div>
+
+                <div class="mt-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <span class="text-xs font-medium text-gray-500 uppercase">Detected Founder</span>
+                    <div v-if="log.founder" class="text-sm font-medium text-green-700">
+                      {{ log.founder.name }} ({{ log.founder.companyName }})
+                    </div>
+                    <div v-else class="text-sm text-amber-600">Not detected</div>
+                  </div>
+                  <div>
+                    <span class="text-xs font-medium text-gray-500 uppercase">Detected Investor</span>
+                    <div v-if="log.investor" class="text-sm font-medium text-green-700">
+                      {{ log.investor.name }}<span v-if="log.investor.firm"> ({{ log.investor.firm }})</span>
+                    </div>
+                    <div v-else class="text-sm text-amber-600">Not detected</div>
+                  </div>
+                </div>
+
+                <div v-if="log.bodyPreview" class="mt-3 text-xs text-gray-500 bg-gray-50 p-2 rounded max-h-20 overflow-hidden">
+                  {{ log.bodyPreview }}
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-2 ml-4">
+                <template v-if="log.status === 'pending'">
+                  <button @click="openInboundConfirmModal(log)" class="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700">
+                    Confirm
+                  </button>
+                  <button @click="dismissInboundLog(log.id)" class="px-3 py-1.5 border border-gray-300 text-gray-600 rounded text-sm hover:bg-gray-50">
+                    Dismiss
+                  </button>
+                </template>
+                <span v-else class="text-sm px-2 py-1 rounded" :class="log.status === 'confirmed' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                  {{ log.status }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </main>
 
     <!-- Modals -->
@@ -798,6 +1224,36 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Geography</label>
               <input v-model="investorForm.geography" type="text" class="w-full border rounded px-3 py-2">
             </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
+              <div class="flex flex-wrap gap-1 mb-2">
+                <span v-for="(tag, idx) in investorFormTags" :key="idx"
+                  class="inline-flex items-center gap-1 bg-teal-100 text-teal-700 px-2 py-0.5 rounded text-sm">
+                  {{ tag }}
+                  <button type="button" @click="removeInvestorTag(idx)" class="text-teal-500 hover:text-teal-800">&times;</button>
+                </span>
+              </div>
+              <div class="flex gap-2">
+                <input v-model="newInvestorTag" type="text" placeholder="Add tag..."
+                  @keydown.enter.prevent="addInvestorTag"
+                  class="flex-1 border rounded px-3 py-1 text-sm">
+                <button type="button" @click="addInvestorTag" class="bg-teal-600 text-white px-3 py-1 rounded text-sm hover:bg-teal-700">Add</button>
+              </div>
+              <p class="text-xs text-gray-500 mt-1">Press Enter or click Add to add tags</p>
+            </div>
+            <div v-if="!editingInvestor">
+              <label class="block text-sm font-medium text-gray-700 mb-1">Assign to Node *</label>
+              <select v-model="investorForm.nodeId" required class="w-full border rounded px-3 py-2">
+                <option value="">Select a node...</option>
+                <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }}</option>
+              </select>
+              <p class="text-xs text-gray-500 mt-1">Every investor must be connected to a node</p>
+            </div>
+            <div v-if="editingInvestor" class="flex items-center gap-2">
+              <input type="checkbox" v-model="investorForm.active" id="investor-active" class="rounded">
+              <label for="investor-active" class="text-sm font-medium text-gray-700">Active</label>
+              <span class="text-xs text-gray-500">(Inactive investors are hidden from planning)</span>
+            </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
             <button type="button" @click="closeInvestorModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -814,26 +1270,71 @@
         <form @submit.prevent="saveIntro">
           <div class="space-y-4">
             <div v-if="!editingIntro" class="grid grid-cols-3 gap-4">
-              <div>
+              <div class="relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Founder</label>
-                <select v-model="introForm.founderId" required class="w-full border rounded px-3 py-2">
-                  <option value="">Select...</option>
-                  <option v-for="f in founders" :key="f.id" :value="f.id">{{ f.name }}</option>
-                </select>
+                <input
+                  v-model="introFounderSearch"
+                  @focus="introFounderDropdownOpen = true"
+                  @blur="blurIntroFounder"
+                  type="text"
+                  :placeholder="introForm.founderId ? founders.find(f => f.id == introForm.founderId)?.name : 'Type to search...'"
+                  :class="['w-full border rounded px-3 py-2', introForm.founderId ? 'border-green-500 bg-green-50' : '']"
+                />
+                <div v-if="introFounderDropdownOpen && introFounderOptions.length" class="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto">
+                  <div
+                    v-for="f in introFounderOptions"
+                    :key="f.id"
+                    @mousedown="introForm.founderId = f.id; introFounderSearch = f.name; introFounderDropdownOpen = false"
+                    class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                  >
+                    <span class="font-medium">{{ f.name }}</span>
+                    <span class="text-gray-500 ml-1">{{ f.companyName }}</span>
+                  </div>
+                </div>
               </div>
-              <div>
+              <div class="relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Node</label>
-                <select v-model="introForm.nodeId" required class="w-full border rounded px-3 py-2">
-                  <option value="">Select...</option>
-                  <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }}</option>
-                </select>
+                <input
+                  v-model="introNodeSearch"
+                  @focus="introNodeDropdownOpen = true"
+                  @blur="blurIntroNode"
+                  type="text"
+                  :placeholder="introForm.nodeId ? nodes.find(n => n.id == introForm.nodeId)?.name : 'Type to search...'"
+                  :class="['w-full border rounded px-3 py-2', introForm.nodeId ? 'border-green-500 bg-green-50' : '']"
+                />
+                <div v-if="introNodeDropdownOpen && introNodeOptions.length" class="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto">
+                  <div
+                    v-for="n in introNodeOptions"
+                    :key="n.id"
+                    @mousedown="introForm.nodeId = n.id; introNodeSearch = n.name; introNodeDropdownOpen = false"
+                    class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                  >
+                    <span class="font-medium">{{ n.name }}</span>
+                    <span v-if="n.company" class="text-gray-500 ml-1">{{ n.company }}</span>
+                  </div>
+                </div>
               </div>
-              <div>
+              <div class="relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Investor</label>
-                <select v-model="introForm.investorId" required class="w-full border rounded px-3 py-2">
-                  <option value="">Select...</option>
-                  <option v-for="i in investors" :key="i.id" :value="i.id">{{ i.name }} @ {{ i.firm }}</option>
-                </select>
+                <input
+                  v-model="introInvestorSearch"
+                  @focus="introInvestorDropdownOpen = true"
+                  @blur="blurIntroInvestor"
+                  type="text"
+                  :placeholder="introForm.investorId ? investors.find(i => i.id == introForm.investorId)?.name : 'Type to search...'"
+                  :class="['w-full border rounded px-3 py-2', introForm.investorId ? 'border-green-500 bg-green-50' : '']"
+                />
+                <div v-if="introInvestorDropdownOpen && introInvestorOptions.length" class="absolute z-10 w-full mt-1 bg-white border rounded shadow-lg max-h-48 overflow-y-auto">
+                  <div
+                    v-for="i in introInvestorOptions"
+                    :key="i.id"
+                    @mousedown="introForm.investorId = i.id; introInvestorSearch = i.name; introInvestorDropdownOpen = false"
+                    class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+                  >
+                    <span class="font-medium">{{ i.name }}</span>
+                    <span class="text-gray-500 ml-1">@ {{ i.firm }}</span>
+                  </div>
+                </div>
               </div>
             </div>
             <div v-else class="p-3 bg-gray-50 rounded text-sm">
@@ -1051,6 +1552,55 @@
       </div>
     </div>
 
+    <!-- Inbound Confirm Modal -->
+    <div v-if="showInboundConfirmModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+        <h3 class="text-lg font-semibold mb-4">Confirm Intro Log</h3>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+            <div class="text-sm font-medium bg-gray-50 p-2 rounded">{{ inboundConfirmLog?.subject || '(No subject)' }}</div>
+          </div>
+          <div v-if="inboundConfirmLog?.bodyPreview">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Body Preview</label>
+            <div class="text-xs bg-gray-50 p-2 rounded max-h-24 overflow-y-auto whitespace-pre-wrap">{{ inboundConfirmLog.bodyPreview }}</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Founder *</label>
+            <select v-model="inboundConfirmForm.founderId" required class="w-full border rounded px-3 py-2">
+              <option value="">Select founder...</option>
+              <option v-for="f in founders" :key="f.id" :value="f.id">{{ f.name }} ({{ f.companyName }})</option>
+            </select>
+            <span v-if="!inboundConfirmLog?.detectedFounderId" class="text-xs text-amber-600">Not auto-detected</span>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Investor *</label>
+            <select v-model="inboundConfirmForm.investorId" required class="w-full border rounded px-3 py-2">
+              <option value="">Select investor...</option>
+              <option v-for="i in investors" :key="i.id" :value="i.id">{{ i.name }}<span v-if="i.firm"> @ {{ i.firm }}</span></option>
+            </select>
+            <span v-if="!inboundConfirmLog?.detectedInvestorId" class="text-xs text-amber-600">Not auto-detected</span>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Node (for relationship path)</label>
+            <select v-model="inboundConfirmForm.nodeId" class="w-full border rounded px-3 py-2">
+              <option value="">Auto-detect from relationships...</option>
+              <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }}</option>
+            </select>
+            <span class="text-xs text-gray-500">If blank, will try to find existing founder-node-investor relationship</span>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <input v-model="inboundConfirmForm.notes" type="text" placeholder="Optional notes" class="w-full border rounded px-3 py-2">
+          </div>
+        </div>
+        <div class="flex justify-end space-x-3 mt-6">
+          <button type="button" @click="closeInboundConfirmModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+          <button @click="submitInboundConfirm" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Confirm as Intro Requested</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Portfolio Modal -->
     <div v-if="showPortfolioModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -1203,6 +1753,7 @@
         </div>
       </div>
     </div>
+
     </template>
   </div>
 
@@ -1223,11 +1774,13 @@
         const tabs = [
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'portfolio', label: 'Portfolio' },
+          { id: 'onboarding', label: 'Onboarding' },
           { id: 'founders', label: 'Founders' },
           { id: 'nodes', label: 'Nodes' },
           { id: 'investors', label: 'Investors' },
           { id: 'intros', label: 'Intro Requests' },
           { id: 'relationships', label: 'Relationships' },
+          { id: 'inbound', label: 'Inbound Logs' },
         ];
 
         const introStatuses = [
@@ -1235,7 +1788,6 @@
           'introduced',
           'passed',
           'ignored',
-          'not_a_fit',
           'first_meeting_complete',
           'second_meeting_complete',
           'follow_up_questions',
@@ -1248,6 +1800,7 @@
         // Data
         const founders = ref([]);
         const nodes = ref([]);
+        const nodeStats = ref({});
         const investors = ref([]);
         const introRequests = ref([]);
         const fnRelationships = ref([]);
@@ -1256,10 +1809,26 @@
         const overdueRequests = ref([]);
         const nodeTasks = ref([]);
         const trends = ref({});
+        const chartMetric = ref('requests'); // 'requests', 'meetings', or 'acceptRate'
+        const chartNodeId = ref(''); // Filter chart by node
         const portfolio = ref({ companies: [], summary: {} });
         const eligibleFounders = ref([]);
         const adminNodeId = 2; // Mat Sherman's node ID
         const expandedFounderTasks = ref({});
+
+        // Onboarding
+        const onboardingWorkflows = ref([]);
+        const onboardingSummary = ref({});
+        const showStartOnboardingModal = ref(false);
+        const startOnboardingForm = ref({ portfolioCompanyId: null, equityPercent: '0.5', vestingMonths: 48, vestingCliffMonths: 0, notes: '' });
+        const selectedWorkflow = ref(null);
+        const showWorkflowModal = ref(false);
+        const workflowDetails = ref(null);
+
+        // Inbound logs
+        const inboundLogs = ref([]);
+        const inboundFilterStatus = ref('pending');
+        const pendingInboundCount = ref(0);
 
         // Modals
         const showFounderModal = ref(false);
@@ -1302,6 +1871,16 @@
         const currentResearchInvestorId = ref(null);
         let researchPollingInterval = null;
 
+        // Inbound confirm modal
+        const showInboundConfirmModal = ref(false);
+        const inboundConfirmLog = ref(null);
+        const inboundConfirmForm = reactive({
+          founderId: '',
+          investorId: '',
+          nodeId: '',
+          notes: '',
+        });
+
         // Edit state
         const editingFounder = ref(null);
         const editingNode = ref(null);
@@ -1312,13 +1891,43 @@
         // Forms
         const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round' });
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [] });
+        const newInvestorTag = ref('');
+        const investorFormTags = computed(() => {
+          if (!investorForm.tags) return [];
+          if (Array.isArray(investorForm.tags)) return investorForm.tags;
+          try { return JSON.parse(investorForm.tags); } catch { return []; }
+        });
+        const addInvestorTag = () => {
+          const tag = newInvestorTag.value.trim().toLowerCase().replace(/\s+/g, '-');
+          if (tag && !investorFormTags.value.includes(tag)) {
+            if (Array.isArray(investorForm.tags)) {
+              investorForm.tags.push(tag);
+            } else {
+              investorForm.tags = [...investorFormTags.value, tag];
+            }
+          }
+          newInvestorTag.value = '';
+        };
+        const removeInvestorTag = (idx) => {
+          const currentTags = [...investorFormTags.value];
+          currentTags.splice(idx, 1);
+          investorForm.tags = currentTags;
+        };
         const introForm = reactive({
           founderId: '', nodeId: '', investorId: '', status: 'intro_request_sent',
           dateRequested: '', dateNodeAsked: '', dateIntroduced: '', firstMeetingDate: '',
           nextFollowupDate: '', followupOwner: 'founder', passReason: '', notes: '',
           founderName: '', nodeName: '', investorName: ''
         });
+
+        // Intro form autocomplete search
+        const introFounderSearch = ref('');
+        const introNodeSearch = ref('');
+        const introInvestorSearch = ref('');
+        const introFounderDropdownOpen = ref(false);
+        const introNodeDropdownOpen = ref(false);
+        const introInvestorDropdownOpen = ref(false);
         const followupForm = reactive({ followupType: 'node_check', completedBy: 'admin', notes: '', nextAction: '' });
         const fnRelForm = reactive({ founderId: '', nodeId: '', relationshipStrength: 'medium', howConnected: '' });
         const niConnForm = reactive({ nodeId: '', investorId: '', connectionStrength: 'medium', validated: false });
@@ -1341,6 +1950,7 @@
 
         // Intro Planning
         const planningFounderId = ref('');
+        const planningFilterStale = ref(false);
         const shuffleSeed = ref(Date.now());
         const filterByNodeId = ref('');
 
@@ -1354,6 +1964,31 @@
 
         const hiddenFounderCount = computed(() => {
           return founders.value.filter(f => f.hidden).length;
+        });
+
+        // Computed: filtered options for intro form autocomplete
+        const introFounderOptions = computed(() => {
+          const search = introFounderSearch.value.toLowerCase().trim();
+          if (!search) return founders.value.slice(0, 10);
+          return founders.value
+            .filter(f => f.name.toLowerCase().includes(search) || f.companyName?.toLowerCase().includes(search))
+            .slice(0, 10);
+        });
+
+        const introNodeOptions = computed(() => {
+          const search = introNodeSearch.value.toLowerCase().trim();
+          if (!search) return nodes.value.slice(0, 10);
+          return nodes.value
+            .filter(n => n.name.toLowerCase().includes(search) || n.company?.toLowerCase().includes(search))
+            .slice(0, 10);
+        });
+
+        const introInvestorOptions = computed(() => {
+          const search = introInvestorSearch.value.toLowerCase().trim();
+          if (!search) return investors.value.slice(0, 10);
+          return investors.value
+            .filter(i => i.name.toLowerCase().includes(search) || i.firm?.toLowerCase().includes(search))
+            .slice(0, 10);
         });
 
         // Computed: investors filtered and sorted for intro planning
@@ -1378,6 +2013,18 @@
               .map(ir => ir.investor.firm.toLowerCase().trim())
           );
 
+          // Calculate most recent intro request date for each investor (across all founders)
+          const investorLastContactMap = new Map();
+          for (const ir of introRequests.value) {
+            const requestDate = ir.dateRequested || ir.createdAt;
+            if (requestDate) {
+              const existing = investorLastContactMap.get(ir.investorId);
+              if (!existing || requestDate > existing) {
+                investorLastContactMap.set(ir.investorId, requestDate);
+              }
+            }
+          }
+
           // Get founder's node relationships
           const founderNodeIds = new Set(
             fnRelationships.value
@@ -1389,6 +2036,9 @@
           const investorList = [];
 
           for (const inv of investors.value) {
+            // Skip inactive investors
+            if (inv.active === false) continue;
+
             // Skip if already has intro
             if (existingIntroInvestorIds.has(inv.id)) continue;
 
@@ -1506,6 +2156,23 @@
               fitReasons.push('has_research');
             }
 
+            // === RECENCY BONUS ===
+            // Investors not contacted recently get a boost (up to +30 points)
+            const lastContact = investorLastContactMap.get(inv.id);
+            let weeksSinceContact = 52; // Default to 1 year if never contacted
+            if (lastContact) {
+              const lastDate = new Date(lastContact);
+              const now = new Date();
+              const daysSince = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
+              weeksSinceContact = Math.floor(daysSince / 7);
+            }
+            // Scale: 0 weeks = 0 points, 6+ weeks = 30 points
+            const recencyBonus = Math.min(30, weeksSinceContact * 5);
+            score += recencyBonus;
+            if (weeksSinceContact >= 6) {
+              fitReasons.push('not_recent');
+            }
+
             // Add randomization (0-20 points based on shuffle seed)
             const randomFactor = ((inv.id * shuffleSeed.value) % 20);
             score += randomFactor;
@@ -1514,11 +2181,26 @@
             const bestConnection = strongConnection || nodeConnections[0];
             const nodeName = nodes.value.find(n => n.id === bestConnection.nodeId)?.name || 'Unknown';
 
+            // Get last 3 intro requests for this investor (across all founders)
+            const recentIntros = introRequests.value
+              .filter(ir => ir.investorId === inv.id)
+              .sort((a, b) => (b.dateRequested || b.createdAt || '').localeCompare(a.dateRequested || a.createdAt || ''))
+              .slice(0, 3)
+              .map(ir => ({
+                id: ir.id,
+                founderName: ir.founder?.name || 'Unknown',
+                companyName: ir.founder?.companyName || '',
+                status: ir.status,
+                dateRequested: ir.dateRequested,
+              }));
+
             investorList.push({
               ...inv,
               investor: inv,
               score,
               fitReasons,
+              weeksSinceContact,
+              recentIntros,
               nodeConnection: {
                 nodeName,
                 strength: bestConnection.connectionStrength,
@@ -1526,8 +2208,16 @@
             });
           }
 
-          // Sort by score descending
-          return investorList.sort((a, b) => b.score - a.score);
+          // Apply stale filter if enabled (6+ weeks since contact)
+          let filtered = investorList;
+          if (planningFilterStale.value) {
+            filtered = investorList.filter(inv => inv.weeksSinceContact >= 6);
+            // Sort by weeks since contact descending (oldest first)
+            return filtered.sort((a, b) => b.weeksSinceContact - a.weeksSinceContact);
+          }
+
+          // Default: sort by score descending
+          return filtered.sort((a, b) => b.score - a.score);
         });
 
         const shuffleInvestors = () => {
@@ -1623,8 +2313,9 @@
               return;
             }
             const error = await res.json();
-            alert(error.error || 'An error occurred');
-            throw new Error(error.error);
+            const errorMsg = typeof error.error === 'string' ? error.error : JSON.stringify(error.error);
+            alert(errorMsg || 'An error occurred');
+            throw new Error(errorMsg);
           }
           return res.json();
         };
@@ -1682,10 +2373,10 @@
         };
 
         const checkSession = async () => {
-          if (!adminSessionId.value) return false;
           try {
+            // Try session check (works without sessionId in local dev mode)
             const res = await fetch('/api/admin-auth/session', {
-              headers: { 'X-Admin-Session': adminSessionId.value },
+              headers: adminSessionId.value ? { 'X-Admin-Session': adminSessionId.value } : {},
             });
             const data = await res.json();
             if (res.ok && data.admin) {
@@ -1720,6 +2411,7 @@
         const loadAllData = () => {
           loadFounders();
           loadNodes();
+          loadNodeStats();
           loadInvestors();
           loadIntroRequests();
           loadRelationships();
@@ -1727,11 +2419,26 @@
           loadNodeTasks();
           loadTrends();
           loadPortfolio();
+          loadPendingInboundCount();
+          loadOnboardingWorkflows();
         };
 
         // Load functions
         const loadFounders = async () => { founders.value = await api('/founders'); };
         const loadNodes = async () => { nodes.value = await api('/nodes'); };
+        const loadNodeStats = async () => {
+          try {
+            const stats = await fetch('/api/debug/node-stats').then(r => r.json());
+            // Convert array to map by node name for easy lookup
+            const statsMap = {};
+            for (const s of stats) {
+              statsMap[s.node] = s;
+            }
+            nodeStats.value = statsMap;
+          } catch (e) {
+            console.error('Failed to load node stats:', e);
+          }
+        };
         const loadInvestors = async () => { investors.value = await api('/investors'); };
         const loadIntroRequests = async () => {
           let url = '/intro-requests?';
@@ -1749,7 +2456,11 @@
         };
 
         const loadTrends = async () => {
-          trends.value = await api('/intro-requests/stats/trends');
+          let url = '/intro-requests/stats/trends';
+          if (chartNodeId.value) {
+            url += `?nodeId=${chartNodeId.value}`;
+          }
+          trends.value = await api(url);
         };
 
         const loadPortfolio = async () => {
@@ -1814,6 +2525,265 @@
           });
         };
 
+        // Onboarding functions
+        const loadOnboardingWorkflows = async () => {
+          const data = await api('/onboarding/workflows');
+          onboardingWorkflows.value = data.workflows || [];
+          onboardingSummary.value = data.summary || {};
+        };
+
+        const getEligibleForOnboarding = () => {
+          const onboardedIds = new Set(onboardingWorkflows.value.map(w => w.portfolioCompanyId));
+          return (portfolio.value.companies || []).filter(c => !onboardedIds.has(c.id));
+        };
+
+        const openStartOnboardingModal = () => {
+          startOnboardingForm.value = { portfolioCompanyId: null, equityPercent: '0.5', vestingMonths: 48, vestingCliffMonths: 0, notes: '' };
+          showStartOnboardingModal.value = true;
+        };
+
+        const startOnboarding = async () => {
+          if (!startOnboardingForm.value.portfolioCompanyId) return;
+          await api(`/onboarding/${startOnboardingForm.value.portfolioCompanyId}/start`, {
+            method: 'POST',
+            body: {
+              equityPercent: startOnboardingForm.value.equityPercent,
+              vestingMonths: startOnboardingForm.value.vestingMonths,
+              vestingCliffMonths: startOnboardingForm.value.vestingCliffMonths,
+              notes: startOnboardingForm.value.notes,
+            },
+          });
+          showStartOnboardingModal.value = false;
+          loadOnboardingWorkflows();
+        };
+
+        const openWorkflowModal = async (workflow) => {
+          selectedWorkflow.value = workflow;
+          const data = await api(`/onboarding/workflows/${workflow.id}`);
+          workflowDetails.value = data;
+          showWorkflowModal.value = true;
+        };
+
+        const closeWorkflowModal = () => {
+          showWorkflowModal.value = false;
+          selectedWorkflow.value = null;
+          workflowDetails.value = null;
+        };
+
+        const sendOffer = async (workflowId) => {
+          await api(`/onboarding/${workflowId}/send-offer`, { method: 'POST' });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
+        const generateAdvisoryAgreement = async (workflowId) => {
+          await api(`/onboarding/${workflowId}/generate-advisory-agreement`, {
+            method: 'POST',
+            body: { adminEmail: adminEmail.value },
+          });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
+        const checkSignatureStatus = async (workflowId) => {
+          try {
+            const result = await api(`/onboarding/${workflowId}/check-signature-status`, { method: 'POST' });
+            if (result.isComplete) {
+              alert('All signatures complete! Workflow updated.');
+            } else {
+              const signerStatus = result.signers.map(s => `${s.email}: ${s.status}`).join('\n');
+              alert(`Signature status:\n${signerStatus}`);
+            }
+            loadOnboardingWorkflows();
+            if (workflowDetails.value?.workflow?.id === workflowId) {
+              openWorkflowModal({ id: workflowId });
+            }
+          } catch (err) {
+            alert('Error checking status: ' + (err.message || err));
+          }
+        };
+
+        const signEquityAgreement = async (workflowId) => {
+          await api(`/onboarding/${workflowId}/sign-equity-agreement`, { method: 'POST' });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
+        const markSharesPurchased = async (workflowId) => {
+          const amount = prompt('Enter purchase amount (e.g., 10.00):');
+          if (!amount) return;
+          const method = prompt('Payment method (check/wire/ach):') || 'check';
+          await api(`/onboarding/${workflowId}/mark-shares-purchased`, {
+            method: 'POST',
+            body: { amount, method },
+          });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
+        const file83b = async (workflowId) => {
+          const proofUrl = prompt('Enter 83(b) proof URL (certified mail receipt):') || '';
+          await api(`/onboarding/${workflowId}/file-83b`, {
+            method: 'POST',
+            body: { proofUrl },
+          });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
+        const verifyCertificate = async (workflowId) => {
+          const certNumber = prompt('Enter certificate number (optional):') || '';
+          await api(`/onboarding/${workflowId}/verify-certificate`, {
+            method: 'POST',
+            body: { certificateNumber: certNumber },
+          });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
+        const sendReminder = async (workflowId) => {
+          await api(`/onboarding/${workflowId}/send-reminder`, { method: 'POST' });
+          alert('Reminder sent!');
+        };
+
+        const formatOnboardingStatus = (status) => {
+          const statusMap = {
+            'offer_pending': 'Offer Pending',
+            'offer_accepted': 'Offer Accepted',
+            'entity_info_pending': 'Awaiting Entity Info',
+            'entity_info_received': 'Entity Info Received',
+            'advisory_agreement_sent': 'Advisory Sent',
+            'admin_signed': 'Admin Signed',
+            'founder_signed': 'Founder Signed',
+            'equity_agreement_pending': 'Awaiting Equity Agreement',
+            'equity_agreement_signed': 'Equity Agreement Signed',
+            'shares_purchased': 'Shares Purchased',
+            '83b_filed': '83(b) Filed',
+            'certificate_pending': 'Awaiting Certificate',
+            'completed': 'Completed',
+          };
+          return statusMap[status] || status;
+        };
+
+        const formatVestingSchedule = (vestingMonths, vestingCliffMonths) => {
+          const months = vestingMonths || 48;
+          const cliff = vestingCliffMonths || 0;
+          const years = months / 12;
+          const cliffText = cliff === 0 ? 'no cliff' : `${cliff}-month cliff`;
+          return `${years}-year vest, ${cliffText}`;
+        };
+
+        const onboardingStatusClass = (status) => {
+          if (status === 'completed') return 'bg-green-100 text-green-800';
+          if (status.includes('pending') || status.includes('awaiting')) return 'bg-yellow-100 text-yellow-800';
+          return 'bg-blue-100 text-blue-800';
+        };
+
+        const getNextOnboardingAction = (workflow) => {
+          const actions = {
+            'offer_pending': workflow.offerSentAt ? null : { label: 'Send Offer', action: () => sendOffer(workflow.id) },
+            'entity_info_received': { label: 'Generate Agreement', action: () => generateAdvisoryAgreement(workflow.id) },
+            'advisory_agreement_sent': { label: 'Check Signatures', action: () => checkSignatureStatus(workflow.id) },
+            'admin_signed': { label: 'Check Signatures', action: () => checkSignatureStatus(workflow.id) },
+            'equity_agreement_pending': { label: 'Check Stock Agreement', action: () => checkSignatureStatus(workflow.id) },
+            'equity_agreement_signed': { label: 'Mark Purchased', action: () => markSharesPurchased(workflow.id) },
+            'shares_purchased': { label: 'File 83(b)', action: () => file83b(workflow.id) },
+            'certificate_pending': workflow.certificateUrl ? { label: 'Verify Certificate', action: () => verifyCertificate(workflow.id) } : null,
+          };
+          return actions[workflow.status] || null;
+        };
+
+        // Inbound logs functions
+        const loadInboundLogs = async () => {
+          const query = inboundFilterStatus.value ? `?status=${inboundFilterStatus.value}` : '';
+          inboundLogs.value = await api(`/inbound/logs${query}`);
+          // Update pending count
+          const pending = await api('/inbound/pending');
+          pendingInboundCount.value = pending.length;
+        };
+
+        const loadPendingInboundCount = async () => {
+          try {
+            const pending = await api('/inbound/pending');
+            pendingInboundCount.value = pending.length;
+          } catch (e) {
+            // Silent fail
+          }
+        };
+
+        const openInboundConfirmModal = (log) => {
+          inboundConfirmLog.value = log;
+          inboundConfirmForm.founderId = log.detectedFounderId || '';
+          inboundConfirmForm.investorId = log.detectedInvestorId || '';
+          inboundConfirmForm.nodeId = '';
+          inboundConfirmForm.notes = '';
+          showInboundConfirmModal.value = true;
+        };
+
+        const closeInboundConfirmModal = () => {
+          showInboundConfirmModal.value = false;
+          inboundConfirmLog.value = null;
+        };
+
+        const submitInboundConfirm = async () => {
+          if (!inboundConfirmForm.founderId) {
+            alert('Please select a founder');
+            return;
+          }
+          if (!inboundConfirmForm.investorId) {
+            alert('Please select an investor');
+            return;
+          }
+
+          const body = {
+            founderId: parseInt(inboundConfirmForm.founderId),
+            investorId: parseInt(inboundConfirmForm.investorId),
+          };
+          if (inboundConfirmForm.nodeId) {
+            body.nodeId = parseInt(inboundConfirmForm.nodeId);
+          }
+          if (inboundConfirmForm.notes) {
+            body.notes = inboundConfirmForm.notes;
+          }
+
+          try {
+            await api(`/inbound/${inboundConfirmLog.value.id}/confirm`, { method: 'POST', body });
+            closeInboundConfirmModal();
+            loadInboundLogs();
+            // Refresh intro requests if on that tab
+            if (activeTab.value === 'intros') {
+              loadIntroRequests();
+            }
+          } catch (e) {
+            alert('Failed to confirm: ' + e.message);
+          }
+        };
+
+        const dismissInboundLog = async (logId) => {
+          if (!confirm('Are you sure you want to dismiss this log? It will not create an intro request.')) {
+            return;
+          }
+
+          try {
+            await api(`/inbound/${logId}/dismiss`, { method: 'POST' });
+            loadInboundLogs();
+          } catch (e) {
+            alert('Failed to dismiss: ' + e.message);
+          }
+        };
+
         const formatCurrency = (value) => {
           if (!value) return '-';
           return '$' + value.toLocaleString();
@@ -1843,9 +2813,16 @@
           return isGood ? 'text-green-600' : 'text-red-600';
         };
 
+        const getChartValue = (month) => {
+          if (chartMetric.value === 'intros') return month.introduced || 0;
+          if (chartMetric.value === 'acceptRate') return month.acceptRate || 0;
+          return month.total || 0;
+        };
+
         const getBarHeight = (value) => {
           if (!trends.value.monthlyStats?.length) return 0;
-          const maxValue = Math.max(...trends.value.monthlyStats.map(m => m.total), 1);
+          const values = trends.value.monthlyStats.map(m => getChartValue(m));
+          const maxValue = Math.max(...values, 1);
           return Math.max((value / maxValue) * 80, 4);
         };
 
@@ -1889,6 +2866,11 @@
         const formatStatus = (status) => status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
         const formatStage = (stage) => stage?.replace(/_/g, '-').replace(/\b\w/g, l => l.toUpperCase()) || '';
         const formatRoundStatus = (status) => status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
+        const parseTags = (tags) => {
+          if (!tags) return [];
+          if (Array.isArray(tags)) return tags;
+          try { return JSON.parse(tags); } catch { return []; }
+        };
 
         const statusClass = (status) => {
           const classes = {
@@ -1896,7 +2878,6 @@
             introduced: 'bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs',
             passed: 'bg-red-100 text-red-800 px-2 py-1 rounded text-xs',
             ignored: 'bg-gray-100 text-gray-800 px-2 py-1 rounded text-xs',
-            not_a_fit: 'bg-red-100 text-red-800 px-2 py-1 rounded text-xs',
             first_meeting_complete: 'bg-green-100 text-green-800 px-2 py-1 rounded text-xs',
             second_meeting_complete: 'bg-green-100 text-green-800 px-2 py-1 rounded text-xs',
             follow_up_questions: 'bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs',
@@ -1998,17 +2979,43 @@
 
         const saveInvestor = async () => {
           if (editingInvestor.value) {
-            await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorForm });
+            const { nodeId, ...investorData } = investorForm;
+            await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorData });
           } else {
-            await api('/investors', { method: 'POST', body: investorForm });
+            // Require node for new investors
+            if (!investorForm.nodeId) {
+              alert('Please select a node to assign this investor to');
+              return;
+            }
+            const { nodeId, ...investorData } = investorForm;
+            const newInvestor = await api('/investors', { method: 'POST', body: investorData });
+            // Create the node-investor connection
+            await api('/relationships/node-investor', {
+              method: 'POST',
+              body: {
+                nodeId: parseInt(investorForm.nodeId),
+                investorId: newInvestor.id,
+                connectionStrength: 'medium',
+                validated: true,
+              }
+            });
           }
           closeInvestorModal();
           loadInvestors();
+          loadRelationships();
         };
 
         const editInvestor = (investor) => {
           editingInvestor.value = investor.id;
-          Object.assign(investorForm, investor);
+          let tags = [];
+          if (investor.tags) {
+            tags = Array.isArray(investor.tags) ? investor.tags : (typeof investor.tags === 'string' ? JSON.parse(investor.tags) : []);
+          }
+          Object.assign(investorForm, {
+            ...investor,
+            active: investor.active !== false,
+            tags: tags,
+          });
           showInvestorModal.value = true;
         };
 
@@ -2019,10 +3026,40 @@
           }
         };
 
+        const toggleInvestorActive = async (investor) => {
+          const newActive = investor.active === false ? true : false;
+          await api(`/investors/${investor.id}`, {
+            method: 'PUT',
+            body: { active: newActive }
+          });
+          loadInvestors();
+        };
+
+        const generateTags = async (investorId) => {
+          try {
+            await api(`/investors/${investorId}/generate-tags`, { method: 'POST' });
+            loadInvestors();
+          } catch (err) {
+            alert('Failed to generate tags: ' + (err.message || err));
+          }
+        };
+
+        const generateAllTags = async () => {
+          if (!confirm('Generate tags for all investors with AI research?')) return;
+          try {
+            const result = await api('/investors/generate-all-tags', { method: 'POST' });
+            alert(`Generated tags for ${result.results?.length || 0} investors`);
+            loadInvestors();
+          } catch (err) {
+            alert('Failed to generate tags: ' + (err.message || err));
+          }
+        };
+
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '' });
+          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [] });
+          newInvestorTag.value = '';
         };
 
         const saveIntro = async () => {
@@ -2063,6 +3100,21 @@
             nextFollowupDate: '', followupOwner: 'founder', passReason: '', notes: '',
             founderName: '', nodeName: '', investorName: ''
           });
+          // Clear autocomplete search fields
+          introFounderSearch.value = '';
+          introNodeSearch.value = '';
+          introInvestorSearch.value = '';
+        };
+
+        // Blur handlers for autocomplete dropdowns (delay to allow click)
+        const blurIntroFounder = () => {
+          setTimeout(() => { introFounderDropdownOpen.value = false; }, 200);
+        };
+        const blurIntroNode = () => {
+          setTimeout(() => { introNodeDropdownOpen.value = false; }, 200);
+        };
+        const blurIntroInvestor = () => {
+          setTimeout(() => { introInvestorDropdownOpen.value = false; }, 200);
         };
 
         const showAddFollowup = (intro) => {
@@ -2330,22 +3382,29 @@
           requestMagicLink, logout,
           // Data
           tabs, activeTab, introStatuses,
-          founders, nodes, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, trends, portfolio, eligibleFounders, expandedFounderTasks,
+          founders, nodes, nodeStats, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, trends, portfolio, eligibleFounders, expandedFounderTasks,
+          inboundLogs, inboundFilterStatus, pendingInboundCount,
           showFounderModal, showNodeModal, showInvestorModal, showIntroModal, showFollowupModal, showFNRelModal, showNIConnModal,
           showLoginLinkModal, loginLinkData, linkCopied,
           showPortfolioModal, editingPortfolio, portfolioView, portfolioForm,
           savePortfolio, editPortfolioCompany, deletePortfolioCompany, closePortfolioModal,
+          showInboundConfirmModal, inboundConfirmLog, inboundConfirmForm,
+          loadInboundLogs, loadPendingInboundCount, openInboundConfirmModal, closeInboundConfirmModal, submitInboundConfirm, dismissInboundLog,
           formatCurrency, calculatePaperValue, getCompletionStatus,
           editingFounder, editingNode, editingInvestor, editingIntro,
-          founderForm, nodeForm, investorForm, introForm, followupForm, fnRelForm, niConnForm,
+          founderForm, nodeForm, investorForm, newInvestorTag, investorFormTags, addInvestorTag, removeInvestorTag, introForm, followupForm, fnRelForm, niConnForm,
+          introFounderSearch, introNodeSearch, introInvestorSearch,
+          introFounderDropdownOpen, introNodeDropdownOpen, introInvestorDropdownOpen,
+          introFounderOptions, introNodeOptions, introInvestorOptions,
+          blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
-          formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight,
+          formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, chartMetric, chartNodeId, getChartValue, loadTrends,
           loadIntroRequests, markNodeTaskDone, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
-          planningFounderId, plannedInvestors, shuffleInvestors, requestIntroFor,
+          planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,
           saveNode, editNode, deleteNode, closeNodeModal,
-          saveInvestor, editInvestor, deleteInvestor, closeInvestorModal,
+          saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, generateTags, generateAllTags, closeInvestorModal,
           saveIntro, editIntro, closeIntroModal,
           showAddFollowup, saveFollowup,
           saveFNRelationship, deleteFNRelationship,
@@ -2353,7 +3412,14 @@
           generateLoginLink, copyLoginLink, impersonateFounder, sendInviteEmail, emailSending, emailSent,
           showResearchModal, researchState, researchError, researchData, researchModalTitle, canRefreshResearch,
           openResearchModal, closeResearchModal, triggerResearch, getUrlDomain, formatDate,
-          bulkResearch, startBulkResearch,
+          bulkResearch,
+          // Onboarding
+          onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,
+          selectedWorkflow, showWorkflowModal, workflowDetails,
+          loadOnboardingWorkflows, getEligibleForOnboarding, openStartOnboardingModal, startOnboarding,
+          openWorkflowModal, closeWorkflowModal, sendOffer, generateAdvisoryAgreement, checkSignatureStatus,
+          signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
+          formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction,
         };
       }
     }).mount('#app');

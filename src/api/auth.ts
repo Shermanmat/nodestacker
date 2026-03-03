@@ -52,21 +52,21 @@ app.post('/magic-link', async (c) => {
       await postmarkClient.sendEmail({
         From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
         To: founder.email,
-        Subject: 'Your NodeStacker Login Link',
+        Subject: 'Your MatCap Login Link',
         HtmlBody: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Hi ${founder.name},</h2>
-            <p>Click the button below to log in to your NodeStacker founder portal:</p>
+            <p>Click the button below to log in to your MatCap founder portal:</p>
             <p style="margin: 30px 0;">
               <a href="${magicLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Log In to NodeStacker
+                Log In to MatCap
               </a>
             </p>
             <p style="color: #666; font-size: 14px;">This link expires in 15 minutes.</p>
             <p style="color: #666; font-size: 14px;">If you didn't request this, you can ignore this email.</p>
           </div>
         `,
-        TextBody: `Hi ${founder.name},\n\nClick here to log in to NodeStacker: ${magicLink}\n\nThis link expires in 15 minutes.`,
+        TextBody: `Hi ${founder.name},\n\nClick here to log in to MatCap: ${magicLink}\n\nThis link expires in 15 minutes.`,
       });
       console.log(`✅ Email sent to ${founder.email}`);
     } catch (err) {
@@ -201,11 +201,11 @@ app.post('/admin/generate-link/:founderId', async (c) => {
       await postmarkClient.sendEmail({
         From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
         To: founder.email,
-        Subject: `You're invited to NodeStacker`,
+        Subject: `You're invited to MatCap`,
         HtmlBody: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
             <h2>Hi ${founder.name},</h2>
-            <p>You've been invited to NodeStacker - your founder portal for managing investor intros.</p>
+            <p>You've been invited to MatCap - your founder portal for managing investor intros.</p>
             <p>Click the button below to access your dashboard:</p>
             <p style="margin: 30px 0;">
               <a href="${magicLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
@@ -216,7 +216,7 @@ app.post('/admin/generate-link/:founderId', async (c) => {
             <p>Best,<br>Mat</p>
           </div>
         `,
-        TextBody: `Hi ${founder.name},\n\nYou've been invited to NodeStacker - your founder portal for managing investor intros.\n\nClick here to access your dashboard: ${magicLink}\n\nThis link expires in 7 days.\n\nBest,\nMat`,
+        TextBody: `Hi ${founder.name},\n\nYou've been invited to MatCap - your founder portal for managing investor intros.\n\nClick here to access your dashboard: ${magicLink}\n\nThis link expires in 7 days.\n\nBest,\nMat`,
       });
       emailSent = true;
       console.log(`✅ Invite email sent to ${founder.email}`);

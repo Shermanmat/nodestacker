@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { eq, and, inArray, notInArray, desc, sql } from 'drizzle-orm';
-import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch } from '../db/index.js';
+import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
 import { z } from 'zod';
+import * as onboardingEmails from '../services/onboarding-emails.js';
+import * as esign from '../services/esign.js';
 
 type Variables = {
   founderId: number;
@@ -31,19 +33,45 @@ app.get('/dashboard', async (c) => {
     where: eq(founders.id, founderId),
   });
 
-  // Get counts
+  // Get founder's intro requests
   const allIntros = await db.query.introRequests.findMany({
     where: eq(introRequests.founderId, founderId),
   });
 
+  // Get global stats for comparison
+  const allGlobalIntros = await db.query.introRequests.findMany();
+
   const today = new Date().toISOString().split('T')[0];
 
+  // Count by status
+  const totalRequests = allIntros.length;
+  const introduced = allIntros.filter(i =>
+    ['introduced', 'first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'invested', 'circle_back_round_opens'].includes(i.status)
+  ).length;
+  const passed = allIntros.filter(i => i.status === 'passed').length;
+  const ignored = allIntros.filter(i => i.status === 'ignored').length;
+  const pending = allIntros.filter(i => i.status === 'intro_request_sent').length;
+  const invested = allIntros.filter(i => i.status === 'invested').length;
+
+  // Calculate accept rates
+  const acceptRate = totalRequests > 0 ? Math.round((introduced / totalRequests) * 100) : 0;
+
+  // Global accept rate
+  const globalTotal = allGlobalIntros.length;
+  const globalIntroduced = allGlobalIntros.filter(i =>
+    ['introduced', 'first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'invested', 'circle_back_round_opens'].includes(i.status)
+  ).length;
+  const globalAcceptRate = globalTotal > 0 ? Math.round((globalIntroduced / globalTotal) * 100) : 0;
+
   const stats = {
-    totalIntros: allIntros.length,
-    activeIntros: allIntros.filter(i =>
-      !['passed', 'ignored', 'invested', 'circle_back_round_opens'].includes(i.status)
-    ).length,
-    invested: allIntros.filter(i => i.status === 'invested').length,
+    totalRequests,
+    introduced,
+    passed,
+    ignored,
+    pending,
+    invested,
+    acceptRate,
+    globalAcceptRate,
     overdueFollowups: allIntros.filter(i =>
       i.nextFollowupDate && i.nextFollowupDate < today &&
       !['passed', 'ignored', 'invested'].includes(i.status)
@@ -308,7 +336,7 @@ app.put('/my-intros/:id', async (c) => {
       'follow_up_questions',
       'circle_back_round_opens',
       'invested',
-      'not_a_fit',
+      'passed',
     ]).optional(),
     firstMeetingDate: z.string().optional(),
     secondMeetingDate: z.string().optional(),
@@ -399,7 +427,7 @@ app.get('/tasks', async (c) => {
 
   for (const intro of allIntros) {
     // Skip terminal statuses and pre-intro (node's responsibility)
-    if (['passed', 'ignored', 'invested', 'not_a_fit', 'intro_request_sent'].includes(intro.status)) {
+    if (['passed', 'ignored', 'invested', 'intro_request_sent'].includes(intro.status)) {
       continue;
     }
 
@@ -448,7 +476,10 @@ app.get('/tasks', async (c) => {
     }
 
     // 5. Founder hasn't touched it yet - show task based on status
-    // (No grace period - show immediately so founders know to update)
+    // Give a 3-day grace period for newly introduced intros before showing task
+    if (intro.status === 'introduced' && intro.createdAt > threeDaysAgo) {
+      continue;
+    }
 
     let message = '';
     switch (intro.status) {
@@ -518,7 +549,7 @@ app.get('/nodes', async (c) => {
     }
     const entry = nodeIntroMap.get(intro.nodeId)!;
     entry.intros.push(intro);
-    if (!['passed', 'ignored', 'invested', 'not_a_fit'].includes(intro.status)) {
+    if (!['passed', 'ignored', 'invested'].includes(intro.status)) {
       entry.activeCount++;
     }
     if (intro.status === 'invested') {
@@ -571,6 +602,471 @@ app.get('/nodes', async (c) => {
   return c.json({
     workingWith: workingWithNodes,
     available: availableNodesWithCounts,
+  });
+});
+
+// ============== ONBOARDING ENDPOINTS ==============
+
+// Helper function to log onboarding events
+async function logOnboardingEvent(
+  workflowId: number,
+  eventType: string,
+  actorEmail?: string,
+  details?: Record<string, any>
+) {
+  await db.insert(onboardingEvents).values({
+    workflowId,
+    eventType,
+    actor: OnboardingActor.FOUNDER,
+    actorEmail,
+    details: details ? JSON.stringify(details) : undefined,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+// Get current onboarding status
+app.get('/onboarding/status', async (c) => {
+  const founderId = c.get('founderId') as number;
+
+  // Find portfolio company for this founder
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+    with: {
+      founder: true,
+    },
+  });
+
+  if (!portfolioCompany) {
+    return c.json({ hasOnboarding: false, message: 'Not yet a portfolio company' });
+  }
+
+  // Find onboarding workflow
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+    with: {
+      events: true,
+    },
+  });
+
+  if (!workflow) {
+    return c.json({ hasOnboarding: false, message: 'No onboarding workflow started' });
+  }
+
+  // Calculate share details if available
+  let shareDetails = null;
+  if (workflow.authorizedShares && workflow.offerEquityPercent && workflow.sharePrice) {
+    const shareCount = Math.round(workflow.authorizedShares * (parseFloat(workflow.offerEquityPercent) / 100));
+    shareDetails = {
+      shareCount,
+      sharePrice: workflow.sharePrice,
+      totalAmount: (shareCount * parseFloat(workflow.sharePrice)).toFixed(2),
+    };
+  }
+
+  // Determine next action for founder
+  let nextAction = null;
+  switch (workflow.status) {
+    case OnboardingStatus.OFFER_PENDING:
+      if (workflow.offerSentAt) {
+        nextAction = { type: 'accept_offer', message: 'Accept or decline the offer' };
+      }
+      break;
+    case OnboardingStatus.OFFER_ACCEPTED:
+    case OnboardingStatus.ENTITY_INFO_PENDING:
+      nextAction = { type: 'entity_info', message: 'Submit your company details' };
+      break;
+    case OnboardingStatus.ADVISORY_AGREEMENT_SENT:
+    case OnboardingStatus.ADMIN_SIGNED:
+      nextAction = { type: 'sign_advisory', message: 'Sign the advisory agreement (check your email)' };
+      break;
+    case OnboardingStatus.FOUNDER_SIGNED:
+    case OnboardingStatus.EQUITY_AGREEMENT_PENDING:
+      nextAction = { type: 'upload_equity_agreement', message: 'Upload equity purchase agreement' };
+      break;
+    case OnboardingStatus.CERTIFICATE_PENDING:
+      nextAction = { type: 'upload_certificate', message: 'Upload stock certificate' };
+      break;
+    case OnboardingStatus.COMPLETED:
+      nextAction = null;
+      break;
+    default:
+      nextAction = { type: 'wait', message: 'Waiting for admin action' };
+  }
+
+  return c.json({
+    hasOnboarding: true,
+    workflow: {
+      id: workflow.id,
+      status: workflow.status,
+      offerEquityPercent: workflow.offerEquityPercent,
+      offerNotes: workflow.offerNotes,
+      offerSentAt: workflow.offerSentAt,
+      offerAcceptedAt: workflow.offerAcceptedAt,
+      vestingMonths: workflow.vestingMonths,
+      vestingCliffMonths: workflow.vestingCliffMonths,
+      entityName: workflow.entityName,
+      entityType: workflow.entityType,
+      entityState: workflow.entityState,
+      authorizedShares: workflow.authorizedShares,
+      sharePrice: workflow.sharePrice,
+      agreementSentAt: workflow.agreementSentAt,
+      founderSignedAt: workflow.founderSignedAt,
+      adminSignedAt: workflow.adminSignedAt,
+      equityAgreementReceivedAt: workflow.equityAgreementReceivedAt,
+      equityAgreementUrl: workflow.equityAgreementUrl,
+      sharePurchaseDate: workflow.sharePurchaseDate,
+      election83bFiledAt: workflow.election83bFiledAt,
+      certificateReceivedAt: workflow.certificateReceivedAt,
+      certificateUrl: workflow.certificateUrl,
+      createdAt: workflow.createdAt,
+      updatedAt: workflow.updatedAt,
+    },
+    shareDetails,
+    nextAction,
+    events: workflow.events.slice(0, 10), // Last 10 events
+  });
+});
+
+// Accept the offer
+app.post('/onboarding/accept-offer', async (c) => {
+  const founderId = c.get('founderId') as number;
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+
+  if (!founder) {
+    return c.json({ error: 'Founder not found' }, 404);
+  }
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+
+  if (!portfolioCompany) {
+    return c.json({ error: 'Not a portfolio company' }, 400);
+  }
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+
+  if (!workflow) {
+    return c.json({ error: 'No onboarding workflow found' }, 404);
+  }
+
+  if (workflow.status !== OnboardingStatus.OFFER_PENDING) {
+    return c.json({ error: `Cannot accept offer in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  await db.update(onboardingWorkflows)
+    .set({
+      status: OnboardingStatus.ENTITY_INFO_PENDING,
+      offerAcceptedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.OFFER_ACCEPTED, founder.email);
+
+  // Send email requesting entity info
+  await onboardingEmails.sendEntityInfoRequestEmail({
+    name: founder.name,
+    email: founder.email,
+    companyName: founder.companyName,
+  });
+
+  return c.json({ success: true, message: 'Offer accepted! Please submit your company details.' });
+});
+
+// Submit entity info
+app.post('/onboarding/entity-info', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    entityName: z.string().min(1),
+    entityType: z.enum(['llc', 'c_corp', 's_corp', 'partnership', 'sole_prop', 'other']),
+    entityState: z.string().min(2).max(2), // State code
+    authorizedShares: z.number().positive(),
+    sharePrice: z.string().optional(), // Defaults to 0.0001 if not provided
+    founderTitle: z.string().optional(), // Defaults to 'Founder & CEO' if not provided
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+
+  if (!founder) {
+    return c.json({ error: 'Founder not found' }, 404);
+  }
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+
+  if (!portfolioCompany) {
+    return c.json({ error: 'Not a portfolio company' }, 400);
+  }
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+
+  if (!workflow) {
+    return c.json({ error: 'No onboarding workflow found' }, 404);
+  }
+
+  if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED &&
+      workflow.status !== OnboardingStatus.ENTITY_INFO_PENDING) {
+    return c.json({ error: `Cannot submit entity info in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  const sharePrice = parsed.data.sharePrice || '0.0001';
+  const founderTitle = parsed.data.founderTitle || 'Founder & CEO';
+
+  await db.update(onboardingWorkflows)
+    .set({
+      status: OnboardingStatus.ENTITY_INFO_RECEIVED,
+      entityName: parsed.data.entityName,
+      entityType: parsed.data.entityType,
+      entityState: parsed.data.entityState,
+      authorizedShares: parsed.data.authorizedShares,
+      sharePrice,
+      founderTitle,
+      entityInfoReceivedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.ENTITY_INFO_SUBMITTED, founder.email, {
+    entityName: parsed.data.entityName,
+    entityType: parsed.data.entityType,
+    authorizedShares: parsed.data.authorizedShares,
+  });
+
+  // Auto-send advisory agreement via Dropbox Sign template
+  let agreementSent = false;
+  if (esign.isConfigured()) {
+    try {
+      // Calculate share count
+      const equityPercent = parseFloat(workflow.offerEquityPercent || '0');
+      const shareCount = Math.round(parsed.data.authorizedShares * (equityPercent / 100));
+
+      // Use the Dropbox Sign template with merge fields
+      const result = await esign.createSignatureRequest(
+        {
+          company_name: parsed.data.entityName,
+          effective_date: now.split('T')[0],
+          share_count: shareCount.toLocaleString(),
+          founder_name: founder.name,
+          founder_title: founderTitle,
+          founder_email: founder.email,
+          equity_percent: workflow.offerEquityPercent || '',
+        },
+        [
+          { name: founder.name, email: founder.email, role: 'Founder' },
+          { name: 'Mat Sherman', email: 'mat@matsherman.com', role: 'Advisor' },
+        ]
+      );
+
+      // Update workflow with signature request info
+      await db.update(onboardingWorkflows)
+        .set({
+          status: OnboardingStatus.ADVISORY_AGREEMENT_SENT,
+          esignDocumentId: result.documentId,
+          esignSignatureRequestId: result.signatureRequestId,
+          agreementSentAt: now,
+          updatedAt: now,
+        })
+        .where(eq(onboardingWorkflows.id, workflow.id));
+
+      await logOnboardingEvent(workflow.id, OnboardingEventType.ADVISORY_AGREEMENT_CREATED, 'system', {
+        signatureRequestId: result.signatureRequestId,
+      });
+
+      agreementSent = true;
+      console.log(`✅ Advisory agreement auto-sent for ${founder.companyName}`);
+    } catch (err: any) {
+      console.error('Failed to auto-send advisory agreement:', err);
+      // Continue anyway - admin can manually send
+    }
+  }
+
+  // Notify admin
+  await onboardingEmails.notifyAdminEntityInfoReceived(
+    'mat@matsherman.com',
+    { name: founder.name, email: founder.email, companyName: founder.companyName },
+    {
+      entityName: parsed.data.entityName,
+      entityType: parsed.data.entityType,
+      authorizedShares: parsed.data.authorizedShares,
+    }
+  );
+
+  return c.json({
+    success: true,
+    message: agreementSent
+      ? 'Company details received! The advisory agreement has been sent to your email for signature.'
+      : 'Company details received! We will prepare the advisory agreement.',
+  });
+});
+
+// Upload equity agreement
+app.post('/onboarding/upload-equity-agreement', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    documentUrl: z.string().url(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+
+  if (!founder) {
+    return c.json({ error: 'Founder not found' }, 404);
+  }
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+
+  if (!portfolioCompany) {
+    return c.json({ error: 'Not a portfolio company' }, 400);
+  }
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+
+  if (!workflow) {
+    return c.json({ error: 'No onboarding workflow found' }, 404);
+  }
+
+  // Can upload after advisory is signed by founder
+  const allowedStatuses = [
+    OnboardingStatus.FOUNDER_SIGNED,
+    OnboardingStatus.EQUITY_AGREEMENT_PENDING,
+  ];
+  if (!allowedStatuses.includes(workflow.status as any)) {
+    return c.json({ error: `Cannot upload equity agreement in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  await db.update(onboardingWorkflows)
+    .set({
+      status: OnboardingStatus.EQUITY_AGREEMENT_PENDING,
+      equityAgreementUrl: parsed.data.documentUrl,
+      equityAgreementReceivedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.EQUITY_AGREEMENT_UPLOADED, founder.email, {
+    documentUrl: parsed.data.documentUrl,
+  });
+
+  // Notify admin
+  const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+  await onboardingEmails.notifyAdminEquityAgreementUploaded(adminEmail, {
+    name: founder.name,
+    email: founder.email,
+    companyName: founder.companyName,
+  });
+
+  return c.json({
+    success: true,
+    message: 'Equity agreement uploaded! We will review and sign it.'
+  });
+});
+
+// Upload certificate
+app.post('/onboarding/upload-certificate', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    documentUrl: z.string().url(),
+    certificateNumber: z.string().optional(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+
+  if (!founder) {
+    return c.json({ error: 'Founder not found' }, 404);
+  }
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+
+  if (!portfolioCompany) {
+    return c.json({ error: 'Not a portfolio company' }, 400);
+  }
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+
+  if (!workflow) {
+    return c.json({ error: 'No onboarding workflow found' }, 404);
+  }
+
+  if (workflow.status !== OnboardingStatus.CERTIFICATE_PENDING) {
+    return c.json({ error: `Cannot upload certificate in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  await db.update(onboardingWorkflows)
+    .set({
+      certificateUrl: parsed.data.documentUrl,
+      certificateNumber: parsed.data.certificateNumber,
+      certificateReceivedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.CERTIFICATE_UPLOADED, founder.email, {
+    documentUrl: parsed.data.documentUrl,
+    certificateNumber: parsed.data.certificateNumber,
+  });
+
+  // Notify admin
+  const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+  await onboardingEmails.notifyAdminCertificateUploaded(adminEmail, {
+    name: founder.name,
+    email: founder.email,
+    companyName: founder.companyName,
+  });
+
+  return c.json({
+    success: true,
+    message: 'Certificate uploaded! We will verify and complete the onboarding.'
   });
 });
 

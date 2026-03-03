@@ -82,6 +82,8 @@ export const investors = sqliteTable('investors', {
   focusAreas: text('focus_areas'), // JSON array stored as text
   checkSize: text('check_size'),
   geography: text('geography'),
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  tags: text('tags'), // JSON array of auto-generated tags from AI research
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
@@ -250,6 +252,104 @@ export const investorResearchRelations = relations(investorResearch, ({ one }) =
   }),
 }));
 
+// Network Founders Tables (for podcast network matching)
+
+export const NetworkMatchStatus = {
+  SUGGESTED: 'suggested',
+  INTERESTED: 'interested',
+  INTRO_MADE: 'intro_made',
+  PASSED: 'passed',
+} as const;
+
+export const NetworkIntroRequestStatus = {
+  PENDING: 'pending',
+  MATCHED: 'matched',
+  COMPLETED: 'completed',
+} as const;
+
+export const networkFounders = sqliteTable('network_founders', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  companyName: text('company_name').notNull(),
+  email: text('email'),
+  linkedinUrl: text('linkedin_url'),
+  episodeTitle: text('episode_title').notNull(),
+  episodeUrl: text('episode_url'),
+  episodeDate: text('episode_date'),
+  notes: text('notes'), // Admin notes (e.g., "Company dead", "Now at Block")
+  status: text('status').default('active'), // active, inactive, unknown
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const networkFounderResearch = sqliteTable('network_founder_research', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  networkFounderId: integer('network_founder_id').notNull().references(() => networkFounders.id),
+  companyDescription: text('company_description'),
+  industry: text('industry'),
+  companyStage: text('company_stage'),
+  employeeCount: text('employee_count'),
+  targetCustomers: text('target_customers'),
+  recentNews: text('recent_news'),
+  sourceUrls: text('source_urls'), // JSON array
+  status: text('status').notNull().default('pending'), // pending, in_progress, completed, failed
+  errorMessage: text('error_message'),
+  researchedAt: text('researched_at'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const networkIntroRequests = sqliteTable('network_intro_requests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  portfolioCompanyId: integer('portfolio_company_id').notNull().references(() => portfolioCompanies.id),
+  requestText: text('request_text').notNull(),
+  status: text('status').notNull().default('pending'), // pending, matched, completed
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const networkMatches = sqliteTable('network_matches', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  introRequestId: integer('intro_request_id').notNull().references(() => networkIntroRequests.id),
+  networkFounderId: integer('network_founder_id').notNull().references(() => networkFounders.id),
+  matchScore: integer('match_score').notNull(),
+  matchReasoning: text('match_reasoning'),
+  status: text('status').notNull().default('suggested'), // suggested, interested, intro_made, passed
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Network Relations
+
+export const networkFoundersRelations = relations(networkFounders, ({ many }) => ({
+  research: many(networkFounderResearch),
+  matches: many(networkMatches),
+}));
+
+export const networkFounderResearchRelations = relations(networkFounderResearch, ({ one }) => ({
+  networkFounder: one(networkFounders, {
+    fields: [networkFounderResearch.networkFounderId],
+    references: [networkFounders.id],
+  }),
+}));
+
+export const networkIntroRequestsRelations = relations(networkIntroRequests, ({ one, many }) => ({
+  portfolioCompany: one(portfolioCompanies, {
+    fields: [networkIntroRequests.portfolioCompanyId],
+    references: [portfolioCompanies.id],
+  }),
+  matches: many(networkMatches),
+}));
+
+export const networkMatchesRelations = relations(networkMatches, ({ one }) => ({
+  introRequest: one(networkIntroRequests, {
+    fields: [networkMatches.introRequestId],
+    references: [networkIntroRequests.id],
+  }),
+  networkFounder: one(networkFounders, {
+    fields: [networkMatches.networkFounderId],
+    references: [networkFounders.id],
+  }),
+}));
+
 // Type exports
 export type Founder = typeof founders.$inferSelect;
 export type NewFounder = typeof founders.$inferInsert;
@@ -269,3 +369,196 @@ export type InvestorResearch = typeof investorResearch.$inferSelect;
 export type NewInvestorResearch = typeof investorResearch.$inferInsert;
 export type PortfolioCompany = typeof portfolioCompanies.$inferSelect;
 export type NewPortfolioCompany = typeof portfolioCompanies.$inferInsert;
+export type NetworkFounder = typeof networkFounders.$inferSelect;
+export type NewNetworkFounder = typeof networkFounders.$inferInsert;
+export type NetworkFounderResearch = typeof networkFounderResearch.$inferSelect;
+export type NewNetworkFounderResearch = typeof networkFounderResearch.$inferInsert;
+export type NetworkIntroRequest = typeof networkIntroRequests.$inferSelect;
+export type NewNetworkIntroRequest = typeof networkIntroRequests.$inferInsert;
+export type NetworkMatch = typeof networkMatches.$inferSelect;
+export type NewNetworkMatch = typeof networkMatches.$inferInsert;
+
+// Admin Sessions Table (persistent admin login sessions)
+export const adminSessions = sqliteTable('admin_sessions', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type AdminSession = typeof adminSessions.$inferSelect;
+export type NewAdminSession = typeof adminSessions.$inferInsert;
+
+// Inbound Intro Logs Table (BCC email logging for intro tracking)
+export const InboundIntroLogStatus = {
+  PENDING: 'pending',
+  CONFIRMED: 'confirmed',
+  DISMISSED: 'dismissed',
+} as const;
+
+export const inboundIntroLogs = sqliteTable('inbound_intro_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  fromEmail: text('from_email').notNull(),
+  toEmails: text('to_emails').notNull(), // JSON array
+  ccEmails: text('cc_emails'), // JSON array
+  subject: text('subject'),
+  bodyPreview: text('body_preview'), // First 500 chars
+  detectedFounderId: integer('detected_founder_id').references(() => founders.id),
+  detectedInvestorId: integer('detected_investor_id').references(() => investors.id),
+  status: text('status').notNull().default('pending'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  processedAt: text('processed_at'),
+  emailDate: text('email_date'), // Original email date from Postmark
+});
+
+export const inboundIntroLogsRelations = relations(inboundIntroLogs, ({ one }) => ({
+  founder: one(founders, {
+    fields: [inboundIntroLogs.detectedFounderId],
+    references: [founders.id],
+  }),
+  investor: one(investors, {
+    fields: [inboundIntroLogs.detectedInvestorId],
+    references: [investors.id],
+  }),
+}));
+
+export type InboundIntroLog = typeof inboundIntroLogs.$inferSelect;
+export type NewInboundIntroLog = typeof inboundIntroLogs.$inferInsert;
+
+// Onboarding Workflow Tables
+
+export const OnboardingStatus = {
+  OFFER_PENDING: 'offer_pending',
+  OFFER_ACCEPTED: 'offer_accepted',
+  ENTITY_INFO_PENDING: 'entity_info_pending',
+  ENTITY_INFO_RECEIVED: 'entity_info_received',
+  ADVISORY_AGREEMENT_SENT: 'advisory_agreement_sent',
+  ADMIN_SIGNED: 'admin_signed',
+  FOUNDER_SIGNED: 'founder_signed',
+  EQUITY_AGREEMENT_PENDING: 'equity_agreement_pending',
+  EQUITY_AGREEMENT_SIGNED: 'equity_agreement_signed',
+  SHARES_PURCHASED: 'shares_purchased',
+  ELECTION_83B_FILED: '83b_filed',
+  CERTIFICATE_PENDING: 'certificate_pending',
+  COMPLETED: 'completed',
+} as const;
+
+export const OnboardingEventType = {
+  WORKFLOW_STARTED: 'workflow_started',
+  OFFER_SENT: 'offer_sent',
+  OFFER_ACCEPTED: 'offer_accepted',
+  ENTITY_INFO_SUBMITTED: 'entity_info_submitted',
+  ADVISORY_AGREEMENT_CREATED: 'advisory_agreement_created',
+  ADVISORY_AGREEMENT_SENT: 'advisory_agreement_sent',
+  ADMIN_SIGNED_ADVISORY: 'admin_signed_advisory',
+  FOUNDER_SIGNED_ADVISORY: 'founder_signed_advisory',
+  EQUITY_AGREEMENT_UPLOADED: 'equity_agreement_uploaded',
+  EQUITY_AGREEMENT_SIGNED: 'equity_agreement_signed',
+  SHARES_PURCHASED: 'shares_purchased',
+  ELECTION_83B_FILED: '83b_filed',
+  CERTIFICATE_UPLOADED: 'certificate_uploaded',
+  CERTIFICATE_VERIFIED: 'certificate_verified',
+  WORKFLOW_COMPLETED: 'workflow_completed',
+  REMINDER_SENT: 'reminder_sent',
+  WEBHOOK_RECEIVED: 'webhook_received',
+  DOCUMENT_UPLOADED: 'document_uploaded',
+} as const;
+
+export const OnboardingActor = {
+  ADMIN: 'admin',
+  FOUNDER: 'founder',
+  SYSTEM: 'system',
+  WEBHOOK: 'webhook',
+} as const;
+
+export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  portfolioCompanyId: integer('portfolio_company_id').notNull().references(() => portfolioCompanies.id).unique(),
+  status: text('status').notNull().default('offer_pending'),
+
+  // Offer details
+  offerEquityPercent: text('offer_equity_percent'),
+  offerNotes: text('offer_notes'),
+  offerSentAt: text('offer_sent_at'),
+  offerAcceptedAt: text('offer_accepted_at'),
+
+  // Vesting schedule
+  vestingMonths: integer('vesting_months').default(48),
+  vestingCliffMonths: integer('vesting_cliff_months').default(0),
+  vestingStartDate: text('vesting_start_date'),
+
+  // Entity info (from founder)
+  entityName: text('entity_name'),
+  entityType: text('entity_type'),
+  entityState: text('entity_state'),
+  authorizedShares: integer('authorized_shares'),
+  sharePrice: text('share_price').default('0.0001'),
+  founderTitle: text('founder_title'),
+  entityInfoReceivedAt: text('entity_info_received_at'),
+
+  // E-signature tracking (advisory agreement)
+  esignDocumentId: text('esign_document_id'),
+  esignSignatureRequestId: text('esign_signature_request_id'),
+  agreementSentAt: text('agreement_sent_at'),
+  founderSignedAt: text('founder_signed_at'),
+  adminSignedAt: text('admin_signed_at'),
+  signedDocumentUrl: text('signed_document_url'),
+
+  // Equity purchase agreement (founder sends to MatCap)
+  equityAgreementReceivedAt: text('equity_agreement_received_at'),
+  equityAgreementUrl: text('equity_agreement_url'),
+  equityAgreementSignedAt: text('equity_agreement_signed_at'),
+
+  // Share purchase
+  sharePurchaseAmount: text('share_purchase_amount'),
+  sharePurchaseDate: text('share_purchase_date'),
+  sharePurchaseMethod: text('share_purchase_method'),
+
+  // 83(b) election
+  election83bFiledAt: text('election_83b_filed_at'),
+  election83bProofUrl: text('election_83b_proof_url'),
+
+  // Stock certificate (founder issues to MatCap)
+  certificateReceivedAt: text('certificate_received_at'),
+  certificateUrl: text('certificate_url'),
+  certificateNumber: text('certificate_number'),
+  equityVerifiedAt: text('equity_verified_at'),
+
+  // Google Drive
+  driveFolderId: text('drive_folder_id'),
+  driveFolderUrl: text('drive_folder_url'),
+
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const onboardingEvents = sqliteTable('onboarding_events', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  workflowId: integer('workflow_id').notNull().references(() => onboardingWorkflows.id),
+  eventType: text('event_type').notNull(),
+  actor: text('actor').notNull(),
+  actorEmail: text('actor_email'),
+  details: text('details'), // JSON
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Onboarding Relations
+export const onboardingWorkflowsRelations = relations(onboardingWorkflows, ({ one, many }) => ({
+  portfolioCompany: one(portfolioCompanies, {
+    fields: [onboardingWorkflows.portfolioCompanyId],
+    references: [portfolioCompanies.id],
+  }),
+  events: many(onboardingEvents),
+}));
+
+export const onboardingEventsRelations = relations(onboardingEvents, ({ one }) => ({
+  workflow: one(onboardingWorkflows, {
+    fields: [onboardingEvents.workflowId],
+    references: [onboardingWorkflows.id],
+  }),
+}));
+
+export type OnboardingWorkflow = typeof onboardingWorkflows.$inferSelect;
+export type NewOnboardingWorkflow = typeof onboardingWorkflows.$inferInsert;
+export type OnboardingEvent = typeof onboardingEvents.$inferSelect;
+export type NewOnboardingEvent = typeof onboardingEvents.$inferInsert;

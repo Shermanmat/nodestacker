@@ -113,6 +113,69 @@ app.delete('/:id', async (c) => {
   return c.json({ success: true });
 });
 
+// Get node's network stats
+app.get('/:id/stats', async (c) => {
+  const id = parseInt(c.req.param('id'));
+
+  // Get node info
+  const node = await db.query.nodes.findFirst({
+    where: eq(nodes.id, id),
+  });
+
+  if (!node) {
+    return c.json({ error: 'Node not found' }, 404);
+  }
+
+  // Get all investor connections
+  const connections = await db.query.nodeInvestorConnections.findMany({
+    where: eq(nodeInvestorConnections.nodeId, id),
+    with: { investor: true },
+  });
+
+  // Get all intro requests through this node
+  const intros = await db.query.introRequests.findMany({
+    where: eq(introRequests.nodeId, id),
+    with: { founder: true, investor: true },
+  });
+
+  // Calculate stats
+  const networkByStrength = {
+    strong: connections.filter(c => c.connectionStrength === 'strong').length,
+    medium: connections.filter(c => c.connectionStrength === 'medium').length,
+    weak: connections.filter(c => c.connectionStrength === 'weak').length,
+  };
+
+  const introsByStatus: Record<string, number> = {};
+  for (const intro of intros) {
+    introsByStatus[intro.status] = (introsByStatus[intro.status] || 0) + 1;
+  }
+
+  const successStatuses = ['meeting_scheduled', 'in_discussions', 'invested', 'introduced'];
+  const successfulIntros = intros.filter(i => successStatuses.includes(i.status)).length;
+  const passedIntros = intros.filter(i => i.status === 'passed').length;
+  const completedIntros = successfulIntros + passedIntros;
+
+  return c.json({
+    node: { id: node.id, name: node.name, email: node.email },
+    network: {
+      totalInvestors: connections.length,
+      byStrength: networkByStrength,
+      validated: connections.filter(c => c.validated).length,
+    },
+    intros: {
+      total: intros.length,
+      byStatus: introsByStatus,
+      successRate: completedIntros > 0 ? Math.round((successfulIntros / completedIntros) * 100) : null,
+    },
+    recentIntros: intros.slice(0, 5).map(i => ({
+      founder: i.founder?.name,
+      investor: i.investor?.name,
+      status: i.status,
+      dateRequested: i.dateRequested,
+    })),
+  });
+});
+
 // Get node's investors
 app.get('/:id/investors', async (c) => {
   const id = parseInt(c.req.param('id'));

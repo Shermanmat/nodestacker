@@ -14,7 +14,10 @@ const createInvestorSchema = z.object({
   geography: z.string().nullable().optional(),
 });
 
-const updateInvestorSchema = createInvestorSchema.partial();
+const updateInvestorSchema = createInvestorSchema.partial().extend({
+  active: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
+});
 
 // List all investors with their latest research
 app.get('/', async (c) => {
@@ -49,10 +52,11 @@ app.get('/', async (c) => {
     }
   }
 
-  // Parse focusAreas JSON and attach research
+  // Parse focusAreas and tags JSON, attach research
   const parsed = allInvestors.map(inv => ({
     ...inv,
     focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
+    tags: inv.tags ? JSON.parse(inv.tags) : [],
     research: researchMap.get(inv.id) || null,
   }));
 
@@ -125,6 +129,9 @@ app.put('/:id', async (c) => {
   if (parsed.data.focusAreas) {
     updateData.focusAreas = JSON.stringify(parsed.data.focusAreas);
   }
+  if (parsed.data.tags) {
+    updateData.tags = JSON.stringify(parsed.data.tags);
+  }
 
   const result = await db.update(investors)
     .set(updateData)
@@ -137,6 +144,7 @@ app.put('/:id', async (c) => {
   return c.json({
     ...result[0],
     focusAreas: result[0].focusAreas ? JSON.parse(result[0].focusAreas) : [],
+    tags: result[0].tags ? JSON.parse(result[0].tags) : [],
   });
 });
 

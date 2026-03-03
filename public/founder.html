@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NodeStacker - Founder Portal</title>
+  <title>Matcap - Founder Portal</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -16,7 +16,7 @@
     <!-- Login Screen -->
     <div v-if="!session" class="min-h-screen flex items-center justify-center">
       <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md">
-        <h1 class="text-2xl font-bold text-center mb-2">NodeStacker</h1>
+        <h1 class="text-2xl font-bold text-center mb-2">Matcap</h1>
         <p class="text-gray-500 text-center mb-6">Founder Portal</p>
 
         <div v-if="!magicLinkSent">
@@ -55,7 +55,7 @@
         <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
           <div>
             <h1 class="text-xl font-bold text-gray-900">{{ session.founder.companyName }}</h1>
-            <p class="text-sm text-gray-500">NodeStacker</p>
+            <p class="text-sm text-gray-500">Matcap</p>
           </div>
           <div class="flex items-center space-x-4">
             <span class="text-sm text-gray-600">{{ session.founder.name }}</span>
@@ -84,18 +84,42 @@
         <div v-if="activeTab === 'dashboard'">
           <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
 
-          <div class="grid grid-cols-4 gap-4 mb-6">
+          <div class="grid grid-cols-3 md:grid-cols-6 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-4">
-              <div class="text-sm text-gray-500">Active Intros</div>
-              <div class="text-2xl font-bold">{{ dashboard.stats?.activeIntros || 0 }}</div>
+              <div class="text-sm text-gray-500">Requests</div>
+              <div class="text-2xl font-bold">{{ dashboard.stats?.totalRequests || 0 }}</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4">
-              <div class="text-sm text-gray-500">Total Intros</div>
-              <div class="text-2xl font-bold">{{ dashboard.stats?.totalIntros || 0 }}</div>
+              <div class="text-sm text-gray-500">Introduced</div>
+              <div class="text-2xl font-bold text-blue-600">{{ dashboard.stats?.introduced || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Pending</div>
+              <div class="text-2xl font-bold text-yellow-600">{{ dashboard.stats?.pending || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Passed</div>
+              <div class="text-2xl font-bold text-gray-500">{{ dashboard.stats?.passed || 0 }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Ignored</div>
+              <div class="text-2xl font-bold text-gray-400">{{ dashboard.stats?.ignored || 0 }}</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4">
               <div class="text-sm text-gray-500">Invested</div>
               <div class="text-2xl font-bold text-green-600">{{ dashboard.stats?.invested || 0 }}</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">Your Accept Rate</div>
+              <div class="text-2xl font-bold" :class="dashboard.stats?.acceptRate >= dashboard.stats?.globalAcceptRate ? 'text-green-600' : 'text-yellow-600'">
+                {{ dashboard.stats?.acceptRate || 0 }}%
+              </div>
+              <div class="text-xs text-gray-400 mt-1">
+                Global average: {{ dashboard.stats?.globalAcceptRate || 0 }}%
+              </div>
             </div>
             <div class="bg-white rounded-lg shadow p-4">
               <div class="text-sm text-gray-500">Overdue Tasks</div>
@@ -122,6 +146,197 @@
             <button v-if="tasks.length > 5" @click="activeTab = 'tasks'" class="mt-3 text-blue-600 text-sm hover:underline">
               View all {{ tasks.length }} tasks →
             </button>
+          </div>
+        </div>
+
+        <!-- Onboarding -->
+        <div v-if="activeTab === 'onboarding'">
+          <h2 class="text-xl font-semibold mb-4">Onboarding Status</h2>
+
+          <div v-if="!onboarding.hasOnboarding" class="bg-white rounded-lg shadow p-8 text-center">
+            <p class="text-gray-500">No onboarding in progress.</p>
+            <p class="text-sm text-gray-400 mt-2">If you've been offered an advisory relationship, it will appear here.</p>
+          </div>
+
+          <div v-else class="space-y-6">
+            <!-- Status Card -->
+            <div class="bg-white rounded-lg shadow p-6">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="font-semibold text-lg">Current Status</h3>
+                <span class="px-3 py-1 rounded-full text-sm font-medium"
+                  :class="onboarding.workflow?.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'">
+                  {{ formatOnboardingStatus(onboarding.workflow?.status) }}
+                </span>
+              </div>
+
+              <!-- Offer Details -->
+              <div v-if="onboarding.workflow?.offerEquityPercent" class="mb-4 p-4 bg-gray-50 rounded-lg">
+                <div class="text-sm text-gray-500 mb-2">Proposed Terms</div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <div class="text-xs text-gray-400">Equity</div>
+                    <div class="text-2xl font-bold text-blue-600">{{ onboarding.workflow.offerEquityPercent }}%</div>
+                  </div>
+                  <div>
+                    <div class="text-xs text-gray-400">Vesting</div>
+                    <div class="text-lg font-semibold text-gray-800">
+                      {{ formatVestingSchedule(onboarding.workflow.vestingMonths, onboarding.workflow.vestingCliffMonths) }}
+                    </div>
+                  </div>
+                </div>
+                <p v-if="onboarding.workflow?.offerNotes" class="text-sm text-gray-600 mt-3 pt-3 border-t">{{ onboarding.workflow.offerNotes }}</p>
+              </div>
+
+              <!-- Share Details -->
+              <div v-if="onboarding.shareDetails" class="mb-4 p-4 bg-blue-50 rounded-lg">
+                <div class="text-sm font-medium mb-2">Share Details</div>
+                <div class="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span class="text-gray-500">Shares:</span>
+                    <span class="font-medium ml-1">{{ onboarding.shareDetails.shareCount?.toLocaleString() }}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500">Price:</span>
+                    <span class="font-medium ml-1">${{ onboarding.shareDetails.sharePrice }}</span>
+                  </div>
+                  <div>
+                    <span class="text-gray-500">Total:</span>
+                    <span class="font-medium ml-1">${{ onboarding.shareDetails.totalAmount }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Next Action -->
+              <div v-if="onboarding.nextAction" class="border-t pt-4">
+                <div class="text-sm text-gray-500 mb-2">Next Step</div>
+                <p class="font-medium mb-4">{{ onboarding.nextAction.message }}</p>
+
+                <!-- Accept Offer -->
+                <div v-if="onboarding.nextAction.type === 'accept_offer'">
+                  <button @click="acceptOffer" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                    Accept Offer
+                  </button>
+                </div>
+
+                <!-- Entity Info Form -->
+                <div v-if="onboarding.nextAction.type === 'entity_info'" class="space-y-4">
+                  <div class="grid grid-cols-2 gap-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Legal Entity Name</label>
+                      <input v-model="entityForm.entityName" type="text" class="w-full border rounded px-3 py-2" placeholder="Acme Inc.">
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Entity Type</label>
+                      <select v-model="entityForm.entityType" class="w-full border rounded px-3 py-2">
+                        <option value="c_corp">C-Corp</option>
+                        <option value="s_corp">S-Corp</option>
+                        <option value="llc">LLC</option>
+                        <option value="partnership">Partnership</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">State of Incorporation</label>
+                      <input v-model="entityForm.entityState" type="text" class="w-full border rounded px-3 py-2" placeholder="DE" maxlength="2">
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Authorized Shares</label>
+                      <input v-model.number="entityForm.authorizedShares" type="number" class="w-full border rounded px-3 py-2" placeholder="10000000">
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Share Price (optional)</label>
+                      <input v-model="entityForm.sharePrice" type="text" class="w-full border rounded px-3 py-2" placeholder="0.0001">
+                      <p class="text-xs text-gray-400 mt-1">Defaults to $0.0001. <a href="https://carta.com/learn/startups/equity-management/founder-shares/" target="_blank" class="text-blue-500 hover:underline">How do I determine share price?</a></p>
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Your Title</label>
+                      <select v-model="entityForm.founderTitle" class="w-full border rounded px-3 py-2">
+                        <option value="Founder & CEO">Founder & CEO</option>
+                        <option value="Co-Founder & CEO">Co-Founder & CEO</option>
+                        <option value="Founder">Founder</option>
+                        <option value="Co-Founder">Co-Founder</option>
+                        <option value="CEO">CEO</option>
+                        <option value="President">President</option>
+                      </select>
+                    </div>
+                  </div>
+                  <button @click="submitEntityInfo" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    Submit Company Details
+                  </button>
+                </div>
+
+                <!-- Sign Advisory -->
+                <div v-if="onboarding.nextAction.type === 'sign_advisory'" class="text-gray-600">
+                  <p>Check your email from Dropbox Sign to review and sign the advisory agreement.</p>
+                </div>
+
+                <!-- Upload Equity Agreement -->
+                <div v-if="onboarding.nextAction.type === 'upload_equity_agreement'">
+                  <button @click="uploadEquityAgreement" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    Upload Equity Agreement
+                  </button>
+                  <p class="text-sm text-gray-500 mt-2">Upload a link to your equity purchase agreement (Carta, Pulley, or lawyer-prepared document).</p>
+                </div>
+
+                <!-- Upload Certificate -->
+                <div v-if="onboarding.nextAction.type === 'upload_certificate'">
+                  <button @click="uploadCertificate" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                    Upload Stock Certificate
+                  </button>
+                  <p class="text-sm text-gray-500 mt-2">Upload a link to the stock certificate issued from your cap table.</p>
+                </div>
+              </div>
+
+              <!-- Completed -->
+              <div v-if="onboarding.workflow?.status === 'completed'" class="text-center py-4">
+                <div class="text-4xl mb-2">🎉</div>
+                <p class="text-green-600 font-medium">Onboarding Complete!</p>
+              </div>
+            </div>
+
+            <!-- Progress Timeline -->
+            <div class="bg-white rounded-lg shadow p-6">
+              <h3 class="font-semibold mb-4">Progress</h3>
+              <div class="space-y-3 text-sm">
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.offerSentAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Offer Sent</span>
+                  <span v-if="onboarding.workflow?.offerSentAt" class="text-gray-400 text-xs">{{ onboarding.workflow.offerSentAt?.split('T')[0] }}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.offerAcceptedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Offer Accepted</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.entityInfoReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Company Details Submitted</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.founderSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Advisory Agreement Signed</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.equityAgreementReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Equity Agreement Uploaded</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.sharePurchaseDate ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Shares Purchased</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.election83bFiledAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>83(b) Election Filed</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.certificateReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Stock Certificate Received</span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.equityVerifiedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Completed</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -321,7 +536,6 @@
               <option value="follow_up_questions">Follow-up Questions</option>
               <option value="circle_back_round_opens">Circle Back</option>
               <option value="invested">Invested</option>
-              <option value="not_a_fit">Not a Fit</option>
               <option value="passed">Passed</option>
               <option value="ignored">Ignored</option>
             </select>
@@ -374,7 +588,7 @@
               <option value="follow_up_questions">Follow-up Questions</option>
               <option value="circle_back_round_opens">Circle Back When Round Opens</option>
               <option value="invested">Invested!</option>
-              <option value="not_a_fit">Not a Fit</option>
+              <option value="passed">Passed</option>
             </select>
           </div>
           <div class="mb-4">
@@ -403,6 +617,7 @@
       setup() {
         const tabs = [
           { id: 'dashboard', label: 'Dashboard' },
+          { id: 'onboarding', label: 'Onboarding' },
           { id: 'tasks', label: 'Tasks' },
           { id: 'intros', label: 'My Intros' },
           { id: 'nodes', label: 'Nodes' },
@@ -423,6 +638,17 @@
         const availableInvestors = ref([]);
         const myIntros = ref([]);
         const nodesData = ref({ workingWith: [], available: [] });
+
+        // Onboarding
+        const onboarding = ref({ hasOnboarding: false });
+        const entityForm = reactive({
+          entityName: '',
+          entityType: 'c_corp',
+          entityState: 'DE',
+          authorizedShares: 10000000,
+          sharePrice: '0.0001',
+          founderTitle: 'Founder & CEO',
+        });
 
         // Filters
         const investorSearch = ref('');
@@ -539,6 +765,96 @@
           availableInvestors.value = await api('/portal/available-investors') || [];
           myIntros.value = await api('/portal/my-intros') || [];
           nodesData.value = await api('/portal/nodes') || { workingWith: [], available: [] };
+          loadOnboarding(true); // Set tab to onboarding if active
+        };
+
+        const loadOnboarding = async (setTab = false) => {
+          try {
+            onboarding.value = await api('/portal/onboarding/status') || { hasOnboarding: false };
+            // If there's active onboarding (not completed), switch to onboarding tab
+            if (setTab && onboarding.value.hasOnboarding && onboarding.value.workflow?.status !== 'completed') {
+              activeTab.value = 'onboarding';
+            }
+          } catch (e) {
+            onboarding.value = { hasOnboarding: false };
+          }
+        };
+
+        const acceptOffer = async () => {
+          try {
+            await api('/portal/onboarding/accept-offer', { method: 'POST' });
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed to accept offer: ' + e.message);
+          }
+        };
+
+        const submitEntityInfo = async () => {
+          try {
+            await api('/portal/onboarding/entity-info', {
+              method: 'POST',
+              body: entityForm,
+            });
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed to submit: ' + e.message);
+          }
+        };
+
+        const uploadEquityAgreement = async () => {
+          const url = prompt('Enter the URL to your equity purchase agreement (Google Drive, Dropbox, etc.):');
+          if (!url) return;
+          try {
+            await api('/portal/onboarding/upload-equity-agreement', {
+              method: 'POST',
+              body: { documentUrl: url },
+            });
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed to upload: ' + e.message);
+          }
+        };
+
+        const uploadCertificate = async () => {
+          const url = prompt('Enter the URL to the stock certificate (Google Drive, Dropbox, etc.):');
+          if (!url) return;
+          const certNumber = prompt('Certificate number (optional):') || '';
+          try {
+            await api('/portal/onboarding/upload-certificate', {
+              method: 'POST',
+              body: { documentUrl: url, certificateNumber: certNumber },
+            });
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed to upload: ' + e.message);
+          }
+        };
+
+        const formatOnboardingStatus = (status) => {
+          const map = {
+            'offer_pending': 'Offer Pending',
+            'offer_accepted': 'Offer Accepted',
+            'entity_info_pending': 'Awaiting Your Company Details',
+            'entity_info_received': 'Company Details Received',
+            'advisory_agreement_sent': 'Advisory Agreement Sent',
+            'admin_signed': 'Waiting for Your Signature',
+            'founder_signed': 'Advisory Signed',
+            'equity_agreement_pending': 'Awaiting Equity Agreement',
+            'equity_agreement_signed': 'Equity Agreement Signed',
+            'shares_purchased': 'Shares Purchased',
+            '83b_filed': '83(b) Filed',
+            'certificate_pending': 'Awaiting Certificate',
+            'completed': 'Completed',
+          };
+          return map[status] || status;
+        };
+
+        const formatVestingSchedule = (vestingMonths, vestingCliffMonths) => {
+          const months = vestingMonths || 48;
+          const cliff = vestingCliffMonths || 0;
+          const years = months / 12;
+          const cliffText = cliff === 0 ? 'no cliff' : `${cliff}-month cliff`;
+          return `${years}-year vest, ${cliffText}`;
         };
 
         const filteredInvestors = computed(() => {
@@ -635,7 +951,6 @@
             introduced: 'bg-blue-100 text-blue-800',
             passed: 'bg-red-100 text-red-800',
             ignored: 'bg-gray-100 text-gray-800',
-            not_a_fit: 'bg-red-100 text-red-800',
             first_meeting_complete: 'bg-green-100 text-green-800',
             second_meeting_complete: 'bg-green-100 text-green-800',
             follow_up_questions: 'bg-purple-100 text-purple-800',
@@ -697,6 +1012,10 @@
           showIntroDetail, submitIntroUpdate, showTaskAction,
           toggleFounderFilter, clearFounderFilters, toggleResearchExpand,
           truncateText, extractFounderPrefs,
+          // Onboarding
+          onboarding, entityForm,
+          loadOnboarding, acceptOffer, submitEntityInfo, uploadEquityAgreement, uploadCertificate,
+          formatOnboardingStatus, formatVestingSchedule,
         };
       }
     }).mount('#app');

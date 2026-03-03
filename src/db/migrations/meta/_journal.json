@@ -29,6 +29,55 @@
       "when": 1771459200000,
       "tag": "0003_portfolio_companies",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1771627500000,
+      "tag": "0004_network_founders",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1771630000000,
+      "tag": "0005_admin_sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1771995600000,
+      "tag": "0006_inbound_intro_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1772020000000,
+      "tag": "0007_investor_active",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1772100000000,
+      "tag": "0008_investor_tags",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1772200000000,
+      "tag": "0009_email_date",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1772600000000,
+      "tag": "0010_onboarding_workflows",
+      "breakpoints": true
     }
   ]
 }

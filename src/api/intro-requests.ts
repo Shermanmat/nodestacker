@@ -10,7 +10,6 @@ const introStatusValues = [
   'introduced',
   'passed',
   'ignored',
-  'not_a_fit',
   'first_meeting_complete',
   'second_meeting_complete',
   'follow_up_questions',
@@ -350,7 +349,14 @@ app.get('/views/circle-back', async (c) => {
 
 // Trends/Stats Over Time
 app.get('/stats/trends', async (c) => {
-  const allRequests = await db.select().from(introRequests);
+  const nodeId = c.req.query('nodeId');
+
+  let allRequests;
+  if (nodeId) {
+    allRequests = await db.select().from(introRequests).where(eq(introRequests.nodeId, parseInt(nodeId)));
+  } else {
+    allRequests = await db.select().from(introRequests);
+  }
 
   // Group by month using dateRequested (YYYY-MM)
   const monthlyData: Record<string, {
@@ -375,10 +381,11 @@ app.get('/stats/trends', async (c) => {
     monthlyData[month].total++;
 
     // Count statuses
-    if (req.status === 'introduced' || ['first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'circle_back_round_opens', 'invested'].includes(req.status)) {
+    // Note: follow_up_questions is PRE-intro (investor asking questions before deciding), not POST-intro
+    if (req.status === 'introduced' || ['first_meeting_complete', 'second_meeting_complete', 'circle_back_round_opens', 'invested'].includes(req.status)) {
       monthlyData[month].introduced++;
     }
-    if (['first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'circle_back_round_opens', 'invested'].includes(req.status)) {
+    if (['first_meeting_complete', 'second_meeting_complete', 'circle_back_round_opens', 'invested'].includes(req.status)) {
       monthlyData[month].meetings++;
     }
     if (req.status === 'passed') {
@@ -398,7 +405,9 @@ app.get('/stats/trends', async (c) => {
   // Calculate rates and format for response
   const monthlyStats = sortedMonths.map(month => {
     const data = monthlyData[month];
-    const completedIntros = data.introduced + data.passed + data.ignored;
+    // data.introduced already includes all accepted statuses (introduced, meetings, invested)
+    // Decided = accepted + passed + ignored (excludes pending)
+    const decided = data.introduced + data.passed + data.ignored;
     return {
       month,
       label: formatMonthLabel(month),
@@ -408,14 +417,14 @@ app.get('/stats/trends', async (c) => {
       passed: data.passed,
       ignored: data.ignored,
       invested: data.invested,
-      introRate: completedIntros > 0 ? Math.round((data.introduced / completedIntros) * 100) : 0,
-      meetingRate: data.introduced > 0 ? Math.round((data.meetings / data.introduced) * 100) : 0,
+      // Accept Rate = accepted / (accepted + passed + ignored)
+      acceptRate: decided > 0 ? Math.round((data.introduced / decided) * 100) : 0,
     };
   });
 
   // Current vs previous month comparison
-  const current = monthlyStats[0] || { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0, introRate: 0, meetingRate: 0 };
-  const previous = monthlyStats[1] || { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0, introRate: 0, meetingRate: 0 };
+  const current = monthlyStats[0] || { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0, acceptRate: 0 };
+  const previous = monthlyStats[1] || { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0, acceptRate: 0 };
 
   const comparison = {
     intros: {
@@ -424,23 +433,17 @@ app.get('/stats/trends', async (c) => {
       change: current.total - previous.total,
       direction: current.total > previous.total ? 'up' : current.total < previous.total ? 'down' : 'same',
     },
-    meetings: {
-      current: current.meetings,
-      previous: previous.meetings,
-      change: current.meetings - previous.meetings,
-      direction: current.meetings > previous.meetings ? 'up' : current.meetings < previous.meetings ? 'down' : 'same',
+    introduced: {
+      current: current.introduced,
+      previous: previous.introduced,
+      change: current.introduced - previous.introduced,
+      direction: current.introduced > previous.introduced ? 'up' : current.introduced < previous.introduced ? 'down' : 'same',
     },
-    introRate: {
-      current: current.introRate,
-      previous: previous.introRate,
-      change: current.introRate - previous.introRate,
-      direction: current.introRate > previous.introRate ? 'up' : current.introRate < previous.introRate ? 'down' : 'same',
-    },
-    meetingRate: {
-      current: current.meetingRate,
-      previous: previous.meetingRate,
-      change: current.meetingRate - previous.meetingRate,
-      direction: current.meetingRate > previous.meetingRate ? 'up' : current.meetingRate < previous.meetingRate ? 'down' : 'same',
+    acceptRate: {
+      current: current.acceptRate,
+      previous: previous.acceptRate,
+      change: current.acceptRate - previous.acceptRate,
+      direction: current.acceptRate > previous.acceptRate ? 'up' : current.acceptRate < previous.acceptRate ? 'down' : 'same',
     },
     invested: {
       current: current.invested,
@@ -529,7 +532,7 @@ app.get('/tasks/node/:nodeId', async (c) => {
     }
 
     // Skip terminal statuses and pre-intro (not made yet)
-    if (['passed', 'ignored', 'invested', 'not_a_fit', 'intro_request_sent'].includes(intro.status)) {
+    if (['passed', 'ignored', 'invested', 'intro_request_sent'].includes(intro.status)) {
       continue;
     }
 
@@ -646,5 +649,52 @@ app.get('/tasks/node/:nodeId', async (c) => {
 
   return c.json(sortedGroups);
 });
+
+// One-time migration: convert 'not_a_fit' to 'passed'
+(async () => {
+  try {
+    const result = await db
+      .update(introRequests)
+      .set({ status: 'passed' })
+      .where(eq(introRequests.status, 'not_a_fit'));
+    console.log('✅ Migrated not_a_fit statuses to passed');
+  } catch (err) {
+    console.error('Failed to migrate not_a_fit statuses:', err);
+  }
+})();
+
+// Auto-ignore stale intro requests (unchanged for 3 weeks)
+// Runs every hour
+setInterval(async () => {
+  try {
+    const threeWeeksAgo = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Find requests that are still in 'intro_request_sent' status and haven't been updated in 3 weeks
+    const staleRequests = await db
+      .select({ id: introRequests.id })
+      .from(introRequests)
+      .where(
+        and(
+          eq(introRequests.status, 'intro_request_sent'),
+          lt(introRequests.updatedAt, threeWeeksAgo)
+        )
+      );
+
+    if (staleRequests.length > 0) {
+      const staleIds = staleRequests.map(r => r.id);
+      await db
+        .update(introRequests)
+        .set({
+          status: 'ignored',
+          updatedAt: new Date().toISOString()
+        })
+        .where(inArray(introRequests.id, staleIds));
+
+      console.log(`🧹 Auto-ignored ${staleRequests.length} stale intro requests`);
+    }
+  } catch (err) {
+    console.error('Failed to auto-ignore stale requests:', err);
+  }
+}, 60 * 60 * 1000); // Every hour
 
 export default app;

@@ -1,0 +1,491 @@
+/**
+ * Onboarding Email Service
+ * Handles all email notifications for the founder onboarding workflow
+ */
+
+import * as postmark from 'postmark';
+
+// Initialize Postmark client
+const postmarkClient = process.env.POSTMARK_API_KEY
+  ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
+  : null;
+
+const FROM_EMAIL = process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
+
+interface EmailResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+interface FounderInfo {
+  name: string;
+  email: string;
+  companyName: string;
+}
+
+interface WorkflowInfo {
+  equityPercent: string;
+  sharePrice: string;
+  shareCount: number;
+  totalAmount: string;
+  grantDate: string;
+}
+
+/**
+ * Send an email via Postmark
+ */
+async function sendEmail(
+  to: string,
+  subject: string,
+  htmlBody: string,
+  textBody: string
+): Promise<EmailResult> {
+  if (!postmarkClient) {
+    console.log(`📧 Email (no Postmark configured):\n  To: ${to}\n  Subject: ${subject}`);
+    return { success: true, messageId: 'dev-mode' };
+  }
+
+  try {
+    const result = await postmarkClient.sendEmail({
+      From: FROM_EMAIL,
+      To: to,
+      Subject: subject,
+      HtmlBody: htmlBody,
+      TextBody: textBody,
+    });
+    console.log(`✅ Email sent to ${to}: ${subject}`);
+    return { success: true, messageId: result.MessageID };
+  } catch (err: any) {
+    console.error(`❌ Failed to send email to ${to}:`, err);
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Common email wrapper with styling
+ */
+function wrapEmail(content: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+      ${content}
+      <p style="margin-top: 30px;">Best,<br>Mat</p>
+      <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 30px 0;" />
+      <p style="color: #666; font-size: 12px;">
+        MatCapital Founder Portal<br>
+        <a href="${BASE_URL}/founder" style="color: #2563eb;">Access your portal</a>
+      </p>
+    </div>
+  `;
+}
+
+/**
+ * Button component for emails
+ */
+function emailButton(text: string, url: string): string {
+  return `
+    <p style="margin: 30px 0;">
+      <a href="${url}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+        ${text}
+      </a>
+    </p>
+  `;
+}
+
+// ============== FOUNDER EMAILS ==============
+
+interface VestingInfo {
+  vestingMonths: number;
+  vestingCliffMonths: number;
+  notes?: string;
+}
+
+/**
+ * Format vesting schedule for display
+ */
+function formatVestingSchedule(vestingMonths: number, vestingCliffMonths: number): string {
+  const years = vestingMonths / 12;
+  const cliffText = vestingCliffMonths === 0
+    ? 'no cliff'
+    : `${vestingCliffMonths}-month cliff`;
+
+  return `${years}-year vesting, ${cliffText}`;
+}
+
+/**
+ * Email: MatCap wants to work with you
+ */
+export async function sendOfferEmail(founder: FounderInfo, equityPercent: string, vesting: VestingInfo): Promise<EmailResult> {
+  const subject = `MatCap wants to work with you`;
+  const portalUrl = `${BASE_URL}/founder`;
+  const vestingText = formatVestingSchedule(vesting.vestingMonths, vesting.vestingCliffMonths);
+  const firstName = founder.name.split(' ')[0];
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${firstName},</h2>
+    <p>After careful consideration, we would like to extend a spot to you in the MatCap portfolio. This includes our network access, event access, and office hours.</p>
+    <p>Here are the terms:</p>
+    <ul>
+      <li><strong>${equityPercent}% equity</strong></li>
+      <li><strong>${vestingText}</strong></li>
+    </ul>
+    ${vesting.notes ? `<p>${vesting.notes}</p>` : ''}
+    ${emailButton('Accept Offer', portalUrl)}
+  `);
+
+  const textBody = `Hi ${firstName},
+
+After careful consideration, we would like to extend a spot to you in the MatCap portfolio. This includes our network access, event access, and office hours.
+
+Here are the terms:
+- ${equityPercent}% equity
+- ${vestingText}
+${vesting.notes ? `\n${vesting.notes}\n` : ''}
+Accept the offer here: ${portalUrl}
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Complete your company details (entity info)
+ */
+export async function sendEntityInfoRequestEmail(founder: FounderInfo): Promise<EmailResult> {
+  const subject = `Next step: Company details needed`;
+  const portalUrl = `${BASE_URL}/founder`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${founder.name},</h2>
+    <p>Great - you've accepted the offer!</p>
+    <p>To prepare the advisory agreement, I need a few details about your company:</p>
+    <ul>
+      <li>Legal entity name (e.g., "Acme Inc.")</li>
+      <li>Entity type (LLC, C-Corp, etc.)</li>
+      <li>State of incorporation</li>
+      <li>Total authorized shares</li>
+    </ul>
+    <p>You can also set your share price (defaults to $0.0001 if you don't change it).</p>
+    ${emailButton('Enter Company Details', portalUrl)}
+  `);
+
+  const textBody = `Hi ${founder.name},
+
+Great - you've accepted the offer!
+
+To prepare the advisory agreement, I need a few details about your company:
+- Legal entity name
+- Entity type (LLC, C-Corp, etc.)
+- State of incorporation
+- Total authorized shares
+
+Enter details here: ${portalUrl}
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Sign your advisory agreement
+ */
+export async function sendAdvisoryAgreementReadyEmail(founder: FounderInfo): Promise<EmailResult> {
+  const subject = `Advisory agreement ready for signature`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${founder.name},</h2>
+    <p>The advisory agreement is ready! I've already signed it.</p>
+    <p>You should receive an email from Dropbox Sign with the document. Please review and sign when you have a moment.</p>
+    <p>Once signed, I'll send you next steps for the equity issuance.</p>
+  `);
+
+  const textBody = `Hi ${founder.name},
+
+The advisory agreement is ready! I've already signed it.
+
+You should receive an email from Dropbox Sign with the document. Please review and sign when you have a moment.
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Stock agreement ready to sign
+ */
+export async function sendEquityAgreementRequestEmail(
+  founder: FounderInfo,
+  workflow: WorkflowInfo
+): Promise<EmailResult> {
+  const subject = `Next Step - Sign Stock Agreement`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${founder.name},</h2>
+    <p>Our advisory agreement is signed! Now let's formalize the equity.</p>
+    <p>I've sent you a Stock Award & Purchase Agreement for:</p>
+    <ul>
+      <li><strong>${workflow.shareCount.toLocaleString()} shares</strong> of common stock</li>
+      <li>At <strong>$${workflow.sharePrice}</strong> per share (<strong>$${workflow.totalAmount}</strong> total)</li>
+    </ul>
+    <p>Look out for an email from <strong>Dropbox Sign</strong> in your inbox to review and sign the document.</p>
+  `);
+
+  const textBody = `Hi ${founder.name},
+
+Our advisory agreement is signed! Now let's formalize the equity.
+
+I've sent you a Stock Award & Purchase Agreement for:
+- ${workflow.shareCount.toLocaleString()} shares of common stock
+- At $${workflow.sharePrice} per share ($${workflow.totalAmount} total)
+
+Look out for an email from Dropbox Sign in your inbox to review and sign the document.
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Shares purchased, 83(b) being filed
+ */
+export async function sendSharesPurchasedEmail(
+  founder: FounderInfo,
+  workflow: WorkflowInfo
+): Promise<EmailResult> {
+  const subject = `Shares purchased - 83(b) election being filed`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${founder.name},</h2>
+    <p>I've purchased my shares in ${founder.companyName}:</p>
+    <ul>
+      <li>${workflow.shareCount.toLocaleString()} shares at $${workflow.sharePrice}/share</li>
+      <li>Total: $${workflow.totalAmount}</li>
+    </ul>
+    <p>I'm filing my 83(b) election with the IRS (required within 30 days of the grant). I'll send you a copy once it's mailed.</p>
+    <p><strong>Next step:</strong> I'll reach out when it's time for you to issue the stock certificate.</p>
+  `);
+
+  const textBody = `Hi ${founder.name},
+
+I've purchased my shares in ${founder.companyName}:
+- ${workflow.shareCount.toLocaleString()} shares at $${workflow.sharePrice}/share
+- Total: $${workflow.totalAmount}
+
+I'm filing my 83(b) election with the IRS (required within 30 days of the grant). I'll send you a copy once it's mailed.
+
+Next step: I'll reach out when it's time for you to issue the stock certificate.
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Issue stock certificate
+ */
+export async function sendCertificateRequestEmail(founder: FounderInfo, workflow: WorkflowInfo): Promise<EmailResult> {
+  const subject = `Final Step - Issue Stock Certificate`;
+  const portalUrl = `${BASE_URL}/founder`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${founder.name},</h2>
+    <p>I've signed the equity agreement and purchased the shares. I've also filed my 83(b) election with the IRS.</p>
+    <p><strong>Last step:</strong> Please issue the stock certificate.</p>
+    <h3>In Carta:</h3>
+    <ol>
+      <li>Go to Securities → Issue Certificate</li>
+      <li>Select the shareholder (MatCapital)</li>
+      <li>Generate and download the certificate</li>
+    </ol>
+    <h3>In Pulley:</h3>
+    <ol>
+      <li>Go to Cap Table → Certificates</li>
+      <li>Create new certificate for the existing grant</li>
+      <li>Download the PDF</li>
+    </ol>
+    ${emailButton('Upload Certificate', portalUrl)}
+  `);
+
+  const textBody = `Hi ${founder.name},
+
+I've signed the equity agreement and purchased the shares. I've also filed my 83(b) election with the IRS.
+
+Last step: Please issue the stock certificate.
+
+In Carta:
+1. Go to Securities → Issue Certificate
+2. Select the shareholder (MatCapital)
+3. Generate and download the certificate
+
+In Pulley:
+1. Go to Cap Table → Certificates
+2. Create new certificate for the existing grant
+3. Download the PDF
+
+Upload here: ${portalUrl}
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Reminder for pending action
+ */
+export async function sendReminderEmail(
+  founder: FounderInfo,
+  action: string,
+  daysSince: number
+): Promise<EmailResult> {
+  const subject = `Reminder: ${action}`;
+  const portalUrl = `${BASE_URL}/founder`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${founder.name},</h2>
+    <p>Just a friendly reminder - we're waiting on: <strong>${action}</strong></p>
+    <p>It's been ${daysSince} days since the last step. Let me know if you have any questions or need help!</p>
+    ${emailButton('Go to Portal', portalUrl)}
+  `);
+
+  const textBody = `Hi ${founder.name},
+
+Just a friendly reminder - we're waiting on: ${action}
+
+It's been ${daysSince} days since the last step. Let me know if you have any questions!
+
+Portal: ${portalUrl}
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+// ============== ADMIN EMAILS ==============
+
+/**
+ * Email to admin: Entity info received - ready to generate agreement
+ */
+export async function notifyAdminEntityInfoReceived(
+  adminEmail: string,
+  founder: FounderInfo,
+  entityInfo: { entityName: string; entityType: string; authorizedShares: number }
+): Promise<EmailResult> {
+  const subject = `[MatCap] ${founder.companyName} submitted company details - generate agreement`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Company Details Received</h2>
+    <p><strong>${founder.name}</strong> (${founder.companyName}) has submitted their company details:</p>
+    <ul>
+      <li><strong>Entity:</strong> ${entityInfo.entityName}</li>
+      <li><strong>Type:</strong> ${entityInfo.entityType.toUpperCase()}</li>
+      <li><strong>Authorized Shares:</strong> ${entityInfo.authorizedShares.toLocaleString()}</li>
+    </ul>
+    <p><strong>Next step:</strong> Generate and send the advisory agreement.</p>
+    ${emailButton('Generate Agreement', `${BASE_URL}/?tab=onboarding`)}
+  `);
+
+  const textBody = `Company Details Received
+
+${founder.name} (${founder.companyName}) has submitted their company details:
+- Entity: ${entityInfo.entityName}
+- Type: ${entityInfo.entityType.toUpperCase()}
+- Authorized Shares: ${entityInfo.authorizedShares.toLocaleString()}
+
+Next step: Generate and send the advisory agreement.
+
+View in admin: ${BASE_URL}/?tab=onboarding`;
+
+  return sendEmail(adminEmail, subject, htmlBody, textBody);
+}
+
+/**
+ * Email to admin: Advisory agreement complete
+ */
+export async function notifyAdminAdvisoryComplete(
+  adminEmail: string,
+  founder: FounderInfo
+): Promise<EmailResult> {
+  const subject = `[MatCap] ${founder.companyName} advisory agreement signed`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Advisory Agreement Complete</h2>
+    <p><strong>${founder.name}</strong> (${founder.companyName}) has signed the advisory agreement.</p>
+    <p>Next step: Wait for founder to upload equity purchase agreement, then sign it.</p>
+    ${emailButton('View in Admin', `${BASE_URL}/#/onboarding`)}
+  `);
+
+  const textBody = `Advisory Agreement Complete
+
+${founder.name} (${founder.companyName}) has signed the advisory agreement.
+
+Next step: Wait for founder to upload equity purchase agreement, then sign it.
+
+View in admin: ${BASE_URL}/#/onboarding`;
+
+  return sendEmail(adminEmail, subject, htmlBody, textBody);
+}
+
+/**
+ * Email to admin: Equity agreement uploaded
+ */
+export async function notifyAdminEquityAgreementUploaded(
+  adminEmail: string,
+  founder: FounderInfo
+): Promise<EmailResult> {
+  const subject = `[MatCap] ${founder.companyName} uploaded equity agreement - sign it`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Equity Agreement Ready to Sign</h2>
+    <p><strong>${founder.name}</strong> (${founder.companyName}) has uploaded their equity purchase agreement.</p>
+    <p>Please review and sign it.</p>
+    ${emailButton('Review & Sign', `${BASE_URL}/#/onboarding`)}
+  `);
+
+  const textBody = `Equity Agreement Ready to Sign
+
+${founder.name} (${founder.companyName}) has uploaded their equity purchase agreement.
+
+Please review and sign it: ${BASE_URL}/#/onboarding`;
+
+  return sendEmail(adminEmail, subject, htmlBody, textBody);
+}
+
+/**
+ * Email to admin: Certificate uploaded
+ */
+export async function notifyAdminCertificateUploaded(
+  adminEmail: string,
+  founder: FounderInfo
+): Promise<EmailResult> {
+  const subject = `[MatCap] ${founder.companyName} certificate uploaded - verify`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Certificate Ready for Verification</h2>
+    <p><strong>${founder.name}</strong> (${founder.companyName}) has uploaded the stock certificate.</p>
+    <p>Please verify and complete the onboarding.</p>
+    ${emailButton('Verify Certificate', `${BASE_URL}/#/onboarding`)}
+  `);
+
+  const textBody = `Certificate Ready for Verification
+
+${founder.name} (${founder.companyName}) has uploaded the stock certificate.
+
+Please verify: ${BASE_URL}/#/onboarding`;
+
+  return sendEmail(adminEmail, subject, htmlBody, textBody);
+}
+
+/**
+ * Check if email service is configured
+ */
+export function isConfigured(): boolean {
+  return !!process.env.POSTMARK_API_KEY;
+}

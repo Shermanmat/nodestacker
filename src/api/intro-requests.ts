@@ -399,6 +399,13 @@ app.get('/stats/trends', async (c) => {
     }
   }
 
+  // Ensure current month is included even if empty
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  if (!monthlyData[currentMonth]) {
+    monthlyData[currentMonth] = { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0 };
+  }
+
   // Sort months and get last 6
   const sortedMonths = Object.keys(monthlyData).sort().reverse().slice(0, 6);
 
@@ -470,7 +477,11 @@ app.get('/stats/trends', async (c) => {
 function formatMonthLabel(month: string): string {
   const [year, m] = month.split('-');
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[parseInt(m) - 1]} ${year}`;
+  const monthIndex = parseInt(m) - 1;
+  if (isNaN(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+    return month; // Return raw month if parsing fails
+  }
+  return `${months[monthIndex]} ${year}`;
 }
 
 // Pipeline Stats

@@ -513,6 +513,56 @@ app.get('/stats/pipeline', async (c) => {
   return c.json(stats);
 });
 
+// Investor MAU (Monthly Active Investors) - unique investors engaged per month
+app.get('/stats/investor-mau', async (c) => {
+  const allRequests = await db.select().from(introRequests);
+
+  // Group by month and count unique investors that received at least one intro
+  const monthlyInvestors: Record<string, Set<number>> = {};
+
+  for (const req of allRequests) {
+    // Use dateIntroduced as primary date (when investor was actually contacted)
+    // Fall back to dateRequested or createdAt
+    const dateStr = req.dateIntroduced || req.dateRequested || req.createdAt;
+    if (!dateStr) continue;
+
+    // Only count if intro was actually made (not just requested)
+    // Status must be beyond 'intro_request_sent' OR have dateIntroduced set
+    const wasIntroduced = req.dateIntroduced ||
+      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
+       'circle_back_round_opens', 'invested', 'passed', 'ignored'].includes(req.status);
+
+    if (!wasIntroduced) continue;
+
+    const month = (req.dateIntroduced || dateStr).substring(0, 7); // YYYY-MM
+
+    if (!monthlyInvestors[month]) {
+      monthlyInvestors[month] = new Set();
+    }
+    monthlyInvestors[month].add(req.investorId);
+  }
+
+  // Ensure current month is included
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  if (!monthlyInvestors[currentMonth]) {
+    monthlyInvestors[currentMonth] = new Set();
+  }
+
+  // Sort months and get last 12
+  const sortedMonths = Object.keys(monthlyInvestors).sort().reverse().slice(0, 12);
+
+  const monthlyStats = sortedMonths.map(month => ({
+    month,
+    label: formatMonthLabel(month),
+    uniqueInvestors: monthlyInvestors[month].size,
+  }));
+
+  return c.json({
+    monthlyStats: monthlyStats.reverse(), // Oldest first for charting
+  });
+});
+
 // Admin/Node Tasks - tasks for the node (person making intros)
 // Timeline: Day 3 = "schedule meeting?", Day 14 = "did they meet?"
 // Only intros after May 2025

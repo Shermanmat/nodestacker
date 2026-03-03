@@ -190,6 +190,22 @@
           </div>
         </div>
 
+        <!-- Investor MAU Chart -->
+        <div v-if="investorMau.monthlyStats?.length > 1" class="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 class="font-medium mb-3">Monthly Active Investors</h3>
+          <p class="text-xs text-gray-500 mb-3">Unique investors engaged per month (received at least one intro)</p>
+          <div class="flex items-end gap-2 h-24">
+            <div v-for="month in investorMau.monthlyStats" :key="month.month" class="flex-1 flex flex-col items-center">
+              <div class="w-full bg-purple-100 rounded-t relative" :style="{ height: getMauBarHeight(month.uniqueInvestors) + 'px' }">
+                <div class="absolute -top-5 left-0 right-0 text-center text-xs font-medium">
+                  {{ month.uniqueInvestors }}
+                </div>
+              </div>
+              <div class="text-xs text-gray-400 mt-1">{{ getMonthShort(month.label) }}</div>
+            </div>
+          </div>
+        </div>
+
         <!-- My Tasks (Node Tasks) - Grouped by Founder -->
         <div v-if="nodeTasks.length > 0" class="bg-white rounded-lg shadow p-4 mb-6">
           <h3 class="font-medium mb-3">My Follow-ups</h3>
@@ -1809,6 +1825,7 @@
         const overdueRequests = ref([]);
         const nodeTasks = ref([]);
         const trends = ref({});
+        const investorMau = ref({});
         const chartMetric = ref('requests'); // 'requests', 'meetings', or 'acceptRate'
         const chartNodeId = ref(''); // Filter chart by node
         const portfolio = ref({ companies: [], summary: {} });
@@ -2418,6 +2435,7 @@
           loadStats();
           loadNodeTasks();
           loadTrends();
+          loadInvestorMau();
           loadPortfolio();
           loadPendingInboundCount();
           loadOnboardingWorkflows();
@@ -2461,6 +2479,10 @@
             url += `?nodeId=${chartNodeId.value}`;
           }
           trends.value = await api(url);
+        };
+
+        const loadInvestorMau = async () => {
+          investorMau.value = await api('/intro-requests/stats/investor-mau');
         };
 
         const loadPortfolio = async () => {
@@ -2828,6 +2850,13 @@
         const getBarHeight = (value) => {
           if (!trends.value.monthlyStats?.length) return 0;
           const values = trends.value.monthlyStats.map(m => getChartValue(m));
+          const maxValue = Math.max(...values, 1);
+          return Math.max((value / maxValue) * 80, 4);
+        };
+
+        const getMauBarHeight = (value) => {
+          if (!investorMau.value.monthlyStats?.length) return 0;
+          const values = investorMau.value.monthlyStats.map(m => m.uniqueInvestors);
           const maxValue = Math.max(...values, 1);
           return Math.max((value / maxValue) * 80, 4);
         };
@@ -3404,7 +3433,7 @@
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
-          formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends,
+          formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
           loadIntroRequests, markNodeTaskDone, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,

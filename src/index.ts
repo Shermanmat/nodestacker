@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serveStatic } from '@hono/node-server/serve-static';
+import cron from 'node-cron';
 
 import foundersRoutes from './api/founders.js';
 import nodesRoutes from './api/nodes.js';
@@ -19,6 +20,8 @@ import adminAuthRoutes from './api/admin-auth.js';
 import inboundRoutes from './api/inbound.js';
 import onboardingRoutes from './api/onboarding.js';
 import webhooksRoutes from './api/webhooks.js';
+import weeklyDigestRoutes from './api/weekly-digest.js';
+import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests, investorResearch } from './db/index.js';
@@ -62,6 +65,8 @@ app.use('/api/inbound/:id/dismiss', adminGuard);
 // Onboarding admin endpoints
 app.use('/api/onboarding', adminGuard);
 app.use('/api/onboarding/*', adminGuard);
+// Weekly digest - preview requires admin, send allows token auth for cron
+app.use('/api/weekly-digest/preview/*', adminGuard);
 
 app.route('/api/founders', foundersRoutes);
 app.route('/api/nodes', nodesRoutes);
@@ -74,6 +79,7 @@ app.route('/api/portfolio', portfolioRoutes);
 app.route('/api/inbound', inboundRoutes);
 app.route('/api/onboarding', onboardingRoutes);
 app.route('/api/webhooks', webhooksRoutes);
+app.route('/api/weekly-digest', weeklyDigestRoutes);
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
@@ -421,6 +427,23 @@ app.get('*', serveStatic({ path: './public/index.html' }));
 
 const port = parseInt(process.env.PORT || '3000');
 console.log(`NodeStacker server running on http://localhost:${port}`);
+
+// Schedule weekly digest emails
+// Friday 5pm Arizona (MST/UTC-7) = Saturday 00:00 UTC
+// Cron: minute hour day month weekday
+cron.schedule('0 0 * * 6', async () => {
+  console.log('[CRON] Running weekly digest job...');
+  try {
+    const result = await sendWeeklyDigests();
+    console.log('[CRON] Weekly digest complete:', result);
+  } catch (err) {
+    console.error('[CRON] Weekly digest failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Weekly digest scheduled for Saturday 00:00 UTC (Friday 5pm Arizona)');
 
 serve({
   fetch: app.fetch,

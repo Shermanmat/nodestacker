@@ -372,7 +372,8 @@ app.get('/stats/trends', async (c) => {
     const dateStr = req.dateRequested || req.createdAt;
     if (!dateStr) continue;
 
-    const month = dateStr.substring(0, 7); // YYYY-MM
+    // Parse date robustly - handle both ISO format and other formats
+    const month = extractYearMonth(dateStr);
 
     if (!monthlyData[month]) {
       monthlyData[month] = { total: 0, introduced: 0, meetings: 0, passed: 0, ignored: 0, invested: 0 };
@@ -484,6 +485,23 @@ function formatMonthLabel(month: string): string {
   return `${months[monthIndex]} ${year}`;
 }
 
+// Extract YYYY-MM from various date formats
+function extractYearMonth(dateStr: string): string {
+  // If already in YYYY-MM or YYYY-MM-DD format
+  if (/^\d{4}-\d{2}/.test(dateStr)) {
+    return dateStr.substring(0, 7);
+  }
+  // Try parsing as a date
+  const date = new Date(dateStr);
+  if (!isNaN(date.getTime())) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
+  }
+  // Fallback - return as-is (will be filtered out or show as invalid)
+  return dateStr.substring(0, 7);
+}
+
 // Pipeline Stats
 app.get('/stats/pipeline', async (c) => {
   const allRequests = await db.select().from(introRequests);
@@ -534,7 +552,7 @@ app.get('/stats/investor-mau', async (c) => {
 
     if (!wasIntroduced) continue;
 
-    const month = (req.dateIntroduced || dateStr).substring(0, 7); // YYYY-MM
+    const month = extractYearMonth(req.dateIntroduced || dateStr);
 
     if (!monthlyInvestors[month]) {
       monthlyInvestors[month] = new Set();

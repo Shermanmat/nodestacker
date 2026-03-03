@@ -531,28 +531,23 @@ app.get('/stats/pipeline', async (c) => {
   return c.json(stats);
 });
 
-// Investor MAU (Monthly Active Investors) - unique investors engaged per month
+// Investor MAU (Monthly Active Investors) - unique investors who replied per month
 app.get('/stats/investor-mau', async (c) => {
   const allRequests = await db.select().from(introRequests);
 
-  // Group by month and count unique investors that received at least one intro
+  // Group by month and count unique investors that replied (not ignored, not pending)
   const monthlyInvestors: Record<string, Set<number>> = {};
 
   for (const req of allRequests) {
-    // Use dateIntroduced as primary date (when investor was actually contacted)
-    // Fall back to dateRequested or createdAt
+    // Only count investors who actually replied (anything except ignored and intro_request_sent)
+    const replied = !['intro_request_sent', 'ignored'].includes(req.status);
+    if (!replied) continue;
+
+    // Use dateIntroduced as primary date, fall back to dateRequested or createdAt
     const dateStr = req.dateIntroduced || req.dateRequested || req.createdAt;
     if (!dateStr) continue;
 
-    // Only count if intro was actually made (not just requested)
-    // Status must be beyond 'intro_request_sent' OR have dateIntroduced set
-    const wasIntroduced = req.dateIntroduced ||
-      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
-       'circle_back_round_opens', 'invested', 'passed', 'ignored'].includes(req.status);
-
-    if (!wasIntroduced) continue;
-
-    const month = extractYearMonth(req.dateIntroduced || dateStr);
+    const month = extractYearMonth(dateStr);
 
     if (!monthlyInvestors[month]) {
       monthlyInvestors[month] = new Set();

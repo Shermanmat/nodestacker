@@ -184,7 +184,7 @@
                     {{ chartMetric === 'acceptRate' ? getChartValue(month) + '%' : getChartValue(month) }}
                   </div>
                 </div>
-                <div class="text-xs text-gray-400 mt-1">{{ month.label?.split(' ')[0] }}</div>
+                <div class="text-xs text-gray-400 mt-1">{{ getMonthShort(month.label) }}</div>
               </div>
             </div>
           </div>
@@ -2819,6 +2819,12 @@
           return month.total || 0;
         };
 
+        const getMonthShort = (label) => {
+          if (!label) return '?';
+          const parts = label.split(' ');
+          return parts[0] || label;
+        };
+
         const getBarHeight = (value) => {
           if (!trends.value.monthlyStats?.length) return 0;
           const values = trends.value.monthlyStats.map(m => getChartValue(m));
@@ -3398,7 +3404,7 @@
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
-          formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, chartMetric, chartNodeId, getChartValue, loadTrends,
+          formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends,
           loadIntroRequests, markNodeTaskDone, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,

@@ -9,6 +9,8 @@
   <style>
     [v-cloak] { display: none; }
     .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; }
+    /* Mobile-friendly table scrolling */
+    .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body class="bg-gray-50">
@@ -67,9 +69,9 @@
     <!-- Header -->
     <header class="bg-white shadow-sm border-b">
       <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-        <h1 class="text-2xl font-bold text-gray-900">Matcap</h1>
-        <div class="flex items-center gap-4">
-          <span class="text-sm text-gray-500">{{ adminEmail }}</span>
+        <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Matcap</h1>
+        <div class="flex items-center gap-2 sm:gap-4">
+          <span class="text-xs sm:text-sm text-gray-500 hidden sm:inline">{{ adminEmail }}</span>
           <button @click="logout" class="text-sm text-red-600 hover:text-red-700">Logout</button>
         </div>
       </div>
@@ -77,13 +79,13 @@
 
     <!-- Navigation Tabs -->
     <nav class="bg-white border-b">
-      <div class="max-w-7xl mx-auto px-4">
-        <div class="flex space-x-8">
+      <div class="max-w-7xl mx-auto px-4 overflow-x-auto">
+        <div class="flex space-x-4 sm:space-x-8 min-w-max">
           <button
             v-for="tab in tabs"
             :key="tab.id"
             @click="activeTab = tab.id; if (tab.id === 'inbound') loadInboundLogs(); if (tab.id === 'onboarding') loadOnboardingWorkflows();"
-            :class="['py-4 px-1 text-sm font-medium', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']"
+            :class="['py-4 px-1 text-sm font-medium whitespace-nowrap', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']"
           >
             {{ tab.label }}
             <span v-if="tab.id === 'inbound' && pendingInboundCount > 0" class="ml-1 px-1.5 py-0.5 text-xs bg-red-500 text-white rounded-full">{{ pendingInboundCount }}</span>
@@ -99,7 +101,7 @@
         <h2 class="text-xl font-semibold mb-4">Pipeline Overview</h2>
 
         <!-- Stats Cards -->
-        <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           <div class="bg-white rounded-lg shadow p-4">
             <div class="text-sm text-gray-500">Total Intro Requests</div>
             <div class="text-2xl font-bold">{{ stats.total || 0 }}</div>
@@ -121,7 +123,7 @@
         <!-- Trends Over Time -->
         <div v-if="trends.comparison" class="bg-white rounded-lg shadow p-4 mb-6">
           <h3 class="font-medium mb-3">Trends ({{ trends.currentMonth }} vs {{ trends.previousMonth }})</h3>
-          <div class="grid grid-cols-5 gap-4">
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
             <div class="text-center p-3 rounded bg-gray-50">
               <div class="text-xs text-gray-500 mb-1">Requests</div>
               <div class="text-xl font-bold">{{ trends.comparison.intros?.current || 0 }}</div>
@@ -250,7 +252,7 @@
         <!-- Pipeline by Status -->
         <div class="bg-white rounded-lg shadow p-4 mb-6">
           <h3 class="font-medium mb-3">Pipeline by Status</h3>
-          <div class="grid grid-cols-3 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div v-for="(count, status) in stats.byStatus" :key="status" class="flex justify-between py-2 px-3 bg-gray-50 rounded">
               <span class="text-sm">{{ formatStatus(status) }}</span>
               <span class="font-medium">{{ count }}</span>
@@ -326,7 +328,7 @@
         <!-- Admin View -->
         <template v-if="portfolioView === 'admin'">
           <!-- Portfolio Summary -->
-          <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-4">
               <div class="text-sm text-gray-500">Total Companies</div>
               <div class="text-2xl font-bold">{{ portfolio.summary?.totalCompanies || 0 }}</div>
@@ -406,7 +408,7 @@
         </div>
 
         <!-- Status Summary -->
-        <div class="grid grid-cols-5 gap-4 mb-6">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 mb-6">
           <div class="bg-white rounded-lg shadow p-4">
             <div class="text-sm text-gray-500">Offer Stage</div>
             <div class="text-2xl font-bold text-yellow-600">{{ (onboardingSummary.offer_pending || 0) + (onboardingSummary.offer_accepted || 0) }}</div>
@@ -434,8 +436,8 @@
           No onboarding workflows yet. Click "Start Onboarding" to begin with a portfolio company.
         </div>
 
-        <div v-else class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm">
+        <div v-else class="bg-white rounded-lg shadow overflow-x-auto">
+          <table class="w-full text-sm min-w-[600px]">
             <thead class="bg-gray-50">
               <tr class="text-left text-gray-500">
                 <th class="py-3 px-4">Company</th>
@@ -500,7 +502,7 @@
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Vesting Schedule</label>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <select v-model="startOnboardingForm.vestingMonths" class="w-full border rounded px-3 py-2">
                     <option :value="12">1 year</option>
@@ -551,7 +553,7 @@
 
           <!-- Offer Terms -->
           <div class="mb-4 p-4 bg-blue-50 rounded-lg">
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <div class="text-xs text-gray-500">Equity</div>
                 <div class="text-lg font-bold text-blue-600">{{ workflowDetails.workflow?.offerEquityPercent }}%</div>
@@ -623,7 +625,7 @@
           <!-- Share Details -->
           <div v-if="workflowDetails.shareDetails" class="mb-6 p-4 bg-blue-50 rounded-lg">
             <h4 class="font-medium mb-2">Share Details</h4>
-            <div class="grid grid-cols-3 gap-4 text-sm">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div>
                 <div class="text-gray-500">Shares</div>
                 <div class="font-medium">{{ workflowDetails.shareDetails.shareCount?.toLocaleString() }}</div>
@@ -675,8 +677,8 @@
           </button>
         </div>
 
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm">
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+          <table class="w-full text-sm min-w-[600px]">
             <thead class="bg-gray-50">
               <tr class="text-left text-gray-500">
                 <th class="py-3 px-4">Name</th>
@@ -968,8 +970,8 @@
           </div>
         </div>
 
-        <div class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm">
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+          <table class="w-full text-sm min-w-[600px]">
             <thead class="bg-gray-50">
               <tr class="text-left text-gray-500">
                 <th class="py-3 px-4">Founder</th>
@@ -1003,7 +1005,7 @@
       <div v-if="activeTab === 'relationships'">
         <h2 class="text-xl font-semibold mb-4">Manage Relationships</h2>
 
-        <div class="grid grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <!-- Founder-Node Relationships -->
           <div class="bg-white rounded-lg shadow p-4">
             <div class="flex justify-between items-center mb-3">
@@ -1080,7 +1082,7 @@
                   <span v-if="log.ccEmails && log.ccEmails.length > 0"> &bull; CC: {{ log.ccEmails.join(', ') }}</span>
                 </div>
 
-                <div class="mt-3 grid grid-cols-2 gap-4">
+                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span class="text-xs font-medium text-gray-500 uppercase">Detected Founder</span>
                     <div v-if="log.founder" class="text-sm font-medium text-green-700">
@@ -1285,7 +1287,7 @@
         <h3 class="text-lg font-semibold mb-4">{{ editingIntro ? 'Update' : 'New' }} Intro Request</h3>
         <form @submit.prevent="saveIntro">
           <div class="space-y-4">
-            <div v-if="!editingIntro" class="grid grid-cols-3 gap-4">
+            <div v-if="!editingIntro" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div class="relative">
                 <label class="block text-sm font-medium text-gray-700 mb-1">Founder</label>
                 <input
@@ -1362,7 +1364,7 @@
                 <option v-for="status in introStatuses" :key="status" :value="status">{{ formatStatus(status) }}</option>
               </select>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Date Requested</label>
                 <input v-model="introForm.dateRequested" type="date" class="w-full border rounded px-3 py-2">
@@ -1372,7 +1374,7 @@
                 <input v-model="introForm.dateNodeAsked" type="date" class="w-full border rounded px-3 py-2">
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Date Introduced</label>
                 <input v-model="introForm.dateIntroduced" type="date" class="w-full border rounded px-3 py-2">
@@ -1382,7 +1384,7 @@
                 <input v-model="introForm.firstMeetingDate" type="date" class="w-full border rounded px-3 py-2">
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Next Follow-up Date</label>
                 <input v-model="introForm.nextFollowupDate" type="date" class="w-full border rounded px-3 py-2">
@@ -1643,7 +1645,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">My Notes</label>
               <textarea v-model="portfolioForm.notes" rows="2" placeholder="Personal notes about this investment" class="w-full border rounded px-3 py-2"></textarea>
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Investment Date</label>
                 <input v-model="portfolioForm.investmentDate" type="date" class="w-full border rounded px-3 py-2">

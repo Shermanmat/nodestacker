@@ -57,8 +57,8 @@
             <h1 class="text-xl font-bold text-gray-900">{{ session.founder.companyName }}</h1>
             <p class="text-sm text-gray-500">Matcap</p>
           </div>
-          <div class="flex items-center space-x-4">
-            <span class="text-sm text-gray-600">{{ session.founder.name }}</span>
+          <div class="flex items-center space-x-2 sm:space-x-4">
+            <span class="text-xs sm:text-sm text-gray-600 hidden sm:inline">{{ session.founder.name }}</span>
             <button @click="logout" class="text-sm text-red-600 hover:underline">Logout</button>
           </div>
         </div>
@@ -66,10 +66,10 @@
 
       <!-- Navigation -->
       <nav class="bg-white border-b">
-        <div class="max-w-5xl mx-auto px-4">
-          <div class="flex space-x-8">
+        <div class="max-w-5xl mx-auto px-4 overflow-x-auto">
+          <div class="flex space-x-4 sm:space-x-8 min-w-max">
             <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id"
-              :class="['py-4 px-1 text-sm font-medium', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']">
+              :class="['py-4 px-1 text-sm font-medium whitespace-nowrap', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']">
               {{ tab.label }}
               <span v-if="tab.id === 'tasks' && tasks.length > 0"
                 class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{{ tasks.length }}</span>
@@ -111,7 +111,7 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-4 mb-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-4">
               <div class="text-sm text-gray-500">Your Accept Rate</div>
               <div class="text-2xl font-bold" :class="dashboard.stats?.acceptRate >= dashboard.stats?.globalAcceptRate ? 'text-green-600' : 'text-yellow-600'">
@@ -172,7 +172,7 @@
               <!-- Offer Details -->
               <div v-if="onboarding.workflow?.offerEquityPercent" class="mb-4 p-4 bg-gray-50 rounded-lg">
                 <div class="text-sm text-gray-500 mb-2">Proposed Terms</div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div class="text-xs text-gray-400">Equity</div>
                     <div class="text-2xl font-bold text-blue-600">{{ onboarding.workflow.offerEquityPercent }}%</div>
@@ -190,7 +190,7 @@
               <!-- Share Details -->
               <div v-if="onboarding.shareDetails" class="mb-4 p-4 bg-blue-50 rounded-lg">
                 <div class="text-sm font-medium mb-2">Share Details</div>
-                <div class="grid grid-cols-3 gap-4 text-sm">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span class="text-gray-500">Shares:</span>
                     <span class="font-medium ml-1">{{ onboarding.shareDetails.shareCount?.toLocaleString() }}</span>
@@ -220,7 +220,7 @@
 
                 <!-- Entity Info Form -->
                 <div v-if="onboarding.nextAction.type === 'entity_info'" class="space-y-4">
-                  <div class="grid grid-cols-2 gap-4">
+                  <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Legal Entity Name</label>
                       <input v-model="entityForm.entityName" type="text" class="w-full border rounded px-3 py-2" placeholder="Acme Inc.">

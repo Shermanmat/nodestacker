@@ -251,6 +251,47 @@ Mat`;
 }
 
 /**
+ * Email: Send wire info so Mat can purchase shares
+ */
+export async function sendWireInfoRequestEmail(
+  founder: FounderInfo,
+  details: { shareCount: number; totalAmount: string; sharePrice: string }
+): Promise<EmailResult> {
+  const subject = `Next Step - Send Wire Info for Share Purchase`;
+  const portalUrl = `${BASE_URL}/founder`;
+  const firstName = founder.name.split(' ')[0];
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${firstName},</h2>
+    <p>The stock agreement is fully signed! Now I need to purchase the shares.</p>
+    <p>Please send me your company's wire/payment information so I can send <strong>$${details.totalAmount}</strong> for <strong>${details.shareCount.toLocaleString()} shares</strong> at $${details.sharePrice}/share.</p>
+    <p>You can upload a wire instruction document (PDF from your bank) or provide the details through the portal:</p>
+    ${emailButton('Upload Wire Info', portalUrl)}
+    <p>Typical wire info includes:</p>
+    <ul>
+      <li>Bank name & address</li>
+      <li>Account name</li>
+      <li>Account number</li>
+      <li>Routing number (ABA/ACH)</li>
+      <li>Any reference/memo to include</li>
+    </ul>
+  `);
+
+  const textBody = `Hi ${firstName},
+
+The stock agreement is fully signed! Now I need to purchase the shares.
+
+Please send me your company's wire/payment information so I can send $${details.totalAmount} for ${details.shareCount.toLocaleString()} shares at $${details.sharePrice}/share.
+
+Upload wire info here: ${portalUrl}
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
  * Email: Shares purchased, 83(b) being filed
  */
 export async function sendSharesPurchasedEmail(
@@ -454,6 +495,31 @@ export async function notifyAdminEquityAgreementUploaded(
 ${founder.name} (${founder.companyName}) has uploaded their equity purchase agreement.
 
 Please review and sign it: ${BASE_URL}/#/onboarding`;
+
+  return sendEmail(adminEmail, subject, htmlBody, textBody);
+}
+
+/**
+ * Email to admin: Wire info received - ready to purchase shares
+ */
+export async function notifyAdminWireInfoReceived(
+  adminEmail: string,
+  founder: FounderInfo
+): Promise<EmailResult> {
+  const subject = `[MatCap] ${founder.companyName} sent wire info - purchase shares`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Wire Info Received</h2>
+    <p><strong>${founder.name}</strong> (${founder.companyName}) has uploaded their wire/payment information.</p>
+    <p>You can now purchase the shares and mark it complete in the admin dashboard.</p>
+    ${emailButton('View in Admin', `${BASE_URL}/?tab=onboarding`)}
+  `);
+
+  const textBody = `Wire Info Received
+
+${founder.name} (${founder.companyName}) has uploaded their wire/payment information.
+
+Purchase shares and mark complete: ${BASE_URL}/?tab=onboarding`;
 
   return sendEmail(adminEmail, subject, htmlBody, textBody);
 }

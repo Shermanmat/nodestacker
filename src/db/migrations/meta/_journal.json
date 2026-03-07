@@ -78,6 +78,34 @@
       "when": 1772600000000,
       "tag": "0010_onboarding_workflows",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1772700000000,
+      "tag": "0011_vesting_schedule",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1772800000000,
+      "tag": "0012_founder_leads",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1772900000000,
+      "tag": "0013_public_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1773000000000,
+      "tag": "0014_board_approval",
+      "breakpoints": true
     }
   ]
 }

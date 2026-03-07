@@ -19,8 +19,12 @@ import portfolioRoutes from './api/portfolio.js';
 import adminAuthRoutes from './api/admin-auth.js';
 import inboundRoutes from './api/inbound.js';
 import onboardingRoutes from './api/onboarding.js';
+import onboardingChatRoutes from './api/onboarding-chat.js';
 import webhooksRoutes from './api/webhooks.js';
 import weeklyDigestRoutes from './api/weekly-digest.js';
+import publicAuthRoutes from './api/public-auth.js';
+import publicProfileRoutes from './api/public-profile.js';
+import publicCompaniesRoutes from './api/public-companies.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -37,6 +41,13 @@ app.use('/api/*', cors());
 app.route('/api/admin-auth', adminAuthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/portal', founderPortalRoutes);
+// Public network signup/login (separate from founder auth)
+app.route('/api/public', publicAuthRoutes);
+app.route('/api/public', publicProfileRoutes);
+app.route('/api/public/companies', publicCompaniesRoutes);
+// Onboarding chat is public (founder intake interview)
+// Admin endpoints (/leads, /leads/:id/convert) are protected below
+app.route('/api/onboarding-chat', onboardingChatRoutes);
 // Inbound webhook endpoint is public (uses token auth internally)
 // Other inbound endpoints are protected below
 
@@ -65,6 +76,9 @@ app.use('/api/inbound/:id/dismiss', adminGuard);
 // Onboarding admin endpoints
 app.use('/api/onboarding', adminGuard);
 app.use('/api/onboarding/*', adminGuard);
+// Onboarding chat admin endpoints (leads management)
+app.use('/api/onboarding-chat/leads', adminGuard);
+app.use('/api/onboarding-chat/leads/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 
@@ -418,6 +432,15 @@ app.post('/api/investors/generate-all-tags', async (c) => {
 // Explicit route for founder portal
 app.get('/founder', serveStatic({ path: './public/founder.html' }));
 
+// Explicit route for founder onboarding (conversational intake)
+app.get('/onboarding', serveStatic({ path: './public/onboarding.html' }));
+
+// Public network pages
+app.get('/signup', serveStatic({ path: './public/signup.html' }));
+app.get('/dashboard', serveStatic({ path: './public/dashboard.html' }));
+
+// Marketing site
+app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
 
 // Serve static files from public directory
 app.use('/*', serveStatic({ root: './public' }));

@@ -168,6 +168,15 @@ app.put('/:id', async (c) => {
     return c.json({ error: errorMsg || 'Invalid data' }, 400);
   }
 
+  // Get existing intro request to check for status change
+  const existing = await db.query.introRequests.findFirst({
+    where: eq(introRequests.id, id),
+  });
+
+  if (!existing) {
+    return c.json({ error: 'Intro request not found' }, 404);
+  }
+
   const now = new Date().toISOString();
   const result = await db.update(introRequests)
     .set({
@@ -177,9 +186,18 @@ app.put('/:id', async (c) => {
     .where(eq(introRequests.id, id))
     .returning();
 
-  if (result.length === 0) {
-    return c.json({ error: 'Intro request not found' }, 404);
+  // If status changed to 'introduced', update lastIntroDate on the node-investor connection
+  if (parsed.data.status === 'introduced' && existing.status !== 'introduced') {
+    await db.update(nodeInvestorConnections)
+      .set({ lastIntroDate: now.split('T')[0] })
+      .where(
+        and(
+          eq(nodeInvestorConnections.nodeId, existing.nodeId),
+          eq(nodeInvestorConnections.investorId, existing.investorId)
+        )
+      );
   }
+
   return c.json(result[0]);
 });
 
@@ -576,8 +594,48 @@ app.get('/stats/investor-mau', async (c) => {
   });
 });
 
+// Bump investor - record that the node followed up with the investor
+app.post('/:id/bump-investor', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({
+    where: eq(introRequests.id, id),
+    with: { founder: true, investor: true },
+  });
+
+  if (!intro) {
+    return c.json({ error: 'Intro request not found' }, 404);
+  }
+
+  if (intro.status !== 'intro_request_sent') {
+    return c.json({ error: 'Can only bump intros in intro_request_sent status' }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const newBumpCount = (intro.investorBumpCount || 0) + 1;
+
+  await db.update(introRequests)
+    .set({
+      investorBumpCount: newBumpCount,
+      lastInvestorBumpAt: now,
+      updatedAt: now,
+    })
+    .where(eq(introRequests.id, id));
+
+  // Log the bump as a followup
+  await db.insert(followupLogs).values({
+    introRequestId: id,
+    followupType: 'node_check',
+    completedBy: 'admin',
+    completedAt: now,
+    notes: `Bump #${newBumpCount} to ${intro.investor.name} re: ${intro.founder.name}`,
+    nextAction: newBumpCount >= 2 ? 'Auto-ignore in 7 days if no response' : 'Follow up again if no response',
+  });
+
+  return c.json({ success: true, bumpCount: newBumpCount });
+});
+
 // Admin/Node Tasks - tasks for the node (person making intros)
-// Timeline: Day 3 = "schedule meeting?", Day 14 = "did they meet?"
+// Timeline: Day 5 = "bump investor", Day 7 after bump = "bump again" or auto-ignore
 // Only intros after May 2025
 app.get('/tasks/node/:nodeId', async (c) => {
   const nodeId = parseInt(c.req.param('nodeId'));
@@ -605,8 +663,35 @@ app.get('/tasks/node/:nodeId', async (c) => {
       continue;
     }
 
-    // Skip terminal statuses and pre-intro (not made yet)
-    if (['passed', 'ignored', 'invested', 'intro_request_sent'].includes(intro.status)) {
+    // Skip terminal statuses
+    if (['passed', 'ignored', 'invested'].includes(intro.status)) {
+      continue;
+    }
+
+    // Intro request sent - check if investor needs a bump
+    if (intro.status === 'intro_request_sent') {
+      const requestDate = intro.dateRequested || intro.createdAt;
+      const bumpCount = intro.investorBumpCount || 0;
+      const lastBump = intro.lastInvestorBumpAt;
+      const fiveDaysAgo = new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString();
+      const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+      if (bumpCount === 0 && requestDate < fiveDaysAgo) {
+        tasks.push({
+          type: 'bump_investor',
+          priority: 'high',
+          intro,
+          message: `Bump ${intro.investor.name} re: ${intro.founder.name} (no response)`,
+        });
+      } else if (bumpCount === 1 && lastBump && lastBump < sevenDaysAgo) {
+        tasks.push({
+          type: 'bump_investor',
+          priority: 'high',
+          intro,
+          message: `2nd bump to ${intro.investor.name} re: ${intro.founder.name} (still no response)`,
+        });
+      }
+      // bumpCount >= 2: auto-ignore will handle it
       continue;
     }
 
@@ -633,11 +718,9 @@ app.get('/tasks/node/:nodeId', async (c) => {
 
     // Not updated yet - check timing based on status
     if (intro.status === 'introduced') {
-      // Use dateIntroduced, then dateRequested, then createdAt as fallback
       const introDate = intro.dateIntroduced || intro.dateRequested || intro.createdAt;
 
       if (introDate < fourteenDaysAgo) {
-        // 14+ days: Did they meet?
         tasks.push({
           type: 'check_meeting',
           priority: 'high',
@@ -645,7 +728,6 @@ app.get('/tasks/node/:nodeId', async (c) => {
           message: `Did ${intro.founder.name} meet with ${intro.investor.name} @ ${intro.investor.firm}?`,
         });
       } else if (introDate < threeDaysAgo) {
-        // 3-14 days: Did they schedule?
         tasks.push({
           type: 'check_schedule',
           priority: 'medium',
@@ -653,7 +735,6 @@ app.get('/tasks/node/:nodeId', async (c) => {
           message: `Did ${intro.founder.name} schedule a meeting with ${intro.investor.name} @ ${intro.investor.firm}?`,
         });
       }
-      // Less than 3 days: no task yet
       continue;
     }
 
@@ -737,13 +818,17 @@ app.get('/tasks/node/:nodeId', async (c) => {
   }
 })();
 
-// Auto-ignore stale intro requests (unchanged for 3 weeks)
+// Auto-ignore stale intro requests
+// - intro_request_sent: unchanged for 3 weeks
+// - introduced with 2+ bumps: 7 days after last bump with no response
 // Runs every hour
 setInterval(async () => {
   try {
+    const now = new Date().toISOString();
     const threeWeeksAgo = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Find requests that are still in 'intro_request_sent' status and haven't been updated in 3 weeks
+    // 1. Stale intro_request_sent (unchanged for 3 weeks)
     const staleRequests = await db
       .select({ id: introRequests.id })
       .from(introRequests)
@@ -754,17 +839,39 @@ setInterval(async () => {
         )
       );
 
-    if (staleRequests.length > 0) {
-      const staleIds = staleRequests.map(r => r.id);
+    // 2. Intro requested with 2+ bumps, last bump 7+ days ago (investor ghosted after follow-ups)
+    const ghostedRequests = await db
+      .select({ id: introRequests.id })
+      .from(introRequests)
+      .where(
+        and(
+          eq(introRequests.status, 'intro_request_sent'),
+          sql`${introRequests.investorBumpCount} >= 2`,
+          lt(introRequests.lastInvestorBumpAt, sevenDaysAgo)
+        )
+      );
+
+    const allStaleIds = [
+      ...staleRequests.map(r => r.id),
+      ...ghostedRequests.map(r => r.id),
+    ];
+
+    if (allStaleIds.length > 0) {
       await db
         .update(introRequests)
         .set({
           status: 'ignored',
-          updatedAt: new Date().toISOString()
+          passReason: 'ghosted',
+          updatedAt: now,
         })
-        .where(inArray(introRequests.id, staleIds));
+        .where(inArray(introRequests.id, allStaleIds));
 
-      console.log(`🧹 Auto-ignored ${staleRequests.length} stale intro requests`);
+      if (staleRequests.length > 0) {
+        console.log(`Auto-ignored ${staleRequests.length} stale intro requests`);
+      }
+      if (ghostedRequests.length > 0) {
+        console.log(`Auto-ignored ${ghostedRequests.length} ghosted intros (2 bumps, no response)`);
+      }
     }
   } catch (err) {
     console.error('Failed to auto-ignore stale requests:', err);

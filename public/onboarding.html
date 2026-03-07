@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MatCap - Step 1: Get on Our Radar</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    .chat-message {
+      animation: fadeIn 0.3s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .typing-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px 16px;
+    }
+    .typing-indicator span {
+      width: 8px;
+      height: 8px;
+      background: #94a3b8;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app" v-cloak>
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b sticky top-0 z-10">
+      <div class="max-w-2xl mx-auto px-4 py-4">
+        <h1 class="text-xl font-bold text-gray-900">MatCap</h1>
+        <p class="text-sm text-gray-500">Step 1: Get on our radar</p>
+      </div>
+    </header>
+
+    <!-- Main Chat Container -->
+    <main class="max-w-2xl mx-auto pb-32">
+      <!-- Intro Section (shown before starting) -->
+      <div v-if="!sessionId" class="px-4 py-12 text-center">
+        <div class="bg-white rounded-2xl shadow-lg p-8 max-w-md mx-auto">
+          <div class="text-5xl mb-4">👋</div>
+          <h2 class="text-2xl font-bold text-gray-900 mb-3">Let's get to know you</h2>
+          <p class="text-gray-600 mb-6">
+            Answer a few thoughtful questions and receive a sharp blurb you can immediately use when talking to investors.
+          </p>
+          <button @click="startConversation" :disabled="starting"
+            class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            {{ starting ? 'Starting...' : 'Start Conversation' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat Messages -->
+      <div v-else class="px-4 py-6 space-y-4">
+        <div v-for="(msg, index) in messages" :key="index"
+          class="chat-message"
+          :class="msg.role === 'assistant' ? 'flex justify-start' : 'flex justify-end'">
+          <div :class="msg.role === 'assistant'
+            ? 'bg-white shadow rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]'
+            : 'bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]'">
+            <p class="whitespace-pre-wrap">{{ msg.content }}</p>
+          </div>
+        </div>
+
+        <!-- Typing Indicator -->
+        <div v-if="sending" class="flex justify-start">
+          <div class="bg-white shadow rounded-2xl rounded-tl-sm typing-indicator">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+
+        <!-- Completion Card -->
+        <div v-if="isComplete && outputs" class="bg-white shadow-lg rounded-2xl p-6 space-y-6">
+          <div class="text-center">
+            <div class="text-4xl mb-2">🎉</div>
+            <h3 class="text-xl font-bold text-gray-900">Your Investor Blurb</h3>
+            <p class="text-sm text-gray-500 mt-1">Copy and use this when reaching out to investors</p>
+          </div>
+
+          <!-- Blurb -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Blurb</span>
+              <button @click="copyToClipboard(outputs.investorBlurb, 'blurb')"
+                class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
+                <span v-if="copiedBlurb">✓ Copied!</span>
+                <span v-else>Copy</span>
+              </button>
+            </div>
+            <p class="text-gray-800 leading-relaxed">{{ outputs.investorBlurb }}</p>
+          </div>
+
+          <!-- One-Liner -->
+          <div class="bg-gray-50 rounded-lg p-4">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">One-Liner</span>
+              <button @click="copyToClipboard(outputs.oneLiner, 'oneliner')"
+                class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
+                <span v-if="copiedOneLiner">✓ Copied!</span>
+                <span v-else>Copy</span>
+              </button>
+            </div>
+            <p class="text-gray-800 font-medium">{{ outputs.oneLiner }}</p>
+          </div>
+
+          <div class="text-center pt-4 border-t">
+            <p class="text-sm text-gray-500 mb-2">We've also sent this to your email for easy reference.</p>
+            <p class="text-sm text-gray-600">
+              Questions? Reach out to <a href="mailto:mat@matsherman.com" class="text-blue-600 hover:underline">mat@matsherman.com</a>
+            </p>
+          </div>
+        </div>
+
+        <!-- Scroll anchor -->
+        <div ref="scrollAnchor"></div>
+      </div>
+    </main>
+
+    <!-- Input Area -->
+    <div v-if="sessionId && !isComplete" class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
+      <div class="max-w-2xl mx-auto px-4 py-4">
+        <form @submit.prevent="sendMessage" class="flex gap-3">
+          <input v-model="userInput" type="text"
+            :disabled="sending"
+            placeholder="Type your message..."
+            class="flex-1 border rounded-full px-5 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+            ref="inputField">
+          <button type="submit" :disabled="sending || !userInput.trim()"
+            class="bg-blue-600 text-white px-6 py-3 rounded-full font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            Send
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div v-if="error" class="fixed bottom-20 left-4 right-4 max-w-md mx-auto">
+      <div class="bg-red-100 text-red-700 px-4 py-3 rounded-lg shadow-lg flex justify-between items-center">
+        <span>{{ error }}</span>
+        <button @click="error = null" class="text-red-700 hover:text-red-900">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, nextTick, watch } = Vue;
+
+    createApp({
+      setup() {
+        const sessionId = ref(null);
+        const messages = ref([]);
+        const userInput = ref('');
+        const sending = ref(false);
+        const starting = ref(false);
+        const isComplete = ref(false);
+        const outputs = ref(null);
+        const error = ref(null);
+        const copiedBlurb = ref(false);
+        const copiedOneLiner = ref(false);
+        const scrollAnchor = ref(null);
+        const inputField = ref(null);
+
+        // Auto-scroll to bottom when messages change
+        watch(messages, async () => {
+          await nextTick();
+          scrollAnchor.value?.scrollIntoView({ behavior: 'smooth' });
+        }, { deep: true });
+
+        // Focus input after sending
+        watch(sending, async (newVal) => {
+          if (!newVal) {
+            await nextTick();
+            inputField.value?.focus();
+          }
+        });
+
+        async function startConversation() {
+          starting.value = true;
+          error.value = null;
+
+          try {
+            const response = await fetch('/api/onboarding-chat/start', {
+              method: 'POST',
+            });
+
+            if (!response.ok) {
+              const data = await response.json();
+              throw new Error(data.error || 'Failed to start conversation');
+            }
+
+            const data = await response.json();
+            sessionId.value = data.sessionId;
+            messages.value = [{ role: 'assistant', content: data.message }];
+
+            // Store session ID in localStorage
+            localStorage.setItem('onboarding_session', data.sessionId);
+
+            await nextTick();
+            inputField.value?.focus();
+          } catch (err) {
+            error.value = err.message;
+          } finally {
+            starting.value = false;
+          }
+        }
+
+        async function sendMessage() {
+          if (!userInput.value.trim() || sending.value) return;
+
+          const message = userInput.value.trim();
+          userInput.value = '';
+          messages.value.push({ role: 'user', content: message });
+          sending.value = true;
+          error.value = null;
+
+          try {
+            const response = await fetch(`/api/onboarding-chat/${sessionId.value}/message`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ message }),
+            });
+
+            if (!response.ok) {
+              const data = await response.json();
+              throw new Error(data.error || 'Failed to send message');
+            }
+
+            const data = await response.json();
+            messages.value.push({ role: 'assistant', content: data.message });
+
+            if (data.isComplete && data.outputs) {
+              isComplete.value = true;
+              outputs.value = data.outputs;
+            }
+          } catch (err) {
+            error.value = err.message;
+          } finally {
+            sending.value = false;
+          }
+        }
+
+        function copyToClipboard(text, type) {
+          navigator.clipboard.writeText(text).then(() => {
+            if (type === 'blurb') {
+              copiedBlurb.value = true;
+              setTimeout(() => copiedBlurb.value = false, 2000);
+            } else {
+              copiedOneLiner.value = true;
+              setTimeout(() => copiedOneLiner.value = false, 2000);
+            }
+          });
+        }
+
+        // Check for existing session on load
+        async function checkExistingSession() {
+          const savedSession = localStorage.getItem('onboarding_session');
+          if (savedSession) {
+            try {
+              const response = await fetch(`/api/onboarding-chat/${savedSession}`);
+              if (response.ok) {
+                const data = await response.json();
+                if (data.status !== 'completed') {
+                  sessionId.value = parseInt(savedSession);
+                  messages.value = data.conversationHistory || [];
+                  isComplete.value = false;
+                } else if (data.outputs) {
+                  sessionId.value = parseInt(savedSession);
+                  messages.value = data.conversationHistory || [];
+                  isComplete.value = true;
+                  outputs.value = data.outputs;
+                }
+              }
+            } catch (err) {
+              console.error('Failed to restore session:', err);
+              localStorage.removeItem('onboarding_session');
+            }
+          }
+        }
+
+        checkExistingSession();
+
+        return {
+          sessionId,
+          messages,
+          userInput,
+          sending,
+          starting,
+          isComplete,
+          outputs,
+          error,
+          copiedBlurb,
+          copiedOneLiner,
+          scrollAnchor,
+          inputField,
+          startConversation,
+          sendMessage,
+          copyToClipboard,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

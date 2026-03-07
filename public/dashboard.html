@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MatCap Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    .modal-backdrop {
+      background: rgba(0, 0, 0, 0.5);
+    }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app" v-cloak>
+    <!-- Login Screen -->
+    <div v-if="!isAuthenticated" class="min-h-screen flex items-center justify-center px-4">
+      <div class="bg-white rounded-2xl shadow-lg p-8 max-w-md w-full">
+        <!-- Magic Link Sent -->
+        <div v-if="loginStep === 'sent'" class="text-center">
+          <div class="text-5xl mb-4">📧</div>
+          <h2 class="text-2xl font-bold text-gray-900 mb-3">Check Your Email</h2>
+          <p class="text-gray-600 mb-6">
+            We sent a magic link to <strong>{{ loginEmail }}</strong>
+          </p>
+          <button @click="loginStep = 'email'" class="text-blue-600 hover:underline">
+            Use a different email
+          </button>
+        </div>
+
+        <!-- Email Input -->
+        <div v-else class="text-center">
+          <h1 class="text-2xl font-bold text-gray-900 mb-2">MatCap Dashboard</h1>
+          <p class="text-gray-600 mb-6">Enter your email to log in</p>
+
+          <form @submit.prevent="requestMagicLink" class="space-y-4">
+            <input v-model="loginEmail" type="email" required
+              class="w-full border rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="you@example.com">
+
+            <div v-if="loginError" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {{ loginError }}
+            </div>
+
+            <button type="submit" :disabled="loginLoading"
+              class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+              {{ loginLoading ? 'Sending...' : 'Send Magic Link' }}
+            </button>
+          </form>
+
+          <div class="mt-6 text-sm text-gray-500">
+            Don't have an account?
+            <a href="/signup" class="text-blue-600 hover:underline">Sign up</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div v-else>
+      <!-- Header -->
+      <header class="bg-white shadow-sm border-b">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">MatCap</h1>
+            <p class="text-sm text-gray-500">Welcome, {{ user.firstName }}</p>
+          </div>
+          <div class="flex items-center gap-4">
+            <button @click="showProfileModal = true" class="text-gray-600 hover:text-gray-900">
+              Edit Profile
+            </button>
+            <button @click="logout" class="text-red-600 hover:text-red-700">
+              Log Out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="max-w-4xl mx-auto px-4 py-8">
+        <!-- User Card -->
+        <div class="bg-white rounded-xl shadow p-6 mb-8">
+          <div class="flex items-start justify-between">
+            <div>
+              <h2 class="text-xl font-bold text-gray-900">{{ user.firstName }} {{ user.lastName }}</h2>
+              <p class="text-gray-600 mt-1">{{ user.oneLiner }}</p>
+              <p class="text-sm text-gray-500 mt-2">📍 {{ user.city }}</p>
+              <div class="flex gap-4 mt-3">
+                <a v-if="user.linkedinUrl" :href="user.linkedinUrl" target="_blank"
+                  class="text-blue-600 hover:underline text-sm">LinkedIn</a>
+                <span v-if="user.twitterHandle" class="text-gray-500 text-sm">@{{ user.twitterHandle }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Companies Section -->
+        <div class="mb-8">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-bold text-gray-900">Your Companies</h3>
+            <button @click="openAddCompanyModal"
+              class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
+              + Add Company
+            </button>
+          </div>
+
+          <div v-if="companies.length === 0" class="bg-white rounded-xl shadow p-8 text-center">
+            <div class="text-4xl mb-4">🏢</div>
+            <p class="text-gray-600 mb-4">You haven't added any companies yet.</p>
+            <button @click="openAddCompanyModal"
+              class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700">
+              Add Your First Company
+            </button>
+          </div>
+
+          <div v-else class="space-y-4">
+            <div v-for="company in companies" :key="company.id"
+              class="bg-white rounded-xl shadow p-6">
+              <div class="flex justify-between items-start">
+                <div class="flex-1">
+                  <h4 class="text-lg font-semibold text-gray-900">{{ company.companyName }}</h4>
+                  <p class="text-gray-600 mt-1">{{ company.oneLiner }}</p>
+                  <div class="flex gap-4 mt-3 text-sm">
+                    <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full">{{ company.sector }}</span>
+                    <a v-if="company.url" :href="company.url" target="_blank"
+                      class="text-blue-600 hover:underline">Website</a>
+                  </div>
+                </div>
+                <div class="flex gap-2 ml-4">
+                  <button @click="openEditCompanyModal(company)"
+                    class="text-gray-600 hover:text-gray-900 px-3 py-1 border rounded-lg text-sm">
+                    Edit
+                  </button>
+                  <button @click="deleteCompany(company.id)"
+                    class="text-red-600 hover:text-red-700 px-3 py-1 border border-red-200 rounded-lg text-sm">
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Add/Edit Company Modal -->
+      <div v-if="showCompanyModal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
+        @click.self="showCompanyModal = false">
+        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full mx-4">
+          <h3 class="text-xl font-bold text-gray-900 mb-6">
+            {{ editingCompany ? 'Edit Company' : 'Add Company' }}
+          </h3>
+
+          <form @submit.prevent="saveCompany" class="space-y-5">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+              <input v-model="companyForm.companyName" type="text" required
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">One-liner *</label>
+              <input v-model="companyForm.oneLiner" type="text" required
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500"
+                placeholder="Building X for Y">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+              <input v-model="companyForm.url" type="url"
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500"
+                placeholder="https://example.com">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Sector *</label>
+              <select v-model="companyForm.sector" required
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+                <option value="">Select a sector</option>
+                <option v-for="sector in sectors" :key="sector" :value="sector">{{ sector }}</option>
+              </select>
+            </div>
+
+            <div v-if="companyError" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {{ companyError }}
+            </div>
+
+            <div class="flex gap-3 pt-4">
+              <button type="button" @click="showCompanyModal = false"
+                class="flex-1 border px-4 py-2.5 rounded-lg font-medium hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="submit" :disabled="companySaving"
+                class="flex-1 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+                {{ companySaving ? 'Saving...' : (editingCompany ? 'Save Changes' : 'Add Company') }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Edit Profile Modal -->
+      <div v-if="showProfileModal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
+        @click.self="showProfileModal = false">
+        <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full mx-4">
+          <h3 class="text-xl font-bold text-gray-900 mb-6">Edit Profile</h3>
+
+          <form @submit.prevent="saveProfile" class="space-y-5">
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <input v-model="profileForm.firstName" type="text"
+                  class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <input v-model="profileForm.lastName" type="text"
+                  class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">One-liner intro</label>
+              <input v-model="profileForm.oneLiner" type="text"
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input v-model="profileForm.city" type="text"
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">LinkedIn URL</label>
+              <input v-model="profileForm.linkedinUrl" type="url"
+                class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Twitter Handle</label>
+              <div class="flex">
+                <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 bg-gray-50 text-gray-500">@</span>
+                <input v-model="profileForm.twitterHandle" type="text"
+                  class="flex-1 border rounded-r-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500">
+              </div>
+            </div>
+
+            <div v-if="profileError" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
+              {{ profileError }}
+            </div>
+
+            <div class="flex gap-3 pt-4">
+              <button type="button" @click="showProfileModal = false"
+                class="flex-1 border px-4 py-2.5 rounded-lg font-medium hover:bg-gray-50">
+                Cancel
+              </button>
+              <button type="submit" :disabled="profileSaving"
+                class="flex-1 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
+                {{ profileSaving ? 'Saving...' : 'Save Changes' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, reactive, onMounted } = Vue;
+
+    createApp({
+      setup() {
+        // Auth state
+        const isAuthenticated = ref(false);
+        const sessionId = ref(null);
+        const user = ref({});
+
+        // Login
+        const loginEmail = ref('');
+        const loginStep = ref('email');
+        const loginLoading = ref(false);
+        const loginError = ref(null);
+
+        // Companies
+        const companies = ref([]);
+        const sectors = ref([]);
+        const showCompanyModal = ref(false);
+        const editingCompany = ref(null);
+        const companyForm = reactive({
+          companyName: '',
+          oneLiner: '',
+          url: '',
+          sector: '',
+        });
+        const companySaving = ref(false);
+        const companyError = ref(null);
+
+        // Profile
+        const showProfileModal = ref(false);
+        const profileForm = reactive({
+          firstName: '',
+          lastName: '',
+          oneLiner: '',
+          city: '',
+          linkedinUrl: '',
+          twitterHandle: '',
+        });
+        const profileSaving = ref(false);
+        const profileError = ref(null);
+
+        // API headers
+        function getHeaders() {
+          return {
+            'Content-Type': 'application/json',
+            'X-Public-Session': sessionId.value,
+          };
+        }
+
+        // Check for token in URL (from magic link)
+        async function checkToken() {
+          const params = new URLSearchParams(window.location.search);
+          const token = params.get('token');
+
+          if (token) {
+            try {
+              const response = await fetch('/api/public/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token }),
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                sessionId.value = data.sessionId;
+                user.value = data.user;
+                isAuthenticated.value = true;
+                localStorage.setItem('public_session', data.sessionId);
+
+                // Clean up URL
+                window.history.replaceState({}, '', '/dashboard');
+
+                await loadCompanies();
+                await loadSectors();
+              }
+            } catch (err) {
+              console.error('Token verification failed:', err);
+            }
+          }
+        }
+
+        // Check existing session
+        async function checkSession() {
+          const savedSession = localStorage.getItem('public_session');
+          if (savedSession) {
+            try {
+              const response = await fetch('/api/public/session', {
+                headers: { 'X-Public-Session': savedSession },
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                sessionId.value = savedSession;
+                user.value = data.user;
+                isAuthenticated.value = true;
+                await loadCompanies();
+                await loadSectors();
+              } else {
+                localStorage.removeItem('public_session');
+              }
+            } catch (err) {
+              localStorage.removeItem('public_session');
+            }
+          }
+        }
+
+        async function requestMagicLink() {
+          loginLoading.value = true;
+          loginError.value = null;
+
+          try {
+            const response = await fetch('/api/public/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: loginEmail.value }),
+            });
+
+            if (response.ok) {
+              loginStep.value = 'sent';
+            } else {
+              const data = await response.json();
+              loginError.value = data.error || 'Failed to send magic link';
+            }
+          } catch (err) {
+            loginError.value = 'Network error. Please try again.';
+          } finally {
+            loginLoading.value = false;
+          }
+        }
+
+        async function logout() {
+          await fetch('/api/public/logout', {
+            method: 'POST',
+            headers: getHeaders(),
+          });
+          localStorage.removeItem('public_session');
+          isAuthenticated.value = false;
+          sessionId.value = null;
+          user.value = {};
+          companies.value = [];
+        }
+
+        // Companies
+        async function loadCompanies() {
+          try {
+            const response = await fetch('/api/public/companies', {
+              headers: getHeaders(),
+            });
+            if (response.ok) {
+              companies.value = await response.json();
+            }
+          } catch (err) {
+            console.error('Failed to load companies:', err);
+          }
+        }
+
+        async function loadSectors() {
+          try {
+            const response = await fetch('/api/public/companies/sectors');
+            if (response.ok) {
+              sectors.value = await response.json();
+            }
+          } catch (err) {
+            console.error('Failed to load sectors:', err);
+          }
+        }
+
+        function openAddCompanyModal() {
+          editingCompany.value = null;
+          companyForm.companyName = '';
+          companyForm.oneLiner = '';
+          companyForm.url = '';
+          companyForm.sector = '';
+          companyError.value = null;
+          showCompanyModal.value = true;
+        }
+
+        function openEditCompanyModal(company) {
+          editingCompany.value = company;
+          companyForm.companyName = company.companyName;
+          companyForm.oneLiner = company.oneLiner || '';
+          companyForm.url = company.url || '';
+          companyForm.sector = company.sector || '';
+          companyError.value = null;
+          showCompanyModal.value = true;
+        }
+
+        async function saveCompany() {
+          companySaving.value = true;
+          companyError.value = null;
+
+          try {
+            const url = editingCompany.value
+              ? `/api/public/companies/${editingCompany.value.id}`
+              : '/api/public/companies';
+
+            const response = await fetch(url, {
+              method: editingCompany.value ? 'PUT' : 'POST',
+              headers: getHeaders(),
+              body: JSON.stringify(companyForm),
+            });
+
+            if (response.ok) {
+              showCompanyModal.value = false;
+              await loadCompanies();
+            } else {
+              const data = await response.json();
+              companyError.value = data.error || 'Failed to save company';
+            }
+          } catch (err) {
+            companyError.value = 'Network error. Please try again.';
+          } finally {
+            companySaving.value = false;
+          }
+        }
+
+        async function deleteCompany(companyId) {
+          if (!confirm('Are you sure you want to delete this company?')) return;
+
+          try {
+            const response = await fetch(`/api/public/companies/${companyId}`, {
+              method: 'DELETE',
+              headers: getHeaders(),
+            });
+
+            if (response.ok) {
+              await loadCompanies();
+            }
+          } catch (err) {
+            console.error('Failed to delete company:', err);
+          }
+        }
+
+        // Profile
+        function openProfileModal() {
+          profileForm.firstName = user.value.firstName;
+          profileForm.lastName = user.value.lastName;
+          profileForm.oneLiner = user.value.oneLiner || '';
+          profileForm.city = user.value.city || '';
+          profileForm.linkedinUrl = user.value.linkedinUrl || '';
+          profileForm.twitterHandle = user.value.twitterHandle || '';
+          profileError.value = null;
+          showProfileModal.value = true;
+        }
+
+        async function saveProfile() {
+          profileSaving.value = true;
+          profileError.value = null;
+
+          try {
+            const response = await fetch('/api/public/me', {
+              method: 'PUT',
+              headers: getHeaders(),
+              body: JSON.stringify(profileForm),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              user.value = data;
+              showProfileModal.value = false;
+            } else {
+              const data = await response.json();
+              profileError.value = data.error || 'Failed to save profile';
+            }
+          } catch (err) {
+            profileError.value = 'Network error. Please try again.';
+          } finally {
+            profileSaving.value = false;
+          }
+        }
+
+        // Initialize profile form when modal opens
+        const originalShowProfileModal = showProfileModal;
+
+        onMounted(async () => {
+          await checkToken();
+          if (!isAuthenticated.value) {
+            await checkSession();
+          }
+        });
+
+        return {
+          // Auth
+          isAuthenticated,
+          user,
+          loginEmail,
+          loginStep,
+          loginLoading,
+          loginError,
+          requestMagicLink,
+          logout,
+
+          // Companies
+          companies,
+          sectors,
+          showCompanyModal,
+          editingCompany,
+          companyForm,
+          companySaving,
+          companyError,
+          openAddCompanyModal,
+          openEditCompanyModal,
+          saveCompany,
+          deleteCompany,
+
+          // Profile
+          showProfileModal: {
+            get() { return showProfileModal.value; },
+            set(val) {
+              if (val && !showProfileModal.value) {
+                // Opening modal - populate form
+                profileForm.firstName = user.value.firstName;
+                profileForm.lastName = user.value.lastName;
+                profileForm.oneLiner = user.value.oneLiner || '';
+                profileForm.city = user.value.city || '';
+                profileForm.linkedinUrl = user.value.linkedinUrl || '';
+                profileForm.twitterHandle = user.value.twitterHandle || '';
+                profileError.value = null;
+              }
+              showProfileModal.value = val;
+            }
+          },
+          profileForm,
+          profileSaving,
+          profileError,
+          saveProfile,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

@@ -12,6 +12,7 @@ import {
   onboardingEvents,
   portfolioCompanies,
   founders,
+  boardMembers,
   OnboardingStatus,
   OnboardingEventType,
   OnboardingActor,
@@ -65,6 +66,7 @@ async function getWorkflowWithDetails(workflowId: number) {
         },
       },
       events: true,
+      boardMembers: true,
     },
   });
   return workflow;
@@ -78,6 +80,64 @@ function calculateShareCount(equityPercent: string, authorizedShares: number): n
 function calculateTotalAmount(shareCount: number, sharePrice: string): string {
   const price = parseFloat(sharePrice);
   return (shareCount * price).toFixed(2);
+}
+
+async function sendStockAgreement(
+  workflowId: number,
+  workflow: any,
+  updates: Record<string, any>,
+  now: string
+) {
+  const founder = workflow.portfolioCompany.founder;
+  const shareCount = workflow.authorizedShares && workflow.offerEquityPercent
+    ? calculateShareCount(workflow.offerEquityPercent, workflow.authorizedShares)
+    : 0;
+  const totalAmount = calculateTotalAmount(shareCount, workflow.sharePrice || '0.0001');
+
+  try {
+    const stockResult = await esign.createStockAgreementRequest(
+      {
+        company_name: workflow.entityName || founder.companyName,
+        entity_state: workflow.entityState || 'DE',
+        effective_date: now.split('T')[0],
+        share_count: shareCount.toLocaleString(),
+        price_per_share: '$' + (workflow.sharePrice || '0.0001'),
+        total_purchase_price: '$' + totalAmount,
+        founder_name: founder.name,
+        founder_title: workflow.founderTitle || 'Founder & CEO',
+        founder_email: founder.email,
+      },
+      [
+        { name: founder.name, email: founder.email, role: 'Founder' },
+        { name: 'Mat Sherman', email: 'mat@matsherman.com', role: 'Advisor' },
+      ]
+    );
+
+    updates.equityAgreementUrl = stockResult.signatureRequestId;
+    updates.equityAgreementReceivedAt = now;
+
+    await logEvent(workflowId, OnboardingEventType.EQUITY_AGREEMENT_UPLOADED, OnboardingActor.SYSTEM, undefined, {
+      signatureRequestId: stockResult.signatureRequestId,
+      shareCount,
+      totalAmount,
+    });
+
+    updates.status = OnboardingStatus.EQUITY_AGREEMENT_PENDING;
+    console.log(`Stock agreement sent for ${founder.companyName}`);
+  } catch (stockErr: any) {
+    console.error('Failed to create stock agreement:', stockErr);
+    await onboardingEmails.sendEquityAgreementRequestEmail(
+      { name: founder.name, email: founder.email, companyName: founder.companyName },
+      {
+        equityPercent: workflow.offerEquityPercent || '',
+        sharePrice: workflow.sharePrice || '0.0001',
+        shareCount,
+        totalAmount,
+        grantDate: now.split('T')[0],
+      }
+    );
+    updates.status = OnboardingStatus.EQUITY_AGREEMENT_PENDING;
+  }
 }
 
 // ============== LIST WORKFLOWS ==============
@@ -141,7 +201,7 @@ app.get('/workflows/:id', async (c) => {
     };
   }
 
-  return c.json({ workflow, shareDetails });
+  return c.json({ workflow, shareDetails, boardMembers: workflow.boardMembers || [] });
 });
 
 // ============== START WORKFLOW ==============
@@ -382,77 +442,76 @@ app.post('/:id/check-signature-status', async (c) => {
       await logEvent(workflowId, OnboardingEventType.ADMIN_SIGNED_ADVISORY, OnboardingActor.WEBHOOK, adminSigner.email);
     }
 
-    // If both signed advisory, automatically generate and send stock agreement
+    // If both signed advisory, move to board approval
     if (status.isComplete && workflow.status !== OnboardingStatus.FOUNDER_SIGNED &&
+        workflow.status !== OnboardingStatus.BOARD_APPROVAL_PENDING &&
+        workflow.status !== OnboardingStatus.BOARD_APPROVED &&
         workflow.status !== OnboardingStatus.EQUITY_AGREEMENT_PENDING) {
       newStatus = OnboardingStatus.FOUNDER_SIGNED;
 
-      const founder = workflow.portfolioCompany.founder;
-      const shareCount = workflow.authorizedShares && workflow.offerEquityPercent
-        ? calculateShareCount(workflow.offerEquityPercent, workflow.authorizedShares)
-        : 0;
-      const totalAmount = calculateTotalAmount(shareCount, workflow.sharePrice || '0.0001');
+      // Check if board members exist - if so, move to board approval
+      const members = await db.query.boardMembers.findMany({
+        where: eq(boardMembers.workflowId, workflowId),
+      });
 
-      // Automatically create and send the Stock Award + Purchase Agreement using Dropbox Sign template
-      try {
-        const stockResult = await esign.createStockAgreementRequest(
-          {
-            company_name: workflow.entityName || founder.companyName,
-            entity_state: workflow.entityState || 'DE',
-            effective_date: now.split('T')[0],
-            share_count: shareCount.toLocaleString(),
-            price_per_share: '$' + (workflow.sharePrice || '0.0001'),
-            total_purchase_price: '$' + totalAmount,
-            founder_name: founder.name,
-            founder_title: workflow.founderTitle || 'Founder & CEO',
-            founder_email: founder.email,
-          },
-          [
-            { name: founder.name, email: founder.email, role: 'Founder' },
-            { name: 'Mat Sherman', email: 'mat@matsherman.com', role: 'Advisor' },
-          ]
-        );
+      if (members.length > 0) {
+        newStatus = OnboardingStatus.BOARD_APPROVAL_PENDING;
+        updates.boardApprovalRequestedAt = now;
 
-        // Store stock agreement signature request ID (reusing equity fields)
-        updates.equityAgreementUrl = stockResult.signatureRequestId; // Store for tracking
-        updates.equityAgreementReceivedAt = now; // Mark as sent
-
-        await logEvent(workflowId, OnboardingEventType.EQUITY_AGREEMENT_UPLOADED, OnboardingActor.SYSTEM, undefined, {
-          signatureRequestId: stockResult.signatureRequestId,
-          shareCount,
-          totalAmount,
+        await logEvent(workflowId, OnboardingEventType.BOARD_APPROVAL_REQUESTED, OnboardingActor.SYSTEM, undefined, {
+          boardMemberCount: members.length,
         });
 
-        newStatus = OnboardingStatus.EQUITY_AGREEMENT_PENDING;
-        console.log(`✅ Stock agreement sent for ${founder.companyName}`);
-      } catch (stockErr: any) {
-        console.error('Failed to create stock agreement:', stockErr);
-        // Fall back to old behavior - ask founder to upload
-        await onboardingEmails.sendEquityAgreementRequestEmail(
-          { name: founder.name, email: founder.email, companyName: founder.companyName },
-          {
-            equityPercent: workflow.offerEquityPercent || '',
-            sharePrice: workflow.sharePrice || '0.0001',
-            shareCount,
-            totalAmount,
-            grantDate: now.split('T')[0],
-          }
-        );
-        newStatus = OnboardingStatus.EQUITY_AGREEMENT_PENDING;
+        // Check if sole founder already matches — auto-approve solo founders
+        if (members.length === 1 && members[0].email.toLowerCase() === workflow.portfolioCompany.founder.email.toLowerCase()) {
+          console.log(`Solo founder board - will need in-app approval for ${workflow.portfolioCompany.founder.companyName}`);
+        }
+      } else {
+        // No board members recorded - go directly to equity agreement (legacy flows)
+        newStatus = OnboardingStatus.BOARD_APPROVED;
+        updates.boardApprovedAt = now;
+        await sendStockAgreement(workflowId, workflow, updates, now);
       }
     }
 
-    // If checking stock agreement and it's complete, move to next phase
-    if (checkingAgreement === 'stock' && status.isComplete &&
-        workflow.status === OnboardingStatus.EQUITY_AGREEMENT_PENDING) {
-      newStatus = OnboardingStatus.EQUITY_AGREEMENT_SIGNED;
-      updates.equityAgreementSignedAt = now;
+    // Track individual stock agreement signatures
+    if (checkingAgreement === 'stock') {
+      const eqFounderSigner = status.signers.find(s => s.email === workflow.portfolioCompany.founder.email);
+      const eqAdminSigner = status.signers.find(s => s.email === 'mat@matsherman.com');
 
-      await logEvent(workflowId, OnboardingEventType.EQUITY_AGREEMENT_SIGNED, OnboardingActor.SYSTEM, undefined, {
-        signatureRequestId,
-      });
+      if (eqFounderSigner?.status === 'signed' && !workflow.equityFounderSignedAt) {
+        updates.equityFounderSignedAt = eqFounderSigner.signedAt || now;
+        await logEvent(workflowId, OnboardingEventType.EQUITY_FOUNDER_SIGNED, OnboardingActor.WEBHOOK, eqFounderSigner.email);
+      }
 
-      console.log(`✅ Stock agreement fully signed for ${workflow.portfolioCompany.founder.companyName}`);
+      if (eqAdminSigner?.status === 'signed' && !workflow.equityAdminSignedAt) {
+        updates.equityAdminSignedAt = eqAdminSigner.signedAt || now;
+        await logEvent(workflowId, OnboardingEventType.EQUITY_ADMIN_SIGNED, OnboardingActor.WEBHOOK, eqAdminSigner.email);
+      }
+
+      // If both signed, move to wire info pending
+      if (status.isComplete && workflow.status === OnboardingStatus.EQUITY_AGREEMENT_PENDING) {
+        newStatus = OnboardingStatus.WIRE_INFO_PENDING;
+        updates.equityAgreementSignedAt = now;
+
+        await logEvent(workflowId, OnboardingEventType.EQUITY_AGREEMENT_SIGNED, OnboardingActor.SYSTEM, undefined, {
+          signatureRequestId,
+        });
+
+        // Email founder requesting wire info
+        const founder = workflow.portfolioCompany.founder;
+        const shareCount = workflow.authorizedShares && workflow.offerEquityPercent
+          ? calculateShareCount(workflow.offerEquityPercent, workflow.authorizedShares)
+          : 0;
+        const totalAmount = calculateTotalAmount(shareCount, workflow.sharePrice || '0.0001');
+
+        await onboardingEmails.sendWireInfoRequestEmail(
+          { name: founder.name, email: founder.email, companyName: founder.companyName },
+          { shareCount, totalAmount, sharePrice: workflow.sharePrice || '0.0001' }
+        );
+
+        console.log(`Stock agreement fully signed for ${founder.companyName}, wire info requested`);
+      }
     }
 
     if (Object.keys(updates).length > 0 || newStatus !== workflow.status) {
@@ -520,7 +579,8 @@ app.post('/:id/mark-shares-purchased', async (c) => {
     return c.json({ error: 'Workflow not found' }, 404);
   }
 
-  if (workflow.status !== OnboardingStatus.EQUITY_AGREEMENT_SIGNED) {
+  if (workflow.status !== OnboardingStatus.EQUITY_AGREEMENT_SIGNED &&
+      workflow.status !== OnboardingStatus.WIRE_INFO_PENDING) {
     return c.json({ error: `Cannot mark shares purchased in status: ${workflow.status}` }, 400);
   }
 
@@ -702,8 +762,14 @@ app.post('/:id/send-reminder', async (c) => {
     case OnboardingStatus.ADMIN_SIGNED:
       action = 'Sign the advisory agreement';
       break;
+    case OnboardingStatus.BOARD_APPROVAL_PENDING:
+      action = 'Approve the equity issuance (board consent)';
+      break;
     case OnboardingStatus.EQUITY_AGREEMENT_PENDING:
-      action = 'Upload the equity purchase agreement';
+      action = 'Sign the stock agreement (check Dropbox Sign)';
+      break;
+    case OnboardingStatus.WIRE_INFO_PENDING:
+      action = 'Upload your wire/payment info';
       break;
     case OnboardingStatus.CERTIFICATE_PENDING:
       action = 'Upload the stock certificate';

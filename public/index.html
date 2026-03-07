@@ -82,7 +82,7 @@
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="activeTab = tab.id; if (tab.id === 'inbound') loadInboundLogs(); if (tab.id === 'onboarding') loadOnboardingWorkflows();"
+            @click="activeTab = tab.id; if (tab.id === 'inbound') loadInboundLogs(); if (tab.id === 'onboarding') loadOnboardingWorkflows(); if (tab.id === 'health') loadNetworkHealth();"
             :class="['py-4 px-1 text-sm font-medium', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']"
           >
             {{ tab.label }}
@@ -234,7 +234,13 @@
                   <div class="flex-1">
                     <span class="text-sm">{{ task.intro.investor.name }} @ {{ task.intro.investor.firm }}</span>
                     <span class="text-xs ml-2 text-gray-500">{{ formatTaskType(task.type) }}</span>
+                    <span v-if="task.intro.investorBumpCount > 0" class="text-xs ml-2 text-orange-600">
+                      ({{ task.intro.investorBumpCount }} bump{{ task.intro.investorBumpCount > 1 ? 's' : '' }} sent)
+                    </span>
                   </div>
+                  <button v-if="task.type === 'bump_investor'" @click="bumpInvestor(task)" class="text-orange-600 hover:underline text-sm ml-4">
+                    Bump
+                  </button>
                   <button @click="goToIntro(task.intro)" class="text-blue-600 hover:underline text-sm ml-4">
                     Edit
                   </button>
@@ -591,13 +597,28 @@
                 <span>Founder Signed Advisory</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.equityAgreementReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
-                <span>Equity Agreement Received</span>
-                <a v-if="workflowDetails.workflow?.equityAgreementUrl" :href="workflowDetails.workflow?.equityAgreementUrl" target="_blank" class="text-blue-600 text-xs hover:underline">View</a>
+                <span :class="workflowDetails.workflow?.boardApprovedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Board Approval</span>
+                <span v-if="workflowDetails.workflow?.boardApprovedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.boardApprovedAt?.split('T')[0] }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.equityAgreementSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
-                <span>Equity Agreement Signed</span>
+                <span :class="workflowDetails.workflow?.equityAgreementReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Stock Agreement Sent</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.equityFounderSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Founder Signed Stock Agreement</span>
+                <span v-if="workflowDetails.workflow?.equityFounderSignedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.equityFounderSignedAt?.split('T')[0] }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.equityAdminSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Admin Signed Stock Agreement</span>
+                <span v-if="workflowDetails.workflow?.equityAdminSignedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.equityAdminSignedAt?.split('T')[0] }}</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <span :class="workflowDetails.workflow?.wireInfoUrl ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span>Wire Info Received</span>
+                <a v-if="workflowDetails.workflow?.wireInfoUrl" :href="workflowDetails.workflow?.wireInfoUrl" target="_blank" class="text-blue-600 text-xs hover:underline">View</a>
               </div>
               <div class="flex items-center gap-2">
                 <span :class="workflowDetails.workflow?.sharePurchaseDate ? 'text-green-500' : 'text-gray-300'">✓</span>
@@ -635,6 +656,26 @@
               <div>
                 <div class="text-gray-500">Total</div>
                 <div class="font-medium">${{ workflowDetails.shareDetails.totalAmount }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Board Consent Record -->
+          <div v-if="workflowDetails.boardMembers && workflowDetails.boardMembers.length > 0" class="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-medium mb-2">Board Consent Record</h4>
+            <p class="text-xs text-gray-500 mb-3">Written consent in lieu of a board meeting to approve equity issuance.</p>
+            <div class="space-y-2">
+              <div v-for="member in workflowDetails.boardMembers" :key="member.id"
+                class="flex items-center justify-between bg-white rounded px-3 py-2 border text-sm">
+                <div>
+                  <span class="font-medium">{{ member.name }}</span>
+                  <span class="text-gray-400 ml-2">{{ member.email }}</span>
+                  <span v-if="member.title" class="text-gray-400 ml-1">({{ member.title }})</span>
+                </div>
+                <span v-if="member.approvedAt" class="text-green-600 text-xs font-medium">
+                  Approved {{ member.approvedAt.split('T')[0] }}
+                </span>
+                <span v-else class="text-yellow-600 text-xs">Pending</span>
               </div>
             </div>
           </div>
@@ -1117,6 +1158,133 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Network Health Tab -->
+      <div v-if="activeTab === 'health'">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold">Network Health</h2>
+          <button @click="loadNetworkHealth" class="text-blue-600 text-sm hover:underline">Refresh</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-4 gap-4 mb-8">
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-gray-900">{{ networkHealth.summary.total }}</div>
+            <div class="text-sm text-gray-500">Total Investors</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-green-600">{{ networkHealth.summary.active }}</div>
+            <div class="text-sm text-gray-500">Active</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-amber-600">{{ networkHealth.summary.dormant }}</div>
+            <div class="text-sm text-gray-500">Dormant</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-gray-400">
+              {{ networkHealth.summary.total > 0 ? Math.round((networkHealth.summary.dormant / networkHealth.summary.total) * 100) : 0 }}%
+            </div>
+            <div class="text-sm text-gray-500">Dormancy Rate</div>
+          </div>
+        </div>
+
+        <!-- Dormancy Breakdown -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <h3 class="font-semibold mb-4">Dormancy Breakdown</h3>
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex items-center justify-between py-2 border-b">
+              <span class="text-gray-600">No intros in 90+ days</span>
+              <span class="font-semibold text-amber-600">{{ networkHealth.summary.dormantByReason?.no_recent_intros || 0 }}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b">
+              <span class="text-gray-600">High ignore rate (&gt;70%)</span>
+              <span class="font-semibold text-amber-600">{{ networkHealth.summary.dormantByReason?.high_ignore_rate || 0 }}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b">
+              <span class="text-gray-600">All passes, no meetings</span>
+              <span class="font-semibold text-amber-600">{{ networkHealth.summary.dormantByReason?.all_passes || 0 }}</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b">
+              <span class="text-gray-600">Never responded (3+ intros)</span>
+              <span class="font-semibold text-red-600">{{ networkHealth.summary.dormantByReason?.never_responded || 0 }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="flex items-center gap-4 mb-4">
+          <span class="text-sm text-gray-500">Show:</span>
+          <select v-model="healthFilter" class="border rounded px-3 py-1.5">
+            <option value="all">All Investors</option>
+            <option value="dormant">Dormant Only</option>
+            <option value="active">Active Only</option>
+          </select>
+        </div>
+
+        <!-- Investor List -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Investor</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Intros</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Response</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meetings</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Intro</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200">
+              <tr v-for="inv in filteredHealthInvestors()" :key="inv.id"
+                  :class="{ 'bg-amber-50': inv.isDormant, 'bg-gray-100 opacity-60': !inv.active }">
+                <td class="px-4 py-3">
+                  <div class="font-medium">{{ inv.name }}</div>
+                  <div class="text-sm text-gray-500">{{ inv.firm }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="text-sm">{{ inv.totalIntros }} total</div>
+                  <div class="text-xs text-gray-500">{{ inv.responded }} responded, {{ inv.ignored }} ignored</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 bg-gray-200 rounded-full h-2">
+                      <div class="bg-green-500 rounded-full h-2" :style="{ width: inv.responseRate + '%' }"></div>
+                    </div>
+                    <span class="text-sm">{{ inv.responseRate }}%</span>
+                  </div>
+                </td>
+                <td class="px-4 py-3 text-sm">
+                  {{ inv.meetings }} meetings
+                  <span v-if="inv.invested > 0" class="text-green-600 font-medium">({{ inv.invested }} invested)</span>
+                </td>
+                <td class="px-4 py-3">
+                  <div v-if="inv.lastIntroDate" class="text-sm">{{ inv.lastIntroDate }}</div>
+                  <div v-if="inv.daysSinceLastIntro !== null" class="text-xs text-gray-500">{{ inv.daysSinceLastIntro }} days ago</div>
+                  <div v-else class="text-sm text-gray-400">Never</div>
+                </td>
+                <td class="px-4 py-3">
+                  <span v-if="!inv.active" class="px-2 py-1 bg-gray-200 text-gray-600 rounded text-xs">Inactive</span>
+                  <span v-else-if="inv.isDormant" class="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs">
+                    {{ dormancyReasonLabel(inv.dormancyReason) }}
+                  </span>
+                  <span v-else class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">Healthy</span>
+                </td>
+                <td class="px-4 py-3">
+                  <button v-if="inv.active" @click="markInvestorInactive(inv.id)"
+                          class="text-red-600 hover:text-red-800 text-sm">
+                    Mark Inactive
+                  </button>
+                  <button v-else @click="markInvestorActive(inv.id)"
+                          class="text-green-600 hover:text-green-800 text-sm">
+                    Reactivate
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1797,6 +1965,7 @@
           { id: 'intros', label: 'Intro Requests' },
           { id: 'relationships', label: 'Relationships' },
           { id: 'inbound', label: 'Inbound Logs' },
+          { id: 'health', label: 'Network Health' },
         ];
 
         const introStatuses = [
@@ -1826,6 +1995,8 @@
         const nodeTasks = ref([]);
         const trends = ref({});
         const investorMau = ref({});
+        const networkHealth = ref({ investors: [], summary: { total: 0, active: 0, dormant: 0, dormantByReason: {} } });
+        const healthFilter = ref('all'); // 'all', 'dormant', 'active'
         const chartMetric = ref('requests'); // 'requests', 'meetings', or 'acceptRate'
         const chartNodeId = ref(''); // Filter chart by node
         const portfolio = ref({ companies: [], summary: {} });
@@ -2547,6 +2718,39 @@
           });
         };
 
+        // Network Health functions
+        const loadNetworkHealth = async () => {
+          const data = await api('/investors/health');
+          networkHealth.value = data;
+        };
+
+        const filteredHealthInvestors = () => {
+          const investors = networkHealth.value.investors || [];
+          if (healthFilter.value === 'dormant') return investors.filter(i => i.isDormant);
+          if (healthFilter.value === 'active') return investors.filter(i => !i.isDormant && i.active);
+          return investors;
+        };
+
+        const markInvestorInactive = async (investorId) => {
+          await api(`/investors/${investorId}`, { method: 'PUT', body: { active: false } });
+          loadNetworkHealth();
+        };
+
+        const markInvestorActive = async (investorId) => {
+          await api(`/investors/${investorId}`, { method: 'PUT', body: { active: true } });
+          loadNetworkHealth();
+        };
+
+        const dormancyReasonLabel = (reason) => {
+          const labels = {
+            'no_recent_intros': 'No intros in 90+ days',
+            'high_ignore_rate': 'High ignore rate (>70%)',
+            'all_passes': 'All passes, no meetings',
+            'never_responded': 'Never responded (3+ intros)',
+          };
+          return labels[reason] || reason;
+        };
+
         // Onboarding functions
         const loadOnboardingWorkflows = async () => {
           const data = await api('/onboarding/workflows');
@@ -2689,8 +2893,13 @@
             'advisory_agreement_sent': 'Advisory Sent',
             'admin_signed': 'Admin Signed',
             'founder_signed': 'Founder Signed',
-            'equity_agreement_pending': 'Awaiting Equity Agreement',
-            'equity_agreement_signed': 'Equity Agreement Signed',
+            'board_approval_pending': 'Awaiting Board Approval',
+            'board_approved': 'Board Approved',
+            'equity_agreement_pending': 'Awaiting Stock Signatures',
+            'equity_founder_signed': 'Founder Signed Stock',
+            'equity_admin_signed': 'Admin Signed Stock',
+            'equity_agreement_signed': 'Stock Agreement Signed',
+            'wire_info_pending': 'Awaiting Wire Info',
             'shares_purchased': 'Shares Purchased',
             '83b_filed': '83(b) Filed',
             'certificate_pending': 'Awaiting Certificate',
@@ -2874,6 +3083,13 @@
           await loadNodeTasks();
         };
 
+        // Bump investor - record that you followed up
+        const bumpInvestor = async (task) => {
+          if (!confirm(`Mark that you bumped ${task.intro.investor.name} about ${task.intro.founder.name}?`)) return;
+          await api(`/intro-requests/${task.intro.id}/bump-investor`, { method: 'POST' });
+          await loadNodeTasks();
+        };
+
         // Navigate to intro request and open edit modal
         const goToIntro = (intro) => {
           activeTab.value = 'intros';
@@ -2889,6 +3105,7 @@
             'check_schedule': 'schedule meeting?',
             'check_meeting': 'did they meet?',
             'check_in': 'check in',
+            'bump_investor': 'needs bump',
             'follow_up_questions': 'has questions',
             'first_meeting_complete': 'post-meeting',
             'second_meeting_complete': 'post-2nd meeting',
@@ -3013,31 +3230,34 @@
         };
 
         const saveInvestor = async () => {
-          if (editingInvestor.value) {
-            const { nodeId, ...investorData } = investorForm;
-            await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorData });
-          } else {
-            // Require node for new investors
-            if (!investorForm.nodeId) {
-              alert('Please select a node to assign this investor to');
-              return;
-            }
-            const { nodeId, ...investorData } = investorForm;
-            const newInvestor = await api('/investors', { method: 'POST', body: investorData });
-            // Create the node-investor connection
-            await api('/relationships/node-investor', {
-              method: 'POST',
-              body: {
-                nodeId: parseInt(investorForm.nodeId),
-                investorId: newInvestor.id,
-                connectionStrength: 'medium',
-                validated: true,
+          try {
+            if (editingInvestor.value) {
+              const { nodeId, ...investorData } = investorForm;
+              await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorData });
+            } else {
+              // Require node for new investors
+              if (!investorForm.nodeId) {
+                alert('Please select a node to assign this investor to');
+                return;
               }
-            });
+              const { nodeId, ...investorData } = investorForm;
+              const newInvestor = await api('/investors', { method: 'POST', body: investorData });
+              // Create the node-investor connection
+              await api(`/nodes/${investorForm.nodeId}/investors`, {
+                method: 'POST',
+                body: {
+                  investorId: newInvestor.id,
+                  connectionStrength: 'medium',
+                  validated: true,
+                }
+              });
+            }
+            closeInvestorModal();
+            loadInvestors();
+            loadRelationships();
+          } catch (e) {
+            alert('Failed to save investor: ' + e.message);
           }
-          closeInvestorModal();
-          loadInvestors();
-          loadRelationships();
         };
 
         const editInvestor = (investor) => {
@@ -3434,7 +3654,7 @@
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
           formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
-          loadIntroRequests, markNodeTaskDone, goToIntro, toggleFounderTasks, formatTaskType,
+          loadIntroRequests, markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,
@@ -3455,6 +3675,9 @@
           openWorkflowModal, closeWorkflowModal, sendOffer, generateAdvisoryAgreement, checkSignatureStatus,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction,
+          // Network Health
+          networkHealth, healthFilter, loadNetworkHealth, filteredHealthInvestors,
+          markInvestorInactive, markInvestorActive, dormancyReasonLabel,
         };
       }
     }).mount('#app');

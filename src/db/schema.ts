@@ -126,6 +126,8 @@ export const introRequests = sqliteTable('intro_requests', {
   lastFollowupDate: text('last_followup_date'),
   followupOwner: text('followup_owner').default('founder'),
   passReason: text('pass_reason'),
+  investorBumpCount: integer('investor_bump_count').notNull().default(0),
+  lastInvestorBumpAt: text('last_investor_bump_at'),
   notes: text('notes'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
@@ -435,8 +437,13 @@ export const OnboardingStatus = {
   ADVISORY_AGREEMENT_SENT: 'advisory_agreement_sent',
   ADMIN_SIGNED: 'admin_signed',
   FOUNDER_SIGNED: 'founder_signed',
+  BOARD_APPROVAL_PENDING: 'board_approval_pending',
+  BOARD_APPROVED: 'board_approved',
   EQUITY_AGREEMENT_PENDING: 'equity_agreement_pending',
+  EQUITY_FOUNDER_SIGNED: 'equity_founder_signed',
+  EQUITY_ADMIN_SIGNED: 'equity_admin_signed',
   EQUITY_AGREEMENT_SIGNED: 'equity_agreement_signed',
+  WIRE_INFO_PENDING: 'wire_info_pending',
   SHARES_PURCHASED: 'shares_purchased',
   ELECTION_83B_FILED: '83b_filed',
   CERTIFICATE_PENDING: 'certificate_pending',
@@ -452,8 +459,14 @@ export const OnboardingEventType = {
   ADVISORY_AGREEMENT_SENT: 'advisory_agreement_sent',
   ADMIN_SIGNED_ADVISORY: 'admin_signed_advisory',
   FOUNDER_SIGNED_ADVISORY: 'founder_signed_advisory',
+  BOARD_APPROVAL_REQUESTED: 'board_approval_requested',
+  BOARD_MEMBER_APPROVED: 'board_member_approved',
+  BOARD_APPROVAL_COMPLETE: 'board_approval_complete',
   EQUITY_AGREEMENT_UPLOADED: 'equity_agreement_uploaded',
+  EQUITY_FOUNDER_SIGNED: 'equity_founder_signed',
+  EQUITY_ADMIN_SIGNED: 'equity_admin_signed',
   EQUITY_AGREEMENT_SIGNED: 'equity_agreement_signed',
+  WIRE_INFO_SUBMITTED: 'wire_info_submitted',
   SHARES_PURCHASED: 'shares_purchased',
   ELECTION_83B_FILED: '83b_filed',
   CERTIFICATE_UPLOADED: 'certificate_uploaded',
@@ -504,10 +517,15 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   adminSignedAt: text('admin_signed_at'),
   signedDocumentUrl: text('signed_document_url'),
 
-  // Equity purchase agreement (founder sends to MatCap)
+  // Equity purchase agreement (e-signed via Dropbox Sign)
   equityAgreementReceivedAt: text('equity_agreement_received_at'),
   equityAgreementUrl: text('equity_agreement_url'),
+  equityFounderSignedAt: text('equity_founder_signed_at'),
+  equityAdminSignedAt: text('equity_admin_signed_at'),
   equityAgreementSignedAt: text('equity_agreement_signed_at'),
+
+  // Wire info (founder provides for share purchase)
+  wireInfoUrl: text('wire_info_url'),
 
   // Share purchase
   sharePurchaseAmount: text('share_purchase_amount'),
@@ -523,6 +541,10 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   certificateUrl: text('certificate_url'),
   certificateNumber: text('certificate_number'),
   equityVerifiedAt: text('equity_verified_at'),
+
+  // Board approval
+  boardApprovalRequestedAt: text('board_approval_requested_at'),
+  boardApprovedAt: text('board_approved_at'),
 
   // Google Drive
   driveFolderId: text('drive_folder_id'),
@@ -542,6 +564,18 @@ export const onboardingEvents = sqliteTable('onboarding_events', {
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
+export const boardMembers = sqliteTable('board_members', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  workflowId: integer('workflow_id').notNull().references(() => onboardingWorkflows.id),
+  name: text('name').notNull(),
+  email: text('email').notNull(),
+  title: text('title'),
+  isFounder: integer('is_founder', { mode: 'boolean' }).notNull().default(false),
+  approvedAt: text('approved_at'),
+  approvalIp: text('approval_ip'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
 // Onboarding Relations
 export const onboardingWorkflowsRelations = relations(onboardingWorkflows, ({ one, many }) => ({
   portfolioCompany: one(portfolioCompanies, {
@@ -549,6 +583,7 @@ export const onboardingWorkflowsRelations = relations(onboardingWorkflows, ({ on
     references: [portfolioCompanies.id],
   }),
   events: many(onboardingEvents),
+  boardMembers: many(boardMembers),
 }));
 
 export const onboardingEventsRelations = relations(onboardingEvents, ({ one }) => ({
@@ -558,7 +593,172 @@ export const onboardingEventsRelations = relations(onboardingEvents, ({ one }) =
   }),
 }));
 
+export const boardMembersRelations = relations(boardMembers, ({ one }) => ({
+  workflow: one(onboardingWorkflows, {
+    fields: [boardMembers.workflowId],
+    references: [onboardingWorkflows.id],
+  }),
+}));
+
 export type OnboardingWorkflow = typeof onboardingWorkflows.$inferSelect;
 export type NewOnboardingWorkflow = typeof onboardingWorkflows.$inferInsert;
 export type OnboardingEvent = typeof onboardingEvents.$inferSelect;
 export type NewOnboardingEvent = typeof onboardingEvents.$inferInsert;
+export type BoardMember = typeof boardMembers.$inferSelect;
+export type NewBoardMember = typeof boardMembers.$inferInsert;
+
+// Founder Leads Tables (conversational onboarding)
+
+export const FounderLeadStatus = {
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  CONVERTED: 'converted',
+} as const;
+
+export const FounderPersona = {
+  HIGH_SLOPE_BUILDER: 'high_slope_builder',
+  EXPERIENCED_OPERATOR: 'experienced_operator',
+  BUSINESS_ORIENTED_CODER: 'business_oriented_coder',
+  LARGE_COMPANY_SPINOUT: 'large_company_spinout',
+  STARTUP_INSIDER_FIRST_TIME: 'startup_insider_first_time',
+  SCRAPPY_BOOTSTRAPPED: 'scrappy_bootstrapped',
+  DOMAIN_EXPERT: 'domain_expert',
+} as const;
+
+export const FundraisingExperience = {
+  RAISED_VENTURE: 'raised_venture',
+  WORKED_AT_VENTURE_BACKED: 'worked_at_venture_backed',
+  ATTEMPTED_RAISE: 'attempted_raise',
+  NEVER_ATTEMPTED: 'never_attempted',
+} as const;
+
+export const InvestorNetworkRange = {
+  COLD: '0-5',
+  LIMITED: '5-15',
+  DECENT: '15-30',
+  STRONG: '30-50',
+  EXTENSIVE: '50+',
+} as const;
+
+export const FounderCompanyStage = {
+  IDEA: 'idea',
+  BUILDING_PRODUCT: 'building_product',
+  DESIGN_PARTNERS: 'design_partners',
+  EARLY_CUSTOMERS: 'early_customers',
+  REVENUE: 'revenue',
+  SCALING: 'scaling',
+} as const;
+
+export const GeographyContext = {
+  MAJOR_TECH_HUB: 'major_tech_hub',
+  OUTSIDE_TECH_HUBS: 'outside_tech_hubs',
+} as const;
+
+export const founderLeads = sqliteTable('founder_leads', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+
+  // Contact
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  email: text('email'),
+
+  // Company
+  companyName: text('company_name'),
+  companyDescription: text('company_description'),
+  sector: text('sector'),
+
+  // Extracted Tags
+  primaryPersona: text('primary_persona'),
+  secondaryPersona: text('secondary_persona'),
+  fundraisingExperience: text('fundraising_experience'),
+  investorNetworkNumber: integer('investor_network_number'),
+  investorNetworkRange: text('investor_network_range'),
+  companyStage: text('company_stage'),
+  geographyContext: text('geography_context'),
+
+  // Generated Outputs
+  investorBlurb: text('investor_blurb'),
+  oneLiner: text('one_liner'),
+
+  // Conversation
+  conversationHistory: text('conversation_history'), // JSON array of messages
+
+  // Tracking
+  status: text('status').notNull().default('in_progress'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  completedAt: text('completed_at'),
+  convertedFounderId: integer('converted_founder_id').references(() => founders.id),
+
+  // Link to public signup (if applicant came through public signup flow)
+  publicUserId: integer('public_user_id'),
+  publicCompanyId: integer('public_company_id'),
+});
+
+export const founderLeadsRelations = relations(founderLeads, ({ one }) => ({
+  convertedFounder: one(founders, {
+    fields: [founderLeads.convertedFounderId],
+    references: [founders.id],
+  }),
+}));
+
+export type FounderLead = typeof founderLeads.$inferSelect;
+export type NewFounderLead = typeof founderLeads.$inferInsert;
+
+// Public Network Tables (for public-facing founder signup)
+
+export const publicUsers = sqliteTable('public_users', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  firstName: text('first_name').notNull(),
+  lastName: text('last_name').notNull(),
+  email: text('email').notNull().unique(),
+  oneLiner: text('one_liner'),
+  city: text('city'),
+  linkedinUrl: text('linkedin_url'),
+  twitterHandle: text('twitter_handle'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const publicCompanies = sqliteTable('public_companies', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => publicUsers.id),
+  companyName: text('company_name').notNull(),
+  oneLiner: text('one_liner'),
+  url: text('url'),
+  sector: text('sector'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const publicSessions = sqliteTable('public_sessions', {
+  id: text('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => publicUsers.id),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Public Network Relations
+
+export const publicUsersRelations = relations(publicUsers, ({ many }) => ({
+  companies: many(publicCompanies),
+  sessions: many(publicSessions),
+}));
+
+export const publicCompaniesRelations = relations(publicCompanies, ({ one }) => ({
+  user: one(publicUsers, {
+    fields: [publicCompanies.userId],
+    references: [publicUsers.id],
+  }),
+}));
+
+export const publicSessionsRelations = relations(publicSessions, ({ one }) => ({
+  user: one(publicUsers, {
+    fields: [publicSessions.userId],
+    references: [publicUsers.id],
+  }),
+}));
+
+export type PublicUser = typeof publicUsers.$inferSelect;
+export type NewPublicUser = typeof publicUsers.$inferInsert;
+export type PublicCompany = typeof publicCompanies.$inferSelect;
+export type NewPublicCompany = typeof publicCompanies.$inferInsert;
+export type PublicSession = typeof publicSessions.$inferSelect;
+export type NewPublicSession = typeof publicSessions.$inferInsert;

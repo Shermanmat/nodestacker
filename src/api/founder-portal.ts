@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, inArray, notInArray, desc, sql } from 'drizzle-orm';
-import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
+import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
 import { z } from 'zod';
 import * as onboardingEmails from '../services/onboarding-emails.js';
@@ -645,6 +645,7 @@ app.get('/onboarding/status', async (c) => {
     where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
     with: {
       events: true,
+      boardMembers: true,
     },
   });
 
@@ -680,8 +681,22 @@ app.get('/onboarding/status', async (c) => {
       nextAction = { type: 'sign_advisory', message: 'Sign the advisory agreement (check your email)' };
       break;
     case OnboardingStatus.FOUNDER_SIGNED:
+    case OnboardingStatus.BOARD_APPROVAL_PENDING:
+      nextAction = { type: 'board_approval', message: 'Board members must approve the equity issuance' };
+      break;
+    case OnboardingStatus.BOARD_APPROVED:
     case OnboardingStatus.EQUITY_AGREEMENT_PENDING:
-      nextAction = { type: 'upload_equity_agreement', message: 'Upload equity purchase agreement' };
+      nextAction = { type: 'sign_equity', message: 'Sign the stock agreement (check your email from Dropbox Sign)' };
+      break;
+    case OnboardingStatus.EQUITY_FOUNDER_SIGNED:
+      nextAction = { type: 'wait', message: 'Waiting for Mat to sign the stock agreement' };
+      break;
+    case OnboardingStatus.EQUITY_ADMIN_SIGNED:
+      nextAction = { type: 'sign_equity', message: 'Sign the stock agreement (check your email from Dropbox Sign)' };
+      break;
+    case OnboardingStatus.WIRE_INFO_PENDING:
+    case OnboardingStatus.EQUITY_AGREEMENT_SIGNED:
+      nextAction = { type: 'upload_wire_info', message: 'Upload your wire/payment info so Mat can purchase shares' };
       break;
     case OnboardingStatus.CERTIFICATE_PENDING:
       nextAction = { type: 'upload_certificate', message: 'Upload stock certificate' };
@@ -709,20 +724,36 @@ app.get('/onboarding/status', async (c) => {
       entityState: workflow.entityState,
       authorizedShares: workflow.authorizedShares,
       sharePrice: workflow.sharePrice,
+      entityInfoReceivedAt: workflow.entityInfoReceivedAt,
       agreementSentAt: workflow.agreementSentAt,
       founderSignedAt: workflow.founderSignedAt,
       adminSignedAt: workflow.adminSignedAt,
       equityAgreementReceivedAt: workflow.equityAgreementReceivedAt,
       equityAgreementUrl: workflow.equityAgreementUrl,
+      equityFounderSignedAt: workflow.equityFounderSignedAt,
+      equityAdminSignedAt: workflow.equityAdminSignedAt,
+      equityAgreementSignedAt: workflow.equityAgreementSignedAt,
+      wireInfoUrl: workflow.wireInfoUrl,
       sharePurchaseDate: workflow.sharePurchaseDate,
       election83bFiledAt: workflow.election83bFiledAt,
       certificateReceivedAt: workflow.certificateReceivedAt,
       certificateUrl: workflow.certificateUrl,
+      boardApprovalRequestedAt: workflow.boardApprovalRequestedAt,
+      boardApprovedAt: workflow.boardApprovedAt,
       createdAt: workflow.createdAt,
       updatedAt: workflow.updatedAt,
     },
     shareDetails,
     nextAction,
+    boardMembers: (workflow.boardMembers || []).map(m => ({
+      id: m.id,
+      name: m.name,
+      email: m.email,
+      title: m.title,
+      approvedAt: m.approvedAt,
+      // Founder can approve on behalf of any board member in their workflow
+      canApprove: !m.approvedAt,
+    })),
     events: workflow.events.slice(0, 10), // Last 10 events
   });
 });
@@ -793,6 +824,11 @@ app.post('/onboarding/entity-info', async (c) => {
     authorizedShares: z.number().positive(),
     sharePrice: z.string().optional(), // Defaults to 0.0001 if not provided
     founderTitle: z.string().optional(), // Defaults to 'Founder & CEO' if not provided
+    boardMembers: z.array(z.object({
+      name: z.string().min(1),
+      email: z.string().email(),
+      title: z.string().optional(),
+    })).min(1, 'At least one board member is required'),
   });
 
   const parsed = schema.safeParse(body);
@@ -848,10 +884,23 @@ app.post('/onboarding/entity-info', async (c) => {
     })
     .where(eq(onboardingWorkflows.id, workflow.id));
 
+  // Save board members
+  for (const member of parsed.data.boardMembers) {
+    await db.insert(boardMembers).values({
+      workflowId: workflow.id,
+      name: member.name,
+      email: member.email,
+      title: member.title || null,
+      isFounder: member.email.toLowerCase() === founder.email.toLowerCase(),
+      createdAt: now,
+    });
+  }
+
   await logOnboardingEvent(workflow.id, OnboardingEventType.ENTITY_INFO_SUBMITTED, founder.email, {
     entityName: parsed.data.entityName,
     entityType: parsed.data.entityType,
     authorizedShares: parsed.data.authorizedShares,
+    boardMemberCount: parsed.data.boardMembers.length,
   });
 
   // Auto-send advisory agreement via Dropbox Sign template
@@ -921,6 +970,154 @@ app.post('/onboarding/entity-info', async (c) => {
   });
 });
 
+// Board member approval
+app.post('/onboarding/board-approve', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    boardMemberId: z.number(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+
+  if (!founder) {
+    return c.json({ error: 'Founder not found' }, 404);
+  }
+
+  // Find the board member
+  const member = await db.query.boardMembers.findFirst({
+    where: eq(boardMembers.id, parsed.data.boardMemberId),
+    with: { workflow: true },
+  });
+
+  if (!member) {
+    return c.json({ error: 'Board member not found' }, 404);
+  }
+
+  if (member.approvedAt) {
+    return c.json({ error: 'Already approved' }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  // Record the approval
+  await db.update(boardMembers)
+    .set({ approvedAt: now })
+    .where(eq(boardMembers.id, member.id));
+
+  await logOnboardingEvent(member.workflowId, OnboardingEventType.BOARD_MEMBER_APPROVED, founder.email, {
+    boardMemberName: member.name,
+    boardMemberEmail: member.email,
+  });
+
+  // Check if all board members have approved
+  const allMembers = await db.query.boardMembers.findMany({
+    where: eq(boardMembers.workflowId, member.workflowId),
+  });
+
+  const allApproved = allMembers.every(m => m.id === member.id ? true : !!m.approvedAt);
+
+  if (allApproved) {
+    // All board members approved - advance workflow
+    await db.update(onboardingWorkflows)
+      .set({
+        status: OnboardingStatus.BOARD_APPROVED,
+        boardApprovedAt: now,
+        updatedAt: now,
+      })
+      .where(eq(onboardingWorkflows.id, member.workflowId));
+
+    await logOnboardingEvent(member.workflowId, OnboardingEventType.BOARD_APPROVAL_COMPLETE, 'system', {
+      totalMembers: allMembers.length,
+    });
+
+    // Auto-send stock agreement via Dropbox Sign
+    const workflow = await db.query.onboardingWorkflows.findFirst({
+      where: eq(onboardingWorkflows.id, member.workflowId),
+      with: { portfolioCompany: { with: { founder: true } } },
+    });
+
+    if (workflow && esign.isConfigured()) {
+      const wFounder = workflow.portfolioCompany.founder;
+      const shareCount = workflow.authorizedShares && workflow.offerEquityPercent
+        ? Math.round(workflow.authorizedShares * (parseFloat(workflow.offerEquityPercent) / 100))
+        : 0;
+      const totalAmount = (shareCount * parseFloat(workflow.sharePrice || '0.0001')).toFixed(2);
+
+      try {
+        const stockResult = await esign.createStockAgreementRequest(
+          {
+            company_name: workflow.entityName || wFounder.companyName,
+            entity_state: workflow.entityState || 'DE',
+            effective_date: now.split('T')[0],
+            share_count: shareCount.toLocaleString(),
+            price_per_share: '$' + (workflow.sharePrice || '0.0001'),
+            total_purchase_price: '$' + totalAmount,
+            founder_name: wFounder.name,
+            founder_title: workflow.founderTitle || 'Founder & CEO',
+            founder_email: wFounder.email,
+          },
+          [
+            { name: wFounder.name, email: wFounder.email, role: 'Founder' },
+            { name: 'Mat Sherman', email: 'mat@matsherman.com', role: 'Advisor' },
+          ]
+        );
+
+        await db.update(onboardingWorkflows)
+          .set({
+            status: OnboardingStatus.EQUITY_AGREEMENT_PENDING,
+            equityAgreementUrl: stockResult.signatureRequestId,
+            equityAgreementReceivedAt: now,
+            updatedAt: now,
+          })
+          .where(eq(onboardingWorkflows.id, member.workflowId));
+
+        await logOnboardingEvent(member.workflowId, OnboardingEventType.EQUITY_AGREEMENT_UPLOADED, 'system', {
+          signatureRequestId: stockResult.signatureRequestId,
+          shareCount,
+          totalAmount,
+        });
+
+        console.log(`Stock agreement auto-sent for ${wFounder.companyName}`);
+      } catch (err: any) {
+        console.error('Failed to auto-send stock agreement:', err);
+        // Fall back - send email asking founder
+        await onboardingEmails.sendEquityAgreementRequestEmail(
+          { name: wFounder.name, email: wFounder.email, companyName: wFounder.companyName },
+          {
+            equityPercent: workflow.offerEquityPercent || '',
+            sharePrice: workflow.sharePrice || '0.0001',
+            shareCount,
+            totalAmount,
+            grantDate: now.split('T')[0],
+          }
+        );
+        await db.update(onboardingWorkflows)
+          .set({ status: OnboardingStatus.EQUITY_AGREEMENT_PENDING, updatedAt: now })
+          .where(eq(onboardingWorkflows.id, member.workflowId));
+      }
+    }
+
+    console.log(`Board approval complete for workflow ${member.workflowId}`);
+  }
+
+  return c.json({
+    success: true,
+    allApproved,
+    message: allApproved
+      ? 'Board approval complete! Stock agreement has been sent for signature.'
+      : 'Approval recorded. Waiting for remaining board members.',
+  });
+});
+
 // Upload equity agreement
 app.post('/onboarding/upload-equity-agreement', async (c) => {
   const founderId = c.get('founderId') as number;
@@ -959,9 +1156,10 @@ app.post('/onboarding/upload-equity-agreement', async (c) => {
     return c.json({ error: 'No onboarding workflow found' }, 404);
   }
 
-  // Can upload after advisory is signed by founder
+  // Can upload after board approval or advisory signed
   const allowedStatuses = [
     OnboardingStatus.FOUNDER_SIGNED,
+    OnboardingStatus.BOARD_APPROVED,
     OnboardingStatus.EQUITY_AGREEMENT_PENDING,
   ];
   if (!allowedStatuses.includes(workflow.status as any)) {
@@ -994,6 +1192,76 @@ app.post('/onboarding/upload-equity-agreement', async (c) => {
   return c.json({
     success: true,
     message: 'Equity agreement uploaded! We will review and sign it.'
+  });
+});
+
+// Upload wire info
+app.post('/onboarding/upload-wire-info', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    documentUrl: z.string().url(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+
+  if (!founder) {
+    return c.json({ error: 'Founder not found' }, 404);
+  }
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+
+  if (!portfolioCompany) {
+    return c.json({ error: 'Not a portfolio company' }, 400);
+  }
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+
+  if (!workflow) {
+    return c.json({ error: 'No onboarding workflow found' }, 404);
+  }
+
+  if (workflow.status !== OnboardingStatus.WIRE_INFO_PENDING &&
+      workflow.status !== OnboardingStatus.EQUITY_AGREEMENT_SIGNED) {
+    return c.json({ error: `Cannot submit wire info in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  await db.update(onboardingWorkflows)
+    .set({
+      wireInfoUrl: parsed.data.documentUrl,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.WIRE_INFO_SUBMITTED, founder.email, {
+    documentUrl: parsed.data.documentUrl,
+  });
+
+  // Notify admin
+  const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+  await onboardingEmails.notifyAdminWireInfoReceived(adminEmail, {
+    name: founder.name,
+    email: founder.email,
+    companyName: founder.companyName,
+  });
+
+  return c.json({
+    success: true,
+    message: 'Wire info uploaded! Mat will purchase the shares shortly.',
   });
 });
 

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { eq, desc, and } from 'drizzle-orm';
-import { db, investors, investorResearch } from '../db/index.js';
+import { eq, desc, and, sql } from 'drizzle-orm';
+import { db, investors, investorResearch, introRequests, nodeInvestorConnections } from '../db/index.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -61,6 +61,125 @@ app.get('/', async (c) => {
   }));
 
   return c.json(parsed);
+});
+
+// Network Health: Get all investors with engagement metrics and dormancy status
+// IMPORTANT: This must be before /:id to avoid route collision
+app.get('/health', async (c) => {
+  const allInvestors = await db.select().from(investors);
+  const allIntroRequests = await db.select().from(introRequests);
+  const allConnections = await db.select().from(nodeInvestorConnections);
+
+  // Calculate metrics per investor
+  const investorMetrics = allInvestors.map(inv => {
+    const intros = allIntroRequests.filter(ir => ir.investorId === inv.id);
+    const connections = allConnections.filter(c => c.investorId === inv.id);
+
+    // Count statuses
+    const totalIntros = intros.length;
+    const ignored = intros.filter(ir => ir.status === 'ignored').length;
+    const passed = intros.filter(ir => ir.status === 'passed').length;
+    const meetings = intros.filter(ir =>
+      ['first_meeting_complete', 'second_meeting_complete', 'invested'].includes(ir.status)
+    ).length;
+    const invested = intros.filter(ir => ir.status === 'invested').length;
+    const introduced = intros.filter(ir =>
+      ['introduced', 'first_meeting_complete', 'second_meeting_complete', 'invested', 'circle_back_round_opens', 'follow_up_questions'].includes(ir.status)
+    ).length;
+    const responded = introduced + passed; // Responded = actually made a decision (not ignored, not pending)
+
+    // Calculate rates
+    const responseRate = totalIntros > 0 ? Math.round((responded / totalIntros) * 100) : 0;
+    const ignoreRate = totalIntros > 0 ? Math.round((ignored / totalIntros) * 100) : 0;
+    const meetingRate = responded > 0 ? Math.round((meetings / responded) * 100) : 0;
+    const passRate = responded > 0 ? Math.round((passed / responded) * 100) : 0;
+
+    // Find last intro date
+    const introductionDates = intros
+      .filter(ir => ir.dateIntroduced)
+      .map(ir => new Date(ir.dateIntroduced!).getTime());
+    const lastIntroDate = introductionDates.length > 0
+      ? new Date(Math.max(...introductionDates)).toISOString().split('T')[0]
+      : null;
+
+    // Calculate days since last intro
+    const now = new Date();
+    const daysSinceLastIntro = lastIntroDate
+      ? Math.floor((now.getTime() - new Date(lastIntroDate).getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+
+    // Determine dormancy status
+    let isDormant = false;
+    let dormancyReason: string | null = null;
+
+    // Check dormancy conditions (as per plan)
+    if (daysSinceLastIntro !== null && daysSinceLastIntro > 90) {
+      isDormant = true;
+      dormancyReason = 'no_recent_intros';
+    } else if (totalIntros >= 3 && responded === 0) {
+      isDormant = true;
+      dormancyReason = 'never_responded';
+    } else if (totalIntros > 0 && ignoreRate > 70) {
+      isDormant = true;
+      dormancyReason = 'high_ignore_rate';
+    } else if (responded > 0 && passRate > 80 && meetings === 0) {
+      isDormant = true;
+      dormancyReason = 'all_passes';
+    }
+
+    return {
+      id: inv.id,
+      name: inv.name,
+      firm: inv.firm,
+
+      // Engagement metrics
+      totalIntros,
+      responded,
+      ignored,
+      passed,
+      meetings,
+      invested,
+
+      // Calculated rates
+      responseRate,
+      ignoreRate,
+      meetingRate,
+
+      // Recency
+      lastIntroDate,
+      daysSinceLastIntro,
+
+      // Dormancy status
+      isDormant,
+      dormancyReason,
+
+      // Current status
+      active: inv.active,
+      connectionCount: connections.length,
+    };
+  });
+
+  // Calculate summary stats
+  const total = investorMetrics.length;
+  const active = investorMetrics.filter(im => im.active).length;
+  const dormant = investorMetrics.filter(im => im.isDormant).length;
+
+  const dormantByReason = {
+    no_recent_intros: investorMetrics.filter(im => im.dormancyReason === 'no_recent_intros').length,
+    high_ignore_rate: investorMetrics.filter(im => im.dormancyReason === 'high_ignore_rate').length,
+    all_passes: investorMetrics.filter(im => im.dormancyReason === 'all_passes').length,
+    never_responded: investorMetrics.filter(im => im.dormancyReason === 'never_responded').length,
+  };
+
+  return c.json({
+    investors: investorMetrics,
+    summary: {
+      total,
+      active,
+      dormant,
+      dormantByReason,
+    },
+  });
 });
 
 // Get single investor with connections

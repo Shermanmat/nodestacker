@@ -1228,12 +1228,22 @@
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Investor</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Intros</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Response</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Meetings</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700" @click="toggleHealthSort('name')">
+                  Investor <span v-if="healthSort.key === 'name'">{{ healthSort.dir === 'asc' ? '▲' : '▼' }}</span>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700" @click="toggleHealthSort('intros')">
+                  Intros <span v-if="healthSort.key === 'intros'">{{ healthSort.dir === 'asc' ? '▲' : '▼' }}</span>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700" @click="toggleHealthSort('response')">
+                  Response <span v-if="healthSort.key === 'response'">{{ healthSort.dir === 'asc' ? '▲' : '▼' }}</span>
+                </th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700" @click="toggleHealthSort('meetings')">
+                  Meetings <span v-if="healthSort.key === 'meetings'">{{ healthSort.dir === 'asc' ? '▲' : '▼' }}</span>
+                </th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Intro</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:text-gray-700" @click="toggleHealthSort('status')">
+                  Status <span v-if="healthSort.key === 'status'">{{ healthSort.dir === 'asc' ? '▲' : '▼' }}</span>
+                </th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -1997,6 +2007,7 @@
         const investorMau = ref({});
         const networkHealth = ref({ investors: [], summary: { total: 0, active: 0, dormant: 0, dormantByReason: {} } });
         const healthFilter = ref('all'); // 'all', 'dormant', 'active'
+        const healthSort = reactive({ key: 'name', dir: 'asc' });
         const chartMetric = ref('requests'); // 'requests', 'meetings', or 'acceptRate'
         const chartNodeId = ref(''); // Filter chart by node
         const portfolio = ref({ companies: [], summary: {} });
@@ -2724,11 +2735,36 @@
           networkHealth.value = data;
         };
 
+        const toggleHealthSort = (key) => {
+          if (healthSort.key === key) {
+            healthSort.dir = healthSort.dir === 'asc' ? 'desc' : 'asc';
+          } else {
+            healthSort.key = key;
+            healthSort.dir = key === 'name' ? 'asc' : 'desc';
+          }
+        };
+
         const filteredHealthInvestors = () => {
-          const investors = networkHealth.value.investors || [];
-          if (healthFilter.value === 'dormant') return investors.filter(i => i.isDormant);
-          if (healthFilter.value === 'active') return investors.filter(i => !i.isDormant && i.active);
-          return investors;
+          let investors = networkHealth.value.investors || [];
+          if (healthFilter.value === 'dormant') investors = investors.filter(i => i.isDormant);
+          else if (healthFilter.value === 'active') investors = investors.filter(i => !i.isDormant && i.active);
+
+          const sorted = [...investors];
+          const dir = healthSort.dir === 'asc' ? 1 : -1;
+          sorted.sort((a, b) => {
+            switch (healthSort.key) {
+              case 'name': return dir * a.name.localeCompare(b.name);
+              case 'intros': return dir * (a.totalIntros - b.totalIntros);
+              case 'response': return dir * (a.responseRate - b.responseRate);
+              case 'meetings': return dir * (a.meetings - b.meetings);
+              case 'status': {
+                const statusOrder = (inv) => !inv.active ? 0 : inv.isDormant ? 1 : 2;
+                return dir * (statusOrder(a) - statusOrder(b));
+              }
+              default: return 0;
+            }
+          });
+          return sorted;
         };
 
         const markInvestorInactive = async (investorId) => {
@@ -3676,7 +3712,7 @@
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction,
           // Network Health
-          networkHealth, healthFilter, loadNetworkHealth, filteredHealthInvestors,
+          networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
         };
       }

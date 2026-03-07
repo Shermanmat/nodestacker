@@ -10,8 +10,7 @@ CREATE TABLE IF NOT EXISTS public_users (
   twitter_handle TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Companies owned by public users
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS public_companies (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL REFERENCES public_users(id),
@@ -21,21 +20,22 @@ CREATE TABLE IF NOT EXISTS public_companies (
   sector TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Auth sessions for public users
+--> statement-breakpoint
 CREATE TABLE IF NOT EXISTS public_sessions (
   id TEXT PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES public_users(id),
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-
--- Create indexes for faster lookups
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_public_users_email ON public_users(email);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_public_companies_user_id ON public_companies(user_id);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_public_sessions_user_id ON public_sessions(user_id);
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_public_sessions_expires_at ON public_sessions(expires_at);
-
--- Link founder_leads to public signup (for tracking where applicants came from)
+--> statement-breakpoint
 ALTER TABLE founder_leads ADD COLUMN public_user_id INTEGER REFERENCES public_users(id);
+--> statement-breakpoint
 ALTER TABLE founder_leads ADD COLUMN public_company_id INTEGER REFERENCES public_companies(id);

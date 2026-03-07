@@ -34,9 +34,7 @@ CREATE TABLE IF NOT EXISTS founder_leads (
   completed_at TEXT,
   converted_founder_id INTEGER REFERENCES founders(id)
 );
-
--- Index for quick lookups by status
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_founder_leads_status ON founder_leads(status);
-
--- Index for email lookups
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS idx_founder_leads_email ON founder_leads(email);

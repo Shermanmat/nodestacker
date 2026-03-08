@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, desc, and, sql } from 'drizzle-orm';
-import { db, investors, investorResearch, introRequests, nodeInvestorConnections } from '../db/index.js';
+import { db, investors, investorResearch, introRequests, nodeInvestorConnections, investorCategoryAssignments, investorCategories } from '../db/index.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -52,13 +52,38 @@ app.get('/', async (c) => {
     }
   }
 
-  // Parse focusAreas and tags JSON, attach research
-  const parsed = allInvestors.map(inv => ({
+  // Get all category assignments
+  const allCategoryAssignments = await db.select({
+    investorId: investorCategoryAssignments.investorId,
+    categoryId: investorCategoryAssignments.categoryId,
+    categoryName: investorCategories.name,
+    categoryType: investorCategories.type,
+    categoryColor: investorCategories.color,
+  }).from(investorCategoryAssignments)
+    .innerJoin(investorCategories, eq(investorCategoryAssignments.categoryId, investorCategories.id));
+
+  const categoryMap = new Map<number, { id: number; name: string; type: string; color: string | null }[]>();
+  for (const a of allCategoryAssignments) {
+    if (!categoryMap.has(a.investorId)) categoryMap.set(a.investorId, []);
+    categoryMap.get(a.investorId)!.push({ id: a.categoryId, name: a.categoryName, type: a.categoryType, color: a.categoryColor });
+  }
+
+  // Filter by category if requested
+  const categoryFilter = c.req.query('category');
+
+  // Parse focusAreas and tags JSON, attach research and categories
+  let parsed = allInvestors.map(inv => ({
     ...inv,
     focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
     tags: inv.tags ? JSON.parse(inv.tags) : [],
     research: researchMap.get(inv.id) || null,
+    categories: categoryMap.get(inv.id) || [],
   }));
+
+  if (categoryFilter) {
+    const filterLower = categoryFilter.toLowerCase();
+    parsed = parsed.filter(inv => inv.categories.some(cat => cat.name.toLowerCase() === filterLower));
+  }
 
   return c.json(parsed);
 });
@@ -265,6 +290,38 @@ app.put('/:id', async (c) => {
     focusAreas: result[0].focusAreas ? JSON.parse(result[0].focusAreas) : [],
     tags: result[0].tags ? JSON.parse(result[0].tags) : [],
   });
+});
+
+// Assign categories to investor (replaces existing)
+app.post('/:id/categories', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const body = await c.req.json();
+  const parsed = z.object({ categoryIds: z.array(z.number()) }).safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  // Delete existing assignments
+  await db.delete(investorCategoryAssignments).where(eq(investorCategoryAssignments.investorId, id));
+
+  // Insert new assignments
+  if (parsed.data.categoryIds.length > 0) {
+    await db.insert(investorCategoryAssignments).values(
+      parsed.data.categoryIds.map(categoryId => ({ investorId: id, categoryId }))
+    );
+  }
+
+  // Return updated categories
+  const assignments = await db.select({
+    id: investorCategories.id,
+    name: investorCategories.name,
+    type: investorCategories.type,
+    color: investorCategories.color,
+  }).from(investorCategoryAssignments)
+    .innerJoin(investorCategories, eq(investorCategoryAssignments.categoryId, investorCategories.id))
+    .where(eq(investorCategoryAssignments.investorId, id));
+
+  return c.json({ categories: assignments });
 });
 
 // Delete investor

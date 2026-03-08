@@ -25,6 +25,7 @@ import weeklyDigestRoutes from './api/weekly-digest.js';
 import publicAuthRoutes from './api/public-auth.js';
 import publicProfileRoutes from './api/public-profile.js';
 import publicCompaniesRoutes from './api/public-companies.js';
+import categoriesRoutes from './api/categories.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -57,6 +58,8 @@ app.use('/api/founders', adminGuard);
 app.use('/api/founders/*', adminGuard);
 app.use('/api/nodes', adminGuard);
 app.use('/api/nodes/*', adminGuard);
+app.use('/api/categories', adminGuard);
+app.use('/api/categories/*', adminGuard);
 app.use('/api/investors', adminGuard);
 app.use('/api/investors/*', adminGuard);
 app.use('/api/intro-requests', adminGuard);
@@ -82,6 +85,7 @@ app.use('/api/onboarding-chat/leads/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 
+app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
 app.route('/api/nodes', nodesRoutes);
 app.route('/api/investors', investorsRoutes);

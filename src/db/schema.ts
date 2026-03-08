@@ -60,6 +60,9 @@ export const founders = sqliteTable('founders', {
   companyStage: text('company_stage').notNull(),
   roundStatus: text('round_status').notNull().default('pre_round'),
   hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+  introTargetPerWeek: integer('intro_target_per_week').default(2),
+  introCadenceActive: integer('intro_cadence_active', { mode: 'boolean' }).default(false),
+  cadenceStartDate: text('cadence_start_date'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
@@ -148,6 +151,7 @@ export const followupLogs = sqliteTable('followup_logs', {
 export const foundersRelations = relations(founders, ({ many }) => ({
   nodeRelationships: many(founderNodeRelationships),
   introRequests: many(introRequests),
+  categoryAssignments: many(founderCategoryAssignments),
 }));
 
 export const nodesRelations = relations(nodes, ({ many }) => ({
@@ -160,6 +164,7 @@ export const investorsRelations = relations(investors, ({ many }) => ({
   nodeConnections: many(nodeInvestorConnections),
   introRequests: many(introRequests),
   research: many(investorResearch),
+  categoryAssignments: many(investorCategoryAssignments),
 }));
 
 export const founderNodeRelationshipsRelations = relations(founderNodeRelationships, ({ one }) => ({
@@ -253,6 +258,66 @@ export const investorResearchRelations = relations(investorResearch, ({ one }) =
     references: [investors.id],
   }),
 }));
+
+// Category System (shared between investors and founders)
+
+export const CategoryType = {
+  STAGE: 'stage',
+  PERSONA: 'persona',
+  SECTOR: 'sector',
+} as const;
+
+export const investorCategories = sqliteTable('investor_categories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(),
+  type: text('type').notNull().default('sector'),
+  color: text('color').default('gray'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const investorCategoryAssignments = sqliteTable('investor_category_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  investorId: integer('investor_id').notNull().references(() => investors.id),
+  categoryId: integer('category_id').notNull().references(() => investorCategories.id),
+});
+
+export const founderCategoryAssignments = sqliteTable('founder_category_assignments', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  categoryId: integer('category_id').notNull().references(() => investorCategories.id),
+});
+
+export const investorCategoriesRelations = relations(investorCategories, ({ many }) => ({
+  investorAssignments: many(investorCategoryAssignments),
+  founderAssignments: many(founderCategoryAssignments),
+}));
+
+export const investorCategoryAssignmentsRelations = relations(investorCategoryAssignments, ({ one }) => ({
+  investor: one(investors, {
+    fields: [investorCategoryAssignments.investorId],
+    references: [investors.id],
+  }),
+  category: one(investorCategories, {
+    fields: [investorCategoryAssignments.categoryId],
+    references: [investorCategories.id],
+  }),
+}));
+
+export const founderCategoryAssignmentsRelations = relations(founderCategoryAssignments, ({ one }) => ({
+  founder: one(founders, {
+    fields: [founderCategoryAssignments.founderId],
+    references: [founders.id],
+  }),
+  category: one(investorCategories, {
+    fields: [founderCategoryAssignments.categoryId],
+    references: [investorCategories.id],
+  }),
+}));
+
+export type InvestorCategory = typeof investorCategories.$inferSelect;
+export type NewInvestorCategory = typeof investorCategories.$inferInsert;
+export type InvestorCategoryAssignment = typeof investorCategoryAssignments.$inferSelect;
+export type FounderCategoryAssignment = typeof founderCategoryAssignments.$inferSelect;
 
 // Network Founders Tables (for podcast network matching)
 

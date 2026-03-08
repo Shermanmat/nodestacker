@@ -82,7 +82,7 @@
           <button
             v-for="tab in tabs"
             :key="tab.id"
-            @click="activeTab = tab.id; if (tab.id === 'inbound') loadInboundLogs(); if (tab.id === 'onboarding') loadOnboardingWorkflows(); if (tab.id === 'health') loadNetworkHealth();"
+            @click="activeTab = tab.id; if (tab.id === 'inbound') loadInboundLogs(); if (tab.id === 'onboarding') loadOnboardingWorkflows(); if (tab.id === 'health') loadNetworkHealth(); if (tab.id === 'pipeline') loadPipelineHealth(); if (tab.id === 'categories') loadCategories();"
             :class="['py-4 px-1 text-sm font-medium', activeTab === tab.id ? 'tab-active' : 'text-gray-500 hover:text-gray-700']"
           >
             {{ tab.label }}
@@ -735,12 +735,19 @@
                 <td class="py-3 px-4 font-medium">
                   {{ founder.name }}
                   <span v-if="founder.hidden" class="text-xs text-gray-400 ml-1">(hidden)</span>
+                  <div v-if="founder.categories?.length" class="flex gap-1 mt-1 flex-wrap">
+                    <span v-for="cat in founder.categories" :key="cat.id"
+                      :class="categoryBadgeClass(cat.color)"
+                      class="text-xs px-1.5 py-0.5 rounded"
+                      :title="cat.type">{{ cat.name }}</span>
+                  </div>
                 </td>
                 <td class="px-4">{{ founder.email }}</td>
                 <td class="px-4">{{ founder.companyName }}</td>
                 <td class="px-4">{{ formatStage(founder.companyStage) }}</td>
                 <td class="px-4"><span :class="roundStatusClass(founder.roundStatus)">{{ formatRoundStatus(founder.roundStatus) }}</span></td>
                 <td class="px-4">
+                  <button @click="openCategoryAssignModal('founder', founder)" class="text-teal-600 hover:underline mr-2">Categories</button>
                   <button @click="openFounderNodesModal(founder)" class="text-purple-600 hover:underline mr-2">Nodes</button>
                   <button @click="generateLoginLink(founder)" class="text-green-600 hover:underline mr-2">Login Link</button>
                   <button @click="editFounder(founder)" class="text-blue-600 hover:underline mr-2">Edit</button>
@@ -824,6 +831,10 @@
               <option value="">All Nodes</option>
               <option v-for="n in nodes" :key="n.id" :value="n.id">{{ n.name }}</option>
             </select>
+            <select v-model="filterByCategoryId" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="">All Categories</option>
+              <option v-for="cat in allCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+            </select>
             <input v-model="investorSearchQuery" type="text" placeholder="Search investors..."
               class="border rounded-lg px-3 py-2 text-sm w-64">
             <button @click="showInvestorModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
@@ -890,6 +901,10 @@
                   <h3 class="font-semibold text-lg">{{ item.name || item.investor?.name }}</h3>
                   <span v-if="(item.active === false || item.investor?.active === false)" class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
                   <span v-if="(item.research || item.investor?.research)" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">AI Researched</span>
+                  <!-- Category badges -->
+                  <span v-for="cat in (item.categories || item.investor?.categories || [])" :key="'cat-'+cat.id"
+                    :class="categoryBadgeClass(cat.color)"
+                    class="text-xs px-2 py-0.5 rounded font-medium">{{ cat.name }}</span>
                   <!-- Auto-generated tags -->
                   <span v-for="tag in parseTags(item.tags || item.investor?.tags)" :key="tag"
                     :class="{
@@ -927,6 +942,7 @@
                 <button v-if="planningFounderId" @click="requestIntroFor(item)" class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700">
                   Request Intro
                 </button>
+                <button @click="openCategoryAssignModal('investor', item.investor || item)" class="text-teal-600 hover:underline text-sm">Categories</button>
                 <button @click="openResearchModal(item.investor || item)" class="text-purple-600 hover:underline text-sm">Research</button>
                 <button v-if="(item.research || item.investor?.research)" @click="generateTags((item.investor || item).id)" class="text-teal-600 hover:underline text-sm">Gen Tags</button>
                 <button @click="editInvestor(item.investor || item)" class="text-blue-600 hover:underline text-sm">Edit</button>
@@ -1298,7 +1314,272 @@
         </div>
       </div>
 
+      <!-- Pipeline Health Tab -->
+      <div v-if="activeTab === 'pipeline'">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold">Founder Pipeline Health</h2>
+          <button @click="loadPipelineHealth" class="text-blue-600 text-sm hover:underline">Refresh</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-5 gap-4 mb-6">
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-2xl font-bold">{{ pipelineHealth.summary?.total || 0 }}</div>
+            <div class="text-sm text-gray-500">Active Founders</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-2xl font-bold text-green-600">{{ pipelineHealth.summary?.onTrack || 0 }}</div>
+            <div class="text-sm text-gray-500">On Track</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-2xl font-bold text-amber-600">{{ pipelineHealth.summary?.behind || 0 }}</div>
+            <div class="text-sm text-gray-500">Behind</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-2xl font-bold text-orange-600">{{ pipelineHealth.summary?.starved || 0 }}</div>
+            <div class="text-sm text-gray-500">Starved</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-2xl font-bold text-red-600">{{ pipelineHealth.summary?.exhausted || 0 }}</div>
+            <div class="text-sm text-gray-500">Exhausted</div>
+          </div>
+        </div>
+
+        <!-- Founder Pipeline Table -->
+        <div v-if="!pipelineHealth.founders?.length" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          No founders with active cadence tracking. Enable cadence on a founder to see pipeline health.
+        </div>
+        <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-gray-500">
+                <th class="py-3 px-4">Founder</th>
+                <th class="px-4">Categories</th>
+                <th class="px-4">Target</th>
+                <th class="px-4">This Week</th>
+                <th class="px-4">Rate</th>
+                <th class="px-4">Status</th>
+                <th class="px-4">Network</th>
+                <th class="px-4">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in pipelineHealth.founders" :key="row.founder.id" class="border-t hover:bg-gray-50">
+                <td class="py-3 px-4">
+                  <div class="font-medium">{{ row.founder.name }}</div>
+                  <div class="text-xs text-gray-500">{{ row.founder.companyName }}</div>
+                </td>
+                <td class="px-4">
+                  <div class="flex gap-1 flex-wrap">
+                    <span v-for="cat in row.founder.categories" :key="cat.id"
+                      :class="categoryBadgeClass(cat.color)"
+                      class="text-xs px-1.5 py-0.5 rounded">{{ cat.name }}</span>
+                    <span v-if="!row.founder.categories?.length" class="text-xs text-gray-400">none</span>
+                  </div>
+                </td>
+                <td class="px-4">
+                  <input type="number" :value="row.cadence.targetPerWeek" min="0" max="20"
+                    @change="updateFounderCadence(row.founder.id, { introTargetPerWeek: parseInt($event.target.value) })"
+                    class="w-16 border rounded px-2 py-1 text-center text-sm">
+                  <span class="text-xs text-gray-400">/wk</span>
+                </td>
+                <td class="px-4">
+                  <span class="font-medium">{{ row.introsThisWeek }}</span>
+                  <span class="text-xs text-gray-400 ml-1">(last: {{ row.introsLastWeek }})</span>
+                </td>
+                <td class="px-4">{{ row.weeklyRate }}/wk</td>
+                <td class="px-4">
+                  <span :class="{
+                    'bg-green-100 text-green-700': row.status === 'on_track',
+                    'bg-amber-100 text-amber-700': row.status === 'behind',
+                    'bg-orange-100 text-orange-700': row.status === 'starved',
+                    'bg-red-100 text-red-700': row.status === 'exhausted',
+                    'bg-gray-100 text-gray-600': row.status === 'paused',
+                  }" class="px-2 py-1 rounded text-xs font-medium">{{ row.status }}</span>
+                </td>
+                <td class="px-4">
+                  <div class="flex items-center gap-2">
+                    <div class="w-20 bg-gray-200 rounded-full h-2">
+                      <div class="rounded-full h-2 transition-all" :class="row.exhaustionPercent > 80 ? 'bg-red-500' : row.exhaustionPercent > 50 ? 'bg-amber-500' : 'bg-green-500'"
+                        :style="{ width: row.exhaustionPercent + '%' }"></div>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ row.remaining }}/{{ row.fitInvestors }}</span>
+                  </div>
+                  <div class="text-xs text-gray-400 mt-0.5">{{ row.activeIntros }} active, {{ row.pendingResponse }} pending</div>
+                </td>
+                <td class="px-4">
+                  <button @click="toggleFounderCadence(row)" class="text-sm mr-2" :class="row.cadence.active ? 'text-orange-600 hover:underline' : 'text-green-600 hover:underline'">
+                    {{ row.cadence.active ? 'Pause' : 'Activate' }}
+                  </button>
+                  <button @click="viewNetworkAvailability(row.founder.id)" class="text-blue-600 hover:underline text-sm">Details</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Network Availability Detail (expandable) -->
+        <div v-if="networkAvailability" class="mt-6 bg-white rounded-lg shadow p-6">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold">
+              Network Availability: {{ networkAvailability.founder.name }} ({{ networkAvailability.founder.companyName }})
+            </h3>
+            <button @click="networkAvailability = null" class="text-gray-400 hover:text-gray-600">Close</button>
+          </div>
+          <div v-if="networkAvailability.founderCategories?.length" class="mb-3">
+            <span class="text-sm text-gray-500 mr-2">Looking for:</span>
+            <span v-for="cat in networkAvailability.founderCategories" :key="cat" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded mr-1">{{ cat }}</span>
+          </div>
+          <div class="space-y-4">
+            <div v-for="nodeGroup in networkAvailability.nodes" :key="nodeGroup.node.id" class="border rounded-lg overflow-hidden">
+              <div class="bg-gray-100 px-4 py-2 flex justify-between items-center">
+                <span class="font-medium">{{ nodeGroup.node.name }}</span>
+                <div class="text-xs text-gray-500">
+                  {{ nodeGroup.available }} available / {{ nodeGroup.fit }} fit / {{ nodeGroup.total }} total
+                </div>
+              </div>
+              <table class="w-full text-sm">
+                <tbody>
+                  <tr v-for="inv in nodeGroup.investors" :key="inv.id" class="border-t"
+                    :class="{ 'bg-green-50': inv.fits && !inv.introd, 'bg-gray-50 opacity-60': inv.introd, 'bg-yellow-50': !inv.fits }">
+                    <td class="py-2 px-4">{{ inv.name }}</td>
+                    <td class="px-4 text-gray-500">{{ inv.firm }}</td>
+                    <td class="px-4">
+                      <span v-for="cat in inv.categories" :key="cat" class="text-xs bg-gray-200 text-gray-700 px-1.5 py-0.5 rounded mr-1">{{ cat }}</span>
+                    </td>
+                    <td class="px-4">
+                      <span v-if="inv.introd" :class="{
+                        'bg-blue-100 text-blue-700': inv.status === 'intro_request_sent' || inv.status === 'introduced',
+                        'bg-green-100 text-green-700': inv.status === 'first_meeting_complete' || inv.status === 'second_meeting_complete' || inv.status === 'invested',
+                        'bg-red-100 text-red-700': inv.status === 'passed',
+                        'bg-gray-100 text-gray-600': inv.status === 'ignored',
+                      }" class="text-xs px-2 py-0.5 rounded">{{ formatStatus(inv.status) }}</span>
+                      <span v-else-if="inv.fits" class="text-xs text-green-600">Available</span>
+                      <span v-else class="text-xs text-gray-400">No category match</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories Tab -->
+      <div v-if="activeTab === 'categories'">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold">Category Manager</h2>
+        </div>
+
+        <!-- Create Category -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+          <h3 class="font-medium mb-3">Add Category</h3>
+          <form @submit.prevent="createCategory" class="flex items-end gap-4">
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Type</label>
+              <select v-model="newCategoryForm.type" class="border rounded px-3 py-2 text-sm">
+                <option value="stage">Stage</option>
+                <option value="persona">Persona</option>
+                <option value="sector">Sector</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Name</label>
+              <input v-model="newCategoryForm.name" type="text" required placeholder="e.g. Hardware"
+                class="border rounded px-3 py-2 text-sm w-48">
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 mb-1">Color</label>
+              <select v-model="newCategoryForm.color" class="border rounded px-3 py-2 text-sm">
+                <option value="gray">Gray</option>
+                <option value="red">Red</option>
+                <option value="blue">Blue</option>
+                <option value="green">Green</option>
+                <option value="purple">Purple</option>
+                <option value="orange">Orange</option>
+                <option value="teal">Teal</option>
+                <option value="pink">Pink</option>
+                <option value="indigo">Indigo</option>
+                <option value="amber">Amber</option>
+              </select>
+            </div>
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">Add</button>
+          </form>
+        </div>
+
+        <!-- Categories grouped by type -->
+        <div v-for="typeGroup in categoryTypeGroups" :key="typeGroup.type" class="bg-white rounded-lg shadow overflow-hidden mb-6">
+          <div class="bg-gray-50 px-4 py-3 border-b">
+            <h3 class="font-semibold text-gray-700 capitalize">{{ typeGroup.type }}</h3>
+            <p class="text-xs text-gray-400">{{ typeGroup.description }}</p>
+          </div>
+          <table class="w-full text-sm">
+            <tbody>
+              <tr v-for="cat in typeGroup.categories" :key="cat.id" class="border-t hover:bg-gray-50">
+                <td class="py-3 px-4 w-48">
+                  <input v-if="editingCategoryId === cat.id" v-model="editCategoryForm.name" type="text"
+                    class="border rounded px-2 py-1 text-sm w-40">
+                  <span v-else class="font-medium">{{ cat.name }}</span>
+                </td>
+                <td class="px-4">
+                  <span :class="categoryBadgeClass(editingCategoryId === cat.id ? editCategoryForm.color : cat.color)"
+                    class="text-xs px-2 py-0.5 rounded">{{ editingCategoryId === cat.id ? editCategoryForm.name || cat.name : cat.name }}</span>
+                </td>
+                <td class="px-4 w-32">
+                  <select v-if="editingCategoryId === cat.id" v-model="editCategoryForm.color" class="border rounded px-2 py-1 text-sm">
+                    <option value="gray">Gray</option>
+                    <option value="red">Red</option>
+                    <option value="blue">Blue</option>
+                    <option value="green">Green</option>
+                    <option value="purple">Purple</option>
+                    <option value="orange">Orange</option>
+                    <option value="teal">Teal</option>
+                    <option value="pink">Pink</option>
+                    <option value="indigo">Indigo</option>
+                    <option value="amber">Amber</option>
+                  </select>
+                  <span v-else class="text-gray-400 text-xs">{{ cat.color }}</span>
+                </td>
+                <td class="px-4 w-40">
+                  <template v-if="editingCategoryId === cat.id">
+                    <button @click="saveCategory(cat.id)" class="text-green-600 hover:underline mr-2">Save</button>
+                    <button @click="editingCategoryId = null" class="text-gray-500 hover:underline">Cancel</button>
+                  </template>
+                  <template v-else>
+                    <button @click="startEditCategory(cat)" class="text-blue-600 hover:underline mr-2">Edit</button>
+                    <button @click="deleteCategory(cat.id)" class="text-red-600 hover:underline">Delete</button>
+                  </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="!typeGroup.categories.length" class="p-4 text-center text-gray-400 text-sm">No {{ typeGroup.type }} categories yet.</div>
+        </div>
+      </div>
+
     </main>
+
+    <!-- Category Assignment Modal -->
+    <div v-if="showCategoryAssignModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-4">Assign Categories: {{ categoryAssignTarget?.name }}</h3>
+        <div class="space-y-4 max-h-80 overflow-y-auto">
+          <div v-for="typeGroup in categoryTypeGroups" :key="typeGroup.type">
+            <div class="text-xs font-semibold text-gray-500 uppercase mb-1">{{ typeGroup.type }}</div>
+            <label v-for="cat in typeGroup.categories" :key="cat.id" class="flex items-center gap-3 p-2 rounded hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" :value="cat.id" v-model="selectedCategoryIds" class="rounded">
+              <span :class="categoryBadgeClass(cat.color)" class="text-xs px-2 py-0.5 rounded">{{ cat.name }}</span>
+            </label>
+            <div v-if="!typeGroup.categories.length" class="text-gray-400 text-xs pl-2 py-1">None</div>
+          </div>
+          <div v-if="!allCategories.length" class="text-gray-500 text-sm">No categories defined. Create some in the Categories tab first.</div>
+        </div>
+        <div class="flex justify-end space-x-3 mt-6">
+          <button @click="showCategoryAssignModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+          <button @click="saveCategoryAssignment" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+        </div>
+      </div>
+    </div>
 
     <!-- Modals -->
 
@@ -1976,6 +2257,8 @@
           { id: 'relationships', label: 'Relationships' },
           { id: 'inbound', label: 'Inbound Logs' },
           { id: 'health', label: 'Network Health' },
+          { id: 'pipeline', label: 'Pipeline Health' },
+          { id: 'categories', label: 'Categories' },
         ];
 
         const introStatuses = [
@@ -2008,6 +2291,19 @@
         const networkHealth = ref({ investors: [], summary: { total: 0, active: 0, dormant: 0, dormantByReason: {} } });
         const healthFilter = ref('all'); // 'all', 'dormant', 'active'
         const healthSort = reactive({ key: 'name', dir: 'asc' });
+
+        // Pipeline Health
+        const pipelineHealth = ref({ founders: [], summary: {} });
+        const networkAvailability = ref(null);
+
+        // Categories
+        const allCategories = ref([]);
+        const newCategoryForm = reactive({ name: '', type: 'sector', color: 'gray' });
+        const editingCategoryId = ref(null);
+        const editCategoryForm = reactive({ name: '', type: 'sector', color: 'gray' });
+        const showCategoryAssignModal = ref(false);
+        const categoryAssignTarget = ref(null); // { type: 'investor'|'founder', id, name }
+        const selectedCategoryIds = ref([]);
         const chartMetric = ref('requests'); // 'requests', 'meetings', or 'acceptRate'
         const chartNodeId = ref(''); // Filter chart by node
         const portfolio = ref({ companies: [], summary: {} });
@@ -2152,6 +2448,7 @@
         const planningFilterStale = ref(false);
         const shuffleSeed = ref(Date.now());
         const filterByNodeId = ref('');
+        const filterByCategoryId = ref('');
 
         // Computed: filtered founders (hide hidden unless toggled)
         const filteredFounders = computed(() => {
@@ -2479,6 +2776,12 @@
             results = results.filter(inv => nodeInvestorIds.has(inv.id));
           }
 
+          // Filter by category
+          if (filterByCategoryId.value) {
+            const catId = parseInt(filterByCategoryId.value);
+            results = results.filter(inv => (inv.categories || []).some(c => c.id === catId));
+          }
+
           // Filter by search query
           if (investorSearchQuery.value) {
             const q = investorSearchQuery.value.toLowerCase();
@@ -2621,6 +2924,7 @@
           loadPortfolio();
           loadPendingInboundCount();
           loadOnboardingWorkflows();
+          loadCategories();
         };
 
         // Load functions
@@ -2785,6 +3089,109 @@
             'never_responded': 'Never responded (3+ intros)',
           };
           return labels[reason] || reason;
+        };
+
+        // Pipeline Health functions
+        const loadPipelineHealth = async () => {
+          const data = await api('/founders/pipeline-health');
+          pipelineHealth.value = data;
+        };
+
+        const viewNetworkAvailability = async (founderId) => {
+          const data = await api(`/founders/${founderId}/network-availability`);
+          networkAvailability.value = data;
+        };
+
+        const updateFounderCadence = async (founderId, updates) => {
+          await api(`/founders/${founderId}`, { method: 'PUT', body: updates });
+          loadPipelineHealth();
+        };
+
+        const toggleFounderCadence = async (row) => {
+          const updates = { introCadenceActive: !row.cadence.active };
+          if (!row.cadence.active && !row.cadence.startDate) {
+            updates.cadenceStartDate = new Date().toISOString().split('T')[0];
+          }
+          await api(`/founders/${row.founder.id}`, { method: 'PUT', body: updates });
+          loadPipelineHealth();
+        };
+
+        // Category functions
+        const categoryTypeGroups = computed(() => {
+          const types = [
+            { type: 'stage', description: 'Investment stage preferences (Pre-seed, Seed, Series A)' },
+            { type: 'persona', description: 'Founder archetypes (Young Slinger, Big Tech Spinout, Repeat Founder)' },
+            { type: 'sector', description: 'Industry focus (Deep Tech, Infra, Pro-America, Climate)' },
+          ];
+          return types.map(t => ({
+            ...t,
+            categories: allCategories.value.filter(c => (c.type || 'sector') === t.type),
+          }));
+        });
+
+        const loadCategories = async () => {
+          allCategories.value = await api('/categories');
+        };
+
+        const createCategory = async () => {
+          if (!newCategoryForm.name) return;
+          await api('/categories', { method: 'POST', body: { name: newCategoryForm.name, type: newCategoryForm.type, color: newCategoryForm.color } });
+          newCategoryForm.name = '';
+          newCategoryForm.color = 'gray';
+          loadCategories();
+        };
+
+        const startEditCategory = (cat) => {
+          editingCategoryId.value = cat.id;
+          editCategoryForm.name = cat.name;
+          editCategoryForm.type = cat.type || 'sector';
+          editCategoryForm.color = cat.color;
+        };
+
+        const saveCategory = async (id) => {
+          await api(`/categories/${id}`, { method: 'PUT', body: { name: editCategoryForm.name, type: editCategoryForm.type, color: editCategoryForm.color } });
+          editingCategoryId.value = null;
+          loadCategories();
+        };
+
+        const deleteCategory = async (id) => {
+          if (!confirm('Delete this category? Assignments will be removed.')) return;
+          await api(`/categories/${id}`, { method: 'DELETE' });
+          loadCategories();
+          loadFounders();
+          loadInvestors();
+        };
+
+        const categoryBadgeClass = (color) => {
+          const map = {
+            gray: 'bg-gray-100 text-gray-700',
+            red: 'bg-red-100 text-red-700',
+            blue: 'bg-blue-100 text-blue-700',
+            green: 'bg-green-100 text-green-700',
+            purple: 'bg-purple-100 text-purple-700',
+            orange: 'bg-orange-100 text-orange-700',
+            teal: 'bg-teal-100 text-teal-700',
+            pink: 'bg-pink-100 text-pink-700',
+            indigo: 'bg-indigo-100 text-indigo-700',
+            amber: 'bg-amber-100 text-amber-700',
+          };
+          return map[color] || map.gray;
+        };
+
+        const openCategoryAssignModal = async (type, entity) => {
+          categoryAssignTarget.value = { type, id: entity.id, name: entity.name };
+          selectedCategoryIds.value = (entity.categories || []).map(c => c.id);
+          if (!allCategories.value.length) await loadCategories();
+          showCategoryAssignModal.value = true;
+        };
+
+        const saveCategoryAssignment = async () => {
+          const { type, id } = categoryAssignTarget.value;
+          const endpoint = type === 'investor' ? `/investors/${id}/categories` : `/founders/${id}/categories`;
+          await api(endpoint, { method: 'POST', body: { categoryIds: selectedCategoryIds.value } });
+          showCategoryAssignModal.value = false;
+          if (type === 'investor') loadInvestors();
+          else loadFounders();
         };
 
         // Onboarding functions
@@ -3688,7 +4095,7 @@
           introFounderDropdownOpen, introNodeDropdownOpen, introInvestorDropdownOpen,
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
-          introFilter, investorSearchQuery, filterByNodeId, filteredAdminInvestors,
+          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filteredAdminInvestors,
           formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
           loadIntroRequests, markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
@@ -3714,6 +4121,14 @@
           // Network Health
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
+          // Pipeline Health
+          pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
+          updateFounderCadence, toggleFounderCadence,
+          // Categories
+          allCategories, newCategoryForm, editingCategoryId, editCategoryForm,
+          showCategoryAssignModal, categoryAssignTarget, selectedCategoryIds,
+          categoryTypeGroups, loadCategories, createCategory, startEditCategory, saveCategory, deleteCategory,
+          categoryBadgeClass, openCategoryAssignModal, saveCategoryAssignment,
         };
       }
     }).mount('#app');

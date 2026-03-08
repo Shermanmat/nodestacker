@@ -272,6 +272,7 @@ export const investorCategories = sqliteTable('investor_categories', {
   name: text('name').notNull().unique(),
   type: text('type').notNull().default('sector'),
   color: text('color').default('gray'),
+  parentId: integer('parent_id'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

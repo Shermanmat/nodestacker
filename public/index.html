@@ -723,6 +723,7 @@
                 <th class="py-3 px-4">Name</th>
                 <th class="px-4">Email</th>
                 <th class="px-4">Company</th>
+                <th class="px-4">Location</th>
                 <th class="px-4">Stage</th>
                 <th class="px-4">Round Status</th>
                 <th class="px-4">Actions</th>
@@ -744,6 +745,7 @@
                 </td>
                 <td class="px-4">{{ founder.email }}</td>
                 <td class="px-4">{{ founder.companyName }}</td>
+                <td class="px-4 text-gray-500">{{ [founder.city, countryName(founder.country)].filter(Boolean).join(', ') || '-' }}</td>
                 <td class="px-4">{{ formatStage(founder.companyStage) }}</td>
                 <td class="px-4"><span :class="roundStatusClass(founder.roundStatus)">{{ formatRoundStatus(founder.roundStatus) }}</span></td>
                 <td class="px-4">
@@ -834,6 +836,10 @@
             <select v-model="filterByCategoryId" class="border rounded-lg px-3 py-2 text-sm">
               <option value="">All Categories</option>
               <option v-for="cat in allCategories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+            </select>
+            <select v-model="filterByCountry" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="">All Countries</option>
+              <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
             </select>
             <input v-model="investorSearchQuery" type="text" placeholder="Search investors..."
               class="border rounded-lg px-3 py-2 text-sm w-64">
@@ -932,6 +938,7 @@
                   <span v-if="planningFounderId && item.fitReasons?.includes('not_recent')" class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Not recently contacted</span>
                 </div>
                 <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
+                <p v-if="(item.city || item.investor?.city) || (item.country || item.investor?.country)" class="text-sm text-gray-400">{{ [item.city || item.investor?.city, countryName(item.country || item.investor?.country)].filter(Boolean).join(', ') }}</p>
                 <p v-if="item.checkSize || item.investor?.checkSize" class="text-sm text-gray-400">Check: {{ item.checkSize || item.investor?.checkSize }}</p>
                 <!-- Node connection info in planning mode -->
                 <p v-if="planningFounderId && item.nodeConnection" class="text-sm text-green-600 mt-1">
@@ -1635,6 +1642,19 @@
                 <option value="round_closed">Round Closed</option>
               </select>
             </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input v-model="founderForm.city" type="text" placeholder="e.g. San Francisco" class="w-full border rounded px-3 py-2">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                <select v-model="founderForm.country" class="w-full border rounded px-3 py-2">
+                  <option value="">-</option>
+                  <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
+                </select>
+              </div>
+            </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
             <button type="button" @click="closeFounderModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -1715,6 +1735,19 @@
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Geography</label>
               <input v-model="investorForm.geography" type="text" class="w-full border rounded px-3 py-2">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+                <input v-model="investorForm.city" type="text" placeholder="e.g. San Francisco" class="w-full border rounded px-3 py-2">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+                <select v-model="investorForm.country" class="w-full border rounded px-3 py-2">
+                  <option value="">-</option>
+                  <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
+                </select>
+              </div>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
@@ -2401,9 +2434,9 @@
         const currentIntroId = ref(null);
 
         // Forms
-        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round' });
+        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [] });
+        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [], city: '', country: '' });
         const newInvestorTag = ref('');
         const investorFormTags = computed(() => {
           if (!investorForm.tags) return [];
@@ -2466,6 +2499,37 @@
         const shuffleSeed = ref(Date.now());
         const filterByNodeId = ref('');
         const filterByCategoryId = ref('');
+        const filterByCountry = ref('');
+
+        const countries = [
+          {code:'AF',name:'Afghanistan'},{code:'AL',name:'Albania'},{code:'DZ',name:'Algeria'},{code:'AR',name:'Argentina'},
+          {code:'AM',name:'Armenia'},{code:'AU',name:'Australia'},{code:'AT',name:'Austria'},{code:'AZ',name:'Azerbaijan'},
+          {code:'BH',name:'Bahrain'},{code:'BD',name:'Bangladesh'},{code:'BY',name:'Belarus'},{code:'BE',name:'Belgium'},
+          {code:'BR',name:'Brazil'},{code:'BG',name:'Bulgaria'},{code:'CA',name:'Canada'},{code:'CL',name:'Chile'},
+          {code:'CN',name:'China'},{code:'CO',name:'Colombia'},{code:'CR',name:'Costa Rica'},{code:'HR',name:'Croatia'},
+          {code:'CZ',name:'Czech Republic'},{code:'DK',name:'Denmark'},{code:'EG',name:'Egypt'},{code:'EE',name:'Estonia'},
+          {code:'ET',name:'Ethiopia'},{code:'FI',name:'Finland'},{code:'FR',name:'France'},{code:'GE',name:'Georgia'},
+          {code:'DE',name:'Germany'},{code:'GH',name:'Ghana'},{code:'GR',name:'Greece'},{code:'HK',name:'Hong Kong'},
+          {code:'HU',name:'Hungary'},{code:'IS',name:'Iceland'},{code:'IN',name:'India'},{code:'ID',name:'Indonesia'},
+          {code:'IE',name:'Ireland'},{code:'IL',name:'Israel'},{code:'IT',name:'Italy'},{code:'JP',name:'Japan'},
+          {code:'JO',name:'Jordan'},{code:'KZ',name:'Kazakhstan'},{code:'KE',name:'Kenya'},{code:'KR',name:'South Korea'},
+          {code:'KW',name:'Kuwait'},{code:'LV',name:'Latvia'},{code:'LB',name:'Lebanon'},{code:'LT',name:'Lithuania'},
+          {code:'LU',name:'Luxembourg'},{code:'MY',name:'Malaysia'},{code:'MX',name:'Mexico'},{code:'MA',name:'Morocco'},
+          {code:'NL',name:'Netherlands'},{code:'NZ',name:'New Zealand'},{code:'NG',name:'Nigeria'},{code:'NO',name:'Norway'},
+          {code:'PK',name:'Pakistan'},{code:'PA',name:'Panama'},{code:'PE',name:'Peru'},{code:'PH',name:'Philippines'},
+          {code:'PL',name:'Poland'},{code:'PT',name:'Portugal'},{code:'QA',name:'Qatar'},{code:'RO',name:'Romania'},
+          {code:'RU',name:'Russia'},{code:'SA',name:'Saudi Arabia'},{code:'RS',name:'Serbia'},{code:'SG',name:'Singapore'},
+          {code:'SK',name:'Slovakia'},{code:'SI',name:'Slovenia'},{code:'ZA',name:'South Africa'},{code:'ES',name:'Spain'},
+          {code:'SE',name:'Sweden'},{code:'CH',name:'Switzerland'},{code:'TW',name:'Taiwan'},{code:'TH',name:'Thailand'},
+          {code:'TR',name:'Turkey'},{code:'UA',name:'Ukraine'},{code:'AE',name:'UAE'},{code:'GB',name:'United Kingdom'},
+          {code:'US',name:'United States'},{code:'UY',name:'Uruguay'},{code:'VN',name:'Vietnam'},
+        ];
+
+        const countryName = (code) => {
+          if (!code) return '';
+          const c = countries.find(c => c.code === code);
+          return c ? c.name : code;
+        };
 
         // Computed: filtered founders (hide hidden unless toggled)
         const filteredFounders = computed(() => {
@@ -2797,6 +2861,11 @@
           if (filterByCategoryId.value) {
             const catId = parseInt(filterByCategoryId.value);
             results = results.filter(inv => (inv.categories || []).some(c => c.id === catId));
+          }
+
+          // Filter by country
+          if (filterByCountry.value) {
+            results = results.filter(inv => inv.country === filterByCountry.value);
           }
 
           // Filter by search query
@@ -3683,7 +3752,7 @@
         const closeFounderModal = () => {
           showFounderModal.value = false;
           editingFounder.value = null;
-          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round' });
+          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
         };
 
         const saveNode = async () => {
@@ -3799,7 +3868,7 @@
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [] });
+          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [], city: '', country: '' });
           newInvestorTag.value = '';
         };
 
@@ -4138,7 +4207,8 @@
           introFounderDropdownOpen, introNodeDropdownOpen, introInvestorDropdownOpen,
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
-          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filteredAdminInvestors,
+          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filteredAdminInvestors,
+          countries, countryName,
           formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
           loadIntroRequests, markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,

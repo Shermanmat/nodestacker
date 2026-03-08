@@ -18,6 +18,8 @@ const updateFounderSchema = createFounderSchema.partial().extend({
   introTargetPerWeek: z.number().int().min(0).optional(),
   introCadenceActive: z.boolean().optional(),
   cadenceStartDate: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
 });
 
 // List all founders (with categories)

@@ -60,6 +60,8 @@ export const founders = sqliteTable('founders', {
   companyStage: text('company_stage').notNull(),
   roundStatus: text('round_status').notNull().default('pre_round'),
   hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
+  city: text('city'),
+  country: text('country'),
   introTargetPerWeek: integer('intro_target_per_week').default(2),
   introCadenceActive: integer('intro_cadence_active', { mode: 'boolean' }).default(false),
   cadenceStartDate: text('cadence_start_date'),
@@ -87,6 +89,8 @@ export const investors = sqliteTable('investors', {
   geography: text('geography'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   tags: text('tags'), // JSON array of auto-generated tags from AI research
+  city: text('city'),
+  country: text('country'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

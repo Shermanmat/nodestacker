@@ -17,6 +17,8 @@ const createInvestorSchema = z.object({
 const updateInvestorSchema = createInvestorSchema.partial().extend({
   active: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
+  city: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
 });
 
 // List all investors with their latest research
@@ -68,8 +70,9 @@ app.get('/', async (c) => {
     categoryMap.get(a.investorId)!.push({ id: a.categoryId, name: a.categoryName, type: a.categoryType, color: a.categoryColor });
   }
 
-  // Filter by category if requested
+  // Filter by category or country if requested
   const categoryFilter = c.req.query('category');
+  const countryFilter = c.req.query('country');
 
   // Parse focusAreas and tags JSON, attach research and categories
   let parsed = allInvestors.map(inv => ({
@@ -83,6 +86,10 @@ app.get('/', async (c) => {
   if (categoryFilter) {
     const filterLower = categoryFilter.toLowerCase();
     parsed = parsed.filter(inv => inv.categories.some(cat => cat.name.toLowerCase() === filterLower));
+  }
+
+  if (countryFilter) {
+    parsed = parsed.filter(inv => inv.country === countryFilter);
   }
 
   return c.json(parsed);

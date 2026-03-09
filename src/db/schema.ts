@@ -169,6 +169,7 @@ export const investorsRelations = relations(investors, ({ many }) => ({
   introRequests: many(introRequests),
   research: many(investorResearch),
   categoryAssignments: many(investorCategoryAssignments),
+  categoryExclusions: many(investorCategoryExclusions),
 }));
 
 export const founderNodeRelationshipsRelations = relations(founderNodeRelationships, ({ one }) => ({
@@ -832,3 +833,84 @@ export type PublicCompany = typeof publicCompanies.$inferSelect;
 export type NewPublicCompany = typeof publicCompanies.$inferInsert;
 export type PublicSession = typeof publicSessions.$inferSelect;
 export type NewPublicSession = typeof publicSessions.$inferInsert;
+
+// Matching System Tables
+
+export const MatchSuggestionStatus = {
+  PENDING: 'pending',
+  APPROVED: 'approved',
+  REJECTED: 'rejected',
+  EXPIRED: 'expired',
+} as const;
+
+// Investor category exclusions (sectors they do NOT want)
+export const investorCategoryExclusions = sqliteTable('investor_category_exclusions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  investorId: integer('investor_id').notNull().references(() => investors.id),
+  categoryId: integer('category_id').notNull().references(() => investorCategories.id),
+});
+
+// Persona hotness tiers (configurable ranking)
+export const personaHotnessTiers = sqliteTable('persona_hotness_tiers', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  persona: text('persona').notNull().unique(),
+  tier: integer('tier').notNull(), // 1-7, higher = hotter
+  label: text('label'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Match suggestions for admin review
+export const matchSuggestions = sqliteTable('match_suggestions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  nodeId: integer('node_id').notNull().references(() => nodes.id),
+  investorId: integer('investor_id').notNull().references(() => investors.id),
+  founderHeatScore: integer('founder_heat_score').notNull(),
+  investorReliabilityScore: integer('investor_reliability_score').notNull(),
+  matchScore: integer('match_score').notNull(),
+  matchReasoning: text('match_reasoning'), // JSON
+  status: text('status').notNull().default('pending'),
+  reviewedAt: text('reviewed_at'),
+  rejectionReason: text('rejection_reason'),
+  introRequestId: integer('intro_request_id').references(() => introRequests.id),
+  batchId: text('batch_id'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Matching Relations
+export const investorCategoryExclusionsRelations = relations(investorCategoryExclusions, ({ one }) => ({
+  investor: one(investors, {
+    fields: [investorCategoryExclusions.investorId],
+    references: [investors.id],
+  }),
+  category: one(investorCategories, {
+    fields: [investorCategoryExclusions.categoryId],
+    references: [investorCategories.id],
+  }),
+}));
+
+export const matchSuggestionsRelations = relations(matchSuggestions, ({ one }) => ({
+  founder: one(founders, {
+    fields: [matchSuggestions.founderId],
+    references: [founders.id],
+  }),
+  node: one(nodes, {
+    fields: [matchSuggestions.nodeId],
+    references: [nodes.id],
+  }),
+  investor: one(investors, {
+    fields: [matchSuggestions.investorId],
+    references: [investors.id],
+  }),
+  introRequest: one(introRequests, {
+    fields: [matchSuggestions.introRequestId],
+    references: [introRequests.id],
+  }),
+}));
+
+export type InvestorCategoryExclusion = typeof investorCategoryExclusions.$inferSelect;
+export type NewInvestorCategoryExclusion = typeof investorCategoryExclusions.$inferInsert;
+export type PersonaHotnessTier = typeof personaHotnessTiers.$inferSelect;
+export type NewPersonaHotnessTier = typeof personaHotnessTiers.$inferInsert;
+export type MatchSuggestion = typeof matchSuggestions.$inferSelect;
+export type NewMatchSuggestion = typeof matchSuggestions.$inferInsert;

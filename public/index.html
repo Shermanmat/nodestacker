@@ -749,6 +749,11 @@
                 <td class="px-4">{{ formatStage(founder.companyStage) }}</td>
                 <td class="px-4"><span :class="roundStatusClass(founder.roundStatus)">{{ formatRoundStatus(founder.roundStatus) }}</span></td>
                 <td class="px-4">
+                  <button @click="toggleFounderCadenceFromList(founder)"
+                    :class="founder.introCadenceActive ? 'text-green-600' : 'text-gray-400'"
+                    class="hover:underline mr-2">
+                    {{ founder.introCadenceActive ? 'Cadence On' : 'Cadence Off' }}
+                  </button>
                   <button @click="openCategoryAssignModal('founder', founder)" class="text-teal-600 hover:underline mr-2">Categories</button>
                   <button @click="openFounderNodesModal(founder)" class="text-purple-600 hover:underline mr-2">Nodes</button>
                   <button @click="generateLoginLink(founder)" class="text-green-600 hover:underline mr-2">Login Link</button>
@@ -3199,6 +3204,16 @@
           loadPipelineHealth();
         };
 
+        const toggleFounderCadenceFromList = async (founder) => {
+          const newVal = !founder.introCadenceActive;
+          const updates = { introCadenceActive: newVal };
+          if (newVal && !founder.cadenceStartDate) {
+            updates.cadenceStartDate = new Date().toISOString().split('T')[0];
+          }
+          await api(`/founders/${founder.id}`, { method: 'PUT', body: updates });
+          loadFounders();
+        };
+
         // Category functions
         const categoryTypeGroups = computed(() => {
           const types = [
@@ -4187,7 +4202,7 @@
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,
-          saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,
+          saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, closeInvestorModal,
           saveIntro, editIntro, closeIntroModal,

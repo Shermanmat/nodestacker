@@ -377,6 +377,25 @@ function passesCategoryFilter(
   return false;
 }
 
+// --- Auto-Ramp ---
+
+export interface RampUp {
+  founderId: number;
+  previousTarget: number;
+  newTarget: number;
+  heatScore: number;
+}
+
+export function computeRecommendedIntroTarget(heatScore: number, currentTarget: number): number {
+  let recommended: number;
+  if (heatScore >= 80) recommended = 4;
+  else if (heatScore >= 60) recommended = 3;
+  else if (heatScore >= 40) recommended = 2;
+  else recommended = 1;
+  // Only ramp up, never decrease automatically
+  return Math.max(recommended, currentTarget);
+}
+
 // --- Match Generation ---
 
 interface GeneratedSuggestion {
@@ -395,16 +414,29 @@ interface GeneratedSuggestion {
  */
 export async function generateMatchSuggestions(
   targetFounderId?: number,
-): Promise<{ suggestions: GeneratedSuggestion[]; batchId: string }> {
+): Promise<{ suggestions: GeneratedSuggestion[]; batchId: string; rampUps: RampUp[] }> {
   const data = await loadMatchingData();
   const batchId = crypto.randomUUID();
 
-  // Get existing pending suggestions to avoid duplicates
+  // Get existing pending/rejected suggestions to avoid duplicates and re-suggestions
   const existingSuggestions = await db.select().from(matchSuggestions)
-    .where(eq(matchSuggestions.status, 'pending'));
+    .where(inArray(matchSuggestions.status, ['pending', 'rejected']));
   const existingTriples = new Set(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
+
+  // Count intros in last 7 days per founder (including pending_suggestion — counts toward quota)
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weeklyIntroCount = new Map<number, number>();
+  for (const ir of data.allIntroRequests) {
+    if (ir.createdAt && new Date(ir.createdAt).getTime() > sevenDaysAgo) {
+      weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
+    }
+  }
+
+  // Track ramp-ups and effective targets
+  const rampUps: RampUp[] = [];
+  const effectiveTargets = new Map<number, number>();
 
   // Filter to eligible founders
   const eligibleFounders = data.allFounders.filter(f => {
@@ -436,6 +468,19 @@ export async function generateMatchSuggestions(
     const staticHeat = computeFounderStaticHeat(founderCats, data.personaTierMap);
     const dynamicHeat = computeFounderDynamicHeat(founderIntros);
     const founderHeat = computeFounderHeatScore(staticHeat, dynamicHeat);
+
+    // Auto-ramp intro target based on heat
+    const currentTarget = founder.introTargetPerWeek || 2;
+    const recommendedTarget = computeRecommendedIntroTarget(founderHeat, currentTarget);
+    effectiveTargets.set(founder.id, recommendedTarget);
+    if (recommendedTarget > currentTarget) {
+      rampUps.push({
+        founderId: founder.id,
+        previousTarget: currentTarget,
+        newTarget: recommendedTarget,
+        heatScore: founderHeat,
+      });
+    }
 
     // Get founder's nodes
     const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id);
@@ -490,18 +535,19 @@ export async function generateMatchSuggestions(
   // Sort by match score descending
   suggestions.sort((a, b) => b.matchScore - a.matchScore);
 
-  // Limit to top N suggestions per founder (introTargetPerWeek * 3)
+  // Limit to remaining weekly quota per founder
   const perFounderCount = new Map<number, number>();
   const filtered = suggestions.filter(s => {
     const count = perFounderCount.get(s.founderId) || 0;
-    const founder = data.allFounders.find(f => f.id === s.founderId)!;
-    const limit = (founder.introTargetPerWeek || 2) * 3;
-    if (count >= limit) return false;
+    const target = effectiveTargets.get(s.founderId) || 2;
+    const usedThisWeek = weeklyIntroCount.get(s.founderId) || 0;
+    const remaining = Math.max(0, target - usedThisWeek);
+    if (count >= remaining) return false;
     perFounderCount.set(s.founderId, count + 1);
     return true;
   });
 
-  return { suggestions: filtered, batchId };
+  return { suggestions: filtered, batchId, rampUps };
 }
 
 // --- Score Computation (for visibility endpoints) ---

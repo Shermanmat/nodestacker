@@ -1012,9 +1012,14 @@
       <div v-if="activeTab === 'intros'">
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Intro Requests</h2>
-          <button @click="showIntroModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
-            New Intro Request
-          </button>
+          <div class="flex gap-2">
+            <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
+              {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
+            </button>
+            <button @click="showIntroModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+              New Intro Request
+            </button>
+          </div>
         </div>
 
         <!-- Filters -->
@@ -1054,8 +1059,14 @@
                 <td class="px-4">{{ req.dateRequested }}</td>
                 <td class="px-4" :class="isOverdue(req.nextFollowupDate) ? 'text-red-600 font-medium' : ''">{{ req.nextFollowupDate || '-' }}</td>
                 <td class="px-4">
-                  <button @click="editIntro(req)" class="text-blue-600 hover:underline mr-2">Update</button>
-                  <button @click="showAddFollowup(req)" class="text-green-600 hover:underline">Log</button>
+                  <template v-if="req.status === 'pending_suggestion'">
+                    <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Approve</button>
+                    <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
+                  </template>
+                  <template v-else>
+                    <button @click="editIntro(req)" class="text-blue-600 hover:underline mr-2">Update</button>
+                    <button @click="showAddFollowup(req)" class="text-green-600 hover:underline">Log</button>
+                  </template>
                 </td>
               </tr>
             </tbody>
@@ -2312,6 +2323,7 @@
         ];
 
         const introStatuses = [
+          'pending_suggestion',
           'intro_request_sent',
           'introduced',
           'passed',
@@ -3036,6 +3048,39 @@
           if (introFilter.founderId) url += `founderId=${introFilter.founderId}&`;
           introRequests.value = await api(url);
         };
+
+        // Match suggestion management
+        const generatingMatches = ref(false);
+        const generateMatches = async () => {
+          generatingMatches.value = true;
+          try {
+            const result = await api('/matching/generate', { method: 'POST', body: JSON.stringify({}) });
+            alert(`Generated ${result.totalGenerated} match suggestion(s) for ${result.foundersCovered} founder(s).${result.rampUps ? `\n\nRamped up targets for ${result.rampUps.length} founder(s).` : ''}`);
+            loadIntroRequests();
+          } catch (e) {
+            alert('Failed to generate matches: ' + e.message);
+          } finally {
+            generatingMatches.value = false;
+          }
+        };
+        const approveSuggestion = async (id) => {
+          if (!confirm('Approve this match? It will become an active intro request.')) return;
+          try {
+            await api(`/matching/approve-intro/${id}`, { method: 'PUT' });
+            loadIntroRequests();
+          } catch (e) {
+            alert('Failed to approve: ' + e.message);
+          }
+        };
+        const rejectSuggestion = async (id) => {
+          if (!confirm('Reject this match suggestion? It will be removed.')) return;
+          try {
+            await api(`/matching/reject-intro/${id}`, { method: 'PUT' });
+            loadIntroRequests();
+          } catch (e) {
+            alert('Failed to reject: ' + e.message);
+          }
+        };
         const loadRelationships = async () => {
           fnRelationships.value = await api('/relationships/founder-node');
           niConnections.value = await api('/relationships/node-investor');
@@ -3681,6 +3726,7 @@
 
         const statusClass = (status) => {
           const classes = {
+            pending_suggestion: 'bg-amber-100 text-amber-800 px-2 py-1 rounded text-xs font-medium',
             intro_request_sent: 'bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-xs',
             introduced: 'bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs',
             passed: 'bg-red-100 text-red-800 px-2 py-1 rounded text-xs',
@@ -4210,7 +4256,8 @@
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filteredAdminInvestors,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
-          loadIntroRequests, markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
+          loadIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
+          markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,

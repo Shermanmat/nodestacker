@@ -28,6 +28,7 @@ export const AddedBy = {
 } as const;
 
 export const IntroStatus = {
+  PENDING_SUGGESTION: 'pending_suggestion',
   INTRO_REQUEST_SENT: 'intro_request_sent',
   INTRODUCED: 'introduced',
   PASSED: 'passed',

@@ -903,13 +903,11 @@
                   <h3 class="font-semibold text-lg">{{ item.name || item.investor?.name }}</h3>
                   <span v-if="(item.active === false || item.investor?.active === false)" class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
                   <span v-if="(item.research || item.investor?.research)" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">AI Researched</span>
-                  <!-- Non-sector category badges (stage, persona) -->
-                  <span v-for="cat in (item.categories || item.investor?.categories || []).filter(c => c.type !== 'sector')" :key="'cat-'+cat.id"
-                    :class="categoryBadgeClass(cat.color)"
-                    class="text-xs px-2 py-0.5 rounded font-medium">{{ cat.name }}</span>
-                  <!-- Sector indicator -->
+                  <!-- Sector/Stage indicators -->
                   <span v-if="(item.categories || item.investor?.categories || []).some(c => c.type === 'sector')"
-                    class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">Sectors assigned</span>
+                    class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">Sectors</span>
+                  <span v-if="(item.categories || item.investor?.categories || []).some(c => c.type === 'stage')"
+                    class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">Stage</span>
                   <!-- Fit indicators (only in planning mode) -->
                   <span v-if="planningFounderId && item.fitReasons?.includes('strong_connection')" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Strong connection</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('stage_match')" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Stage fit</span>
@@ -950,6 +948,11 @@
               <div v-if="(item.categories || item.investor?.categories || []).filter(c => c.type === 'sector').length">
                 <span class="font-medium text-gray-700">Sectors: </span>
                 <span class="text-gray-600">{{ (item.categories || item.investor?.categories || []).filter(c => c.type === 'sector').map(c => c.name).join(', ') }}</span>
+              </div>
+              <!-- Stage -->
+              <div v-if="(item.categories || item.investor?.categories || []).filter(c => c.type === 'stage').length">
+                <span class="font-medium text-gray-700">Stage: </span>
+                <span class="text-gray-600">{{ (item.categories || item.investor?.categories || []).filter(c => c.type === 'stage').map(c => c.name).join(', ') }}</span>
               </div>
               <!-- Research Summary -->
               <template v-if="(item.research || item.investor?.research)">
@@ -3221,12 +3224,15 @@
         // For assignment modal: group sectors under parents, flat list for stage/persona
         const categoryAssignGroups = computed(() => {
           const groups = [];
+          const isInvestor = categoryAssignTarget.value?.type === 'investor';
           // Stage
           const stages = allCategories.value.filter(c => c.type === 'stage');
           if (stages.length) groups.push({ label: 'Stage', categories: stages });
-          // Persona
-          const personas = allCategories.value.filter(c => c.type === 'persona');
-          if (personas.length) groups.push({ label: 'Persona', categories: personas });
+          // Persona — only for founders (investors learn preferences from behavior)
+          if (!isInvestor) {
+            const personas = allCategories.value.filter(c => c.type === 'persona');
+            if (personas.length) groups.push({ label: 'Persona', categories: personas });
+          }
           // Sectors grouped by parent — include parent as selectable (covers all subcategories)
           for (const parent of sectorTree.value) {
             const items = parent.children.length

@@ -850,10 +850,6 @@
               class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 disabled:opacity-50">
               {{ bulkResearch.running ? 'Researching...' : 'Bulk Research' }}
             </button>
-            <button @click="generateAllTags"
-              class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700">
-              Gen All Tags
-            </button>
           </div>
         </div>
 
@@ -911,22 +907,6 @@
                   <span v-for="cat in (item.categories || item.investor?.categories || [])" :key="'cat-'+cat.id"
                     :class="categoryBadgeClass(cat.color)"
                     class="text-xs px-2 py-0.5 rounded font-medium">{{ cat.name }}</span>
-                  <!-- Auto-generated tags -->
-                  <span v-for="tag in parseTags(item.tags || item.investor?.tags)" :key="tag"
-                    :class="{
-                      'bg-red-100 text-red-700': tag === 'deep-tech' || tag === 'hardware',
-                      'bg-blue-100 text-blue-700': tag === 'pro-america' || tag === 'defense',
-                      'bg-green-100 text-green-700': tag === 'climate',
-                      'bg-purple-100 text-purple-700': tag === 'ai-ml',
-                      'bg-yellow-100 text-yellow-700': tag === 'fintech',
-                      'bg-pink-100 text-pink-700': tag === 'healthcare',
-                      'bg-indigo-100 text-indigo-700': tag === 'enterprise' || tag === 'infrastructure',
-                      'bg-orange-100 text-orange-700': tag === 'consumer',
-                      'bg-slate-100 text-slate-700': tag === 'crypto-web3',
-                      'bg-teal-100 text-teal-700': tag === 'seed-focus' || tag === 'series-a',
-                      'bg-cyan-100 text-cyan-700': tag === 'technical-founders' || tag === 'repeat-founders' || tag === 'first-time-friendly',
-                    }"
-                    class="text-xs px-2 py-0.5 rounded">{{ tag }}</span>
                   <!-- Fit indicators (only in planning mode) -->
                   <span v-if="planningFounderId && item.fitReasons?.includes('strong_connection')" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Strong connection</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('stage_match')" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Stage fit</span>
@@ -951,7 +931,6 @@
                 </button>
                 <button @click="openCategoryAssignModal('investor', item.investor || item)" class="text-teal-600 hover:underline text-sm">Categories</button>
                 <button @click="openResearchModal(item.investor || item)" class="text-purple-600 hover:underline text-sm">Research</button>
-                <button v-if="(item.research || item.investor?.research)" @click="generateTags((item.investor || item).id)" class="text-teal-600 hover:underline text-sm">Gen Tags</button>
                 <button @click="editInvestor(item.investor || item)" class="text-blue-600 hover:underline text-sm">Edit</button>
                 <button @click="toggleInvestorActive((item.investor || item))"
                   :class="(item.investor || item).active === false ? 'text-green-600' : 'text-orange-600'"
@@ -1760,23 +1739,6 @@
                 </select>
               </div>
             </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Tags</label>
-              <div class="flex flex-wrap gap-1 mb-2">
-                <span v-for="(tag, idx) in investorFormTags" :key="idx"
-                  class="inline-flex items-center gap-1 bg-teal-100 text-teal-700 px-2 py-0.5 rounded text-sm">
-                  {{ tag }}
-                  <button type="button" @click="removeInvestorTag(idx)" class="text-teal-500 hover:text-teal-800">&times;</button>
-                </span>
-              </div>
-              <div class="flex gap-2">
-                <input v-model="newInvestorTag" type="text" placeholder="Add tag..."
-                  @keydown.enter.prevent="addInvestorTag"
-                  class="flex-1 border rounded px-3 py-1 text-sm">
-                <button type="button" @click="addInvestorTag" class="bg-teal-600 text-white px-3 py-1 rounded text-sm hover:bg-teal-700">Add</button>
-              </div>
-              <p class="text-xs text-gray-500 mt-1">Press Enter or click Add to add tags</p>
-            </div>
             <div v-if="!editingInvestor">
               <label class="block text-sm font-medium text-gray-700 mb-1">Assign to Node *</label>
               <select v-model="investorForm.nodeId" required class="w-full border rounded px-3 py-2">
@@ -2448,29 +2410,7 @@
         // Forms
         const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [], city: '', country: '' });
-        const newInvestorTag = ref('');
-        const investorFormTags = computed(() => {
-          if (!investorForm.tags) return [];
-          if (Array.isArray(investorForm.tags)) return investorForm.tags;
-          try { return JSON.parse(investorForm.tags); } catch { return []; }
-        });
-        const addInvestorTag = () => {
-          const tag = newInvestorTag.value.trim().toLowerCase().replace(/\s+/g, '-');
-          if (tag && !investorFormTags.value.includes(tag)) {
-            if (Array.isArray(investorForm.tags)) {
-              investorForm.tags.push(tag);
-            } else {
-              investorForm.tags = [...investorFormTags.value, tag];
-            }
-          }
-          newInvestorTag.value = '';
-        };
-        const removeInvestorTag = (idx) => {
-          const currentTags = [...investorFormTags.value];
-          currentTags.splice(idx, 1);
-          investorForm.tags = currentTags;
-        };
+        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '' });
         const introForm = reactive({
           founderId: '', nodeId: '', investorId: '', status: 'intro_request_sent',
           dateRequested: '', dateNodeAsked: '', dateIntroduced: '', firstMeetingDate: '',
@@ -3278,9 +3218,11 @@
           // Persona
           const personas = allCategories.value.filter(c => c.type === 'persona');
           if (personas.length) groups.push({ label: 'Persona', categories: personas });
-          // Sectors grouped by parent
+          // Sectors grouped by parent — include parent as selectable (covers all subcategories)
           for (const parent of sectorTree.value) {
-            const items = parent.children.length ? parent.children : [parent];
+            const items = parent.children.length
+              ? [{ ...parent, name: parent.name + ' (All)' }, ...parent.children]
+              : [parent];
             groups.push({ label: parent.name, categories: items, isSector: true });
           }
           return groups;
@@ -3718,11 +3660,7 @@
         const formatStatus = (status) => status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
         const formatStage = (stage) => stage?.replace(/_/g, '-').replace(/\b\w/g, l => l.toUpperCase()) || '';
         const formatRoundStatus = (status) => status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
-        const parseTags = (tags) => {
-          if (!tags) return [];
-          if (Array.isArray(tags)) return tags;
-          try { return JSON.parse(tags); } catch { return []; }
-        };
+
 
         const statusClass = (status) => {
           const classes = {
@@ -3863,14 +3801,9 @@
 
         const editInvestor = (investor) => {
           editingInvestor.value = investor.id;
-          let tags = [];
-          if (investor.tags) {
-            tags = Array.isArray(investor.tags) ? investor.tags : (typeof investor.tags === 'string' ? JSON.parse(investor.tags) : []);
-          }
           Object.assign(investorForm, {
             ...investor,
             active: investor.active !== false,
-            tags: tags,
           });
           showInvestorModal.value = true;
         };
@@ -3891,31 +3824,10 @@
           loadInvestors();
         };
 
-        const generateTags = async (investorId) => {
-          try {
-            await api(`/investors/${investorId}/generate-tags`, { method: 'POST' });
-            loadInvestors();
-          } catch (err) {
-            alert('Failed to generate tags: ' + (err.message || err));
-          }
-        };
-
-        const generateAllTags = async () => {
-          if (!confirm('Generate tags for all investors with AI research?')) return;
-          try {
-            const result = await api('/investors/generate-all-tags', { method: 'POST' });
-            alert(`Generated tags for ${result.results?.length || 0} investors`);
-            loadInvestors();
-          } catch (err) {
-            alert('Failed to generate tags: ' + (err.message || err));
-          }
-        };
-
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, tags: [], city: '', country: '' });
-          newInvestorTag.value = '';
+          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '' });
         };
 
         const saveIntro = async () => {
@@ -4248,21 +4160,21 @@
           loadInboundLogs, loadPendingInboundCount, openInboundConfirmModal, closeInboundConfirmModal, submitInboundConfirm, dismissInboundLog,
           formatCurrency, calculatePaperValue, getCompletionStatus,
           editingFounder, editingNode, editingInvestor, editingIntro,
-          founderForm, nodeForm, investorForm, newInvestorTag, investorFormTags, addInvestorTag, removeInvestorTag, introForm, followupForm, fnRelForm, niConnForm,
+          founderForm, nodeForm, investorForm, introForm, followupForm, fnRelForm, niConnForm,
           introFounderSearch, introNodeSearch, introInvestorSearch,
           introFounderDropdownOpen, introNodeDropdownOpen, introInvestorDropdownOpen,
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filteredAdminInvestors,
           countries, countryName,
-          formatStatus, formatStage, formatRoundStatus, parseTags, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
+          formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau,
           loadIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden,
           saveNode, editNode, deleteNode, closeNodeModal,
-          saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, generateTags, generateAllTags, closeInvestorModal,
+          saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, closeInvestorModal,
           saveIntro, editIntro, closeIntroModal,
           showAddFollowup, saveFollowup,
           saveFNRelationship, deleteFNRelationship,

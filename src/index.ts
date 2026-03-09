@@ -30,7 +30,7 @@ import matchingRoutes from './api/matching.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
-import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests, investorResearch } from './db/index.js';
+import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
 import { desc } from 'drizzle-orm';
 
 const app = new Hono();
@@ -305,137 +305,6 @@ app.get('/api/debug/node-stats', async (c) => {
   }
 
   return c.json(stats);
-});
-
-// Tag generation for investors based on AI research
-const TAG_PATTERNS: { tag: string; patterns: string[] }[] = [
-  { tag: 'deep-tech', patterns: ['deep tech', 'deeptech', 'deep-tech', 'hard tech', 'hardtech', 'frontier tech', 'scientific', 'research-driven', 'phd', 'breakthrough'] },
-  { tag: 'hardware', patterns: ['hardware', 'physical product', 'manufacturing', 'robotics', 'chips', 'semiconductor', 'devices'] },
-  { tag: 'pro-america', patterns: ['american', 'usa', 'us-based', 'us based', 'domestic', 'onshore', 'reshoring', 'made in america', 'patriotic', 'national security'] },
-  { tag: 'defense', patterns: ['defense', 'defence', 'military', 'gov tech', 'government', 'national security', 'aerospace', 'dod'] },
-  { tag: 'climate', patterns: ['climate', 'cleantech', 'clean tech', 'sustainability', 'carbon', 'energy transition', 'renewable', 'green'] },
-  { tag: 'ai-ml', patterns: ['artificial intelligence', ' ai ', 'machine learning', ' ml ', 'llm', 'large language', 'deep learning', 'neural'] },
-  { tag: 'fintech', patterns: ['fintech', 'financial', 'payments', 'banking', 'insurance', 'insurtech', 'lending', 'credit'] },
-  { tag: 'healthcare', patterns: ['health', 'medical', 'biotech', 'pharma', 'therapeutics', 'diagnostics', 'clinical', 'patient'] },
-  { tag: 'enterprise', patterns: ['enterprise', 'b2b', 'saas', 'software', 'business software', 'productivity', 'workflow'] },
-  { tag: 'consumer', patterns: ['consumer', 'b2c', 'retail', 'e-commerce', 'ecommerce', 'marketplace', 'direct-to-consumer', 'dtc'] },
-  { tag: 'infrastructure', patterns: ['infrastructure', 'devtools', 'developer tools', 'platform', 'api', 'cloud', 'data infrastructure'] },
-  { tag: 'crypto-web3', patterns: ['crypto', 'web3', 'blockchain', 'defi', 'nft', 'token', 'decentralized'] },
-  { tag: 'seed-focus', patterns: ['seed stage', 'seed-stage', 'pre-seed', 'preseed', 'earliest stage', 'first check', 'day zero', 'day one', 'formation stage'] },
-  { tag: 'series-a', patterns: ['series a', 'series-a', 'growth stage', 'scaling', 'product-market fit'] },
-  { tag: 'technical-founders', patterns: ['technical founder', 'engineer founder', 'technical background', 'technical team', 'engineering-led'] },
-  { tag: 'repeat-founders', patterns: ['repeat founder', 'serial entrepreneur', 'experienced founder', 'second-time', 'proven founder'] },
-  { tag: 'first-time-friendly', patterns: ['first-time founder', 'first time founder', 'new founder', 'emerging founder', 'aspiring founder'] },
-];
-
-function generateTagsFromText(text: string): string[] {
-  const lowerText = text.toLowerCase();
-  const matchedTags: string[] = [];
-
-  for (const { tag, patterns } of TAG_PATTERNS) {
-    for (const pattern of patterns) {
-      if (lowerText.includes(pattern)) {
-        matchedTags.push(tag);
-        break; // Only add each tag once
-      }
-    }
-  }
-
-  return matchedTags;
-}
-
-// Generate tags for a single investor
-app.post('/api/investors/:id/generate-tags', async (c) => {
-  const investorId = parseInt(c.req.param('id'));
-
-  // Get investor
-  const investor = await db.query.investors.findFirst({
-    where: eq(investors.id, investorId),
-  });
-
-  if (!investor) {
-    return c.json({ error: 'Investor not found' }, 404);
-  }
-
-  // Get latest research
-  const research = await db.select()
-    .from(investorResearch)
-    .where(eq(investorResearch.investorId, investorId))
-    .orderBy(desc(investorResearch.researchedAt))
-    .limit(1);
-
-  if (!research.length || research[0].status !== 'completed') {
-    return c.json({ error: 'No completed research found for this investor' }, 404);
-  }
-
-  const r = research[0];
-  const combinedText = [
-    r.bio || '',
-    r.investmentThesis || '',
-    r.founderPreferences || '',
-    r.recentActivity || '',
-    investor.firm || '',
-    investor.role || '',
-  ].join(' ');
-
-  const tags = generateTagsFromText(combinedText);
-
-  // Save tags to investor
-  await db.update(investors)
-    .set({ tags: JSON.stringify(tags) })
-    .where(eq(investors.id, investorId));
-
-  return c.json({ investorId, name: investor.name, tags });
-});
-
-// Bulk generate tags for all investors with research
-app.post('/api/investors/generate-all-tags', async (c) => {
-  // Get all investors
-  const allInvestors = await db.select().from(investors);
-
-  // Get all completed research
-  const allResearch = await db.select()
-    .from(investorResearch)
-    .where(eq(investorResearch.status, 'completed'))
-    .orderBy(desc(investorResearch.researchedAt));
-
-  // Create map of latest research per investor
-  const researchMap = new Map<number, typeof allResearch[0]>();
-  for (const r of allResearch) {
-    if (!researchMap.has(r.investorId)) {
-      researchMap.set(r.investorId, r);
-    }
-  }
-
-  const results: { id: number; name: string; tags: string[] }[] = [];
-
-  for (const inv of allInvestors) {
-    const r = researchMap.get(inv.id);
-    if (!r) continue;
-
-    const combinedText = [
-      r.bio || '',
-      r.investmentThesis || '',
-      r.founderPreferences || '',
-      r.recentActivity || '',
-      inv.firm || '',
-      inv.role || '',
-    ].join(' ');
-
-    const tags = generateTagsFromText(combinedText);
-
-    // Save tags to investor
-    await db.update(investors)
-      .set({ tags: JSON.stringify(tags) })
-      .where(eq(investors.id, inv.id));
-
-    results.push({ id: inv.id, name: inv.name, tags });
-  }
-
-  return c.json({
-    message: `Generated tags for ${results.length} investors`,
-    results
-  });
 });
 
 // Explicit route for founder portal

@@ -284,6 +284,16 @@ async function loadMatchingData() {
     categoryId: investorCategoryExclusions.categoryId,
   }).from(investorCategoryExclusions);
 
+  // Load all categories for parent/child expansion
+  const allCats = await db.select().from(investorCategories);
+  const parentChildMap = new Map<number, { id: number; name: string; type: string }[]>();
+  for (const cat of allCats) {
+    if (cat.parentId) {
+      if (!parentChildMap.has(cat.parentId)) parentChildMap.set(cat.parentId, []);
+      parentChildMap.get(cat.parentId)!.push({ id: cat.id, name: cat.name, type: cat.type });
+    }
+  }
+
   // Build maps
   const founderCatMap = new Map<number, { id: number; name: string; type: string }[]>();
   for (const a of founderCatAssignments) {
@@ -297,10 +307,42 @@ async function loadMatchingData() {
     investorCatMap.get(a.investorId)!.push({ id: a.categoryId, name: a.categoryName, type: a.categoryType });
   }
 
+  // Expand parent sectors: if investor has a parent sector, add all its children
+  for (const [investorId, cats] of investorCatMap) {
+    const expanded: { id: number; name: string; type: string }[] = [];
+    for (const cat of cats) {
+      const children = parentChildMap.get(cat.id);
+      if (children) {
+        for (const child of children) {
+          if (!cats.some(c => c.id === child.id) && !expanded.some(c => c.id === child.id)) {
+            expanded.push(child);
+          }
+        }
+      }
+    }
+    if (expanded.length > 0) {
+      cats.push(...expanded);
+    }
+  }
+
   const investorExclusionMap = new Map<number, Set<number>>();
   for (const e of exclusionAssignments) {
     if (!investorExclusionMap.has(e.investorId)) investorExclusionMap.set(e.investorId, new Set());
     investorExclusionMap.get(e.investorId)!.add(e.categoryId);
+  }
+
+  // Expand parent exclusions: if investor excludes a parent sector, exclude all children
+  for (const [investorId, excludedIds] of investorExclusionMap) {
+    const expanded: number[] = [];
+    for (const catId of excludedIds) {
+      const children = parentChildMap.get(catId);
+      if (children) {
+        for (const child of children) {
+          if (!excludedIds.has(child.id)) expanded.push(child.id);
+        }
+      }
+    }
+    for (const id of expanded) excludedIds.add(id);
   }
 
   const personaTierMap = new Map<string, number>();

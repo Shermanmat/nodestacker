@@ -16,7 +16,6 @@ const createInvestorSchema = z.object({
 
 const updateInvestorSchema = createInvestorSchema.partial().extend({
   active: z.boolean().optional(),
-  tags: z.array(z.string()).optional(),
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
 });
@@ -74,11 +73,10 @@ app.get('/', async (c) => {
   const categoryFilter = c.req.query('category');
   const countryFilter = c.req.query('country');
 
-  // Parse focusAreas and tags JSON, attach research and categories
+  // Parse focusAreas JSON, attach research and categories
   let parsed = allInvestors.map(inv => ({
     ...inv,
     focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
-    tags: inv.tags ? JSON.parse(inv.tags) : [],
     research: researchMap.get(inv.id) || null,
     categories: categoryMap.get(inv.id) || [],
   }));
@@ -280,10 +278,6 @@ app.put('/:id', async (c) => {
   if (parsed.data.focusAreas) {
     updateData.focusAreas = JSON.stringify(parsed.data.focusAreas);
   }
-  if (parsed.data.tags) {
-    updateData.tags = JSON.stringify(parsed.data.tags);
-  }
-
   const result = await db.update(investors)
     .set(updateData)
     .where(eq(investors.id, id))
@@ -295,7 +289,6 @@ app.put('/:id', async (c) => {
   return c.json({
     ...result[0],
     focusAreas: result[0].focusAreas ? JSON.parse(result[0].focusAreas) : [],
-    tags: result[0].tags ? JSON.parse(result[0].tags) : [],
   });
 });
 

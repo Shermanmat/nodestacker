@@ -156,11 +156,15 @@ app.get('/pipeline-health', async (c) => {
       return d && new Date(d) >= lastWeekStart && new Date(d) < weekStart;
     }).length;
 
-    // Weekly rate (over cadence period)
-    const cadenceStart = founder.cadenceStartDate ? new Date(founder.cadenceStartDate) : null;
-    const weeksActive = cadenceStart
-      ? Math.max(1, Math.ceil((now.getTime() - cadenceStart.getTime()) / (7 * 24 * 60 * 60 * 1000)))
-      : 1;
+    // Weekly rate (over actual history, not cadence start)
+    const firstIntroDate = founderIntros.reduce((earliest: Date | null, ir) => {
+      const d = ir.dateRequested || ir.createdAt;
+      if (!d) return earliest;
+      const date = new Date(d);
+      return !earliest || date < earliest ? date : earliest;
+    }, null as Date | null);
+    const rateStart = firstIntroDate || new Date(founder.createdAt);
+    const weeksActive = Math.max(1, Math.ceil((now.getTime() - rateStart.getTime()) / (7 * 24 * 60 * 60 * 1000)));
     const weeklyRate = Math.round((founderIntros.length / weeksActive) * 10) / 10;
 
     // Active intros (not passed/ignored/invested)

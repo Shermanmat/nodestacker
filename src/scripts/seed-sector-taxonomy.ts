@@ -31,14 +31,14 @@ const sectors: { name: string; color: string; subcategories: string[] }[] = [
     subcategories: ['Payments', 'Banking / Neobanks', 'Lending', 'Wealthtech', 'Crypto / Web3', 'Insurance (Insurtech)', 'Financial infrastructure'],
   },
   {
-    name: 'Enterprise Software (SaaS)',
+    name: 'Enterprise Software (SaaS) / Vertical Agents',
     color: 'blue',
-    subcategories: ['CRM / sales tools', 'Marketing tech', 'HR / payroll', 'Collaboration / productivity', 'Vertical SaaS'],
+    subcategories: ['CRM / sales tools', 'Marketing tech', 'HR / payroll', 'Collaboration / productivity', 'Vertical SaaS', 'AI agents / automation'],
   },
   {
     name: 'Artificial Intelligence',
     color: 'purple',
-    subcategories: ['AI infrastructure', 'Foundation models', 'AI developer tools', 'Vertical AI', 'AI agents / automation'],
+    subcategories: ['AI infrastructure', 'Foundation models', 'AI developer tools', 'Vertical AI'],
   },
   {
     name: 'Infrastructure / Developer Tools',

@@ -903,10 +903,13 @@
                   <h3 class="font-semibold text-lg">{{ item.name || item.investor?.name }}</h3>
                   <span v-if="(item.active === false || item.investor?.active === false)" class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
                   <span v-if="(item.research || item.investor?.research)" class="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded">AI Researched</span>
-                  <!-- Category badges -->
-                  <span v-for="cat in (item.categories || item.investor?.categories || [])" :key="'cat-'+cat.id"
+                  <!-- Non-sector category badges (stage, persona) -->
+                  <span v-for="cat in (item.categories || item.investor?.categories || []).filter(c => c.type !== 'sector')" :key="'cat-'+cat.id"
                     :class="categoryBadgeClass(cat.color)"
                     class="text-xs px-2 py-0.5 rounded font-medium">{{ cat.name }}</span>
+                  <!-- Sector indicator -->
+                  <span v-if="(item.categories || item.investor?.categories || []).some(c => c.type === 'sector')"
+                    class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-medium">Sectors assigned</span>
                   <!-- Fit indicators (only in planning mode) -->
                   <span v-if="planningFounderId && item.fitReasons?.includes('strong_connection')" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Strong connection</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('stage_match')" class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">Stage fit</span>
@@ -941,28 +944,34 @@
               </div>
             </div>
 
-            <!-- Research Summary (visible paragraph) -->
-            <div v-if="(item.research || item.investor?.research)" class="p-4 bg-gray-50 text-sm space-y-3">
-              <div v-if="(item.research || item.investor?.research)?.investmentThesis">
-                <span class="font-medium text-gray-700">Investment Thesis: </span>
-                <span class="text-gray-600">{{ (item.research || item.investor?.research).investmentThesis }}</span>
+            <!-- Detail Section: Sectors + Research -->
+            <div class="p-4 bg-gray-50 text-sm space-y-3">
+              <!-- Sectors -->
+              <div v-if="(item.categories || item.investor?.categories || []).filter(c => c.type === 'sector').length">
+                <span class="font-medium text-gray-700">Sectors: </span>
+                <span class="text-gray-600">{{ (item.categories || item.investor?.categories || []).filter(c => c.type === 'sector').map(c => c.name).join(', ') }}</span>
               </div>
-              <div v-if="(item.research || item.investor?.research)?.founderPreferences">
-                <span class="font-medium text-gray-700">Founder Preferences: </span>
-                <span class="text-gray-600">{{ (item.research || item.investor?.research).founderPreferences }}</span>
+              <!-- Research Summary -->
+              <template v-if="(item.research || item.investor?.research)">
+                <div v-if="(item.research || item.investor?.research)?.investmentThesis">
+                  <span class="font-medium text-gray-700">Investment Thesis: </span>
+                  <span class="text-gray-600">{{ (item.research || item.investor?.research).investmentThesis }}</span>
+                </div>
+                <div v-if="(item.research || item.investor?.research)?.founderPreferences">
+                  <span class="font-medium text-gray-700">Founder Preferences: </span>
+                  <span class="text-gray-600">{{ (item.research || item.investor?.research).founderPreferences }}</span>
+                </div>
+                <div v-if="(item.research || item.investor?.research)?.portfolioCompanies">
+                  <span class="font-medium text-gray-700">Portfolio: </span>
+                  <span class="text-gray-600">{{ (item.research || item.investor?.research).portfolioCompanies }}</span>
+                </div>
+                <div class="text-xs text-gray-400 pt-2 border-t border-gray-200">
+                  Researched {{ formatDate((item.research || item.investor?.research).researchedAt) }}
+                </div>
+              </template>
+              <div v-else class="text-gray-400 italic">
+                No AI research yet. Click "Research" above to generate.
               </div>
-              <div v-if="(item.research || item.investor?.research)?.portfolioCompanies">
-                <span class="font-medium text-gray-700">Portfolio: </span>
-                <span class="text-gray-600">{{ (item.research || item.investor?.research).portfolioCompanies }}</span>
-              </div>
-              <div class="text-xs text-gray-400 pt-2 border-t border-gray-200">
-                Researched {{ formatDate((item.research || item.investor?.research).researchedAt) }}
-              </div>
-            </div>
-
-            <!-- No Research Yet -->
-            <div v-else-if="!(item.research || item.investor?.research)" class="p-4 bg-gray-50 text-sm text-gray-400 italic">
-              No AI research yet. Click "Research" above to generate.
             </div>
 
             <!-- Recent Intro Requests (only in planning mode) -->

@@ -227,14 +227,14 @@ app.put('/reject-intro/:id', async (c) => {
     return c.json({ error: `Not a pending suggestion (status: ${introRequest.status})` }, 400);
   }
 
-  // Delete the intro request (it was never sent)
-  await db.delete(introRequests).where(eq(introRequests.id, id));
-
-  // Mark linked match suggestion as rejected
+  // Mark linked match suggestion as rejected (must happen before deleting intro request due to FK)
   const now = new Date().toISOString();
   await db.update(matchSuggestions)
-    .set({ status: 'rejected', reviewedAt: now, rejectionReason: body.reason || null })
+    .set({ status: 'rejected', reviewedAt: now, rejectionReason: body.reason || null, introRequestId: null })
     .where(eq(matchSuggestions.introRequestId, id));
+
+  // Delete the intro request (it was never sent)
+  await db.delete(introRequests).where(eq(introRequests.id, id));
 
   return c.json({ success: true });
 });

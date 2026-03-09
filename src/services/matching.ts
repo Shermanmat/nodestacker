@@ -467,11 +467,21 @@ export async function generateMatchSuggestions(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
 
-  // Count intros in last 7 days per founder (including pending_suggestion — counts toward quota)
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  // Count intros created this calendar week (Monday-Sunday) per founder
+  // Only count active intros (not rejected/expired suggestions)
+  const now = new Date();
+  const weekStart = new Date(now);
+  const day = weekStart.getDay();
+  weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1)); // Monday
+  weekStart.setHours(0, 0, 0, 0);
+  const weekStartTime = weekStart.getTime();
+
   const weeklyIntroCount = new Map<number, number>();
   for (const ir of data.allIntroRequests) {
-    if (ir.createdAt && new Date(ir.createdAt).getTime() > sevenDaysAgo) {
+    // Skip rejected/expired suggestions — they shouldn't count against quota
+    if (ir.status === 'passed' || ir.status === 'ignored') continue;
+    const d = ir.dateRequested || ir.createdAt;
+    if (d && new Date(d).getTime() >= weekStartTime) {
       weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
     }
   }

@@ -360,6 +360,15 @@ async function loadMatchingData() {
     founderIntroMap.get(ir.founderId)!.push(ir);
   }
 
+  // Build child-to-parent name map for generalist exclusion checks
+  const childToParentName = new Map<number, string>();
+  for (const cat of allCats) {
+    if (cat.parentId) {
+      const parent = allCats.find(c => c.id === cat.parentId);
+      if (parent) childToParentName.set(cat.id, parent.name);
+    }
+  }
+
   return {
     allFounders,
     allInvestors,
@@ -372,6 +381,7 @@ async function loadMatchingData() {
     personaTierMap,
     investorIntroMap,
     founderIntroMap,
+    childToParentName,
   };
 }
 
@@ -385,6 +395,7 @@ function passesCategoryFilter(
   founderCategories: { id: number; name: string; type: string }[],
   investorCategories: { id: number; name: string; type: string }[] | undefined,
   investorExclusions: Set<number> | undefined,
+  childToParentName?: Map<number, string>,
 ): boolean {
   const founderSectorIds = new Set(
     founderCategories.filter(c => c.type === 'sector').map(c => c.id)
@@ -404,9 +415,31 @@ function passesCategoryFilter(
 
   if (investorSectors.length === 0) return true;
 
-  // If investor has "Generalist" category, any founder sector is acceptable
+  // If investor has "Generalist" category, accept most sectors but exclude
+  // Climate/Energy, HardTech/DeepTech, Defense/Government by default
+  // (unless they have explicit category assignments for those sectors)
   const isGeneralist = investorSectors.some(c => c.name.toLowerCase() === 'generalist');
-  if (isGeneralist) return true;
+  if (isGeneralist) {
+    const generalistDefaultExclusions = ['climate / energy', 'hardtech / deeptech', 'defense / government'];
+    const explicitSectorNames = new Set(investorSectors.map(c => c.name.toLowerCase()));
+    for (const sectorId of founderSectorIds) {
+      const founderSector = founderCategories.find(c => c.id === sectorId);
+      if (!founderSector) continue;
+      // Check direct name or parent name (for subcategories like "Clean energy" -> "Climate / Energy")
+      const sectorName = founderSector.name.toLowerCase();
+      const parentName = childToParentName?.get(sectorId)?.toLowerCase();
+      const matchedExclusion = generalistDefaultExclusions.find(
+        ex => ex === sectorName || ex === parentName
+      );
+      if (matchedExclusion) {
+        // Only exclude if investor doesn't also have this sector explicitly assigned
+        if (!explicitSectorNames.has(matchedExclusion)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
   // Strict match: founder must share at least one sector with investor
   if (founderSectorIds.size === 0) return true; // Founder has no sectors = matches anyone
@@ -560,7 +593,7 @@ export async function generateMatchSuggestions(
         // Category filter (hard gate)
         const investorCats = data.investorCatMap.get(investorId);
         const investorExclusions = data.investorExclusionMap.get(investorId);
-        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) continue;
+        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions, data.childToParentName)) continue;
 
         const investorReliability = investorScores.get(investorId)!;
         const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength);

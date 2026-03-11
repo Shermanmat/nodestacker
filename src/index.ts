@@ -319,11 +319,17 @@ app.get('/dashboard', serveStatic({ path: './public/dashboard.html' }));
 
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
+app.get('/founders', serveStatic({ path: './public/founders.html' }));
+app.get('/investors', serveStatic({ path: './public/investors.html' }));
+app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
+
+// Admin dashboard
+app.get('/admin', serveStatic({ path: './public/admin.html' }));
 
 // Serve static files from public directory
 app.use('/*', serveStatic({ root: './public' }));
 
-// Fallback to index.html for SPA routing (admin)
+// Fallback to landing page
 app.get('*', serveStatic({ path: './public/index.html' }));
 
 const port = parseInt(process.env.PORT || '3000');

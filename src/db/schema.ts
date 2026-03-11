@@ -783,6 +783,9 @@ export const publicUsers = sqliteTable('public_users', {
   firstName: text('first_name').notNull(),
   lastName: text('last_name').notNull(),
   email: text('email').notNull().unique(),
+  role: text('role'), // founder, node, investor, other
+  roleOther: text('role_other'), // free text if role is 'other'
+  nodeContacts: text('node_contacts'), // JSON array of {name, firm} for nodes
   oneLiner: text('one_liner'),
   city: text('city'),
   linkedinUrl: text('linkedin_url'),

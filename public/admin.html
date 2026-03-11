@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/favicon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Matcap - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -2626,6 +2627,18 @@
             // Skip if no connection through founder's nodes
             if (nodeConnections.length === 0) continue;
 
+            // Geography filter: if investor has a specific geography, founder must be in it
+            const invGeo = (inv.geography || '').toLowerCase().trim();
+            if (invGeo) {
+              const founderCity = (founder.city || '').toLowerCase();
+              const founderCountry = (founder.country || '').toLowerCase();
+              // Skip if founder has no location or location doesn't match investor geo
+              if (!founderCity && !founderCountry) continue;
+              const geoMatch = founderCity.includes(invGeo) || invGeo.includes(founderCity) ||
+                               founderCountry.includes(invGeo) || invGeo.includes(founderCountry);
+              if (!geoMatch) continue;
+            }
+
             // Sector filter: if both have sectors, at least one must overlap
             // Generalist investors match everything except hardtech defaults (Climate/Energy, HardTech/DeepTech, Defense/Government)
             const invSectors = (inv.categories || []).filter(c => c.type === 'sector');
@@ -2805,10 +2818,20 @@
             });
           }
 
-          // Apply stale filter if enabled (6+ weeks since contact)
+          // Apply search filter
           let filtered = investorList;
+          if (investorSearchQuery.value) {
+            const q = investorSearchQuery.value.toLowerCase();
+            filtered = filtered.filter(inv => {
+              const name = (inv.name || '').toLowerCase();
+              const firm = (inv.firm || '').toLowerCase();
+              return name.includes(q) || firm.includes(q);
+            });
+          }
+
+          // Apply stale filter if enabled (6+ weeks since contact)
           if (planningFilterStale.value) {
-            filtered = investorList.filter(inv => inv.weeksSinceContact >= 6);
+            filtered = filtered.filter(inv => inv.weeksSinceContact >= 6);
             // Sort by weeks since contact descending (oldest first)
             return filtered.sort((a, b) => b.weeksSinceContact - a.weeksSinceContact);
           }

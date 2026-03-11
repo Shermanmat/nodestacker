@@ -509,14 +509,16 @@ export async function generateMatchSuggestions(
     return true;
   });
 
-  // Pre-compute investor scores, cooldowns, and VIP status
+  // Pre-compute investor scores, cooldowns, VIP status, and geo restrictions
   const investorScores = new Map<number, number>();
   const investorCooldowns = new Map<number, CooldownResult>();
   const investorVip = new Set<number>();
+  const investorGeoMap = new Map<number, string>();
   for (const inv of data.allInvestors) {
     if (!inv.active) continue;
     const intros = data.investorIntroMap.get(inv.id) || [];
     investorScores.set(inv.id, computeInvestorReliabilityScore(intros));
+    if (inv.geography) investorGeoMap.set(inv.id, inv.geography.toLowerCase().trim());
     investorCooldowns.set(inv.id, isInvestorOnCooldown(intros));
     if (inv.vip) investorVip.add(inv.id);
   }
@@ -588,6 +590,17 @@ export async function generateMatchSuggestions(
 
         // VIP gate: only match VIP investors with founders who have strong acceptance rates
         if (investorVip.has(investorId) && !qualifiesForVip) continue;
+
+        // Geography gate: if investor has a specific geography, founder must be located there
+        const invGeo = investorGeoMap.get(investorId);
+        if (invGeo) {
+          const founderCity = (founder.city || '').toLowerCase();
+          const founderCountry = (founder.country || '').toLowerCase();
+          if (!founderCity && !founderCountry) continue;
+          const geoMatch = founderCity.includes(invGeo) || invGeo.includes(founderCity) ||
+                           founderCountry.includes(invGeo) || invGeo.includes(founderCountry);
+          if (!geoMatch) continue;
+        }
 
         // Category filter (hard gate)
         const investorCats = data.investorCatMap.get(investorId);

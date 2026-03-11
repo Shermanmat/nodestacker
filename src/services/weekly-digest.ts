@@ -362,7 +362,7 @@ export async function sendWeeklyDigests(): Promise<{ sent: number; skipped: numb
   let skipped = 0;
   const errors: string[] = [];
 
-  const baseUrl = process.env.BASE_URL || 'https://nodestacker.fly.dev';
+  const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
 
   for (const founder of allFounders) {
     try {
@@ -414,7 +414,7 @@ export async function previewDigest(founderId: number): Promise<{ html: string; 
     return null;
   }
 
-  const baseUrl = process.env.BASE_URL || 'https://nodestacker.fly.dev';
+  const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
   const portalUrl = `${baseUrl}/founder.html`;
 
   return generateDigestEmail(founder.name, activity, portalUrl);

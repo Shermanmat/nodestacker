@@ -41,6 +41,8 @@ const signupSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email'),
+  role: z.enum(['founder', 'node', 'investor', 'other']).optional(),
+  roleOther: z.string().optional(),
   oneLiner: z.string().min(1, 'One-liner intro is required'),
   city: z.string().min(1, 'City is required'),
   linkedinUrl: z.string().optional(),
@@ -73,6 +75,8 @@ app.post('/signup', async (c) => {
     firstName: parsed.data.firstName,
     lastName: parsed.data.lastName,
     email: parsed.data.email,
+    role: parsed.data.role || null,
+    roleOther: parsed.data.role === 'other' ? (parsed.data.roleOther || null) : null,
     oneLiner: parsed.data.oneLiner,
     city: parsed.data.city,
     linkedinUrl: normalizeLinkedinUrl(parsed.data.linkedinUrl),
@@ -332,5 +336,38 @@ setInterval(async () => {
     console.error('[PUBLIC-AUTH] Failed to cleanup expired sessions:', err);
   }
 }, 60 * 60 * 1000);
+
+// Save node contacts (investor connections from signup)
+app.post('/node-contacts', async (c) => {
+  const body = await c.req.json();
+  const schema = z.object({
+    email: z.string().email(),
+    contacts: z.array(z.object({
+      name: z.string().min(1),
+      firm: z.string().optional(),
+    })).min(1).max(3),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid data' }, 400);
+  }
+
+  const user = await db.query.publicUsers.findFirst({
+    where: eq(publicUsers.email, parsed.data.email),
+  });
+
+  if (!user) {
+    return c.json({ error: 'User not found' }, 404);
+  }
+
+  await db.update(publicUsers)
+    .set({ nodeContacts: JSON.stringify(parsed.data.contacts) })
+    .where(eq(publicUsers.id, user.id));
+
+  console.log(`[NODE-CONTACTS] ${user.firstName} ${user.lastName} submitted ${parsed.data.contacts.length} investor contacts`);
+
+  return c.json({ success: true });
+});
 
 export default app;

@@ -9,7 +9,7 @@ primary_region = 'sjc'
 [build]
 
 [env]
-  BASE_URL = 'https://nodestacker.fly.dev'
+  BASE_URL = 'https://matcap.vc'
   DATABASE_PATH = '/app/data/nodestacker.db'
 
 [[mounts]]

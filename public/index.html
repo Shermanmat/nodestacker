@@ -119,7 +119,7 @@
   <!-- Scene 2: You're a founder -->
   <section id="scene-2" class="scene-section" style="height: 200vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
-      <div id="scene2-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center opacity-0">
+      <div id="scene-2-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
         <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">You're a founder trying to break in.</h2>
         <p class="mt-4 text-lg text-slate-400">Raising capital is a relationship game — and right now, you don't have the relationships. Cold emails go unanswered. Warm intros are the only currency that works.</p>
       </div>
@@ -129,7 +129,7 @@
   <!-- Scene 3: You Meet MatCap -->
   <section id="scene-3" class="scene-section" style="height: 200vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
-      <div id="scene3-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center opacity-0">
+      <div id="scene-3-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
         <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">You meet MatCap.</h2>
         <p class="mt-4 text-lg text-slate-400">Tell us about your company, your raise, and the investors you want to meet. If we believe in what you're building, we go to work for you.</p>
       </div>
@@ -139,7 +139,7 @@
   <!-- Scene 4: MatCap Activates Nodes -->
   <section id="scene-4" class="scene-section" style="height: 200vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
-      <div id="scene4-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center opacity-0">
+      <div id="scene-4-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
         <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">We connect you with hyper-networked nodes.</h2>
         <p class="mt-4 text-lg text-slate-400">Operators, angels, and advisors who sit at the center of investor networks. They become your allies — people who personally know the investors you need to meet.</p>
       </div>
@@ -149,7 +149,7 @@
   <!-- Scene 5: Nodes Open Their Networks -->
   <section id="scene-5" class="scene-section" style="height: 250vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
-      <div id="scene5-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center opacity-0">
+      <div id="scene-5-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
         <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">Their network becomes your network.</h2>
         <p class="mt-4 text-lg text-slate-400">Nodes open doors to the right investors on your behalf. Your pitch reaches decision-makers through people they already trust — and meetings start happening.</p>
       </div>
@@ -193,6 +193,7 @@
     const isMobile = window.innerWidth < 768;
     const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const dpr = window.devicePixelRatio || 1;
+    console.log('[MatCap] Script loaded. isMobile:', isMobile, 'reducedMotion:', prefersReducedMotion, 'width:', window.innerWidth);
 
     const COLORS = {
       ecosystem: '#94a3b8',
@@ -537,10 +538,20 @@
       gsap.registerPlugin(ScrollTrigger);
       if (isMobile) { setupMobileFallback(); return; }
 
-      function wireScene(id, key, fadeStart, fadeEnd) {
-        gsap.to(id+'-text',{opacity:1,scrollTrigger:{trigger:id,start:'top 80%',end:'top 30%',scrub:true}});
-        gsap.to(id+'-text',{opacity:0,scrollTrigger:{trigger:id,start:fadeStart||'60% top',end:fadeEnd||'bottom top',scrub:true}});
-        ScrollTrigger.create({trigger:id,start:'top top',end:'bottom bottom',scrub:true,onUpdate:self=>{scrollState[key]=self.progress;}});
+      function wireScene(id, key) {
+        const textEl = document.querySelector(id+'-text');
+        console.log('[MatCap] wireScene', id, 'textEl:', !!textEl, 'trigger:', !!document.querySelector(id));
+        if (!textEl) return;
+        ScrollTrigger.create({trigger:id,start:'top top',end:'bottom bottom',scrub:true,onUpdate:function(self){
+          scrollState[key]=self.progress;
+          // Fade text in from 0-25%, hold from 25-65%, fade out from 65-100%
+          var p = self.progress;
+          var op;
+          if (p < 0.25) { op = p / 0.25; }
+          else if (p < 0.65) { op = 1; }
+          else { op = Math.max(0, 1 - ((p - 0.65) / 0.35)); }
+          textEl.style.opacity = String(op);
+        }});
       }
 
       // Hero text fades with scroll
@@ -550,11 +561,14 @@
       wireScene('#scene-2','scene2');
       wireScene('#scene-3','scene3');
       wireScene('#scene-4','scene4');
-      wireScene('#scene-5','scene5','70% top');
+      wireScene('#scene-5','scene5');
 
       // Mark post-scroll for canvas dimming
-      ScrollTrigger.create({trigger:'#how-it-works',start:'top bottom',
-        onEnter:()=>{scrollState.postScroll=true;},onLeaveBack:()=>{scrollState.postScroll=false;}});
+      const firstContent = document.querySelector('.content-section');
+      if (firstContent) {
+        ScrollTrigger.create({trigger:firstContent,start:'top bottom',
+          onEnter:()=>{scrollState.postScroll=true;},onLeaveBack:()=>{scrollState.postScroll=false;}});
+      }
 
       // Fade in content sections
       gsap.utils.toArray('.content-section').forEach(sec=>{
@@ -580,8 +594,16 @@
       },{passive:true});
     }
 
-    resize(); initParticles(); setupScrollTrigger();
+    resize(); initParticles();
+    console.log('[MatCap] particles:', particles.length, 'W:', W, 'H:', H);
+    try {
+      setupScrollTrigger();
+      console.log('[MatCap] ScrollTrigger setup complete');
+    } catch(e) {
+      console.error('[MatCap] ScrollTrigger error:', e);
+    }
     if(!prefersReducedMotion) animate(); else draw();
+    console.log('[MatCap] Animation started');
 
     window.addEventListener('resize',()=>{
       const oW=W,oH=H; resize();

@@ -16,6 +16,7 @@ const createInvestorSchema = z.object({
 
 const updateInvestorSchema = createInvestorSchema.partial().extend({
   active: z.boolean().optional(),
+  vip: z.boolean().optional(),
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
 });

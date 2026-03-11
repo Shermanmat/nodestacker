@@ -155,6 +155,34 @@
       "when": 1773700000000,
       "tag": "0021_remove_investor_tags",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1773800000000,
+      "tag": "0022_default_generalist",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1773900000000,
+      "tag": "0023_dedup_kelvin_beachum",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1774000000000,
+      "tag": "0024_dedup_founder_node_rels",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1774100000000,
+      "tag": "0025_investor_vip",
+      "breakpoints": true
     }
   ]
 }

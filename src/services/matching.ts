@@ -163,19 +163,19 @@ export function isInvestorOnCooldown(investorIntros: IntroRequest[]): CooldownRe
     };
   }
 
-  // Throttle if 1+ intros made in last 3 days
-  const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000;
-  const veryRecent = investorIntros.filter(ir => {
+  // Throttle if 1+ intros made in last 3 weeks
+  const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000;
+  const recentlyIntroduced = investorIntros.filter(ir => {
     if (ir.status !== 'introduced') return false;
     const d = ir.dateIntroduced ? new Date(ir.dateIntroduced).getTime() : 0;
-    return d > threeDaysAgo;
+    return d > threeWeeksAgo;
   });
 
-  if (veryRecent.length >= 1) {
+  if (recentlyIntroduced.length >= 1) {
     return {
       onCooldown: true,
-      reason: `${veryRecent.length} intro(s) made in last 3 days`,
-      unresolvedCount: veryRecent.length,
+      reason: `${recentlyIntroduced.length} intro(s) made in last 3 weeks`,
+      unresolvedCount: recentlyIntroduced.length,
     };
   }
 
@@ -360,15 +360,6 @@ async function loadMatchingData() {
     founderIntroMap.get(ir.founderId)!.push(ir);
   }
 
-  // Build child-to-parent name map for generalist exclusion checks
-  const childToParentName = new Map<number, string>();
-  for (const cat of allCats) {
-    if (cat.parentId) {
-      const parent = allCats.find(c => c.id === cat.parentId);
-      if (parent) childToParentName.set(cat.id, parent.name);
-    }
-  }
-
   return {
     allFounders,
     allInvestors,
@@ -381,7 +372,6 @@ async function loadMatchingData() {
     personaTierMap,
     investorIntroMap,
     founderIntroMap,
-    childToParentName,
   };
 }
 
@@ -395,7 +385,6 @@ function passesCategoryFilter(
   founderCategories: { id: number; name: string; type: string }[],
   investorCategories: { id: number; name: string; type: string }[] | undefined,
   investorExclusions: Set<number> | undefined,
-  childToParentName?: Map<number, string>,
 ): boolean {
   const founderSectorIds = new Set(
     founderCategories.filter(c => c.type === 'sector').map(c => c.id)
@@ -408,48 +397,46 @@ function passesCategoryFilter(
     }
   }
 
+  // --- Sector filter ---
   // If investor has no sector categories, they default to generalist — any founder is fine
   const investorSectors = investorCategories
     ? investorCategories.filter(c => c.type === 'sector')
     : [];
 
-  if (investorSectors.length === 0) return true;
-
-  // If investor has "Generalist" category, accept most sectors but exclude
-  // Climate/Energy, HardTech/DeepTech, Defense/Government by default
-  // (unless they have explicit category assignments for those sectors)
-  const isGeneralist = investorSectors.some(c => c.name.toLowerCase() === 'generalist');
-  if (isGeneralist) {
-    const generalistDefaultExclusions = ['climate / energy', 'hardtech / deeptech', 'defense / government'];
-    const explicitSectorNames = new Set(investorSectors.map(c => c.name.toLowerCase()));
-    for (const sectorId of founderSectorIds) {
-      const founderSector = founderCategories.find(c => c.id === sectorId);
-      if (!founderSector) continue;
-      // Check direct name or parent name (for subcategories like "Clean energy" -> "Climate / Energy")
-      const sectorName = founderSector.name.toLowerCase();
-      const parentName = childToParentName?.get(sectorId)?.toLowerCase();
-      const matchedExclusion = generalistDefaultExclusions.find(
-        ex => ex === sectorName || ex === parentName
-      );
-      if (matchedExclusion) {
-        // Only exclude if investor doesn't also have this sector explicitly assigned
-        if (!explicitSectorNames.has(matchedExclusion)) {
-          return false;
+  let sectorPass = true;
+  if (investorSectors.length > 0) {
+    // If investor has "Generalist" category, any founder sector is acceptable
+    const isGeneralist = investorSectors.some(c => c.name.toLowerCase() === 'generalist');
+    if (!isGeneralist) {
+      // Strict match: founder must share at least one sector with investor
+      if (founderSectorIds.size > 0) {
+        const investorSectorIds = new Set(investorSectors.map(c => c.id));
+        sectorPass = false;
+        for (const id of founderSectorIds) {
+          if (investorSectorIds.has(id)) { sectorPass = true; break; }
         }
       }
+      // Founder has no sectors = matches anyone (sectorPass stays true)
     }
-    return true;
   }
 
-  // Strict match: founder must share at least one sector with investor
-  if (founderSectorIds.size === 0) return true; // Founder has no sectors = matches anyone
+  if (!sectorPass) return false;
 
-  const investorSectorIds = new Set(investorSectors.map(c => c.id));
-  for (const id of founderSectorIds) {
-    if (investorSectorIds.has(id)) return true;
+  // --- Stage filter ---
+  // If both investor and founder have stage categories, require at least one overlap.
+  // If either side has no stage categories, skip the check (don't penalize untagged).
+  const investorStages = investorCategories
+    ? investorCategories.filter(c => c.type === 'stage')
+    : [];
+  const founderStages = founderCategories.filter(c => c.type === 'stage');
+
+  if (investorStages.length > 0 && founderStages.length > 0) {
+    const investorStageIds = new Set(investorStages.map(c => c.id));
+    const hasStageOverlap = founderStages.some(c => investorStageIds.has(c.id));
+    if (!hasStageOverlap) return false;
   }
 
-  return false;
+  return true;
 }
 
 // --- Auto-Ramp ---
@@ -500,21 +487,11 @@ export async function generateMatchSuggestions(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
 
-  // Count intros created this calendar week (Monday-Sunday) per founder
-  // Only count active intros (not rejected/expired suggestions)
-  const now = new Date();
-  const weekStart = new Date(now);
-  const day = weekStart.getDay();
-  weekStart.setDate(weekStart.getDate() - (day === 0 ? 6 : day - 1)); // Monday
-  weekStart.setHours(0, 0, 0, 0);
-  const weekStartTime = weekStart.getTime();
-
+  // Count intros in last 7 days per founder (including pending_suggestion — counts toward quota)
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const weeklyIntroCount = new Map<number, number>();
   for (const ir of data.allIntroRequests) {
-    // Skip rejected/expired suggestions — they shouldn't count against quota
-    if (ir.status === 'passed' || ir.status === 'ignored') continue;
-    const d = ir.dateRequested || ir.createdAt;
-    if (d && new Date(d).getTime() >= weekStartTime) {
+    if (ir.createdAt && new Date(ir.createdAt).getTime() > sevenDaysAgo) {
       weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
     }
   }
@@ -532,14 +509,16 @@ export async function generateMatchSuggestions(
     return true;
   });
 
-  // Pre-compute investor scores and cooldowns
+  // Pre-compute investor scores, cooldowns, and VIP status
   const investorScores = new Map<number, number>();
   const investorCooldowns = new Map<number, CooldownResult>();
+  const investorVip = new Set<number>();
   for (const inv of data.allInvestors) {
     if (!inv.active) continue;
     const intros = data.investorIntroMap.get(inv.id) || [];
     investorScores.set(inv.id, computeInvestorReliabilityScore(intros));
     investorCooldowns.set(inv.id, isInvestorOnCooldown(intros));
+    if (inv.vip) investorVip.add(inv.id);
   }
 
   const suggestions: GeneratedSuggestion[] = [];
@@ -548,6 +527,23 @@ export async function generateMatchSuggestions(
     const founderCats = data.founderCatMap.get(founder.id) || [];
     const founderIntros = data.founderIntroMap.get(founder.id) || [];
     const alreadyIntrodInvestorIds = new Set(founderIntros.map(ir => ir.investorId));
+
+    // Compute founder intro acceptance rate for VIP gating.
+    // Acceptance = intros that progressed to meeting or beyond, out of all introduced.
+    // Requires minimum 3 intros to qualify (otherwise not enough data).
+    const introduced = founderIntros.filter(ir =>
+      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
+        'invested', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)
+    );
+    const accepted = founderIntros.filter(ir =>
+      ['first_meeting_complete', 'second_meeting_complete',
+        'invested', 'follow_up_questions'].includes(ir.status)
+    );
+    const founderAcceptRate = introduced.length >= 3
+      ? accepted.length / introduced.length
+      : 0;
+    // VIP threshold: founder needs ≥50% acceptance rate with at least 3 intros
+    const qualifiesForVip = founderAcceptRate >= 0.5 && introduced.length >= 3;
 
     // Compute founder heat
     const staticHeat = computeFounderStaticHeat(founderCats, data.personaTierMap);
@@ -590,10 +586,13 @@ export async function generateMatchSuggestions(
         const tripleKey = `${founder.id}-${fnRel.nodeId}-${investorId}`;
         if (existingTriples.has(tripleKey)) continue;
 
+        // VIP gate: only match VIP investors with founders who have strong acceptance rates
+        if (investorVip.has(investorId) && !qualifiesForVip) continue;
+
         // Category filter (hard gate)
         const investorCats = data.investorCatMap.get(investorId);
         const investorExclusions = data.investorExclusionMap.get(investorId);
-        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions, data.childToParentName)) continue;
+        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) continue;
 
         const investorReliability = investorScores.get(investorId)!;
         const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength);

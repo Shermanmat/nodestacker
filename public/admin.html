@@ -2584,6 +2584,27 @@
               .map(r => r.nodeId)
           );
 
+          // Build sector matching data
+          // Founder sector IDs + their parent IDs (for parent-child matching)
+          const founderSectorCats = (founder.categories || []).filter(c => c.type === 'sector');
+          const founderSectorIds = new Set(founderSectorCats.map(c => c.id));
+          // Also collect parent IDs of founder sectors for upward matching
+          const founderSectorParentIds = new Set();
+          for (const cat of allCategories.value) {
+            if (founderSectorIds.has(cat.id) && cat.parentId) {
+              founderSectorParentIds.add(cat.parentId);
+            }
+          }
+          // Collect child IDs of founder sectors for downward matching
+          const founderSectorChildIds = new Set();
+          for (const cat of allCategories.value) {
+            if (cat.parentId && founderSectorIds.has(cat.parentId)) {
+              founderSectorChildIds.add(cat.id);
+            }
+          }
+          // Combined: founder sector IDs + parents + children (full family)
+          const founderSectorFamily = new Set([...founderSectorIds, ...founderSectorParentIds, ...founderSectorChildIds]);
+
           // Build investor list with fit scoring
           const investorList = [];
 
@@ -2604,6 +2625,30 @@
 
             // Skip if no connection through founder's nodes
             if (nodeConnections.length === 0) continue;
+
+            // Sector filter: if both have sectors, at least one must overlap
+            // Generalist investors match everything except hardtech defaults (Climate/Energy, HardTech/DeepTech, Defense/Government)
+            const invSectors = (inv.categories || []).filter(c => c.type === 'sector');
+            if (founderSectorIds.size > 0 && invSectors.length > 0) {
+              const isGeneralist = invSectors.some(c => c.name.toLowerCase() === 'generalist');
+              if (isGeneralist) {
+                // Generalist: only exclude hardtech-type sectors
+                const hardtechExclusions = ['climate / energy', 'hardtech / deeptech', 'defense / government'];
+                const founderSectorNames = founderSectorCats.map(c => c.name.toLowerCase());
+                // Also check parent names
+                const founderParentNames = founderSectorCats
+                  .map(c => { const parent = allCategories.value.find(p => p.id === c.parentId); return parent ? parent.name.toLowerCase() : null; })
+                  .filter(Boolean);
+                const allFounderNames = [...founderSectorNames, ...founderParentNames];
+                const excludedByDefault = allFounderNames.some(n => hardtechExclusions.includes(n));
+                if (excludedByDefault) continue;
+              } else {
+                const invSectorIds = new Set(invSectors.map(c => c.id));
+                // Check if any investor sector is in the founder's sector family
+                const hasOverlap = [...invSectorIds].some(id => founderSectorFamily.has(id));
+                if (!hasOverlap) continue; // No sector match — skip this investor
+              }
+            }
 
             // Calculate fit score
             let score = 0;

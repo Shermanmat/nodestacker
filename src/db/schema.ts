@@ -89,6 +89,7 @@ export const investors = sqliteTable('investors', {
   checkSize: text('check_size'),
   geography: text('geography'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  vip: integer('vip', { mode: 'boolean' }).notNull().default(false),
   city: text('city'),
   country: text('country'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),

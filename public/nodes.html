@@ -51,10 +51,10 @@
         <a href="/founders" class="text-sm text-slate-300 transition hover:text-white">For Founders</a>
         <a href="/investors" class="text-sm text-slate-300 transition hover:text-white">For Investors</a>
         <a href="/nodes" class="text-sm font-medium text-white">For Nodes</a>
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700">Become a Node</a>
+        <a href="#apply" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700">Become a Node</a>
       </div>
       <div class="md:hidden">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700">Become a Node</a>
+        <a href="#apply" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-teal-700">Become a Node</a>
       </div>
     </div>
   </nav>
@@ -74,7 +74,7 @@
         MatCap nodes are the connectors who make warm introductions happen. You get access to our full portfolio of founders and use your investor relationships to open doors on their behalf.
       </p>
       <div class="mt-10">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-teal-700">
+        <a href="#apply" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-teal-700">
           Become a Node
         </a>
       </div>
@@ -238,18 +238,133 @@
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="border-t border-white/5 bg-slate-900/50 py-24">
-    <div class="mx-auto max-w-3xl px-6 text-center">
-      <h2 class="text-3xl font-bold tracking-tight text-white md:text-4xl">Turn your network into a force multiplier.</h2>
-      <p class="mt-4 text-lg text-slate-400">Join MatCap as a node and help our portfolio founders get the warm introductions they need to raise their rounds.</p>
-      <div class="mt-10">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-teal-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-teal-700">
-          Become a Node
-        </a>
+  <!-- CTA / Application Form -->
+  <section id="apply" class="border-t border-white/5 bg-slate-900/50 py-24">
+    <div class="mx-auto max-w-xl px-6">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold tracking-tight text-white md:text-4xl">Become a node</h2>
+        <p class="mt-4 text-lg text-slate-400">Tell us a bit about yourself and we'll book a call with our team.</p>
+      </div>
+
+      <div id="node-form-app">
+        <!-- Success -->
+        <div v-if="success" class="rounded-xl border border-teal-500/20 bg-teal-500/10 p-8 text-center">
+          <div class="text-4xl mb-4">🤝</div>
+          <h3 class="text-xl font-bold text-white mb-2">Thanks for your interest!</h3>
+          <p class="text-slate-300">We'll be in touch shortly to schedule a call.</p>
+        </div>
+
+        <!-- Form -->
+        <form v-else @submit.prevent="submit" class="space-y-5">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">First Name *</label>
+              <input v-model="form.firstName" type="text" required
+                class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                placeholder="Mat">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Last Name *</label>
+              <input v-model="form.lastName" type="text" required
+                class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                placeholder="Sherman">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Email *</label>
+            <input v-model="form.email" type="email" required
+              class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+              placeholder="you@example.com">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">LinkedIn URL *</label>
+            <input v-model="form.linkedinUrl" type="text" required
+              class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+              placeholder="linkedin.com/in/yourprofile">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Twitter/X Handle</label>
+            <div class="flex">
+              <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-white/10 bg-slate-700 text-slate-400">@</span>
+              <input v-model="form.twitterHandle" type="text"
+                class="flex-1 rounded-r-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+                placeholder="yourhandle">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Website</label>
+            <input v-model="form.website" type="text"
+              class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+              placeholder="yoursite.com">
+          </div>
+
+          <div v-if="error" class="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+            {{ error }}
+          </div>
+
+          <button type="submit" :disabled="loading"
+            class="w-full rounded-lg bg-teal-600 px-6 py-3 font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50">
+            {{ loading ? 'Submitting...' : 'Book a Call' }}
+          </button>
+        </form>
       </div>
     </div>
   </section>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp, ref, reactive } = Vue;
+    createApp({
+      setup() {
+        const form = reactive({
+          firstName: '',
+          lastName: '',
+          email: '',
+          linkedinUrl: '',
+          twitterHandle: '',
+          website: '',
+        });
+        const loading = ref(false);
+        const error = ref(null);
+        const success = ref(false);
+
+        async function submit() {
+          loading.value = true;
+          error.value = null;
+
+          // Normalize LinkedIn
+          if (form.linkedinUrl && !form.linkedinUrl.match(/^https?:\/\//i)) {
+            form.linkedinUrl = 'https://' + form.linkedinUrl;
+          }
+          // Normalize website
+          if (form.website && !form.website.match(/^https?:\/\//i)) {
+            form.website = 'https://' + form.website;
+          }
+
+          try {
+            const res = await fetch('/api/public/node-interest', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(form),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Something went wrong');
+            success.value = true;
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        return { form, loading, error, success, submit };
+      }
+    }).mount('#node-form-app');
+  </script>
 
   <!-- Footer -->
   <footer class="border-t border-white/10 bg-slate-950">

@@ -2,6 +2,11 @@ import { Hono } from 'hono';
 import { eq, isNotNull } from 'drizzle-orm';
 import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections } from '../db/index.js';
 import { z } from 'zod';
+import * as postmark from 'postmark';
+
+const postmarkClient = process.env.POSTMARK_API_KEY
+  ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
+  : null;
 
 const app = new Hono();
 
@@ -137,9 +142,40 @@ app.post('/applications/:id/approve', async (c) => {
 // Decline portfolio application
 app.post('/applications/:id/decline', async (c) => {
   const companyId = parseInt(c.req.param('id'));
+
+  // Get company and user info for the email
+  const company = await db.select().from(publicCompanies).where(eq(publicCompanies.id, companyId)).get();
+  if (!company) return c.json({ error: 'Company not found' }, 404);
+
+  const user = await db.select().from(publicUsers).where(eq(publicUsers.id, company.userId)).get();
+
   await db.update(publicCompanies)
     .set({ applicationStatus: 'declined' })
     .where(eq(publicCompanies.id, companyId));
+
+  // Send rejection email to the founder
+  if (postmarkClient && user) {
+    try {
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: user.email,
+        Subject: `Update on your MatCap application`,
+        HtmlBody: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <p>Hi ${user.firstName},</p>
+            <p>Thank you for your interest in joining the MatCap portfolio. After reviewing your application for <strong>${company.companyName}</strong>, we've decided not to move forward at this time.</p>
+            <p>This isn't necessarily a reflection of your company's potential — we have limited capacity and can only work with a small number of founders at a time.</p>
+            <p>We wish you the best of luck, and please don't hesitate to reapply in the future if circumstances change.</p>
+            <p>Best,<br>The MatCap Team</p>
+          </div>
+        `,
+        TextBody: `Hi ${user.firstName},\n\nThank you for your interest in joining the MatCap portfolio. After reviewing your application for ${company.companyName}, we've decided not to move forward at this time.\n\nThis isn't necessarily a reflection of your company's potential — we have limited capacity and can only work with a small number of founders at a time.\n\nWe wish you the best of luck, and please don't hesitate to reapply in the future if circumstances change.\n\nBest,\nThe MatCap Team`,
+      });
+    } catch (err) {
+      console.error('Failed to send decline email:', err);
+    }
+  }
+
   return c.json({ success: true });
 });
 

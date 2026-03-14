@@ -982,7 +982,7 @@ app.post('/onboarding/equity-commitment', async (c) => {
     name: founder.name,
     email: founder.email,
     companyName: founder.companyName,
-  }, workflow.incorporationPartner || null);
+  }, workflow.incorporationPartner || 'none');
 
   if (!workflow.incorporationPartner) {
     // Side project: also send light engagement email

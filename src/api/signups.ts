@@ -163,13 +163,13 @@ app.post('/applications/:id/decline', async (c) => {
         HtmlBody: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
             <p>Hi ${user.firstName},</p>
-            <p>Thank you for your interest in joining the MatCap portfolio. After reviewing your application for <strong>${company.companyName}</strong>, we've decided not to move forward at this time.</p>
-            <p>This isn't necessarily a reflection of your company's potential — we have limited capacity and can only work with a small number of founders at a time.</p>
-            <p>We wish you the best of luck, and please don't hesitate to reapply in the future if circumstances change.</p>
+            <p>Thank you for sharing your work with us — we genuinely appreciate you taking the time.</p>
+            <p>After reviewing your application, we've decided not to move forward at this stage. This is less about your company's potential and more about where we are as investors — we don't yet know your market well enough to be a confident, value-adding partner for you right now.</p>
+            <p>We wish you the best as you build, and hope our paths cross again down the road.</p>
             <p>Best,<br>The MatCap Team</p>
           </div>
         `,
-        TextBody: `Hi ${user.firstName},\n\nThank you for your interest in joining the MatCap portfolio. After reviewing your application for ${company.companyName}, we've decided not to move forward at this time.\n\nThis isn't necessarily a reflection of your company's potential — we have limited capacity and can only work with a small number of founders at a time.\n\nWe wish you the best of luck, and please don't hesitate to reapply in the future if circumstances change.\n\nBest,\nThe MatCap Team`,
+        TextBody: `Hi ${user.firstName},\n\nThank you for sharing your work with us — we genuinely appreciate you taking the time.\n\nAfter reviewing your application, we've decided not to move forward at this stage. This is less about your company's potential and more about where we are as investors — we don't yet know your market well enough to be a confident, value-adding partner for you right now.\n\nWe wish you the best as you build, and hope our paths cross again down the road.\n\nBest,\nThe MatCap Team`,
       });
     } catch (err) {
       console.error('Failed to send decline email:', err);

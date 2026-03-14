@@ -97,50 +97,25 @@
           </div>
         </div>
 
-        <!-- Companies Section -->
-        <div class="mb-8">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-lg font-bold text-gray-900">Your Companies</h3>
-            <button @click="openAddCompanyModal"
-              class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700">
-              + Add Company
-            </button>
-          </div>
-
-          <div v-if="companies.length === 0" class="bg-white rounded-xl shadow p-8 text-center">
-            <div class="text-4xl mb-4">🏢</div>
-            <p class="text-gray-600 mb-4">You haven't added any companies yet.</p>
-            <button @click="openAddCompanyModal"
-              class="bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700">
-              Add Your First Company
-            </button>
-          </div>
-
-          <div v-else class="space-y-4">
-            <div v-for="company in companies" :key="company.id"
-              class="bg-white rounded-xl shadow p-6">
-              <div class="flex justify-between items-start">
-                <div class="flex-1">
-                  <h4 class="text-lg font-semibold text-gray-900">{{ company.companyName }}</h4>
-                  <p class="text-gray-600 mt-1">{{ company.oneLiner }}</p>
-                  <div class="flex gap-4 mt-3 text-sm">
-                    <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full">{{ company.sector }}</span>
-                    <a v-if="company.url" :href="company.url" target="_blank"
-                      class="text-blue-600 hover:underline">Website</a>
-                  </div>
-                </div>
-                <div class="flex gap-2 ml-4">
-                  <button @click="openEditCompanyModal(company)"
-                    class="text-gray-600 hover:text-gray-900 px-3 py-1 border rounded-lg text-sm">
-                    Edit
-                  </button>
-                  <button @click="deleteCompany(company.id)"
-                    class="text-red-600 hover:text-red-700 px-3 py-1 border border-red-200 rounded-lg text-sm">
-                    Delete
-                  </button>
-                </div>
+        <!-- Company Section -->
+        <div v-if="company" class="bg-white rounded-xl shadow p-6 mb-8">
+          <div class="flex justify-between items-start">
+            <div class="flex-1">
+              <h3 class="text-lg font-semibold text-gray-900">{{ company.companyName }}</h3>
+              <p class="text-gray-600 mt-1">{{ company.oneLiner }}</p>
+              <div class="flex flex-wrap gap-3 mt-3 text-sm items-center">
+                <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-full">{{ company.sector }}</span>
+                <a v-if="company.url" :href="company.url" target="_blank"
+                  class="text-blue-600 hover:underline">Website</a>
+                <span v-if="company.applicationStatus === 'applied'" class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full font-medium">Application Pending</span>
+                <span v-if="company.applicationStatus === 'approved'" class="bg-green-100 text-green-700 px-3 py-1 rounded-full font-medium">Portfolio Member</span>
+                <span v-if="company.applicationStatus === 'declined'" class="bg-gray-100 text-gray-500 px-3 py-1 rounded-full">Application Declined</span>
               </div>
             </div>
+            <button @click="openEditCompanyModal(company)"
+              class="text-gray-600 hover:text-gray-900 px-3 py-1 border rounded-lg text-sm ml-4">
+              Edit
+            </button>
           </div>
         </div>
       </main>
@@ -149,9 +124,7 @@
       <div v-if="showCompanyModal" class="fixed inset-0 z-50 flex items-center justify-center modal-backdrop"
         @click.self="showCompanyModal = false">
         <div class="bg-white rounded-2xl shadow-xl p-8 max-w-lg w-full mx-4">
-          <h3 class="text-xl font-bold text-gray-900 mb-6">
-            {{ editingCompany ? 'Edit Company' : 'Add Company' }}
-          </h3>
+          <h3 class="text-xl font-bold text-gray-900 mb-6">Edit Company</h3>
 
           <form @submit.prevent="saveCompany" class="space-y-5">
             <div>
@@ -183,6 +156,17 @@
               </select>
             </div>
 
+            <!-- Apply to portfolio -->
+            <div v-if="!editingCompany || !editingCompany.applicationStatus" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input type="checkbox" v-model="companyForm.applyToPortfolio" class="mt-1 rounded">
+                <div>
+                  <span class="font-medium text-gray-900">Apply to join MatCap portfolio</span>
+                  <p class="text-sm text-gray-600 mt-0.5">Get matched with investors through our network of trusted advisors.</p>
+                </div>
+              </label>
+            </div>
+
             <div v-if="companyError" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
               {{ companyError }}
             </div>
@@ -194,7 +178,7 @@
               </button>
               <button type="submit" :disabled="companySaving"
                 class="flex-1 bg-blue-600 text-white px-4 py-2.5 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
-                {{ companySaving ? 'Saving...' : (editingCompany ? 'Save Changes' : 'Add Company') }}
+                {{ companySaving ? 'Saving...' : 'Save Changes' }}
               </button>
             </div>
           </form>
@@ -270,7 +254,7 @@
   </div>
 
   <script>
-    const { createApp, ref, reactive, onMounted } = Vue;
+    const { createApp, ref, reactive, onMounted, watch } = Vue;
 
     createApp({
       setup() {
@@ -285,8 +269,8 @@
         const loginLoading = ref(false);
         const loginError = ref(null);
 
-        // Companies
-        const companies = ref([]);
+        // Company (single)
+        const company = ref(null);
         const sectors = ref([]);
         const showCompanyModal = ref(false);
         const editingCompany = ref(null);
@@ -295,6 +279,7 @@
           oneLiner: '',
           url: '',
           sector: '',
+          applyToPortfolio: false,
         });
         const companySaving = ref(false);
         const companyError = ref(null);
@@ -410,17 +395,18 @@
           isAuthenticated.value = false;
           sessionId.value = null;
           user.value = {};
-          companies.value = [];
+          company.value = null;
         }
 
-        // Companies
+        // Company
         async function loadCompanies() {
           try {
             const response = await fetch('/api/public/companies', {
               headers: getHeaders(),
             });
             if (response.ok) {
-              companies.value = await response.json();
+              const list = await response.json();
+              company.value = list.length > 0 ? list[0] : null;
             }
           } catch (err) {
             console.error('Failed to load companies:', err);
@@ -438,22 +424,13 @@
           }
         }
 
-        function openAddCompanyModal() {
-          editingCompany.value = null;
-          companyForm.companyName = '';
-          companyForm.oneLiner = '';
-          companyForm.url = '';
-          companyForm.sector = '';
-          companyError.value = null;
-          showCompanyModal.value = true;
-        }
-
-        function openEditCompanyModal(company) {
-          editingCompany.value = company;
-          companyForm.companyName = company.companyName;
-          companyForm.oneLiner = company.oneLiner || '';
-          companyForm.url = company.url || '';
-          companyForm.sector = company.sector || '';
+        function openEditCompanyModal(c) {
+          editingCompany.value = c;
+          companyForm.companyName = c.companyName;
+          companyForm.oneLiner = c.oneLiner || '';
+          companyForm.url = c.url || '';
+          companyForm.sector = c.sector || '';
+          companyForm.applyToPortfolio = false;
           companyError.value = null;
           showCompanyModal.value = true;
         }
@@ -463,12 +440,8 @@
           companyError.value = null;
 
           try {
-            const url = editingCompany.value
-              ? `/api/public/companies/${editingCompany.value.id}`
-              : '/api/public/companies';
-
-            const response = await fetch(url, {
-              method: editingCompany.value ? 'PUT' : 'POST',
+            const response = await fetch(`/api/public/companies/${editingCompany.value.id}`, {
+              method: 'PUT',
               headers: getHeaders(),
               body: JSON.stringify(companyForm),
             });
@@ -484,23 +457,6 @@
             companyError.value = 'Network error. Please try again.';
           } finally {
             companySaving.value = false;
-          }
-        }
-
-        async function deleteCompany(companyId) {
-          if (!confirm('Are you sure you want to delete this company?')) return;
-
-          try {
-            const response = await fetch(`/api/public/companies/${companyId}`, {
-              method: 'DELETE',
-              headers: getHeaders(),
-            });
-
-            if (response.ok) {
-              await loadCompanies();
-            }
-          } catch (err) {
-            console.error('Failed to delete company:', err);
           }
         }
 
@@ -542,8 +498,18 @@
           }
         }
 
-        // Initialize profile form when modal opens
-        const originalShowProfileModal = showProfileModal;
+        // Populate profile form when modal opens
+        watch(showProfileModal, (val) => {
+          if (val) {
+            profileForm.firstName = user.value.firstName || '';
+            profileForm.lastName = user.value.lastName || '';
+            profileForm.oneLiner = user.value.oneLiner || '';
+            profileForm.city = user.value.city || '';
+            profileForm.linkedinUrl = user.value.linkedinUrl || '';
+            profileForm.twitterHandle = user.value.twitterHandle || '';
+            profileError.value = null;
+          }
+        });
 
         onMounted(async () => {
           await checkToken();
@@ -572,36 +538,19 @@
           requestMagicLink,
           logout,
 
-          // Companies
-          companies,
+          // Company
+          company,
           sectors,
           showCompanyModal,
           editingCompany,
           companyForm,
           companySaving,
           companyError,
-          openAddCompanyModal,
           openEditCompanyModal,
           saveCompany,
-          deleteCompany,
 
           // Profile
-          showProfileModal: {
-            get() { return showProfileModal.value; },
-            set(val) {
-              if (val && !showProfileModal.value) {
-                // Opening modal - populate form
-                profileForm.firstName = user.value.firstName;
-                profileForm.lastName = user.value.lastName;
-                profileForm.oneLiner = user.value.oneLiner || '';
-                profileForm.city = user.value.city || '';
-                profileForm.linkedinUrl = user.value.linkedinUrl || '';
-                profileForm.twitterHandle = user.value.twitterHandle || '';
-                profileError.value = null;
-              }
-              showProfileModal.value = val;
-            }
-          },
+          showProfileModal,
           profileForm,
           profileSaving,
           profileError,

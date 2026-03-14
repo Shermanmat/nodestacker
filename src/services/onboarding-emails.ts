@@ -131,7 +131,7 @@ export async function sendOfferEmail(founder: FounderInfo, equityPercent: string
       <li><strong>${vestingText}</strong></li>
     </ul>
     ${vesting.notes ? `<p>${vesting.notes}</p>` : ''}
-    ${emailButton('Accept Offer', portalUrl)}
+    ${emailButton('Review Offer', portalUrl)}
   `);
 
   const textBody = `Hi ${firstName},
@@ -142,7 +142,7 @@ Here are the terms:
 - ${equityPercent}% equity
 - ${vestingText}
 ${vesting.notes ? `\n${vesting.notes}\n` : ''}
-Accept the offer here: ${portalUrl}
+Review the offer here: ${portalUrl}
 
 Best,
 Mat`;
@@ -402,6 +402,126 @@ Just a friendly reminder - we're waiting on: ${action}
 It's been ${daysSince} days since the last step. Let me know if you have any questions!
 
 Portal: ${portalUrl}
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Equity commitment confirmation (pre-incorporation partner path)
+ */
+export async function sendEquityCommitmentConfirmationEmail(
+  founder: FounderInfo,
+  partner: string
+): Promise<EmailResult> {
+  const subject = `Equity commitment confirmed`;
+  const firstName = founder.name.split(' ')[0];
+
+  const partnerLinks: Record<string, string> = {
+    'stripe_atlas': 'https://stripe.com/atlas',
+    'clerky': 'https://www.clerky.com',
+    'goodwin': 'https://www.goodwinlaw.com',
+  };
+
+  const partnerNames: Record<string, string> = {
+    'stripe_atlas': 'Stripe Atlas',
+    'clerky': 'Clerky',
+    'goodwin': 'Goodwin',
+  };
+
+  const partnerName = partnerNames[partner] || partner;
+  const partnerLink = partnerLinks[partner] || '';
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${firstName},</h2>
+    <p>Thanks for signing the pre-incorporation equity commitment. Here's a summary:</p>
+    <ul>
+      <li>You've committed to issuing equity to MatCapital upon incorporation</li>
+      <li>Your incorporation partner: <strong>${partnerName}</strong></li>
+    </ul>
+    ${partnerLink ? `<p>Get started with ${partnerName}: <a href="${partnerLink}" style="color: #2563eb;">${partnerLink}</a></p>` : ''}
+    <p>Once you're incorporated, come back to your portal and click "I'm now incorporated" to continue with the equity paperwork.</p>
+    ${emailButton('Go to Portal', `${BASE_URL}/founder`)}
+  `);
+
+  const textBody = `Hi ${firstName},
+
+Thanks for signing the pre-incorporation equity commitment. Here's a summary:
+- You've committed to issuing equity to MatCapital upon incorporation
+- Your incorporation partner: ${partnerName}
+${partnerLink ? `\nGet started with ${partnerName}: ${partnerLink}\n` : ''}
+Once you're incorporated, come back to your portal and click "I'm now incorporated" to continue.
+
+Portal: ${BASE_URL}/founder
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Light engagement confirmation (side project path)
+ */
+export async function sendLightEngagementConfirmationEmail(founder: FounderInfo): Promise<EmailResult> {
+  const subject = `Welcome to the MatCap network`;
+  const firstName = founder.name.split(' ')[0];
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${firstName},</h2>
+    <p>No rush on incorporation - we're glad to have you in the network!</p>
+    <p>Here's what this means:</p>
+    <ul>
+      <li>You'll have access to MatCap events and office hours</li>
+      <li>We'll check in quarterly to see how things are going</li>
+      <li>When you're ready to incorporate, just let us know through the portal and we'll get the equity paperwork started</li>
+    </ul>
+    ${emailButton('Go to Portal', `${BASE_URL}/founder`)}
+  `);
+
+  const textBody = `Hi ${firstName},
+
+No rush on incorporation - we're glad to have you in the network!
+
+Here's what this means:
+- You'll have access to MatCap events and office hours
+- We'll check in quarterly to see how things are going
+- When you're ready to incorporate, just let us know through the portal
+
+Portal: ${BASE_URL}/founder
+
+Best,
+Mat`;
+
+  return sendEmail(founder.email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email: Incorporation nudge (sent every ~3 months to light_engagement founders)
+ */
+export async function sendIncorporationNudgeEmail(founder: FounderInfo): Promise<EmailResult> {
+  const subject = `Checking in - ready to incorporate?`;
+  const firstName = founder.name.split(' ')[0];
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${firstName},</h2>
+    <p>Just checking in! How is ${founder.companyName} going?</p>
+    <p>If you've incorporated or are planning to soon, let us know through the portal and we'll get the equity paperwork started.</p>
+    <p>No rush - just wanted to touch base!</p>
+    ${emailButton('Update Status', `${BASE_URL}/founder`)}
+  `);
+
+  const textBody = `Hi ${firstName},
+
+Just checking in! How is ${founder.companyName} going?
+
+If you've incorporated or are planning to soon, let us know through the portal and we'll get the equity paperwork started.
+
+No rush - just wanted to touch base!
+
+Portal: ${BASE_URL}/founder
 
 Best,
 Mat`;

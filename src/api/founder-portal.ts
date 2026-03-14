@@ -673,6 +673,20 @@ app.get('/onboarding/status', async (c) => {
       }
       break;
     case OnboardingStatus.OFFER_ACCEPTED:
+      if (workflow.incorporated === null || workflow.incorporated === undefined) {
+        nextAction = { type: 'incorporation_question', message: 'Is your company incorporated?' };
+      } else if (workflow.incorporationPartner && !workflow.equityCommitmentSignedAt) {
+        nextAction = { type: 'equity_commitment', message: 'Sign the pre-incorporation equity commitment' };
+      } else {
+        nextAction = { type: 'entity_info', message: 'Submit your company details' };
+      }
+      break;
+    case OnboardingStatus.PENDING_INCORPORATION:
+      nextAction = { type: 'confirm_incorporation', message: 'Let us know when you\'re incorporated' };
+      break;
+    case OnboardingStatus.LIGHT_ENGAGEMENT:
+      nextAction = { type: 'confirm_incorporation', message: 'When you incorporate, let us know and we\'ll get started on the equity paperwork' };
+      break;
     case OnboardingStatus.ENTITY_INFO_PENDING:
       nextAction = { type: 'entity_info', message: 'Submit your company details' };
       break;
@@ -719,6 +733,10 @@ app.get('/onboarding/status', async (c) => {
       offerAcceptedAt: workflow.offerAcceptedAt,
       vestingMonths: workflow.vestingMonths,
       vestingCliffMonths: workflow.vestingCliffMonths,
+      incorporated: workflow.incorporated,
+      incorporationPartner: workflow.incorporationPartner,
+      approvedForLawFirm: workflow.approvedForLawFirm,
+      equityCommitmentSignedAt: workflow.equityCommitmentSignedAt,
       entityName: workflow.entityName,
       entityType: workflow.entityType,
       entityState: workflow.entityState,
@@ -794,7 +812,7 @@ app.post('/onboarding/accept-offer', async (c) => {
 
   await db.update(onboardingWorkflows)
     .set({
-      status: OnboardingStatus.ENTITY_INFO_PENDING,
+      status: OnboardingStatus.OFFER_ACCEPTED,
       offerAcceptedAt: now,
       updatedAt: now,
     })
@@ -802,14 +820,217 @@ app.post('/onboarding/accept-offer', async (c) => {
 
   await logOnboardingEvent(workflow.id, OnboardingEventType.OFFER_ACCEPTED, founder.email);
 
-  // Send email requesting entity info
+  return c.json({ success: true, message: 'Offer accepted! Next: tell us about your incorporation status.' });
+});
+
+// Answer incorporation question
+app.post('/onboarding/incorporation-answer', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    incorporated: z.boolean(),
+    path: z.enum(['partner', 'side_project']).optional(),
+    incorporationPartner: z.string().optional(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+  if (!portfolioCompany) return c.json({ error: 'Not a portfolio company' }, 400);
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+  if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
+
+  if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED) {
+    return c.json({ error: `Cannot answer incorporation in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+  const { incorporated, path, incorporationPartner } = parsed.data;
+
+  if (incorporated) {
+    // Already incorporated → go straight to entity info
+    await db.update(onboardingWorkflows)
+      .set({
+        status: OnboardingStatus.ENTITY_INFO_PENDING,
+        incorporated: true,
+        updatedAt: now,
+      })
+      .where(eq(onboardingWorkflows.id, workflow.id));
+
+    await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: true });
+
+    await onboardingEmails.sendEntityInfoRequestEmail({
+      name: founder.name,
+      email: founder.email,
+      companyName: founder.companyName,
+    });
+
+    return c.json({ success: true, message: 'Great! Please submit your company details.' });
+  }
+
+  if (path === 'side_project') {
+    // Side project → light engagement
+    await db.update(onboardingWorkflows)
+      .set({
+        status: OnboardingStatus.LIGHT_ENGAGEMENT,
+        incorporated: false,
+        updatedAt: now,
+      })
+      .where(eq(onboardingWorkflows.id, workflow.id));
+
+    await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: false, path: 'side_project' });
+
+    await onboardingEmails.sendLightEngagementConfirmationEmail({
+      name: founder.name,
+      email: founder.email,
+      companyName: founder.companyName,
+    });
+
+    return c.json({ success: true, message: 'No problem! We\'ll check in quarterly.' });
+  }
+
+  if (path === 'partner') {
+    // Validate partner selection
+    if (!incorporationPartner) {
+      return c.json({ error: 'Please select an incorporation partner' }, 400);
+    }
+
+    // Validate Goodwin is only available if approved
+    if (incorporationPartner === 'goodwin' && !workflow.approvedForLawFirm) {
+      return c.json({ error: 'Goodwin is not available for this workflow' }, 400);
+    }
+
+    // Partner path → stay in OFFER_ACCEPTED, need equity commitment next
+    await db.update(onboardingWorkflows)
+      .set({
+        incorporated: false,
+        incorporationPartner,
+        updatedAt: now,
+      })
+      .where(eq(onboardingWorkflows.id, workflow.id));
+
+    await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: false, path: 'partner', partner: incorporationPartner });
+
+    return c.json({ success: true, message: 'Next: sign the pre-incorporation equity commitment.' });
+  }
+
+  return c.json({ error: 'If not incorporated, please specify path (partner or side_project)' }, 400);
+});
+
+// Sign equity commitment (pre-incorporation)
+app.post('/onboarding/equity-commitment', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json();
+
+  const schema = z.object({
+    founderName: z.string().min(1),
+    acknowledged: z.literal(true),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues }, 400);
+  }
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+  if (!portfolioCompany) return c.json({ error: 'Not a portfolio company' }, 400);
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+  if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
+
+  if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED || !workflow.incorporationPartner) {
+    return c.json({ error: 'Cannot sign equity commitment in current state' }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  await db.update(onboardingWorkflows)
+    .set({
+      status: OnboardingStatus.PENDING_INCORPORATION,
+      equityCommitmentSignedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.EQUITY_COMMITMENT_SIGNED, founder.email, {
+    founderName: parsed.data.founderName,
+    partner: workflow.incorporationPartner,
+  });
+
+  await onboardingEmails.sendEquityCommitmentConfirmationEmail({
+    name: founder.name,
+    email: founder.email,
+    companyName: founder.companyName,
+  }, workflow.incorporationPartner);
+
+  return c.json({ success: true, message: 'Commitment signed! We\'ll follow up once you\'re incorporated.' });
+});
+
+// Confirm incorporation (from pending_incorporation or light_engagement)
+app.post('/onboarding/confirm-incorporation', async (c) => {
+  const founderId = c.get('founderId') as number;
+
+  const founder = await db.query.founders.findFirst({
+    where: eq(founders.id, founderId),
+  });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+  if (!portfolioCompany) return c.json({ error: 'Not a portfolio company' }, 400);
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+  if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
+
+  if (workflow.status !== OnboardingStatus.PENDING_INCORPORATION && workflow.status !== OnboardingStatus.LIGHT_ENGAGEMENT) {
+    return c.json({ error: `Cannot confirm incorporation in status: ${workflow.status}` }, 400);
+  }
+
+  const now = new Date().toISOString();
+
+  await db.update(onboardingWorkflows)
+    .set({
+      status: OnboardingStatus.ENTITY_INFO_PENDING,
+      incorporated: true,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_CONFIRMED, founder.email);
+
   await onboardingEmails.sendEntityInfoRequestEmail({
     name: founder.name,
     email: founder.email,
     companyName: founder.companyName,
   });
 
-  return c.json({ success: true, message: 'Offer accepted! Please submit your company details.' });
+  return c.json({ success: true, message: 'Congratulations on incorporating! Please submit your company details.' });
 });
 
 // Submit entity info

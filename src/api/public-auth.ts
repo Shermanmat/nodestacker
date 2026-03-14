@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, lt } from 'drizzle-orm';
-import { db, publicUsers, publicSessions } from '../db/index.js';
+import { db, publicUsers, publicCompanies, publicSessions } from '../db/index.js';
 import { z } from 'zod';
 import crypto from 'crypto';
 import * as postmark from 'postmark';
@@ -41,12 +41,14 @@ const signupSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email'),
-  role: z.enum(['founder', 'node', 'investor', 'other']).optional(),
-  roleOther: z.string().optional(),
   oneLiner: z.string().min(1, 'One-liner intro is required'),
   city: z.string().min(1, 'City is required'),
   linkedinUrl: z.string().optional(),
   twitterHandle: z.string().optional(),
+  companyName: z.string().min(1, 'Company name is required'),
+  companyOneLiner: z.string().min(1, 'Company description is required'),
+  sector: z.string().min(1, 'Sector is required'),
+  companyUrl: z.string().optional(),
 });
 
 // Sign up - create new account
@@ -70,13 +72,12 @@ app.post('/signup', async (c) => {
 
   const now = new Date().toISOString();
 
-  // Create user
+  // Create user (always founder)
   const [user] = await db.insert(publicUsers).values({
     firstName: parsed.data.firstName,
     lastName: parsed.data.lastName,
     email: parsed.data.email,
-    role: parsed.data.role || null,
-    roleOther: parsed.data.role === 'other' ? (parsed.data.roleOther || null) : null,
+    role: 'founder',
     oneLiner: parsed.data.oneLiner,
     city: parsed.data.city,
     linkedinUrl: normalizeLinkedinUrl(parsed.data.linkedinUrl),
@@ -84,47 +85,62 @@ app.post('/signup', async (c) => {
     createdAt: now,
   }).returning();
 
-  // Generate token for immediate login
-  const token = crypto.randomBytes(32).toString('hex');
-  const tokenExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
-  tokens.set(token, { email: user.email, expires: tokenExpires });
+  // Create company with application status
+  let companyUrl = parsed.data.companyUrl?.trim() || null;
+  if (companyUrl && !companyUrl.match(/^https?:\/\//i)) {
+    companyUrl = 'https://' + companyUrl;
+  }
+
+  const [company] = await db.insert(publicCompanies).values({
+    userId: user.id,
+    companyName: parsed.data.companyName,
+    oneLiner: parsed.data.companyOneLiner,
+    url: companyUrl,
+    sector: parsed.data.sector,
+    applicationStatus: 'applied',
+    appliedAt: now,
+    createdAt: now,
+  }).returning();
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-  const magicLink = `${baseUrl}/dashboard?token=${token}`;
 
-  console.log(`\n🎉 New public user signed up: ${user.firstName} ${user.lastName} (${user.email})`);
-  console.log(`🔐 Login link: ${magicLink}\n`);
+  console.log(`\n🎉 New founder application: ${user.firstName} ${user.lastName} (${user.email}) — ${company.companyName}\n`);
 
-  // Send welcome email with login link
+  // Notify admin of new application (no welcome email to user)
   if (postmarkClient) {
     try {
+      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'mat@matsherman.com';
       await postmarkClient.sendEmail({
         From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
-        To: user.email,
-        Subject: 'Welcome to MatCap Network',
+        To: adminEmail,
+        Subject: `New founder application: ${parsed.data.companyName} (${user.firstName} ${user.lastName})`,
         HtmlBody: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <h2>Welcome, ${user.firstName}!</h2>
-            <p>Your MatCap Network account has been created. Click the button below to access your dashboard:</p>
-            <p style="margin: 30px 0;">
-              <a href="${magicLink}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Go to Dashboard
-              </a>
-            </p>
-            <p style="color: #666; font-size: 14px;">This link expires in 15 minutes. You can always request a new one from the login page.</p>
+            <h3>New Founder Application</h3>
+            <table style="border-collapse: collapse; width: 100%;">
+              <tr><td style="padding: 6px 12px; color: #666;">Founder</td><td style="padding: 6px 12px; font-weight: bold;">${user.firstName} ${user.lastName}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Email</td><td style="padding: 6px 12px;">${user.email}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Company</td><td style="padding: 6px 12px; font-weight: bold;">${parsed.data.companyName}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Description</td><td style="padding: 6px 12px;">${parsed.data.companyOneLiner}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Sector</td><td style="padding: 6px 12px;">${parsed.data.sector}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">City</td><td style="padding: 6px 12px;">${parsed.data.city || '—'}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Bio</td><td style="padding: 6px 12px;">${parsed.data.oneLiner || '—'}</td></tr>
+              ${parsed.data.linkedinUrl ? `<tr><td style="padding: 6px 12px; color: #666;">LinkedIn</td><td style="padding: 6px 12px;"><a href="${normalizeLinkedinUrl(parsed.data.linkedinUrl)}">${parsed.data.linkedinUrl}</a></td></tr>` : ''}
+              ${companyUrl ? `<tr><td style="padding: 6px 12px; color: #666;">Website</td><td style="padding: 6px 12px;"><a href="${companyUrl}">${companyUrl}</a></td></tr>` : ''}
+            </table>
+            <p style="margin-top: 20px;"><a href="${baseUrl}/admin" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review in Admin →</a></p>
           </div>
         `,
-        TextBody: `Welcome, ${user.firstName}!\n\nYour MatCap Network account has been created.\n\nClick here to access your dashboard: ${magicLink}\n\nThis link expires in 15 minutes.`,
+        TextBody: `New Founder Application\n\nFounder: ${user.firstName} ${user.lastName} (${user.email})\nCompany: ${parsed.data.companyName}\nDescription: ${parsed.data.companyOneLiner}\nSector: ${parsed.data.sector}\nCity: ${parsed.data.city || '—'}\nBio: ${parsed.data.oneLiner || '—'}`,
       });
-      console.log(`✅ Welcome email sent to ${user.email}`);
     } catch (err) {
-      console.error('Failed to send welcome email:', err);
+      console.error('Failed to send admin notification:', err);
     }
   }
 
   return c.json({
     success: true,
-    message: 'Account created! Check your email for a login link.',
+    message: 'Application submitted!',
     user: {
       id: user.id,
       firstName: user.firstName,

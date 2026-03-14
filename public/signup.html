@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
-  <title>Join the MatCap Network</title>
+  <title>Apply to MatCap</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
   <style>
@@ -23,74 +23,28 @@
     </header>
 
     <main class="max-w-lg mx-auto px-4 py-12">
-      <!-- Success: Investor -->
-      <div v-if="success && form.role === 'investor'" class="bg-white rounded-2xl shadow-lg p-8 text-center">
-        <div class="text-5xl mb-4">👋</div>
-        <h2 class="text-2xl font-bold text-gray-900 mb-3">Thanks for signing up!</h2>
-        <p class="text-gray-600">
-          We'll be in touch shortly to learn more about your investment thesis and preferences.
-        </p>
-      </div>
-
-      <!-- Success: Node — ask for 3 investors -->
-      <div v-else-if="success && form.role === 'node' && !nodeContactsSubmitted" class="bg-white rounded-2xl shadow-lg p-8">
-        <div class="text-center mb-6">
-          <div class="text-5xl mb-4">🤝</div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-3">Welcome to MatCap!</h2>
-          <p class="text-gray-600">To get started, tell us about 3 investors you know well. These can be VCs, angels, or anyone who writes checks.</p>
-        </div>
-
-        <form @submit.prevent="submitNodeContacts" class="space-y-4">
-          <div v-for="(contact, i) in nodeContacts" :key="i" class="border rounded-lg p-4 bg-gray-50">
-            <div class="text-sm font-medium text-gray-500 mb-2">Investor {{ i + 1 }}</div>
-            <div class="grid grid-cols-2 gap-3">
-              <div>
-                <input v-model="contact.name" type="text" :required="i === 0"
-                  class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="First name">
-              </div>
-              <div>
-                <input v-model="contact.firm" type="text" :required="i === 0"
-                  class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Firm or company">
-              </div>
-            </div>
-          </div>
-
-          <div v-if="nodeContactsError" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
-            {{ nodeContactsError }}
-          </div>
-
-          <button type="submit" :disabled="nodeContactsLoading"
-            class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {{ nodeContactsLoading ? 'Submitting...' : 'Submit' }}
-          </button>
-
-          <button type="button" @click="nodeContactsSubmitted = true"
-            class="w-full text-gray-500 hover:text-gray-700 py-2 text-sm">
-            Skip for now
-          </button>
-        </form>
-      </div>
-
-      <!-- Success: Generic (founder, other, or node after contacts) -->
-      <div v-else-if="success" class="bg-white rounded-2xl shadow-lg p-8 text-center">
+      <!-- Success -->
+      <div v-if="success" class="bg-white rounded-2xl shadow-lg p-8 text-center">
         <div class="text-5xl mb-4">🎉</div>
-        <h2 class="text-2xl font-bold text-gray-900 mb-3">Account Created!</h2>
-        <p class="text-gray-600 mb-6">
-          Check your email for a magic link to access your dashboard.
+        <h2 class="text-2xl font-bold text-gray-900 mb-3">Application Submitted!</h2>
+        <p class="text-gray-600 mb-2">
+          Thanks for applying to the MatCap network. We'll review your application and be in touch soon.
         </p>
-        <a href="/signup" class="text-blue-600 hover:underline">Didn't receive it? Try again</a>
       </div>
 
-      <!-- Signup Form -->
+      <!-- Application Form -->
       <div v-else class="bg-white rounded-2xl shadow-lg p-8">
         <div class="text-center mb-8">
-          <h2 class="text-2xl font-bold text-gray-900 mb-2">Join the MatCap Network</h2>
-          <p class="text-gray-600">Create your account to get started</p>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Apply to MatCap</h2>
+          <p class="text-gray-600">Tell us about yourself and your company</p>
         </div>
 
         <form @submit.prevent="handleSignup" class="space-y-5">
+          <!-- About You Section -->
+          <div class="border-b pb-2 mb-1">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">About You</h3>
+          </div>
+
           <!-- Name Row -->
           <div class="grid grid-cols-2 gap-4">
             <div>
@@ -113,27 +67,6 @@
             <input v-model="form.email" type="email" required
               class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="you@example.com">
-          </div>
-
-          <!-- Role -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">I am a... *</label>
-            <select v-model="form.role" required
-              class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
-              <option value="" disabled>Select your role</option>
-              <option value="founder">Founder</option>
-              <option value="node">Node (connector / advisor)</option>
-              <option value="investor">Investor</option>
-              <option value="other">Other</option>
-            </select>
-          </div>
-
-          <!-- Role Other (conditional) -->
-          <div v-if="form.role === 'other'">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Tell us more *</label>
-            <input v-model="form.roleOther" type="text" :required="form.role === 'other'"
-              class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g. operator, journalist, service provider...">
           </div>
 
           <!-- One-liner -->
@@ -172,6 +105,46 @@
             </div>
           </div>
 
+          <!-- Company Section -->
+          <div class="border-b pb-2 mb-1 mt-8">
+            <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Your Company</h3>
+          </div>
+
+          <!-- Company Name -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+            <input v-model="form.companyName" type="text" required
+              class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Acme Inc.">
+          </div>
+
+          <!-- Company Description -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company Description *</label>
+            <input v-model="form.companyOneLiner" type="text" required
+              class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Building X for Y">
+            <p class="text-xs text-gray-500 mt-1">One-liner about what your company does</p>
+          </div>
+
+          <!-- Sector -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Sector *</label>
+            <select v-model="form.sector" required
+              class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white">
+              <option value="" disabled>Select a sector</option>
+              <option v-for="sector in sectors" :key="sector" :value="sector">{{ sector }}</option>
+            </select>
+          </div>
+
+          <!-- Company URL -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+            <input v-model="form.companyUrl" type="text" @blur="normalizeCompanyUrl"
+              class="w-full border rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="example.com">
+          </div>
+
           <!-- Error -->
           <div v-if="error" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg text-sm">
             {{ error }}
@@ -180,7 +153,7 @@
           <!-- Submit -->
           <button type="submit" :disabled="loading"
             class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {{ loading ? 'Creating Account...' : 'Create Account' }}
+            {{ loading ? 'Submitting...' : 'Apply' }}
           </button>
         </form>
 
@@ -193,7 +166,7 @@
   </div>
 
   <script>
-    const { createApp, ref, reactive } = Vue;
+    const { createApp, ref, reactive, onMounted } = Vue;
 
     createApp({
       setup() {
@@ -201,52 +174,59 @@
           firstName: '',
           lastName: '',
           email: '',
-          role: '',
-          roleOther: '',
           oneLiner: '',
           city: '',
           linkedinUrl: '',
           twitterHandle: '',
+          companyName: '',
+          companyOneLiner: '',
+          sector: '',
+          companyUrl: '',
         });
 
-        // Pre-fill role from URL param (e.g. /signup?role=node)
-        const urlRole = new URLSearchParams(window.location.search).get('role');
-        if (urlRole && ['founder', 'node', 'investor', 'other'].includes(urlRole)) {
-          form.role = urlRole;
-        }
-
+        const sectors = ref([]);
         const loading = ref(false);
         const error = ref(null);
         const success = ref(false);
 
-        // Node contacts flow
-        const nodeContacts = reactive([
-          { name: '', firm: '' },
-          { name: '', firm: '' },
-          { name: '', firm: '' },
-        ]);
-        const nodeContactsSubmitted = ref(false);
-        const nodeContactsLoading = ref(false);
-        const nodeContactsError = ref(null);
+        // Load sectors for dropdown
+        async function loadSectors() {
+          try {
+            const response = await fetch('/api/public/companies/sectors');
+            if (response.ok) {
+              sectors.value = await response.json();
+            }
+          } catch (err) {
+            console.error('Failed to load sectors:', err);
+          }
+        }
 
         // Auto-prefix LinkedIn URL with https://
         function normalizeLinkedin() {
           let url = form.linkedinUrl.trim();
           if (!url) return;
-          // Strip leading @ or spaces
           url = url.replace(/^@/, '');
-          // Add https:// if missing
           if (url && !url.match(/^https?:\/\//i)) {
             url = 'https://' + url;
           }
           form.linkedinUrl = url;
         }
 
+        // Auto-prefix company URL with https://
+        function normalizeCompanyUrl() {
+          let url = form.companyUrl.trim();
+          if (!url) return;
+          if (url && !url.match(/^https?:\/\//i)) {
+            url = 'https://' + url;
+          }
+          form.companyUrl = url;
+        }
+
         async function handleSignup() {
           loading.value = true;
           error.value = null;
-          // Normalize LinkedIn before submit
           normalizeLinkedin();
+          normalizeCompanyUrl();
 
           try {
             const response = await fetch('/api/public/signup', {
@@ -258,7 +238,7 @@
             const data = await response.json();
 
             if (!response.ok) {
-              throw new Error(data.error || 'Signup failed');
+              throw new Error(data.error || 'Application failed');
             }
 
             success.value = true;
@@ -269,52 +249,19 @@
           }
         }
 
-        async function submitNodeContacts() {
-          // Filter to contacts with at least a name
-          const filled = nodeContacts.filter(c => c.name.trim());
-          if (filled.length === 0) {
-            nodeContactsError.value = 'Please add at least one investor.';
-            return;
-          }
-
-          nodeContactsLoading.value = true;
-          nodeContactsError.value = null;
-
-          try {
-            const response = await fetch('/api/public/node-contacts', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: form.email,
-                contacts: filled,
-              }),
-            });
-
-            const data = await response.json();
-            if (!response.ok) {
-              throw new Error(data.error || 'Failed to save contacts');
-            }
-
-            nodeContactsSubmitted.value = true;
-          } catch (err) {
-            nodeContactsError.value = err.message;
-          } finally {
-            nodeContactsLoading.value = false;
-          }
-        }
+        onMounted(() => {
+          loadSectors();
+        });
 
         return {
           form,
+          sectors,
           loading,
           error,
           success,
           handleSignup,
           normalizeLinkedin,
-          nodeContacts,
-          nodeContactsSubmitted,
-          nodeContactsLoading,
-          nodeContactsError,
-          submitNodeContacts,
+          normalizeCompanyUrl,
         };
       }
     }).mount('#app');

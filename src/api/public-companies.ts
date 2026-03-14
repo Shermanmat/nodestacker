@@ -2,8 +2,13 @@ import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { db, publicUsers, publicCompanies, publicSessions } from '../db/index.js';
 import { z } from 'zod';
+import * as postmark from 'postmark';
 
 const app = new Hono();
+
+const postmarkClient = process.env.POSTMARK_API_KEY
+  ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
+  : null;
 
 // Middleware to validate public session and get user
 async function getAuthenticatedUser(c: any) {
@@ -56,6 +61,7 @@ const createCompanySchema = z.object({
   oneLiner: z.string().min(1, 'One-liner is required'),
   url: z.string().url().optional().or(z.literal('')),
   sector: z.string().min(1, 'Sector is required'),
+  applyToPortfolio: z.boolean().optional(),
 });
 
 const updateCompanySchema = createCompanySchema.partial();
@@ -122,14 +128,23 @@ app.post('/', async (c) => {
 
   const now = new Date().toISOString();
 
+  const applyToPortfolio = parsed.data.applyToPortfolio || false;
+
   const [company] = await db.insert(publicCompanies).values({
     userId: user.id,
     companyName: parsed.data.companyName,
     oneLiner: parsed.data.oneLiner,
     url: parsed.data.url || null,
     sector: parsed.data.sector,
+    applicationStatus: applyToPortfolio ? 'applied' : null,
+    appliedAt: applyToPortfolio ? now : null,
     createdAt: now,
   }).returning();
+
+  if (applyToPortfolio) {
+    console.log(`[PORTFOLIO] ${user.firstName} ${user.lastName} applied with ${parsed.data.companyName}`);
+    await notifyAdminPortfolioApplication(user, parsed.data);
+  }
 
   return c.json(company, 201);
 });
@@ -164,12 +179,23 @@ app.put('/:id', async (c) => {
     return c.json({ error: errorMsg }, 400);
   }
 
+  const body2 = body as Record<string, unknown>;
+  const applyToPortfolio = body2.applyToPortfolio === true;
+
   // Build update object
   const updateData: Record<string, unknown> = {};
   if (parsed.data.companyName !== undefined) updateData.companyName = parsed.data.companyName;
   if (parsed.data.oneLiner !== undefined) updateData.oneLiner = parsed.data.oneLiner;
   if (parsed.data.url !== undefined) updateData.url = parsed.data.url || null;
   if (parsed.data.sector !== undefined) updateData.sector = parsed.data.sector;
+
+  // Allow applying to portfolio on edit (only if not already applied/approved)
+  if (applyToPortfolio && !existing.applicationStatus) {
+    const now = new Date().toISOString();
+    updateData.applicationStatus = 'applied';
+    updateData.appliedAt = now;
+    await notifyAdminPortfolioApplication(user, { companyName: existing.companyName, oneLiner: existing.oneLiner, sector: existing.sector });
+  }
 
   if (Object.keys(updateData).length === 0) {
     return c.json({ error: 'No fields to update' }, 400);
@@ -209,5 +235,37 @@ app.delete('/:id', async (c) => {
 
   return c.json({ success: true });
 });
+
+async function notifyAdminPortfolioApplication(user: any, company: any) {
+  if (!postmarkClient) return;
+  try {
+    const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'mat@matsherman.com';
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
+    await postmarkClient.sendEmail({
+      From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+      To: adminEmail,
+      Subject: `Portfolio application: ${company.companyName} (${user.firstName} ${user.lastName})`,
+      HtmlBody: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h3>New Portfolio Application</h3>
+          <table style="border-collapse: collapse; width: 100%;">
+            <tr><td style="padding: 6px 12px; color: #666;">Founder</td><td style="padding: 6px 12px; font-weight: bold;">${user.firstName} ${user.lastName}</td></tr>
+            <tr><td style="padding: 6px 12px; color: #666;">Email</td><td style="padding: 6px 12px;">${user.email}</td></tr>
+            <tr><td style="padding: 6px 12px; color: #666;">Company</td><td style="padding: 6px 12px; font-weight: bold;">${company.companyName}</td></tr>
+            <tr><td style="padding: 6px 12px; color: #666;">One-liner</td><td style="padding: 6px 12px;">${company.oneLiner || '—'}</td></tr>
+            <tr><td style="padding: 6px 12px; color: #666;">Sector</td><td style="padding: 6px 12px;">${company.sector || '—'}</td></tr>
+            <tr><td style="padding: 6px 12px; color: #666;">City</td><td style="padding: 6px 12px;">${user.city || '—'}</td></tr>
+            ${user.linkedinUrl ? `<tr><td style="padding: 6px 12px; color: #666;">LinkedIn</td><td style="padding: 6px 12px;"><a href="${user.linkedinUrl}">${user.linkedinUrl}</a></td></tr>` : ''}
+          </table>
+          <p style="margin-top: 20px;"><a href="${baseUrl}/admin" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review in Admin →</a></p>
+        </div>
+      `,
+      TextBody: `New Portfolio Application\n\nFounder: ${user.firstName} ${user.lastName} (${user.email})\nCompany: ${company.companyName}\nOne-liner: ${company.oneLiner || '—'}\nSector: ${company.sector || '—'}\nCity: ${user.city || '—'}`,
+    });
+    console.log(`✅ Portfolio application notification sent for ${company.companyName}`);
+  } catch (err) {
+    console.error('Failed to send portfolio application notification:', err);
+  }
+}
 
 export default app;

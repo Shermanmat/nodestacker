@@ -165,7 +165,7 @@
               <div class="flex justify-between items-center mb-4">
                 <h3 class="font-semibold text-lg">Current Status</h3>
                 <span class="px-3 py-1 rounded-full text-sm font-medium"
-                  :class="onboarding.workflow?.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'">
+                  :class="onboarding.workflow?.status === 'completed' ? 'bg-green-100 text-green-800' : ['pending_incorporation', 'light_engagement'].includes(onboarding.workflow?.status) ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'">
                   {{ formatOnboardingStatus(onboarding.workflow?.status) }}
                 </span>
               </div>
@@ -216,6 +216,114 @@
                 <div v-if="onboarding.nextAction.type === 'accept_offer'">
                   <button @click="acceptOffer" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
                     Accept Offer
+                  </button>
+                </div>
+
+                <!-- Incorporation Question -->
+                <div v-if="onboarding.nextAction.type === 'incorporation_question'" class="space-y-4">
+                  <p class="text-gray-600">Before we get started on paperwork, we need to know if your company is incorporated.</p>
+                  <div class="flex gap-4">
+                    <button @click="answerIncorporation(true)"
+                      class="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 text-center">
+                      Yes, we're incorporated
+                    </button>
+                    <button @click="showNotIncorporatedOptions = true"
+                      class="flex-1 bg-gray-200 text-gray-800 px-6 py-3 rounded-lg hover:bg-gray-300 text-center">
+                      Not yet
+                    </button>
+                  </div>
+
+                  <div v-if="showNotIncorporatedOptions" class="space-y-4 mt-4">
+                    <p class="text-sm text-gray-600 font-medium">How would you like to proceed?</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div @click="incorporationPath = 'partner'"
+                        :class="['border-2 rounded-lg p-4 cursor-pointer transition-colors', incorporationPath === 'partner' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
+                        <h4 class="font-semibold mb-1">Incorporate with a partner</h4>
+                        <p class="text-sm text-gray-500">We'll help you incorporate through one of our partners. You'll sign a pre-incorporation equity commitment.</p>
+                      </div>
+                      <div @click="incorporationPath = 'side_project'"
+                        :class="['border-2 rounded-lg p-4 cursor-pointer transition-colors', incorporationPath === 'side_project' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
+                        <h4 class="font-semibold mb-1">Side project for now</h4>
+                        <p class="text-sm text-gray-500">No rush. You'll have network access and we'll check in quarterly. Incorporate whenever you're ready.</p>
+                      </div>
+                    </div>
+
+                    <!-- Partner selection -->
+                    <div v-if="incorporationPath === 'partner'" class="space-y-3">
+                      <p class="text-sm font-medium text-gray-700">Choose an incorporation partner:</p>
+                      <div class="space-y-2">
+                        <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input type="radio" v-model="selectedPartner" value="stripe_atlas" class="text-blue-600">
+                          <div>
+                            <span class="font-medium">Stripe Atlas</span>
+                            <span class="text-sm text-gray-500 ml-2">Delaware C-Corp, $500</span>
+                          </div>
+                        </label>
+                        <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input type="radio" v-model="selectedPartner" value="clerky" class="text-blue-600">
+                          <div>
+                            <span class="font-medium">Clerky</span>
+                            <span class="text-sm text-gray-500 ml-2">Delaware C-Corp, $799</span>
+                          </div>
+                        </label>
+                        <label v-if="onboarding.workflow?.approvedForLawFirm" class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
+                          <input type="radio" v-model="selectedPartner" value="goodwin" class="text-blue-600">
+                          <div>
+                            <span class="font-medium">Goodwin</span>
+                            <span class="text-sm text-gray-500 ml-2">Full-service law firm</span>
+                          </div>
+                        </label>
+                      </div>
+                      <button @click="answerIncorporation(false, 'partner', selectedPartner)" :disabled="!selectedPartner"
+                        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                        Continue
+                      </button>
+                    </div>
+
+                    <!-- Side project confirmation -->
+                    <div v-if="incorporationPath === 'side_project'">
+                      <button @click="answerIncorporation(false, 'side_project')"
+                        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        Confirm - Side project for now
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Equity Commitment -->
+                <div v-if="onboarding.nextAction.type === 'equity_commitment'" class="space-y-4">
+                  <div class="bg-gray-50 border rounded-lg p-6 text-sm leading-relaxed">
+                    <h4 class="font-semibold text-base mb-3">Pre-Incorporation Equity Commitment</h4>
+                    <p class="mb-3">By signing below, I acknowledge and agree to the following:</p>
+                    <ol class="list-decimal list-inside space-y-2 mb-4">
+                      <li>I intend to incorporate a company and will issue <strong>{{ onboarding.workflow?.offerEquityPercent }}%</strong> equity to MatCapital upon incorporation, subject to the vesting schedule previously agreed to.</li>
+                      <li>I will incorporate using <strong>{{ formatPartnerName(onboarding.workflow?.incorporationPartner) }}</strong> as my incorporation partner.</li>
+                      <li>Upon incorporation, I will promptly return to the MatCap Founder Portal to complete the equity issuance process.</li>
+                      <li>This commitment is non-binding but reflects my genuine intention to complete the equity issuance to MatCapital.</li>
+                    </ol>
+                    <div class="border-t pt-4 space-y-3">
+                      <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Your full legal name</label>
+                        <input v-model="equityCommitmentName" type="text" class="w-full border rounded px-3 py-2" placeholder="Full legal name">
+                      </div>
+                      <label class="flex items-start gap-2">
+                        <input type="checkbox" v-model="equityCommitmentAcknowledged" class="mt-1">
+                        <span class="text-sm text-gray-700">I have read and agree to the terms above</span>
+                      </label>
+                    </div>
+                  </div>
+                  <button @click="signEquityCommitment" :disabled="!equityCommitmentName || !equityCommitmentAcknowledged"
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50">
+                    Sign Commitment
+                  </button>
+                </div>
+
+                <!-- Confirm Incorporation -->
+                <div v-if="onboarding.nextAction.type === 'confirm_incorporation'" class="space-y-3">
+                  <p class="text-gray-600">{{ onboarding.nextAction.message }}</p>
+                  <button @click="confirmIncorporation"
+                    class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
+                    I'm now incorporated
                   </button>
                 </div>
 
@@ -374,6 +482,17 @@
                 <div class="flex items-center gap-3">
                   <span :class="onboarding.workflow?.offerAcceptedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
                   <span>Offer Accepted</span>
+                </div>
+                <div v-if="onboarding.workflow?.incorporated === false" class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.incorporated !== null ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Incorporation Status</span>
+                  <span v-if="onboarding.workflow?.incorporationPartner" class="text-gray-400 text-xs">via {{ formatPartnerName(onboarding.workflow.incorporationPartner) }}</span>
+                  <span v-else-if="onboarding.workflow?.status === 'light_engagement'" class="text-gray-400 text-xs">Side project</span>
+                </div>
+                <div v-if="onboarding.workflow?.incorporationPartner" class="flex items-center gap-3">
+                  <span :class="onboarding.workflow?.equityCommitmentSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                  <span>Equity Commitment Signed</span>
+                  <span v-if="onboarding.workflow?.equityCommitmentSignedAt" class="text-gray-400 text-xs">{{ onboarding.workflow.equityCommitmentSignedAt?.split('T')[0] }}</span>
                 </div>
                 <div class="flex items-center gap-3">
                   <span :class="onboarding.workflow?.entityInfoReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
@@ -722,6 +841,11 @@
 
         // Onboarding
         const onboarding = ref({ hasOnboarding: false });
+        const showNotIncorporatedOptions = ref(false);
+        const incorporationPath = ref('');
+        const selectedPartner = ref('');
+        const equityCommitmentName = ref('');
+        const equityCommitmentAcknowledged = ref(false);
         const entityForm = reactive({
           entityName: '',
           entityType: 'c_corp',
@@ -939,10 +1063,64 @@
           }
         };
 
+        const answerIncorporation = async (incorporated, path, partner) => {
+          try {
+            const body = { incorporated };
+            if (!incorporated) {
+              body.path = path;
+              if (partner) body.incorporationPartner = partner;
+            }
+            await api('/portal/onboarding/incorporation-answer', {
+              method: 'POST',
+              body,
+            });
+            showNotIncorporatedOptions.value = false;
+            incorporationPath.value = '';
+            selectedPartner.value = '';
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed: ' + e.message);
+          }
+        };
+
+        const signEquityCommitment = async () => {
+          try {
+            await api('/portal/onboarding/equity-commitment', {
+              method: 'POST',
+              body: {
+                founderName: equityCommitmentName.value,
+                acknowledged: true,
+              },
+            });
+            equityCommitmentName.value = '';
+            equityCommitmentAcknowledged.value = false;
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed: ' + e.message);
+          }
+        };
+
+        const confirmIncorporation = async () => {
+          if (!confirm('Confirm that your company is now incorporated?')) return;
+          try {
+            await api('/portal/onboarding/confirm-incorporation', { method: 'POST' });
+            loadOnboarding();
+          } catch (e) {
+            alert('Failed: ' + e.message);
+          }
+        };
+
+        const formatPartnerName = (partner) => {
+          const names = { 'stripe_atlas': 'Stripe Atlas', 'clerky': 'Clerky', 'goodwin': 'Goodwin' };
+          return names[partner] || partner || '';
+        };
+
         const formatOnboardingStatus = (status) => {
           const map = {
             'offer_pending': 'Offer Pending',
             'offer_accepted': 'Offer Accepted',
+            'pending_incorporation': 'Pending Incorporation',
+            'light_engagement': 'Side Project',
             'entity_info_pending': 'Awaiting Your Company Details',
             'entity_info_received': 'Company Details Received',
             'advisory_agreement_sent': 'Advisory Agreement Sent',
@@ -1128,7 +1306,10 @@
           truncateText, extractFounderPrefs,
           // Onboarding
           onboarding, entityForm,
+          showNotIncorporatedOptions, incorporationPath, selectedPartner,
+          equityCommitmentName, equityCommitmentAcknowledged,
           loadOnboarding, acceptOffer, submitEntityInfo, approveBoardConsent, uploadWireInfo, uploadCertificate,
+          answerIncorporation, signEquityCommitment, confirmIncorporation, formatPartnerName,
           formatOnboardingStatus, formatVestingSchedule,
         };
       }

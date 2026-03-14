@@ -504,6 +504,8 @@ export type NewInboundIntroLog = typeof inboundIntroLogs.$inferInsert;
 export const OnboardingStatus = {
   OFFER_PENDING: 'offer_pending',
   OFFER_ACCEPTED: 'offer_accepted',
+  PENDING_INCORPORATION: 'pending_incorporation',
+  LIGHT_ENGAGEMENT: 'light_engagement',
   ENTITY_INFO_PENDING: 'entity_info_pending',
   ENTITY_INFO_RECEIVED: 'entity_info_received',
   ADVISORY_AGREEMENT_SENT: 'advisory_agreement_sent',
@@ -544,6 +546,10 @@ export const OnboardingEventType = {
   CERTIFICATE_UPLOADED: 'certificate_uploaded',
   CERTIFICATE_VERIFIED: 'certificate_verified',
   WORKFLOW_COMPLETED: 'workflow_completed',
+  INCORPORATION_ANSWERED: 'incorporation_answered',
+  EQUITY_COMMITMENT_SIGNED: 'equity_commitment_signed',
+  INCORPORATION_CONFIRMED: 'incorporation_confirmed',
+  INCORPORATION_NUDGE_SENT: 'incorporation_nudge_sent',
   REMINDER_SENT: 'reminder_sent',
   WEBHOOK_RECEIVED: 'webhook_received',
   DOCUMENT_UPLOADED: 'document_uploaded',
@@ -560,6 +566,13 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   portfolioCompanyId: integer('portfolio_company_id').notNull().references(() => portfolioCompanies.id).unique(),
   status: text('status').notNull().default('offer_pending'),
+
+  // Incorporation check
+  incorporated: integer('incorporated', { mode: 'boolean' }),
+  incorporationPartner: text('incorporation_partner'),
+  approvedForLawFirm: integer('approved_for_law_firm', { mode: 'boolean' }).default(false),
+  equityCommitmentSignedAt: text('equity_commitment_signed_at'),
+  lastIncorporationNudgeAt: text('last_incorporation_nudge_at'),
 
   // Offer details
   offerEquityPercent: text('offer_equity_percent'),
@@ -786,6 +799,7 @@ export const publicUsers = sqliteTable('public_users', {
   role: text('role'), // founder, node, investor, other
   roleOther: text('role_other'), // free text if role is 'other'
   nodeContacts: text('node_contacts'), // JSON array of {name, firm} for nodes
+  status: text('status').notNull().default('pending'), // pending, approved, converted
   oneLiner: text('one_liner'),
   city: text('city'),
   linkedinUrl: text('linkedin_url'),
@@ -800,6 +814,8 @@ export const publicCompanies = sqliteTable('public_companies', {
   oneLiner: text('one_liner'),
   url: text('url'),
   sector: text('sector'),
+  applicationStatus: text('application_status'), // null, 'applied', 'approved', 'declined'
+  appliedAt: text('applied_at'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

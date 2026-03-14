@@ -20,6 +20,41 @@ const migrationsFolder = process.env.NODE_ENV === 'production'
   ? './dist/db/migrations'
   : './src/db/migrations';
 
+// Safely add columns that may already exist (from partial migration runs)
+const safeAddColumn = (table: string, column: string, type: string, extra = '') => {
+  try {
+    sqlite.exec(`ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${type} ${extra}`);
+    console.log(`  Added column ${table}.${column}`);
+  } catch (e: any) {
+    if (e.message?.includes('duplicate column')) {
+      // Column already exists, skip
+    } else {
+      throw e;
+    }
+  }
+};
+
+console.log('Ensuring schema columns exist...');
+// public_users columns (migrations 0026, 0027)
+safeAddColumn('public_users', 'role', 'text');
+safeAddColumn('public_users', 'role_other', 'text');
+safeAddColumn('public_users', 'status', "text NOT NULL DEFAULT 'pending'");
+safeAddColumn('public_users', 'node_contacts', 'text');
+// onboarding_workflows columns (migration 0028)
+safeAddColumn('onboarding_workflows', 'founder_title', 'text');
+safeAddColumn('onboarding_workflows', 'equity_founder_signed_at', 'text');
+safeAddColumn('onboarding_workflows', 'equity_admin_signed_at', 'text');
+safeAddColumn('onboarding_workflows', 'wire_info_url', 'text');
+// public_companies columns (migration 0029)
+safeAddColumn('public_companies', 'application_status', 'text');
+safeAddColumn('public_companies', 'applied_at', 'text');
+// onboarding_workflows incorporation columns (migration 0030)
+safeAddColumn('onboarding_workflows', 'incorporated', 'integer');
+safeAddColumn('onboarding_workflows', 'incorporation_partner', 'text');
+safeAddColumn('onboarding_workflows', 'approved_for_law_firm', 'integer DEFAULT false');
+safeAddColumn('onboarding_workflows', 'equity_commitment_signed_at', 'text');
+safeAddColumn('onboarding_workflows', 'last_incorporation_nudge_at', 'text');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

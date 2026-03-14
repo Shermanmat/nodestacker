@@ -432,8 +432,6 @@ app.get('/stats/trends', async (c) => {
   const monthlyStats = sortedMonths.map(month => {
     const data = monthlyData[month];
     // data.introduced already includes all accepted statuses (introduced, meetings, invested)
-    // Decided = accepted + passed + ignored (excludes pending)
-    const decided = data.introduced + data.passed + data.ignored;
     return {
       month,
       label: formatMonthLabel(month),
@@ -443,8 +441,8 @@ app.get('/stats/trends', async (c) => {
       passed: data.passed,
       ignored: data.ignored,
       invested: data.invested,
-      // Accept Rate = accepted / (accepted + passed + ignored)
-      acceptRate: decided > 0 ? Math.round((data.introduced / decided) * 100) : 0,
+      // Accept Rate = introduced / total requests sent
+      acceptRate: data.total > 0 ? Math.round((data.introduced / data.total) * 100) : 0,
     };
   });
 

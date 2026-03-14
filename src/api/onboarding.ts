@@ -283,6 +283,30 @@ app.post('/:portfolioId/start', async (c) => {
   return c.json(workflow, 201);
 });
 
+// ============== UPDATE OFFER TERMS ==============
+
+app.put('/:id/offer-terms', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+  if (workflow.offerSentAt) return c.json({ error: 'Cannot edit terms after offer has been sent' }, 400);
+
+  const body = await c.req.json();
+  const updates: Record<string, any> = {};
+  if (body.equityPercent !== undefined) updates.offerEquityPercent = body.equityPercent;
+  if (body.vestingMonths !== undefined) updates.vestingMonths = parseInt(body.vestingMonths);
+  if (body.vestingCliffMonths !== undefined) updates.vestingCliffMonths = parseInt(body.vestingCliffMonths);
+
+  if (Object.keys(updates).length === 0) return c.json({ error: 'No fields to update' }, 400);
+
+  updates.updatedAt = new Date().toISOString();
+  await db.update(onboardingWorkflows).set(updates).where(eq(onboardingWorkflows.id, workflowId));
+
+  await logEvent(workflowId, OnboardingEventType.WORKFLOW_STARTED, OnboardingActor.ADMIN, 'Offer terms updated', updates);
+
+  return c.json({ success: true });
+});
+
 // ============== SEND OFFER ==============
 
 app.post('/:id/send-offer', async (c) => {
@@ -843,6 +867,29 @@ app.get('/:id/events', async (c) => {
   });
 
   return c.json(events);
+});
+
+// Toggle approved-for-law-firm
+app.put('/:id/approved-for-law-firm', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const body = await c.req.json();
+  const { approved } = body;
+
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) {
+    return c.json({ error: 'Workflow not found' }, 404);
+  }
+
+  await db.update(onboardingWorkflows)
+    .set({
+      approvedForLawFirm: !!approved,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(onboardingWorkflows.id, workflowId));
+
+  await logEvent(workflowId, 'approved_for_law_firm_toggled', OnboardingActor.ADMIN, undefined, { approved });
+
+  return c.json({ success: true });
 });
 
 export default app;

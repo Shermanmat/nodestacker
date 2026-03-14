@@ -27,6 +27,7 @@ import publicProfileRoutes from './api/public-profile.js';
 import publicCompaniesRoutes from './api/public-companies.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
+import signupsRoutes from './api/signups.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -86,6 +87,8 @@ app.use('/api/onboarding-chat/leads/*', adminGuard);
 // Matching system
 app.use('/api/matching', adminGuard);
 app.use('/api/matching/*', adminGuard);
+app.use('/api/signups', adminGuard);
+app.use('/api/signups/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 
@@ -102,6 +105,7 @@ app.route('/api/inbound', inboundRoutes);
 app.route('/api/onboarding', onboardingRoutes);
 app.route('/api/webhooks', webhooksRoutes);
 app.route('/api/matching', matchingRoutes);
+app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 
 // Health check

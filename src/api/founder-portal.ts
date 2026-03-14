@@ -685,7 +685,11 @@ app.get('/onboarding/status', async (c) => {
       nextAction = { type: 'confirm_incorporation', message: 'Let us know when you\'re incorporated' };
       break;
     case OnboardingStatus.LIGHT_ENGAGEMENT:
-      nextAction = { type: 'confirm_incorporation', message: 'When you incorporate, let us know and we\'ll get started on the equity paperwork' };
+      if (!workflow.equityCommitmentSignedAt) {
+        nextAction = { type: 'equity_commitment', message: 'Sign the pre-incorporation equity commitment' };
+      } else {
+        nextAction = { type: 'confirm_incorporation', message: 'When you incorporate, let us know and we\'ll get started on the equity paperwork' };
+      }
       break;
     case OnboardingStatus.ENTITY_INFO_PENDING:
       nextAction = { type: 'entity_info', message: 'Submit your company details' };
@@ -954,7 +958,7 @@ app.post('/onboarding/equity-commitment', async (c) => {
   });
   if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
 
-  if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED || workflow.incorporated !== false) {
+  if (![OnboardingStatus.OFFER_ACCEPTED, OnboardingStatus.LIGHT_ENGAGEMENT].includes(workflow.status) || workflow.incorporated !== false) {
     return c.json({ error: 'Cannot sign equity commitment in current state' }, 400);
   }
 

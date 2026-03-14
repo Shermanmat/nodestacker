@@ -352,6 +352,7 @@ const serveAdminHtml = async (c: any) => {
 };
 app.get('/admin', serveAdminHtml);
 app.get('/admin2', serveAdminHtml);
+app.get('/admin-fresh', serveAdminHtml);
 
 // Serve static files from public directory
 app.use('/*', serveStatic({ root: './public' }));

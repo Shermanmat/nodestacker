@@ -995,6 +995,10 @@
               </option>
             </select>
             <label v-if="planningFounderId" class="flex items-center gap-2 text-sm text-gray-600">
+              <input type="checkbox" v-model="planningFilterExactSector" class="rounded">
+              Exact sector match only
+            </label>
+            <label v-if="planningFounderId" class="flex items-center gap-2 text-sm text-gray-600">
               <input type="checkbox" v-model="planningFilterStale" class="rounded">
               Not contacted in 6+ weeks
             </label>
@@ -2982,6 +2986,7 @@
         // Intro Planning
         const planningFounderId = ref('');
         const planningFilterStale = ref(false);
+        const planningFilterExactSector = ref(false);
         const shuffleSeed = ref(Date.now());
         const filterByNodeId = ref('');
         const filterByCategoryId = ref('');
@@ -3336,6 +3341,18 @@
               const name = (inv.name || '').toLowerCase();
               const firm = (inv.firm || '').toLowerCase();
               return name.includes(q) || firm.includes(q);
+            });
+          }
+
+          // Apply exact sector filter: exclude generalists, require direct sector overlap
+          if (planningFilterExactSector.value && founderSectorIds.size > 0) {
+            filtered = filtered.filter(inv => {
+              const invSectors = (inv.categories || []).filter(c => c.type === 'sector');
+              if (invSectors.length === 0) return false; // no sectors = skip
+              const isGeneralist = invSectors.some(c => c.name.toLowerCase() === 'generalist');
+              if (isGeneralist) return false; // generalist = skip
+              const invSectorIds = new Set(invSectors.map(c => c.id));
+              return [...invSectorIds].some(id => founderSectorFamily.has(id));
             });
           }
 
@@ -4859,7 +4876,7 @@
           loadIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
-          planningFounderId, planningFilterStale, plannedInvestors, shuffleInvestors, requestIntroFor,
+          planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, toggleInvestorVip, closeInvestorModal,

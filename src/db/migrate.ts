@@ -58,6 +58,34 @@ safeAddColumn('onboarding_workflows', 'last_incorporation_nudge_at', 'text');
 safeAddColumn('onboarding_workflows', 'ein', 'text');
 safeAddColumn('onboarding_workflows', 'articles_of_incorporation_url', 'text');
 
+// voice_interviews + voice_interview_answers tables (migration 0032)
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`voice_interviews\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`public_company_id\` integer NOT NULL REFERENCES \`public_companies\`(\`id\`),
+    \`token\` text NOT NULL,
+    \`status\` text NOT NULL DEFAULT 'researching',
+    \`research\` text,
+    \`questions\` text,
+    \`sent_at\` text,
+    \`completed_at\` text,
+    \`expires_at\` text,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`voice_interviews_token_unique\` ON \`voice_interviews\` (\`token\`)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`voice_interview_answers\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`interview_id\` integer NOT NULL REFERENCES \`voice_interviews\`(\`id\`),
+    \`question_index\` integer NOT NULL,
+    \`audio_url\` text NOT NULL,
+    \`duration_seconds\` integer,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  console.log('  Ensured voice_interviews tables exist');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

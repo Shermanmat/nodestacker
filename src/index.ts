@@ -28,6 +28,7 @@ import publicCompaniesRoutes from './api/public-companies.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
 import signupsRoutes from './api/signups.js';
+import voiceInterviewsRoutes from './api/voice-interviews.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -51,6 +52,8 @@ app.route('/api/public/companies', publicCompaniesRoutes);
 // Onboarding chat is public (founder intake interview)
 // Admin endpoints (/leads, /leads/:id/convert) are protected below
 app.route('/api/onboarding-chat', onboardingChatRoutes);
+// Voice interview public endpoints (token-based auth)
+app.route('/api', voiceInterviewsRoutes);
 // Inbound webhook endpoint is public (uses token auth internally)
 // Other inbound endpoints are protected below
 
@@ -89,6 +92,9 @@ app.use('/api/matching', adminGuard);
 app.use('/api/matching/*', adminGuard);
 app.use('/api/signups', adminGuard);
 app.use('/api/signups/*', adminGuard);
+// Voice interview admin endpoints
+app.use('/api/admin/voice-interviews', adminGuard);
+app.use('/api/admin/voice-interviews/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 
@@ -320,6 +326,9 @@ app.get('/onboarding', serveStatic({ path: './public/onboarding.html' }));
 // Public network pages
 app.get('/signup', serveStatic({ path: './public/signup.html' }));
 app.get('/dashboard', serveStatic({ path: './public/dashboard.html' }));
+
+// Voice interview (public, token-based)
+app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' }));
 
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));

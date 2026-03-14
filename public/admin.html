@@ -1874,16 +1874,54 @@
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-amber-100 text-amber-700': app.applicationStatus === 'applied',
+                    'bg-blue-100 text-blue-700': app.applicationStatus === 'interview_sent',
                     'bg-green-100 text-green-700': app.applicationStatus === 'approved',
                     'bg-gray-100 text-gray-500': app.applicationStatus === 'declined',
-                  }" class="text-xs px-2 py-0.5 rounded font-medium">{{ app.applicationStatus }}</span>
+                  }" class="text-xs px-2 py-0.5 rounded font-medium">
+                    <template v-if="app.applicationStatus === 'interview_sent' && app.voiceInterview?.status === 'researching'">
+                      <span class="inline-block animate-spin mr-1">⏳</span> researching
+                    </template>
+                    <template v-else>{{ app.applicationStatus }}</template>
+                  </span>
                 </td>
                 <td class="px-4 py-3">
-                  <div v-if="app.applicationStatus === 'applied'" class="flex gap-2">
-                    <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
-                    <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
+                  <div class="flex gap-2 flex-wrap">
+                    <template v-if="app.applicationStatus === 'applied'">
+                      <button @click="sendVoiceInterview(app.id)" class="text-xs text-blue-600 hover:underline font-medium">Voice Interview</button>
+                      <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
+                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
+                    </template>
+                    <template v-else-if="app.applicationStatus === 'interview_sent'">
+                      <button v-if="app.voiceInterview?.status === 'completed'" @click="toggleInterviewReview(app.id)" class="text-xs text-purple-600 hover:underline font-medium">
+                        {{ expandedInterview === app.id ? 'Hide' : 'Review' }} Answers
+                      </button>
+                      <button v-if="app.voiceInterview?.status === 'completed'" @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
+                      <button v-if="app.voiceInterview?.status === 'completed'" @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
+                      <span v-else-if="app.voiceInterview?.status === 'sent'" class="text-xs text-gray-400">Waiting for answers...</span>
+                      <span v-else-if="app.voiceInterview?.status === 'researching'" class="text-xs text-gray-400">Generating questions...</span>
+                      <span v-else-if="app.voiceInterview?.status === 'failed'" class="text-xs text-red-400">Research failed</span>
+                    </template>
+                    <span v-else class="text-xs text-gray-400">--</span>
                   </div>
-                  <span v-else class="text-xs text-gray-400">--</span>
+                </td>
+              </tr>
+              <!-- Expandable interview review row -->
+              <tr v-if="expandedInterview === app.id && app.voiceInterview?.status === 'completed'" class="bg-gray-50">
+                <td colspan="7" class="px-4 py-4">
+                  <div class="space-y-4">
+                    <h4 class="font-semibold text-sm text-gray-700">Voice Interview Answers</h4>
+                    <div v-for="(q, qi) in (app.voiceInterview?.questions || [])" :key="qi" class="bg-white rounded-lg p-4 border">
+                      <p class="font-medium text-sm text-gray-900 mb-1">Q{{ qi + 1 }}: {{ q.question }}</p>
+                      <p class="text-xs text-gray-500 italic mb-3">{{ q.reason }}</p>
+                      <div v-if="getAnswer(app, qi)">
+                        <audio :src="getAnswer(app, qi).audioUrl" controls class="w-full mb-1"></audio>
+                        <p class="text-xs text-gray-400" v-if="getAnswer(app, qi).durationSeconds">
+                          Duration: {{ Math.floor(getAnswer(app, qi).durationSeconds / 60) }}:{{ (getAnswer(app, qi).durationSeconds % 60).toString().padStart(2, '0') }}
+                        </p>
+                      </div>
+                      <p v-else class="text-xs text-gray-400 italic">No answer recorded</p>
+                    </div>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -2736,6 +2774,16 @@
           try {
             signups.value = await api('/signups');
             portfolioApplications.value = await api('/signups/applications');
+            // Enrich applications with voice interview data
+            for (const app of portfolioApplications.value) {
+              try {
+                const viData = await fetch(`/api/admin/voice-interviews/${app.id}`, {
+                  headers: { 'X-Admin-Session': adminSessionId.value },
+                }).then(r => r.json());
+                app.voiceInterview = viData.interview || null;
+                app.voiceInterviewAnswers = viData.answers || [];
+              } catch { app.voiceInterview = null; app.voiceInterviewAnswers = []; }
+            }
           } catch (e) { /* handled by api() */ }
         }
 
@@ -2766,6 +2814,25 @@
             await api(`/signups/applications/${companyId}/decline`, { method: 'POST' });
             await loadSignups();
           } catch (e) { /* handled by api() */ }
+        }
+
+        // Voice Interview
+        const expandedInterview = ref(null);
+
+        async function sendVoiceInterview(companyId) {
+          if (!confirm('Send a voice interview? This will research the company and email the founder tailored questions.')) return;
+          try {
+            await api(`/admin/voice-interviews/${companyId}/send`, { method: 'POST' });
+            await loadSignups();
+          } catch (e) { /* handled by api() */ }
+        }
+
+        function toggleInterviewReview(appId) {
+          expandedInterview.value = expandedInterview.value === appId ? null : appId;
+        }
+
+        function getAnswer(app, questionIndex) {
+          return (app.voiceInterviewAnswers || []).find(a => a.questionIndex === questionIndex);
         }
 
         async function updateSignupStatus(id, status) {
@@ -4912,6 +4979,7 @@
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,
           portfolioApplications, approveApplication, declineApplication,
+          sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer,
         };
       }
     }).mount('#app');

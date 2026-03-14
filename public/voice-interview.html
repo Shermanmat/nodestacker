@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Interview - MatCap</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <style>
+    [v-cloak] { display: none; }
+    @keyframes pulse-ring { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.4); opacity: 0; } }
+    .recording-pulse { animation: pulse-ring 1.5s ease-out infinite; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app" v-cloak>
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+      <div class="max-w-lg mx-auto px-4 py-4">
+        <h1 class="text-xl font-bold text-gray-900">MatCap</h1>
+      </div>
+    </header>
+
+    <main class="max-w-lg mx-auto px-4 py-12">
+
+      <!-- Loading -->
+      <div v-if="state === 'loading'" class="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div class="text-4xl mb-4">⏳</div>
+        <p class="text-gray-600">Loading your interview...</p>
+      </div>
+
+      <!-- Researching (questions still generating) -->
+      <div v-else-if="state === 'researching'" class="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div class="text-4xl mb-4">🔍</div>
+        <h2 class="text-xl font-bold text-gray-900 mb-3">Preparing Your Questions</h2>
+        <p class="text-gray-600 mb-4">We're researching your company to create tailored questions. This usually takes about 30 seconds.</p>
+        <button @click="loadInterview" class="text-blue-600 hover:underline text-sm">Refresh</button>
+      </div>
+
+      <!-- Error / Expired -->
+      <div v-else-if="state === 'error'" class="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div class="text-4xl mb-4">😕</div>
+        <h2 class="text-xl font-bold text-gray-900 mb-3">{{ errorTitle }}</h2>
+        <p class="text-gray-600">{{ errorMessage }}</p>
+      </div>
+
+      <!-- Complete -->
+      <div v-else-if="state === 'complete'" class="bg-white rounded-2xl shadow-lg p-8 text-center">
+        <div class="text-5xl mb-4">🎉</div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-3">Interview Submitted!</h2>
+        <p class="text-gray-600 mb-2">Thanks {{ firstName }}! We'll listen to your answers and get back to you soon.</p>
+        <p class="text-sm text-gray-400 mt-4">You can close this page now.</p>
+      </div>
+
+      <!-- Interview -->
+      <div v-else-if="state === 'interview'" class="space-y-6">
+        <!-- Progress -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+          <div class="flex justify-between items-center mb-2">
+            <h2 class="text-lg font-bold text-gray-900">{{ companyName }}</h2>
+            <span class="text-sm text-gray-500">Question {{ currentIndex + 1 }} of {{ questions.length }}</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded-full h-2">
+            <div class="bg-blue-600 rounded-full h-2 transition-all duration-300" :style="{ width: ((currentIndex) / questions.length * 100) + '%' }"></div>
+          </div>
+          <p v-if="expiresAt" class="text-xs text-gray-400 mt-2">Link expires {{ formatExpiry(expiresAt) }}</p>
+        </div>
+
+        <!-- Question Card -->
+        <div class="bg-white rounded-2xl shadow-lg p-6">
+          <div class="mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">{{ questions[currentIndex].question }}</h3>
+            <p class="text-sm text-gray-500 italic">{{ questions[currentIndex].reason }}</p>
+          </div>
+
+          <!-- Not recorded yet -->
+          <div v-if="recordingState === 'idle' && !currentAudioUrl">
+            <p class="text-sm text-gray-500 mb-4">Tap the button below to start recording your answer. Aim for 1-3 minutes.</p>
+            <button @click="startRecording" class="w-full bg-red-500 text-white rounded-xl py-4 text-lg font-semibold hover:bg-red-600 transition flex items-center justify-center gap-2">
+              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+              Start Recording
+            </button>
+          </div>
+
+          <!-- Recording -->
+          <div v-if="recordingState === 'recording'" class="text-center">
+            <div class="relative inline-block mb-4">
+              <div class="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center recording-pulse absolute inset-0"></div>
+              <div class="w-20 h-20 bg-red-500 rounded-full flex items-center justify-center relative">
+                <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+              </div>
+            </div>
+            <p class="text-red-500 font-semibold text-lg mb-1">Recording...</p>
+            <p class="text-gray-500 text-sm mb-4">{{ formatTime(recordingTime) }}</p>
+            <button @click="stopRecording" class="w-full bg-gray-800 text-white rounded-xl py-4 text-lg font-semibold hover:bg-gray-900 transition">
+              Stop Recording
+            </button>
+          </div>
+
+          <!-- Review recording -->
+          <div v-if="recordingState === 'idle' && currentAudioUrl">
+            <p class="text-sm text-gray-500 mb-3">Review your answer:</p>
+            <audio :src="currentAudioUrl" controls class="w-full mb-4"></audio>
+            <div class="flex gap-3">
+              <button @click="reRecord" class="flex-1 border border-gray-300 text-gray-700 rounded-xl py-3 font-medium hover:bg-gray-50 transition">
+                Re-record
+              </button>
+              <button @click="submitAndNext" :disabled="uploading" class="flex-1 bg-blue-600 text-white rounded-xl py-3 font-medium hover:bg-blue-700 transition disabled:opacity-50">
+                {{ uploading ? 'Uploading...' : (isLastQuestion ? 'Submit Interview' : 'Next Question') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    const { createApp, ref, computed, onMounted, onUnmounted } = Vue;
+
+    createApp({
+      setup() {
+        const state = ref('loading');
+        const errorTitle = ref('');
+        const errorMessage = ref('');
+        const companyName = ref('');
+        const firstName = ref('');
+        const questions = ref([]);
+        const answeredIndexes = ref([]);
+        const expiresAt = ref(null);
+        const currentIndex = ref(0);
+
+        const recordingState = ref('idle'); // idle, recording
+        const currentAudioUrl = ref(null);
+        const currentBlob = ref(null);
+        const recordingTime = ref(0);
+        const uploading = ref(false);
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let recordingTimer = null;
+
+        const token = new URLSearchParams(window.location.search).get('token');
+
+        const isLastQuestion = computed(() => currentIndex.value === questions.value.length - 1);
+
+        async function loadInterview() {
+          if (!token) {
+            state.value = 'error';
+            errorTitle.value = 'Invalid Link';
+            errorMessage.value = 'This interview link is missing a token. Please use the link from your email.';
+            return;
+          }
+
+          try {
+            const res = await fetch(`/api/public/voice-interview/${token}`);
+            const data = await res.json();
+
+            if (res.status === 202) {
+              state.value = 'researching';
+              return;
+            }
+
+            if (!res.ok) {
+              state.value = 'error';
+              if (data.status === 'completed') {
+                errorTitle.value = 'Already Completed';
+                errorMessage.value = 'You\'ve already submitted your interview. Thanks!';
+              } else {
+                errorTitle.value = 'Link Expired';
+                errorMessage.value = data.error || 'This interview link is no longer available.';
+              }
+              return;
+            }
+
+            companyName.value = data.companyName;
+            firstName.value = data.firstName;
+            questions.value = data.questions;
+            answeredIndexes.value = data.answeredIndexes || [];
+            expiresAt.value = data.expiresAt;
+
+            // Start at first unanswered question
+            const firstUnanswered = questions.value.findIndex((_, i) => !answeredIndexes.value.includes(i));
+            currentIndex.value = firstUnanswered >= 0 ? firstUnanswered : 0;
+
+            state.value = 'interview';
+          } catch (err) {
+            state.value = 'error';
+            errorTitle.value = 'Something went wrong';
+            errorMessage.value = 'Please try refreshing the page.';
+          }
+        }
+
+        async function startRecording() {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = (e) => {
+              if (e.data.size > 0) audioChunks.push(e.data);
+            };
+
+            mediaRecorder.onstop = () => {
+              const blob = new Blob(audioChunks, { type: 'audio/webm' });
+              currentBlob.value = blob;
+              currentAudioUrl.value = URL.createObjectURL(blob);
+              recordingState.value = 'idle';
+              stream.getTracks().forEach(t => t.stop());
+              clearInterval(recordingTimer);
+            };
+
+            mediaRecorder.start();
+            recordingState.value = 'recording';
+            recordingTime.value = 0;
+            recordingTimer = setInterval(() => recordingTime.value++, 1000);
+          } catch (err) {
+            alert('Microphone access is required to record your answers. Please allow microphone access and try again.');
+          }
+        }
+
+        function stopRecording() {
+          if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+          }
+        }
+
+        function reRecord() {
+          if (currentAudioUrl.value) {
+            URL.revokeObjectURL(currentAudioUrl.value);
+          }
+          currentAudioUrl.value = null;
+          currentBlob.value = null;
+        }
+
+        async function submitAndNext() {
+          if (!currentBlob.value) return;
+          uploading.value = true;
+
+          try {
+            const formData = new FormData();
+            formData.append('audio', currentBlob.value, 'answer.webm');
+            formData.append('questionIndex', currentIndex.value.toString());
+            formData.append('durationSeconds', recordingTime.value.toString());
+
+            const res = await fetch(`/api/public/voice-interview/${token}/answer`, {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!res.ok) {
+              const data = await res.json();
+              alert(data.error || 'Upload failed');
+              uploading.value = false;
+              return;
+            }
+
+            answeredIndexes.value.push(currentIndex.value);
+
+            if (isLastQuestion.value) {
+              // Submit the interview
+              await fetch(`/api/public/voice-interview/${token}/complete`, { method: 'POST' });
+              state.value = 'complete';
+            } else {
+              // Move to next question
+              currentIndex.value++;
+              currentAudioUrl.value = null;
+              currentBlob.value = null;
+              recordingTime.value = 0;
+            }
+          } catch (err) {
+            alert('Upload failed. Please try again.');
+          } finally {
+            uploading.value = false;
+          }
+        }
+
+        function formatTime(seconds) {
+          const m = Math.floor(seconds / 60);
+          const s = seconds % 60;
+          return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function formatExpiry(iso) {
+          if (!iso) return '';
+          const d = new Date(iso);
+          const now = new Date();
+          const hoursLeft = Math.max(0, Math.round((d - now) / (1000 * 60 * 60)));
+          if (hoursLeft <= 0) return 'soon';
+          if (hoursLeft < 24) return `in ${hoursLeft} hours`;
+          return `in ${Math.round(hoursLeft / 24)} days`;
+        }
+
+        onMounted(loadInterview);
+        onUnmounted(() => {
+          if (currentAudioUrl.value) URL.revokeObjectURL(currentAudioUrl.value);
+          clearInterval(recordingTimer);
+        });
+
+        return {
+          state, errorTitle, errorMessage, companyName, firstName,
+          questions, answeredIndexes, expiresAt, currentIndex,
+          recordingState, currentAudioUrl, recordingTime, uploading,
+          isLastQuestion,
+          loadInterview, startRecording, stopRecording, reRecord, submitAndNext,
+          formatTime, formatExpiry,
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

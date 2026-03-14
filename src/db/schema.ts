@@ -856,6 +856,58 @@ export type NewPublicCompany = typeof publicCompanies.$inferInsert;
 export type PublicSession = typeof publicSessions.$inferSelect;
 export type NewPublicSession = typeof publicSessions.$inferInsert;
 
+// Voice Interview Tables
+
+export const VoiceInterviewStatus = {
+  RESEARCHING: 'researching',
+  SENT: 'sent',
+  COMPLETED: 'completed',
+  EXPIRED: 'expired',
+  FAILED: 'failed',
+} as const;
+
+export const voiceInterviews = sqliteTable('voice_interviews', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  publicCompanyId: integer('public_company_id').notNull().references(() => publicCompanies.id),
+  token: text('token').notNull().unique(),
+  status: text('status').notNull().default('researching'),
+  research: text('research'), // AI research summary
+  questions: text('questions'), // JSON array of { question, reason }
+  sentAt: text('sent_at'),
+  completedAt: text('completed_at'),
+  expiresAt: text('expires_at'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const voiceInterviewAnswers = sqliteTable('voice_interview_answers', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  interviewId: integer('interview_id').notNull().references(() => voiceInterviews.id),
+  questionIndex: integer('question_index').notNull(),
+  audioUrl: text('audio_url').notNull(),
+  durationSeconds: integer('duration_seconds'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const voiceInterviewsRelations = relations(voiceInterviews, ({ one, many }) => ({
+  publicCompany: one(publicCompanies, {
+    fields: [voiceInterviews.publicCompanyId],
+    references: [publicCompanies.id],
+  }),
+  answers: many(voiceInterviewAnswers),
+}));
+
+export const voiceInterviewAnswersRelations = relations(voiceInterviewAnswers, ({ one }) => ({
+  interview: one(voiceInterviews, {
+    fields: [voiceInterviewAnswers.interviewId],
+    references: [voiceInterviews.id],
+  }),
+}));
+
+export type VoiceInterview = typeof voiceInterviews.$inferSelect;
+export type NewVoiceInterview = typeof voiceInterviews.$inferInsert;
+export type VoiceInterviewAnswer = typeof voiceInterviewAnswers.$inferSelect;
+export type NewVoiceInterviewAnswer = typeof voiceInterviewAnswers.$inferInsert;
+
 // Matching System Tables
 
 export const MatchSuggestionStatus = {

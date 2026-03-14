@@ -669,6 +669,69 @@ Please verify: ${BASE_URL}/#/onboarding`;
   return sendEmail(adminEmail, subject, htmlBody, textBody);
 }
 
+// ============== VOICE INTERVIEW EMAILS ==============
+
+/**
+ * Email: Voice interview invitation to founder
+ */
+export async function sendVoiceInterviewEmail(
+  email: string,
+  firstName: string,
+  companyName: string,
+  interviewUrl: string
+): Promise<EmailResult> {
+  const subject = `We'd love to learn more about ${companyName}`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Hi ${firstName},</h2>
+    <p>Thanks for applying to MatCap! We've been looking into ${companyName} and have a few tailored questions for you.</p>
+    <p>Instead of scheduling a call, we'd love for you to <strong>record short audio answers</strong> — just a few minutes of your time, whenever works best.</p>
+    ${emailButton('Record Your Answers', interviewUrl)}
+    <p style="color: #666; font-size: 14px;">This link expires in <strong>48 hours</strong>. You can pause and come back to it anytime before then.</p>
+  `);
+
+  const textBody = `Hi ${firstName},
+
+Thanks for applying to MatCap! We've been looking into ${companyName} and have a few tailored questions for you.
+
+Instead of scheduling a call, we'd love for you to record short audio answers — just a few minutes of your time, whenever works best.
+
+Record your answers here: ${interviewUrl}
+
+This link expires in 48 hours. You can pause and come back to it anytime before then.
+
+Best,
+Mat`;
+
+  return sendEmail(email, subject, htmlBody, textBody);
+}
+
+/**
+ * Email to admin: Voice interview completed
+ */
+export async function notifyAdminInterviewCompleted(
+  adminEmail: string,
+  founderName: string,
+  companyName: string
+): Promise<EmailResult> {
+  const subject = `[MatCap] ${founderName} completed voice interview for ${companyName}`;
+
+  const htmlBody = wrapEmail(`
+    <h2>Voice Interview Completed</h2>
+    <p><strong>${founderName}</strong> (${companyName}) has completed their voice interview.</p>
+    <p>Listen to their answers in the admin dashboard.</p>
+    ${emailButton('Review Interview', `${BASE_URL}/admin`)}
+  `);
+
+  const textBody = `Voice Interview Completed
+
+${founderName} (${companyName}) has completed their voice interview.
+
+Listen to their answers: ${BASE_URL}/admin`;
+
+  return sendEmail(adminEmail, subject, htmlBody, textBody);
+}
+
 /**
  * Check if email service is configured
  */

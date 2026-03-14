@@ -51,10 +51,10 @@
         <a href="/founders" class="text-sm text-slate-300 transition hover:text-white">For Founders</a>
         <a href="/investors" class="text-sm font-medium text-white">For Investors</a>
         <a href="/nodes" class="text-sm text-slate-300 transition hover:text-white">For Nodes</a>
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700">Book a Call</a>
+        <a href="#apply" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700">Book a Call</a>
       </div>
       <div class="md:hidden">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700">Book a Call</a>
+        <a href="#apply" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700">Book a Call</a>
       </div>
     </div>
   </nav>
@@ -77,7 +77,7 @@
         Every introduction you receive through MatCap has been personally reviewed by our founding node, Mat Sherman. If a deal reaches your inbox, it's because he believes it's aligned with your thesis.
       </p>
       <div class="mt-10">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-violet-700">
+        <a href="#apply" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-violet-700">
           Book a Call With Our Team
         </a>
       </div>
@@ -186,18 +186,131 @@
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="py-24">
-    <div class="mx-auto max-w-3xl px-6 text-center">
-      <h2 class="text-3xl font-bold tracking-tight text-white md:text-4xl">Better deals. Less noise. Zero cost.</h2>
-      <p class="mt-4 text-lg text-slate-400">Book a call with one of Mat's team members so we can learn more about your thesis and investment preferences.</p>
-      <div class="mt-10">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-violet-600 px-8 py-4 text-lg font-semibold text-white transition hover:bg-violet-700">
-          Book a Call With Our Team
-        </a>
+  <!-- CTA / Interest Form -->
+  <section id="apply" class="py-24">
+    <div class="mx-auto max-w-xl px-6">
+      <div class="text-center mb-10">
+        <h2 class="text-3xl font-bold tracking-tight text-white md:text-4xl">Better deals. Less noise. Zero cost.</h2>
+        <p class="mt-4 text-lg text-slate-400">Tell us a bit about yourself and we'll book a call to learn about your thesis.</p>
+      </div>
+
+      <div id="investor-form-app">
+        <!-- Success -->
+        <div v-if="success" class="rounded-xl border border-violet-500/20 bg-violet-500/10 p-8 text-center">
+          <div class="text-4xl mb-4">🤝</div>
+          <h3 class="text-xl font-bold text-white mb-2">Thanks for your interest!</h3>
+          <p class="text-slate-300">We'll be in touch shortly to schedule a call.</p>
+        </div>
+
+        <!-- Form -->
+        <form v-else @submit.prevent="submit" class="space-y-5">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">First Name *</label>
+              <input v-model="form.firstName" type="text" required
+                class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                placeholder="Mat">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1">Last Name *</label>
+              <input v-model="form.lastName" type="text" required
+                class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                placeholder="Sherman">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Email *</label>
+            <input v-model="form.email" type="email" required
+              class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+              placeholder="you@example.com">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">LinkedIn URL *</label>
+            <input v-model="form.linkedinUrl" type="text" required
+              class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+              placeholder="linkedin.com/in/yourprofile">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Twitter/X Handle</label>
+            <div class="flex">
+              <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-white/10 bg-slate-700 text-slate-400">@</span>
+              <input v-model="form.twitterHandle" type="text"
+                class="flex-1 rounded-r-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+                placeholder="yourhandle">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1">Website</label>
+            <input v-model="form.website" type="text"
+              class="w-full rounded-lg border border-white/10 bg-slate-800 px-4 py-2.5 text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500"
+              placeholder="yourfirm.com">
+          </div>
+
+          <div v-if="error" class="rounded-lg bg-red-500/10 border border-red-500/20 px-4 py-3 text-sm text-red-400">
+            {{ error }}
+          </div>
+
+          <button type="submit" :disabled="loading"
+            class="w-full rounded-lg bg-violet-600 px-6 py-3 font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50">
+            {{ loading ? 'Submitting...' : 'Book a Call' }}
+          </button>
+        </form>
       </div>
     </div>
   </section>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp, ref, reactive } = Vue;
+    createApp({
+      setup() {
+        const form = reactive({
+          firstName: '',
+          lastName: '',
+          email: '',
+          linkedinUrl: '',
+          twitterHandle: '',
+          website: '',
+        });
+        const loading = ref(false);
+        const error = ref(null);
+        const success = ref(false);
+
+        async function submit() {
+          loading.value = true;
+          error.value = null;
+
+          if (form.linkedinUrl && !form.linkedinUrl.match(/^https?:\/\//i)) {
+            form.linkedinUrl = 'https://' + form.linkedinUrl;
+          }
+          if (form.website && !form.website.match(/^https?:\/\//i)) {
+            form.website = 'https://' + form.website;
+          }
+
+          try {
+            const res = await fetch('/api/public/investor-interest', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(form),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Something went wrong');
+            success.value = true;
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        return { form, loading, error, success, submit };
+      }
+    }).mount('#investor-form-app');
+  </script>
 
   <!-- Footer -->
   <footer class="border-t border-white/10 bg-slate-950">

@@ -439,4 +439,55 @@ app.post('/node-interest', async (c) => {
   return c.json({ success: true });
 });
 
+app.post('/investor-interest', async (c) => {
+  const body = await c.req.json();
+  const schema = z.object({
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    email: z.string().email('Invalid email'),
+    linkedinUrl: z.string().min(1, 'LinkedIn is required'),
+    twitterHandle: z.string().optional(),
+    website: z.string().optional(),
+  });
+
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    const errorMsg = parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join(', ');
+    return c.json({ error: errorMsg }, 400);
+  }
+
+  const { firstName, lastName, email, linkedinUrl, twitterHandle, website } = parsed.data;
+
+  console.log(`\n💰 New investor interest: ${firstName} ${lastName} (${email})\n`);
+
+  if (postmarkClient) {
+    try {
+      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL || 'mat@matsherman.com';
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: adminEmail,
+        Subject: `Investor interest: ${firstName} ${lastName}`,
+        HtmlBody: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h3>New Investor Interest</h3>
+            <p>Someone wants to invest. Book a call with them.</p>
+            <table style="border-collapse: collapse; width: 100%;">
+              <tr><td style="padding: 6px 12px; color: #666;">Name</td><td style="padding: 6px 12px; font-weight: bold;">${firstName} ${lastName}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Email</td><td style="padding: 6px 12px;"><a href="mailto:${email}">${email}</a></td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">LinkedIn</td><td style="padding: 6px 12px;"><a href="${linkedinUrl}">${linkedinUrl}</a></td></tr>
+              ${twitterHandle ? `<tr><td style="padding: 6px 12px; color: #666;">Twitter</td><td style="padding: 6px 12px;">@${twitterHandle}</td></tr>` : ''}
+              ${website ? `<tr><td style="padding: 6px 12px; color: #666;">Website</td><td style="padding: 6px 12px;"><a href="${website}">${website}</a></td></tr>` : ''}
+            </table>
+          </div>
+        `,
+        TextBody: `New Investor Interest\n\nName: ${firstName} ${lastName}\nEmail: ${email}\nLinkedIn: ${linkedinUrl}${twitterHandle ? `\nTwitter: @${twitterHandle}` : ''}${website ? `\nWebsite: ${website}` : ''}`,
+      });
+    } catch (err) {
+      console.error('Failed to send investor interest notification:', err);
+    }
+  }
+
+  return c.json({ success: true });
+});
+
 export default app;

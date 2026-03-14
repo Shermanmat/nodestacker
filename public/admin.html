@@ -1850,7 +1850,8 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="app in portfolioApplications" :key="app.id" class="border-t hover:bg-gray-50">
+              <template v-for="app in portfolioApplications" :key="app.id">
+              <tr class="border-t hover:bg-gray-50">
                 <td class="px-4 py-3">
                   <div class="font-medium">{{ app.user?.firstName }} {{ app.user?.lastName }}</div>
                   <div class="text-xs text-gray-500">{{ app.user?.email }}</div>
@@ -1924,6 +1925,7 @@
                   </div>
                 </td>
               </tr>
+              </template>
             </tbody>
           </table>
           <div v-else class="px-4 py-8 text-center text-gray-400">No portfolio applications yet.</div>
@@ -2773,18 +2775,27 @@
         async function loadSignups() {
           try {
             signups.value = await api('/signups');
-            portfolioApplications.value = await api('/signups/applications');
-            // Enrich applications with voice interview data
-            for (const app of portfolioApplications.value) {
+            const apps = await api('/signups/applications');
+            console.log('Portfolio applications loaded:', apps);
+            portfolioApplications.value = apps || [];
+          } catch (e) { console.error('loadSignups failed:', e); }
+          // Enrich with voice interview data after render
+          setTimeout(loadInterviewData, 100);
+        }
+
+        async function loadInterviewData() {
+          try {
+            const enriched = [...portfolioApplications.value];
+            for (let i = 0; i < enriched.length; i++) {
               try {
-                const viData = await fetch(`/api/admin/voice-interviews/${app.id}`, {
-                  headers: { 'X-Admin-Session': adminSessionId.value },
-                }).then(r => r.json());
-                app.voiceInterview = viData.interview || null;
-                app.voiceInterviewAnswers = viData.answers || [];
-              } catch { app.voiceInterview = null; app.voiceInterviewAnswers = []; }
+                const viData = await api(`/admin/voice-interviews/${enriched[i].id}`);
+                enriched[i] = { ...enriched[i], voiceInterview: viData?.interview || null, voiceInterviewAnswers: viData?.answers || [] };
+              } catch (e) {
+                enriched[i] = { ...enriched[i], voiceInterview: null, voiceInterviewAnswers: [] };
+              }
             }
-          } catch (e) { /* handled by api() */ }
+            portfolioApplications.value = enriched;
+          } catch (e) { console.error('Interview data load failed:', e); }
         }
 
         async function approveApplication(companyId) {

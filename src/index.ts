@@ -342,14 +342,16 @@ app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
 
 // Admin dashboard - serve with no-cache headers to prevent proxy caching
-app.get('/admin', async (c) => {
+const serveAdminHtml = async (c: any) => {
   const fs = await import('fs');
   const html = fs.readFileSync('./public/admin.html', 'utf-8');
   c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
   c.header('Pragma', 'no-cache');
   c.header('Expires', '0');
   return c.html(html);
-});
+};
+app.get('/admin', serveAdminHtml);
+app.get('/admin2', serveAdminHtml);
 
 // Serve static files from public directory
 app.use('/*', serveStatic({ root: './public' }));

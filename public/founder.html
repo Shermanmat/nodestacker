@@ -239,12 +239,12 @@
                       <div @click="incorporationPath = 'partner'"
                         :class="['border-2 rounded-lg p-4 cursor-pointer transition-colors', incorporationPath === 'partner' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
                         <h4 class="font-semibold mb-1">Incorporate with a partner</h4>
-                        <p class="text-sm text-gray-500">We'll help you incorporate through one of our partners, ranging from a law firm who will refer fees to Stripe Atlas at $500. You have options. You'll sign a pre-incorporation equity commitment.</p>
+                        <p class="text-sm text-gray-500">We'll help you incorporate through one of our partners, ranging from a law firm who will defer fees to Stripe Atlas at $500. You have options. You'll sign a pre-incorporation equity commitment.</p>
                       </div>
                       <div @click="incorporationPath = 'side_project'"
                         :class="['border-2 rounded-lg p-4 cursor-pointer transition-colors', incorporationPath === 'side_project' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
                         <h4 class="font-semibold mb-1">Side project for now</h4>
-                        <p class="text-sm text-gray-500">No rush. You'll have network access and we'll check in quarterly. Incorporate whenever you're ready.</p>
+                        <p class="text-sm text-gray-500">No rush. You'll sign a pre-incorporation equity commitment, have network access, and we'll check in quarterly.</p>
                       </div>
                     </div>
 
@@ -297,7 +297,7 @@
                     <p class="mb-3">By signing below, I acknowledge and agree to the following:</p>
                     <ol class="list-decimal list-inside space-y-2 mb-4">
                       <li>I intend to incorporate a company and will issue <strong>{{ onboarding.workflow?.offerEquityPercent }}%</strong> equity to MatCapital upon incorporation, subject to the vesting schedule previously agreed to.</li>
-                      <li>I will incorporate using <strong>{{ formatPartnerName(onboarding.workflow?.incorporationPartner) }}</strong> as my incorporation partner.</li>
+                      <li v-if="onboarding.workflow?.incorporationPartner">I will incorporate using <strong>{{ formatPartnerName(onboarding.workflow?.incorporationPartner) }}</strong> as my incorporation partner.</li>
                       <li>Upon incorporation, I will promptly return to the MatCap Founder Portal to complete the equity issuance process.</li>
                       <li>This commitment is non-binding but reflects my genuine intention to complete the equity issuance to MatCapital.</li>
                     </ol>

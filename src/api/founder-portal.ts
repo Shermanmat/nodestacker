@@ -675,7 +675,7 @@ app.get('/onboarding/status', async (c) => {
     case OnboardingStatus.OFFER_ACCEPTED:
       if (workflow.incorporated === null || workflow.incorporated === undefined) {
         nextAction = { type: 'incorporation_question', message: 'Is your company incorporated?' };
-      } else if (workflow.incorporationPartner && !workflow.equityCommitmentSignedAt) {
+      } else if (workflow.incorporated === false && !workflow.equityCommitmentSignedAt) {
         nextAction = { type: 'equity_commitment', message: 'Sign the pre-incorporation equity commitment' };
       } else {
         nextAction = { type: 'entity_info', message: 'Submit your company details' };
@@ -883,10 +883,9 @@ app.post('/onboarding/incorporation-answer', async (c) => {
   }
 
   if (path === 'side_project') {
-    // Side project → light engagement
+    // Side project → still needs equity commitment before light engagement
     await db.update(onboardingWorkflows)
       .set({
-        status: OnboardingStatus.LIGHT_ENGAGEMENT,
         incorporated: false,
         updatedAt: now,
       })
@@ -894,13 +893,7 @@ app.post('/onboarding/incorporation-answer', async (c) => {
 
     await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: false, path: 'side_project' });
 
-    await onboardingEmails.sendLightEngagementConfirmationEmail({
-      name: founder.name,
-      email: founder.email,
-      companyName: founder.companyName,
-    });
-
-    return c.json({ success: true, message: 'No problem! We\'ll check in quarterly.' });
+    return c.json({ success: true, message: 'Next: sign the pre-incorporation equity commitment.' });
   }
 
   if (path === 'partner') {
@@ -961,15 +954,20 @@ app.post('/onboarding/equity-commitment', async (c) => {
   });
   if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
 
-  if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED || !workflow.incorporationPartner) {
+  if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED || workflow.incorporated !== false) {
     return c.json({ error: 'Cannot sign equity commitment in current state' }, 400);
   }
 
   const now = new Date().toISOString();
 
+  // Side projects go to light engagement, partner path goes to pending incorporation
+  const nextStatus = workflow.incorporationPartner
+    ? OnboardingStatus.PENDING_INCORPORATION
+    : OnboardingStatus.LIGHT_ENGAGEMENT;
+
   await db.update(onboardingWorkflows)
     .set({
-      status: OnboardingStatus.PENDING_INCORPORATION,
+      status: nextStatus,
       equityCommitmentSignedAt: now,
       updatedAt: now,
     })
@@ -977,14 +975,23 @@ app.post('/onboarding/equity-commitment', async (c) => {
 
   await logOnboardingEvent(workflow.id, OnboardingEventType.EQUITY_COMMITMENT_SIGNED, founder.email, {
     founderName: parsed.data.founderName,
-    partner: workflow.incorporationPartner,
+    partner: workflow.incorporationPartner || 'side_project',
   });
 
   await onboardingEmails.sendEquityCommitmentConfirmationEmail({
     name: founder.name,
     email: founder.email,
     companyName: founder.companyName,
-  }, workflow.incorporationPartner);
+  }, workflow.incorporationPartner || null);
+
+  if (!workflow.incorporationPartner) {
+    // Side project: also send light engagement email
+    await onboardingEmails.sendLightEngagementConfirmationEmail({
+      name: founder.name,
+      email: founder.email,
+      companyName: founder.companyName,
+    });
+  }
 
   return c.json({ success: true, message: 'Commitment signed! We\'ll follow up once you\'re incorporated.' });
 });

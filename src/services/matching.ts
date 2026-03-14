@@ -381,7 +381,7 @@ async function loadMatchingData() {
  * Check if a founder-investor pair passes category/sector filters.
  * Returns true if they're compatible.
  */
-function passesCategoryFilter(
+export function passesCategoryFilter(
   founderCategories: { id: number; name: string; type: string }[],
   investorCategories: { id: number; name: string; type: string }[] | undefined,
   investorExclusions: Set<number> | undefined,

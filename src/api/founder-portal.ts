@@ -958,7 +958,7 @@ app.post('/onboarding/equity-commitment', async (c) => {
   });
   if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
 
-  if (![OnboardingStatus.OFFER_ACCEPTED, OnboardingStatus.LIGHT_ENGAGEMENT].includes(workflow.status) || workflow.incorporated !== false) {
+  if ((workflow.status !== OnboardingStatus.OFFER_ACCEPTED && workflow.status !== OnboardingStatus.LIGHT_ENGAGEMENT) || workflow.incorporated !== false) {
     return c.json({ error: 'Cannot sign equity commitment in current state' }, 400);
   }
 

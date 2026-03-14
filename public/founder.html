@@ -349,6 +349,20 @@
                       <input v-model="entityForm.entityState" type="text" class="w-full border rounded px-3 py-2" placeholder="DE" maxlength="2">
                     </div>
                     <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">EIN</label>
+                      <input v-model="entityForm.ein" type="text" class="w-full border rounded px-3 py-2" placeholder="XX-XXXXXXX" maxlength="10">
+                      <p class="text-xs text-gray-400 mt-1">From your IRS confirmation letter (CP 575)</p>
+                    </div>
+                  </div>
+
+                  <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Articles of Incorporation / EIN Confirmation Letter</label>
+                    <input v-model="entityForm.articlesOfIncorporationUrl" type="text" class="w-full border rounded px-3 py-2" placeholder="Google Drive, Dropbox, or other link">
+                    <p class="text-xs text-gray-400 mt-1">Upload to Google Drive or Dropbox and paste the share link here</p>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-4 mt-4">
+                    <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Authorized Shares</label>
                       <input v-model.number="entityForm.authorizedShares" type="number" class="w-full border rounded px-3 py-2" placeholder="10000000">
                     </div>
@@ -850,6 +864,8 @@
           entityName: '',
           entityType: 'c_corp',
           entityState: 'DE',
+          ein: '',
+          articlesOfIncorporationUrl: '',
           authorizedShares: 10000000,
           sharePrice: '0.0001',
           founderTitle: 'Founder & CEO',

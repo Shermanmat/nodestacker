@@ -54,6 +54,9 @@ safeAddColumn('onboarding_workflows', 'incorporation_partner', 'text');
 safeAddColumn('onboarding_workflows', 'approved_for_law_firm', 'integer DEFAULT false');
 safeAddColumn('onboarding_workflows', 'equity_commitment_signed_at', 'text');
 safeAddColumn('onboarding_workflows', 'last_incorporation_nudge_at', 'text');
+// onboarding_workflows entity verification columns (migration 0031)
+safeAddColumn('onboarding_workflows', 'ein', 'text');
+safeAddColumn('onboarding_workflows', 'articles_of_incorporation_url', 'text');
 
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });

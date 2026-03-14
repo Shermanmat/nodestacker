@@ -744,6 +744,8 @@ app.get('/onboarding/status', async (c) => {
       entityName: workflow.entityName,
       entityType: workflow.entityType,
       entityState: workflow.entityState,
+      ein: workflow.ein,
+      articlesOfIncorporationUrl: workflow.articlesOfIncorporationUrl,
       authorizedShares: workflow.authorizedShares,
       sharePrice: workflow.sharePrice,
       entityInfoReceivedAt: workflow.entityInfoReceivedAt,
@@ -1053,6 +1055,8 @@ app.post('/onboarding/entity-info', async (c) => {
     entityName: z.string().min(1),
     entityType: z.enum(['llc', 'c_corp', 's_corp', 'partnership', 'sole_prop', 'other']),
     entityState: z.string().min(2).max(2), // State code
+    ein: z.string().min(1, 'EIN is required'),
+    articlesOfIncorporationUrl: z.string().min(1, 'Articles of incorporation are required'),
     authorizedShares: z.number().positive(),
     sharePrice: z.string().optional(), // Defaults to 0.0001 if not provided
     founderTitle: z.string().optional(), // Defaults to 'Founder & CEO' if not provided
@@ -1108,6 +1112,8 @@ app.post('/onboarding/entity-info', async (c) => {
       entityName: parsed.data.entityName,
       entityType: parsed.data.entityType,
       entityState: parsed.data.entityState,
+      ein: parsed.data.ein,
+      articlesOfIncorporationUrl: parsed.data.articlesOfIncorporationUrl,
       authorizedShares: parsed.data.authorizedShares,
       sharePrice,
       founderTitle,

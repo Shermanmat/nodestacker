@@ -589,6 +589,8 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   entityName: text('entity_name'),
   entityType: text('entity_type'),
   entityState: text('entity_state'),
+  ein: text('ein'),
+  articlesOfIncorporationUrl: text('articles_of_incorporation_url'),
   authorizedShares: integer('authorized_shares'),
   sharePrice: text('share_price').default('0.0001'),
   founderTitle: text('founder_title'),

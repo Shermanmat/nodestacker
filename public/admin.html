@@ -111,6 +111,7 @@
         <div class="sidebar-section">Analytics</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'health' }" @click="switchTab('health')">Network Health</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'pipeline' }" @click="switchTab('pipeline')">Pipeline Health</div>
+        <div class="sidebar-link" :class="{ active: activeTab === 'marketplace' }" @click="switchTab('marketplace')">Marketplace Health</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'categories' }" @click="switchTab('categories')">Categories</div>
       </nav>
 
@@ -1598,6 +1599,242 @@
         </div>
       </div>
 
+      <!-- Marketplace Health Tab -->
+      <div v-if="activeTab === 'marketplace'">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold">Marketplace Health</h2>
+          <button @click="loadMarketplaceHealth" class="text-blue-600 text-sm hover:underline">Refresh</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-4 gap-4 mb-8">
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-gray-900">{{ marketplaceHealth.sectorBalance.summary.totalSectors }}</div>
+            <div class="text-sm text-gray-500">Total Sectors</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-green-600">{{ marketplaceHealth.sectorBalance.summary.balanced }}</div>
+            <div class="text-sm text-gray-500">Balanced</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-amber-600">{{ marketplaceHealth.sectorBalance.summary.tight }}</div>
+            <div class="text-sm text-gray-500">Tight</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-red-600">{{ marketplaceHealth.sectorBalance.summary.severe }}</div>
+            <div class="text-sm text-gray-500">Severe</div>
+          </div>
+        </div>
+
+        <!-- Sector Balance Table -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <h3 class="font-semibold mb-4">Supply / Demand by Sector</h3>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left border-b">
+                <th class="pb-2">Sector</th>
+                <th class="pb-2">Founders</th>
+                <th class="pb-2">Investors (Available / Total)</th>
+                <th class="pb-2">Ratio</th>
+                <th class="pb-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="sector in marketplaceHealth.sectorBalance.sectors" :key="sector.categoryId" class="border-b last:border-0">
+                <td class="py-3 font-medium">{{ sector.categoryName }}</td>
+                <td class="py-3">{{ sector.founderCount }}</td>
+                <td class="py-3">
+                  <span class="font-medium">{{ sector.investorsAvailable }}</span>
+                  <span class="text-gray-400"> / {{ sector.investorCountTotal }}</span>
+                  <span v-if="sector.investorsOnCooldown > 0" class="text-xs text-amber-500 ml-1">({{ sector.investorsOnCooldown }} on cooldown)</span>
+                </td>
+                <td class="py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-24 bg-gray-200 rounded-full h-2">
+                      <div class="h-2 rounded-full" :class="{
+                        'bg-green-500': sector.status === 'balanced',
+                        'bg-amber-500': sector.status === 'tight',
+                        'bg-red-500': sector.status === 'severe',
+                        'bg-gray-300': sector.status === 'no_demand',
+                      }" :style="{ width: Math.min(100, (sector.ratio !== null ? Math.min(sector.ratio / 20 * 100, 100) : 100)) + '%' }"></div>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ sector.ratio !== null ? sector.ratio + ':1' : 'No investors' }}</span>
+                  </div>
+                </td>
+                <td class="py-3">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium" :class="{
+                    'bg-green-100 text-green-700': sector.status === 'balanced',
+                    'bg-amber-100 text-amber-700': sector.status === 'tight',
+                    'bg-red-100 text-red-700': sector.status === 'severe',
+                    'bg-gray-100 text-gray-500': sector.status === 'no_demand',
+                  }">{{ sector.status === 'no_demand' ? 'No Demand' : sector.status.charAt(0).toUpperCase() + sector.status.slice(1) }}</span>
+                </td>
+              </tr>
+              <tr v-if="marketplaceHealth.sectorBalance.sectors.length === 0">
+                <td colspan="5" class="py-4 text-center text-gray-400">No sector data available</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Investor Utilization -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold">Investor Utilization</h3>
+            <div class="flex items-center gap-4 text-xs text-gray-500">
+              <span>Utilization Rate: <strong class="text-gray-900">{{ marketplaceHealth.investorUtilization.summary.utilizationRate }}%</strong></span>
+              <select v-model="marketplaceUtilFilter" class="border rounded px-2 py-1 text-sm">
+                <option value="all">All ({{ marketplaceHealth.investorUtilization.summary.totalActive }})</option>
+                <option value="over">Over-utilized ({{ marketplaceHealth.investorUtilization.summary.overUtilized }})</option>
+                <option value="under">Under-utilized ({{ marketplaceHealth.investorUtilization.summary.underUtilized }})</option>
+                <option value="cooldown">On Cooldown ({{ marketplaceHealth.investorUtilization.summary.onCooldown }})</option>
+                <option value="normal">Normal</option>
+                <option value="dormant">Dormant</option>
+              </select>
+            </div>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left border-b">
+                <th class="pb-2">Investor</th>
+                <th class="pb-2">Firm</th>
+                <th class="pb-2">Intros (90d)</th>
+                <th class="pb-2">Reliability</th>
+                <th class="pb-2">Sectors</th>
+                <th class="pb-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="inv in filteredUtilizationInvestors" :key="inv.id" class="border-b last:border-0">
+                <td class="py-3 font-medium">{{ inv.name }}</td>
+                <td class="py-3 text-gray-500">{{ inv.firm || '—' }}</td>
+                <td class="py-3">{{ inv.introsLast90Days }}</td>
+                <td class="py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 bg-gray-200 rounded-full h-2">
+                      <div class="bg-blue-500 h-2 rounded-full" :style="{ width: inv.reliabilityScore + '%' }"></div>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ inv.reliabilityScore }}</span>
+                  </div>
+                </td>
+                <td class="py-3">
+                  <span v-for="sector in inv.sectors" :key="sector" class="inline-block bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs mr-1 mb-1">{{ sector }}</span>
+                  <span v-if="inv.sectors.length === 0" class="text-gray-400 text-xs">Generalist</span>
+                </td>
+                <td class="py-3">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium" :class="{
+                    'bg-red-100 text-red-700': inv.utilizationStatus === 'over',
+                    'bg-green-100 text-green-700': inv.utilizationStatus === 'normal',
+                    'bg-blue-100 text-blue-700': inv.utilizationStatus === 'under',
+                    'bg-amber-100 text-amber-700': inv.utilizationStatus === 'cooldown',
+                    'bg-gray-100 text-gray-500': inv.utilizationStatus === 'dormant',
+                  }">{{ inv.utilizationStatus === 'over' ? 'Over-utilized' : inv.utilizationStatus === 'under' ? 'Under-utilized' : inv.utilizationStatus === 'cooldown' ? 'Cooldown' : inv.utilizationStatus === 'dormant' ? 'Dormant' : 'Normal' }}</span>
+                  <div v-if="inv.onCooldown && inv.cooldownReason" class="text-xs text-amber-500 mt-1">{{ inv.cooldownReason }}</div>
+                </td>
+              </tr>
+              <tr v-if="filteredUtilizationInvestors.length === 0">
+                <td colspan="6" class="py-4 text-center text-gray-400">No investors match filter</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Coverage Gaps -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <h3 class="font-semibold mb-4">Coverage Gaps</h3>
+          <div v-if="marketplaceHealth.coverageGaps.length === 0" class="text-gray-400 text-sm py-4 text-center">
+            No coverage gaps — all sectors with active founders have investor coverage.
+          </div>
+          <div v-for="gap in marketplaceHealth.coverageGaps" :key="gap.categoryId" class="border rounded-lg mb-3 last:mb-0">
+            <div class="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50" @click="toggleGapExpansion(gap.categoryId)">
+              <div class="flex items-center gap-3">
+                <span class="px-2 py-1 rounded-full text-xs font-medium" :class="gap.gap === 'zero_coverage' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'">
+                  {{ gap.gap === 'zero_coverage' ? 'No Coverage' : 'Insufficient' }}
+                </span>
+                <span class="font-medium">{{ gap.categoryName }}</span>
+              </div>
+              <div class="flex items-center gap-4 text-sm text-gray-500">
+                <span>{{ gap.founderCount }} founders</span>
+                <span>{{ gap.investorCount }} investor{{ gap.investorCount !== 1 ? 's' : '' }}</span>
+                <span>{{ gap.waitlistedFounders.length }} waitlisted</span>
+                <svg class="w-4 h-4 transition-transform" :class="{ 'rotate-180': marketplaceExpandedGap === gap.categoryId }" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+              </div>
+            </div>
+            <div v-if="marketplaceExpandedGap === gap.categoryId" class="border-t px-4 pb-4">
+              <table class="w-full text-sm mt-3">
+                <thead>
+                  <tr class="text-left border-b">
+                    <th class="pb-2">#</th>
+                    <th class="pb-2">Founder</th>
+                    <th class="pb-2">Company</th>
+                    <th class="pb-2">Heat Score</th>
+                    <th class="pb-2">Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="f in gap.waitlistedFounders" :key="f.id" class="border-b last:border-0">
+                    <td class="py-2 text-gray-400">{{ f.waitlistPosition }}</td>
+                    <td class="py-2 font-medium">{{ f.name }}</td>
+                    <td class="py-2 text-gray-500">{{ f.companyName || '—' }}</td>
+                    <td class="py-2">
+                      <div class="flex items-center gap-2">
+                        <div class="w-16 bg-gray-200 rounded-full h-2">
+                          <div class="h-2 rounded-full" :class="f.heatScore >= 70 ? 'bg-green-500' : f.heatScore >= 40 ? 'bg-amber-500' : 'bg-red-500'" :style="{ width: f.heatScore + '%' }"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ f.heatScore }}</span>
+                      </div>
+                    </td>
+                    <td class="py-2 text-xs text-gray-500">{{ f.reason }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Aggregated Waitlist -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <h3 class="font-semibold mb-1">Founder Waitlist</h3>
+          <p class="text-sm text-gray-500 mb-4">{{ marketplaceHealth.waitlist.total }} founder{{ marketplaceHealth.waitlist.total !== 1 ? 's' : '' }} in sectors with insufficient investor coverage, ranked by heat score.</p>
+          <table v-if="marketplaceHealth.waitlist.founders.length > 0" class="w-full text-sm">
+            <thead>
+              <tr class="text-left border-b">
+                <th class="pb-2">#</th>
+                <th class="pb-2">Founder</th>
+                <th class="pb-2">Company</th>
+                <th class="pb-2">Heat Score</th>
+                <th class="pb-2">Sectors</th>
+                <th class="pb-2">Gap Sectors</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in marketplaceHealth.waitlist.founders" :key="f.id" class="border-b last:border-0">
+                <td class="py-3 text-gray-400">{{ f.waitlistPosition }}</td>
+                <td class="py-3 font-medium">{{ f.name }}</td>
+                <td class="py-3 text-gray-500">{{ f.companyName || '—' }}</td>
+                <td class="py-3">
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 bg-gray-200 rounded-full h-2">
+                      <div class="h-2 rounded-full" :class="f.heatScore >= 70 ? 'bg-green-500' : f.heatScore >= 40 ? 'bg-amber-500' : 'bg-red-500'" :style="{ width: f.heatScore + '%' }"></div>
+                    </div>
+                    <span class="text-xs text-gray-500">{{ f.heatScore }}</span>
+                  </div>
+                </td>
+                <td class="py-3">
+                  <span v-for="s in f.sectors" :key="s" class="inline-block bg-gray-100 text-gray-600 px-2 py-0.5 rounded text-xs mr-1 mb-1">{{ s }}</span>
+                </td>
+                <td class="py-3">
+                  <span v-for="g in f.gapSectors" :key="g" class="inline-block bg-red-100 text-red-600 px-2 py-0.5 rounded text-xs mr-1 mb-1">{{ g }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="text-gray-400 text-sm py-4 text-center">
+            No founders are currently waitlisted — all sectors have sufficient investor coverage.
+          </div>
+        </div>
+      </div>
+
       <!-- Categories Tab -->
       <div v-if="activeTab === 'categories'">
         <div class="flex justify-between items-center mb-6">
@@ -2687,6 +2924,7 @@
           if (tabId === 'onboarding') loadOnboardingWorkflows();
           if (tabId === 'health') loadNetworkHealth();
           if (tabId === 'pipeline') loadPipelineHealth();
+          if (tabId === 'marketplace') loadMarketplaceHealth();
           if (tabId === 'categories') loadCategories();
           if (tabId === 'signups') loadSignups();
         }
@@ -2710,6 +2948,16 @@
 
         // Pipeline Health
         const pipelineHealth = ref({ founders: [], summary: {} });
+
+        // Marketplace Health
+        const marketplaceHealth = ref({
+          sectorBalance: { summary: { totalSectors: 0, balanced: 0, tight: 0, severe: 0 }, sectors: [] },
+          investorUtilization: { summary: { totalActive: 0, overUtilized: 0, underUtilized: 0, onCooldown: 0, utilizationRate: 0 }, investors: [] },
+          coverageGaps: [],
+          waitlist: { total: 0, founders: [] },
+        });
+        const marketplaceUtilFilter = ref('all');
+        const marketplaceExpandedGap = ref(null);
         const networkAvailability = ref(null);
 
         // Categories
@@ -3893,6 +4141,22 @@
           loadFounders();
         };
 
+        // Marketplace Health
+        const loadMarketplaceHealth = async () => {
+          const data = await api('/marketplace-health');
+          marketplaceHealth.value = data;
+        };
+
+        const filteredUtilizationInvestors = computed(() => {
+          const inv = marketplaceHealth.value.investorUtilization.investors;
+          if (marketplaceUtilFilter.value === 'all') return inv;
+          return inv.filter(i => i.utilizationStatus === marketplaceUtilFilter.value);
+        });
+
+        const toggleGapExpansion = (categoryId) => {
+          marketplaceExpandedGap.value = marketplaceExpandedGap.value === categoryId ? null : categoryId;
+        };
+
         // Category functions
         const categoryTypeGroups = computed(() => {
           const types = [
@@ -4980,6 +5244,9 @@
           // Pipeline Health
           pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
           updateFounderCadence, toggleFounderCadence,
+          // Marketplace Health
+          marketplaceHealth, marketplaceUtilFilter, marketplaceExpandedGap,
+          loadMarketplaceHealth, filteredUtilizationInvestors, toggleGapExpansion,
           // Categories
           allCategories, newCategoryForm, editingCategoryId, editCategoryForm,
           showCategoryAssignModal, categoryAssignTarget, selectedCategoryIds,

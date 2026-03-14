@@ -27,6 +27,7 @@ import publicProfileRoutes from './api/public-profile.js';
 import publicCompaniesRoutes from './api/public-companies.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
+import marketplaceHealthRoutes from './api/marketplace-health.js';
 import signupsRoutes from './api/signups.js';
 import voiceInterviewsRoutes from './api/voice-interviews.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
@@ -90,6 +91,9 @@ app.use('/api/onboarding-chat/leads/*', adminGuard);
 // Matching system
 app.use('/api/matching', adminGuard);
 app.use('/api/matching/*', adminGuard);
+// Marketplace health
+app.use('/api/marketplace-health', adminGuard);
+app.use('/api/marketplace-health/*', adminGuard);
 app.use('/api/signups', adminGuard);
 app.use('/api/signups/*', adminGuard);
 // Voice interview admin endpoints
@@ -111,6 +115,7 @@ app.route('/api/inbound', inboundRoutes);
 app.route('/api/onboarding', onboardingRoutes);
 app.route('/api/webhooks', webhooksRoutes);
 app.route('/api/matching', matchingRoutes);
+app.route('/api/marketplace-health', marketplaceHealthRoutes);
 app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 

@@ -183,6 +183,7 @@ app.get('/', async (c) => {
       isGeneralist,
       utilizationStatus,
       sectorCategoryIds: cats.filter(c => c.type === 'sector').map(c => c.id),
+      excludedCategoryIds: Array.from(investorExclusionMap.get(inv.id) || []),
     };
   });
 
@@ -198,7 +199,8 @@ app.get('/', async (c) => {
 
     // Count active investors covering this sector (including generalists)
     const matchingInvestors = investorMetrics.filter(inv =>
-      inv.sectorCategoryIds.includes(sector.id) || inv.isGeneralist
+      inv.sectorCategoryIds.includes(sector.id) ||
+      (inv.isGeneralist && !inv.excludedCategoryIds.includes(sector.id))
     );
     const investorCountTotal = matchingInvestors.length;
     const investorsAvailable = matchingInvestors.filter(inv => !inv.onCooldown && inv.utilizationStatus !== 'dormant').length;
@@ -335,7 +337,7 @@ app.get('/', async (c) => {
     },
     investorUtilization: {
       summary: utilizationSummary,
-      investors: investorMetrics.map(({ sectorCategoryIds, isGeneralist, ...rest }) => rest),
+      investors: investorMetrics.map(({ sectorCategoryIds, isGeneralist, excludedCategoryIds, ...rest }) => rest),
     },
     coverageGaps,
     waitlist: {

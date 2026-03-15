@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, isNotNull } from 'drizzle-orm';
-import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections } from '../db/index.js';
+import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, ensureDefaultNodeRelationship } from '../db/index.js';
 import { z } from 'zod';
 import * as postmark from 'postmark';
 
@@ -80,6 +80,7 @@ app.post('/applications/:id/approve', async (c) => {
       createdAt: now,
     }).returning();
     founder = created;
+    await ensureDefaultNodeRelationship(founder.id);
   }
 
   // Create portfolio company if not exists
@@ -225,6 +226,7 @@ app.post('/:id/convert/founder', async (c) => {
     createdAt: now,
   }).returning();
 
+  await ensureDefaultNodeRelationship(founder.id);
   await db.update(publicUsers).set({ status: 'converted' }).where(eq(publicUsers.id, id));
 
   return c.json({ success: true, founderId: founder.id });

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { db, founders, founderNodeRelationships, nodes, founderCategoryAssignments, investorCategories, investorCategoryAssignments, introRequests, investors, nodeInvestorConnections } from '../db/index.js';
+import { db, founders, founderNodeRelationships, nodes, founderCategoryAssignments, investorCategories, investorCategoryAssignments, introRequests, investors, nodeInvestorConnections, ensureDefaultNodeRelationship } from '../db/index.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -371,6 +371,8 @@ app.post('/', async (c) => {
     ...parsed.data,
     createdAt: now,
   }).returning();
+
+  await ensureDefaultNodeRelationship(result[0].id);
 
   return c.json(result[0], 201);
 });

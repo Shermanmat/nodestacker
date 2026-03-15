@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { eq, desc } from 'drizzle-orm';
 import { db, inboundIntroLogs, founders, investors, nodes, introRequests, founderNodeRelationships, nodeInvestorConnections } from '../db/index.js';
 import { z } from 'zod';
+import { checkFirmBlocked } from '../services/matching.js';
 
 const app = new Hono();
 
@@ -482,6 +483,12 @@ app.post('/:id/confirm', async (c) => {
 
   const existingForPair = existingRequest &&
     existingRequest.investorId === finalInvestorId;
+
+  // Firm-level dedup: block if another investor at this firm already has an intro for this founder
+  const blockedFirm = !existingForPair ? await checkFirmBlocked(finalFounderId, finalInvestorId) : null;
+  if (blockedFirm) {
+    return c.json({ error: `Another investor at ${blockedFirm} already has an intro request for this founder` }, 400);
+  }
 
   if (existingForPair) {
     // Already exists - just use the existing request

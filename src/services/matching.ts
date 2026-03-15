@@ -182,6 +182,47 @@ export function isInvestorOnCooldown(investorIntros: IntroRequest[]): CooldownRe
   return { onCooldown: false, reason: null, unresolvedCount: 0 };
 }
 
+/**
+ * Get the set of firm names (normalized) that are blocked for a given founder.
+ * A firm is blocked if any investor at that firm already has an intro request
+ * for this founder (any status).
+ */
+export async function getFounderBlockedFirms(founderId: number): Promise<Set<string>> {
+  const founderIntros = await db.select({ investorId: introRequests.investorId })
+    .from(introRequests)
+    .where(eq(introRequests.founderId, founderId));
+
+  const investorIds = founderIntros.map(ir => ir.investorId);
+  if (investorIds.length === 0) return new Set();
+
+  const relevantInvestors = await db.select({ id: investors.id, firm: investors.firm })
+    .from(investors)
+    .where(inArray(investors.id, investorIds));
+
+  const firms = new Set<string>();
+  for (const inv of relevantInvestors) {
+    if (inv.firm) firms.add(inv.firm.trim().toLowerCase());
+  }
+  return firms;
+}
+
+/**
+ * Check if an investor's firm is blocked for a given founder.
+ * Returns the firm name if blocked, null if OK.
+ */
+export async function checkFirmBlocked(founderId: number, investorId: number): Promise<string | null> {
+  const investor = await db.select({ firm: investors.firm })
+    .from(investors)
+    .where(eq(investors.id, investorId))
+    .get();
+
+  if (!investor?.firm) return null;
+
+  const blockedFirms = await getFounderBlockedFirms(founderId);
+  const normalizedFirm = investor.firm.trim().toLowerCase();
+  return blockedFirms.has(normalizedFirm) ? investor.firm : null;
+}
+
 // --- Inverse Match Scoring ---
 
 /**
@@ -519,7 +560,9 @@ export async function generateMatchSuggestions(
   const investorCooldowns = new Map<number, CooldownResult>();
   const investorVip = new Set<number>();
   const investorGeoMap = new Map<number, string>();
+  const investorFirmMap = new Map<number, string>(); // investorId → normalized firm name
   for (const inv of data.allInvestors) {
+    if (inv.firm) investorFirmMap.set(inv.id, inv.firm.trim().toLowerCase());
     if (!inv.active) continue;
     const intros = data.investorIntroMap.get(inv.id) || [];
     investorScores.set(inv.id, computeInvestorReliabilityScore(intros));
@@ -534,6 +577,13 @@ export async function generateMatchSuggestions(
     const founderCats = data.founderCatMap.get(founder.id) || [];
     const founderIntros = data.founderIntroMap.get(founder.id) || [];
     const alreadyIntrodInvestorIds = new Set(founderIntros.map(ir => ir.investorId));
+
+    // Firm-level dedup: if any investor at a firm has been intro'd for this founder, block the whole firm
+    const blockedFirms = new Set<string>();
+    for (const ir of founderIntros) {
+      const firm = investorFirmMap.get(ir.investorId);
+      if (firm) blockedFirms.add(firm);
+    }
 
     // Compute founder intro acceptance rate for VIP gating.
     // Acceptance = intros that progressed to meeting or beyond, out of all introduced.
@@ -581,6 +631,10 @@ export async function generateMatchSuggestions(
 
         // Skip already introduced
         if (alreadyIntrodInvestorIds.has(investorId)) continue;
+
+        // Skip investors at a firm that already has an intro for this founder
+        const investorFirm = investorFirmMap.get(investorId);
+        if (investorFirm && blockedFirms.has(investorFirm)) continue;
 
         // Skip inactive investors
         if (!investorScores.has(investorId)) continue;

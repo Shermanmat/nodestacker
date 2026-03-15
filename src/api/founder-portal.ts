@@ -5,6 +5,7 @@ import { getSessionFounderId } from './auth.js';
 import { z } from 'zod';
 import * as onboardingEmails from '../services/onboarding-emails.js';
 import * as esign from '../services/esign.js';
+import { checkFirmBlocked } from '../services/matching.js';
 
 type Variables = {
   founderId: number;
@@ -294,6 +295,12 @@ app.post('/request-intro', async (c) => {
 
   if (existing) {
     return c.json({ error: 'You already have an active intro request to this investor' }, 400);
+  }
+
+  // Firm-level dedup: block if another investor at this firm already has an intro for this founder
+  const blockedFirm = await checkFirmBlocked(founderId, parsed.data.investorId);
+  if (blockedFirm) {
+    return c.json({ error: `Another investor at ${blockedFirm} already has an intro request for you` }, 400);
   }
 
   const now = new Date().toISOString();

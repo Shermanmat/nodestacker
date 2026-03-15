@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { eq, and, lt, isNull, inArray, sql, desc } from 'drizzle-orm';
 import { db, introRequests, founderNodeRelationships, nodeInvestorConnections, followupLogs } from '../db/index.js';
 import { z } from 'zod';
+import { checkFirmBlocked } from '../services/matching.js';
 
 const app = new Hono();
 
@@ -143,6 +144,12 @@ app.post('/', async (c) => {
 
   if (existingRequest) {
     return c.json({ error: 'Active intro request already exists for this founder-investor pair' }, 400);
+  }
+
+  // Firm-level dedup: block if another investor at this firm already has an intro for this founder
+  const blockedFirm = await checkFirmBlocked(parsed.data.founderId, parsed.data.investorId);
+  if (blockedFirm) {
+    return c.json({ error: `Another investor at ${blockedFirm} already has an intro request for this founder` }, 400);
   }
 
   const now = new Date().toISOString();

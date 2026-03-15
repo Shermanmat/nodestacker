@@ -487,6 +487,11 @@ export async function generateMatchSuggestions(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
 
+  // Track investors already claimed by a pending suggestion (1 suggestion at a time per investor)
+  const claimedInvestorIds = new Set(
+    existingSuggestions.filter(s => s.status === 'pending').map(s => s.investorId)
+  );
+
   // Count intros in last 7 days per founder (including pending_suggestion — counts toward quota)
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const weeklyIntroCount = new Map<number, number>();
@@ -584,6 +589,9 @@ export async function generateMatchSuggestions(
         const cooldown = investorCooldowns.get(investorId);
         if (cooldown?.onCooldown) continue;
 
+        // Skip investors already claimed by another pending suggestion
+        if (claimedInvestorIds.has(investorId)) continue;
+
         // Skip existing pending suggestions for same triple
         const tripleKey = `${founder.id}-${fnRel.nodeId}-${investorId}`;
         if (existingTriples.has(tripleKey)) continue;
@@ -625,6 +633,9 @@ export async function generateMatchSuggestions(
           }),
           batchId,
         });
+
+        // Claim this investor so they aren't suggested for another founder in this batch
+        claimedInvestorIds.add(investorId);
       }
     }
   }

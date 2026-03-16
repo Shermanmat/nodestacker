@@ -564,6 +564,8 @@ export async function generateMatchSuggestions(
   for (const inv of data.allInvestors) {
     if (inv.firm) investorFirmMap.set(inv.id, inv.firm.trim().toLowerCase());
     if (!inv.active) continue;
+    // Skip paused investors (e.g. raising their fund)
+    if (inv.pausedUntil && new Date(inv.pausedUntil) > new Date()) continue;
     const intros = data.investorIntroMap.get(inv.id) || [];
     investorScores.set(inv.id, computeInvestorReliabilityScore(intros));
     if (inv.geography) investorGeoMap.set(inv.id, inv.geography.toLowerCase().trim());

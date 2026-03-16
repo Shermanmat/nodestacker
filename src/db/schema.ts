@@ -90,6 +90,8 @@ export const investors = sqliteTable('investors', {
   geography: text('geography'),
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   vip: integer('vip', { mode: 'boolean' }).notNull().default(false),
+  pausedUntil: text('paused_until'), // ISO date — investor paused (e.g. raising fund)
+  pauseReason: text('pause_reason'),
   city: text('city'),
   country: text('country'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),

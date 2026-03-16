@@ -17,6 +17,8 @@ const createInvestorSchema = z.object({
 const updateInvestorSchema = createInvestorSchema.partial().extend({
   active: z.boolean().optional(),
   vip: z.boolean().optional(),
+  pausedUntil: z.string().nullable().optional(),
+  pauseReason: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
 });
@@ -291,6 +293,37 @@ app.put('/:id', async (c) => {
     ...result[0],
     focusAreas: result[0].focusAreas ? JSON.parse(result[0].focusAreas) : [],
   });
+});
+
+// Pause investor for N months (default 3)
+app.post('/:id/pause', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const body = await c.req.json().catch(() => ({}));
+  const months = body.months || 3;
+  const reason = body.reason || 'Raising fund';
+
+  const pausedUntil = new Date();
+  pausedUntil.setMonth(pausedUntil.getMonth() + months);
+
+  const result = await db.update(investors)
+    .set({ pausedUntil: pausedUntil.toISOString(), pauseReason: reason })
+    .where(eq(investors.id, id))
+    .returning();
+
+  if (result.length === 0) return c.json({ error: 'Investor not found' }, 404);
+  return c.json({ success: true, pausedUntil: result[0].pausedUntil, pauseReason: result[0].pauseReason });
+});
+
+// Unpause investor
+app.post('/:id/unpause', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const result = await db.update(investors)
+    .set({ pausedUntil: null, pauseReason: null })
+    .where(eq(investors.id, id))
+    .returning();
+
+  if (result.length === 0) return c.json({ error: 'Investor not found' }, 404);
+  return c.json({ success: true });
 });
 
 // Assign categories to investor (replaces existing)

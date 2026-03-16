@@ -141,7 +141,10 @@ app.get('/', async (c) => {
 
   // --- Compute investor metrics ---
   const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
-  const activeInvestors = allInvestors.filter(inv => inv.active);
+  const now = new Date();
+  const activeInvestors = allInvestors.filter(inv =>
+    inv.active && !(inv.pausedUntil && new Date(inv.pausedUntil) > now)
+  );
 
   const investorMetrics = activeInvestors.map(inv => {
     const intros = investorIntroMap.get(inv.id) || [];

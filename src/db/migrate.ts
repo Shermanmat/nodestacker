@@ -86,6 +86,10 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// investor pause columns
+safeAddColumn('investors', 'paused_until', 'text');
+safeAddColumn('investors', 'pause_reason', 'text');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

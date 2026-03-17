@@ -2139,7 +2139,12 @@
                       <span v-else-if="app.voiceInterview?.status === 'researching'" class="text-xs text-gray-400">Generating questions...</span>
                       <span v-else-if="app.voiceInterview?.status === 'failed'" class="text-xs text-red-400">Research failed</span>
                     </template>
-                    <span v-else class="text-xs text-gray-400">--</span>
+                    <template v-else>
+                      <button v-if="app.voiceInterview?.status === 'completed'" @click="toggleInterviewReview(app.id)" class="text-xs text-purple-600 hover:underline font-medium">
+                        {{ expandedInterview === app.id ? 'Hide' : 'Review' }} Answers
+                      </button>
+                      <span v-else class="text-xs text-gray-400">--</span>
+                    </template>
                   </div>
                 </td>
               </tr>

@@ -383,4 +383,5 @@ console.log('[CRON] Weekly digest scheduled for Saturday 00:00 UTC (Friday 5pm A
 serve({
   fetch: app.fetch,
   port,
+  hostname: '0.0.0.0',
 });

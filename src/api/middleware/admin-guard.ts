@@ -17,7 +17,7 @@ export async function adminGuard(c: Context, next: Next) {
     return;
   }
 
-  const sessionId = c.req.header('X-Admin-Session');
+  const sessionId = c.req.header('X-Admin-Session') || c.req.query('session');
   const admin = await getAdminSession(sessionId);
 
   if (!admin) {

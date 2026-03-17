@@ -195,6 +195,24 @@ export async function listFolderContents(folderId: string): Promise<DriveFile[]>
 }
 
 /**
+ * Download a file's content as a stream
+ */
+export async function downloadFile(fileId: string): Promise<{ stream: any; mimeType: string }> {
+  const drive = getDriveClient();
+
+  // Get file metadata first for mime type
+  const meta = await drive.files.get({ fileId, fields: 'mimeType' });
+  const mimeType = meta.data.mimeType || 'application/octet-stream';
+
+  const response = await drive.files.get(
+    { fileId, alt: 'media' },
+    { responseType: 'stream' }
+  );
+
+  return { stream: response.data, mimeType };
+}
+
+/**
  * Delete a file (moves to trash)
  */
 export async function deleteFile(fileId: string): Promise<void> {

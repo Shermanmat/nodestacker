@@ -2152,7 +2152,7 @@
                       <p class="font-medium text-sm text-gray-900 mb-1">Q{{ qi + 1 }}: {{ q.question }}</p>
                       <p class="text-xs text-gray-500 italic mb-3">{{ q.reason }}</p>
                       <div v-if="getAnswer(app, qi)">
-                        <audio :src="getAnswer(app, qi).audioUrl" controls class="w-full mb-1"></audio>
+                        <audio :src="audioProxyUrl(getAnswer(app, qi))" controls class="w-full mb-1"></audio>
                         <p class="text-xs text-gray-400" v-if="getAnswer(app, qi).durationSeconds">
                           Duration: {{ Math.floor(getAnswer(app, qi).durationSeconds / 60) }}:{{ (getAnswer(app, qi).durationSeconds % 60).toString().padStart(2, '0') }}
                         </p>
@@ -3093,6 +3093,11 @@
 
         function getAnswer(app, questionIndex) {
           return (app.voiceInterviewAnswers || []).find(a => a.questionIndex === questionIndex);
+        }
+
+        function audioProxyUrl(answer) {
+          if (!answer) return '';
+          return `/api/admin/voice-interviews/audio/${answer.id}?session=${adminSessionId.value}`;
         }
 
         async function updateSignupStatus(id, status) {
@@ -5258,7 +5263,7 @@
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,
           portfolioApplications, approveApplication, declineApplication,
-          sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer,
+          sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer, audioProxyUrl,
         };
       }
     }).mount('#app');

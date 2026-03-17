@@ -9,6 +9,35 @@ const app = new Hono();
 
 // ============ ADMIN ENDPOINTS ============
 
+// Stream audio from Google Drive for playback (must be before :companyId route)
+app.get('/admin/voice-interviews/audio/:answerId', async (c) => {
+  const answerId = parseInt(c.req.param('answerId'));
+
+  const answer = await db.query.voiceInterviewAnswers.findFirst({
+    where: eq(voiceInterviewAnswers.id, answerId),
+  });
+
+  if (!answer || !answer.audioUrl) {
+    return c.json({ error: 'Answer not found' }, 404);
+  }
+
+  // Extract Google Drive file ID from webViewLink
+  const match = answer.audioUrl.match(/\/d\/([^/]+)/);
+  if (!match) {
+    return c.json({ error: 'Invalid audio URL' }, 400);
+  }
+
+  try {
+    const { stream, mimeType } = await downloadFile(match[1]);
+    c.header('Content-Type', mimeType);
+    c.header('Cache-Control', 'private, max-age=3600');
+    return c.body(stream);
+  } catch (err) {
+    console.error('[VOICE-INTERVIEW] Failed to stream audio:', err);
+    return c.json({ error: 'Failed to load audio' }, 500);
+  }
+});
+
 // Send voice interview for a company application
 app.post('/admin/voice-interviews/:companyId/send', async (c) => {
   const companyId = parseInt(c.req.param('companyId'));
@@ -43,35 +72,6 @@ app.get('/admin/voice-interviews/:companyId', async (c) => {
     },
     answers,
   });
-});
-
-// Stream audio from Google Drive for playback
-app.get('/admin/voice-interviews/audio/:answerId', async (c) => {
-  const answerId = parseInt(c.req.param('answerId'));
-
-  const answer = await db.query.voiceInterviewAnswers.findFirst({
-    where: eq(voiceInterviewAnswers.id, answerId),
-  });
-
-  if (!answer || !answer.audioUrl) {
-    return c.json({ error: 'Answer not found' }, 404);
-  }
-
-  // Extract Google Drive file ID from webViewLink
-  const match = answer.audioUrl.match(/\/d\/([^/]+)/);
-  if (!match) {
-    return c.json({ error: 'Invalid audio URL' }, 400);
-  }
-
-  try {
-    const { stream, mimeType } = await downloadFile(match[1]);
-    c.header('Content-Type', mimeType);
-    c.header('Cache-Control', 'private, max-age=3600');
-    return c.body(stream);
-  } catch (err) {
-    console.error('[VOICE-INTERVIEW] Failed to stream audio:', err);
-    return c.json({ error: 'Failed to load audio' }, 500);
-  }
 });
 
 // ============ PUBLIC ENDPOINTS (token-based) ============

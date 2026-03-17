@@ -3950,7 +3950,18 @@
           generatingMatches.value = true;
           try {
             const result = await api('/matching/generate', { method: 'POST', body: JSON.stringify({}) });
-            alert(`Generated ${result.totalGenerated} match suggestion(s) for ${result.foundersCovered} founder(s).${result.rampUps ? `\n\nRamped up targets for ${result.rampUps.length} founder(s).` : ''}`);
+            let msg = `Generated ${result.totalGenerated} match suggestion(s) for ${result.foundersCovered} founder(s).`;
+            if (result.rampUps) msg += `\n\nRamped up targets for ${result.rampUps.length} founder(s).`;
+            if (result.liquidity) {
+              const issues = result.liquidity.filter(l => l.status !== 'healthy');
+              if (issues.length > 0) {
+                msg += '\n\n⚠️ Liquidity warnings:';
+                for (const l of issues) {
+                  msg += `\n• ${l.founderName}: ${l.availableInvestors} available investors (${l.status.toUpperCase()}) — generated ${l.generated}/${l.remaining} needed. ${l.blockedByCooldown} on cooldown, ${l.blockedByFirm} firm-blocked, ${l.blockedByExisting} already intro'd`;
+                }
+              }
+            }
+            alert(msg);
             loadIntroRequests();
           } catch (e) {
             alert('Failed to generate matches: ' + e.message);

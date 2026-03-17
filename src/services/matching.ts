@@ -512,12 +512,27 @@ interface GeneratedSuggestion {
   batchId: string;
 }
 
+interface FounderLiquidity {
+  founderId: number;
+  founderName: string;
+  weeklyTarget: number;
+  usedThisWeek: number;
+  remaining: number;
+  totalReachableInvestors: number;
+  availableInvestors: number;
+  blockedByCooldown: number;
+  blockedByFirm: number;
+  blockedByExisting: number;
+  generated: number;
+  status: 'healthy' | 'tight' | 'dry';
+}
+
 /**
  * Generate match suggestions for eligible founders.
  */
 export async function generateMatchSuggestions(
   targetFounderId?: number,
-): Promise<{ suggestions: GeneratedSuggestion[]; batchId: string; rampUps: RampUp[] }> {
+): Promise<{ suggestions: GeneratedSuggestion[]; batchId: string; rampUps: RampUp[]; liquidity: FounderLiquidity[] }> {
   const data = await loadMatchingData();
   const batchId = crypto.randomUUID();
 
@@ -547,12 +562,25 @@ export async function generateMatchSuggestions(
   const effectiveTargets = new Map<number, number>();
 
   // Filter to eligible founders
-  const eligibleFounders = data.allFounders.filter(f => {
+  const eligibleFoundersUnsorted = data.allFounders.filter(f => {
     if (targetFounderId && f.id !== targetFounderId) return false;
     if (f.hidden) return false;
     if (!f.introCadenceActive) return false;
     if (f.roundStatus === 'round_closed') return false;
     return true;
+  });
+
+  // Round-robin ordering: founders with fewer recent intros get priority
+  // so the "first pick" advantage rotates fairly across batches
+  const eligibleFounders = [...eligibleFoundersUnsorted].sort((a, b) => {
+    const aCount = weeklyIntroCount.get(a.id) || 0;
+    const bCount = weeklyIntroCount.get(b.id) || 0;
+    const aTarget = a.introTargetPerWeek || 2;
+    const bTarget = b.introTargetPerWeek || 2;
+    // Sort by fill rate ascending (least filled founders go first)
+    const aFillRate = aCount / aTarget;
+    const bFillRate = bCount / bTarget;
+    return aFillRate - bFillRate;
   });
 
   // Pre-compute investor scores, cooldowns, VIP status, and geo restrictions
@@ -574,6 +602,7 @@ export async function generateMatchSuggestions(
   }
 
   const suggestions: GeneratedSuggestion[] = [];
+  const liquidityStats: FounderLiquidity[] = [];
 
   for (const founder of eligibleFounders) {
     const founderCats = data.founderCatMap.get(founder.id) || [];
@@ -622,8 +651,13 @@ export async function generateMatchSuggestions(
       });
     }
 
-    // Get founder's nodes
+    // Get founder's nodes and track liquidity
     const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id);
+    let totalReachable = 0;
+    let blockedByExisting = 0;
+    let blockedByFirm = 0;
+    let blockedByCooldown = 0;
+    let availableCount = 0;
 
     for (const fnRel of founderNodes) {
       const nodeConnections = data.allNiConns.filter(c => c.nodeId === fnRel.nodeId);
@@ -631,19 +665,21 @@ export async function generateMatchSuggestions(
       for (const conn of nodeConnections) {
         const investorId = conn.investorId;
 
+        // Skip inactive investors (not in investorScores means inactive/paused)
+        if (!investorScores.has(investorId)) continue;
+
+        totalReachable++;
+
         // Skip already introduced
-        if (alreadyIntrodInvestorIds.has(investorId)) continue;
+        if (alreadyIntrodInvestorIds.has(investorId)) { blockedByExisting++; continue; }
 
         // Skip investors at a firm that already has an intro for this founder
         const investorFirm = investorFirmMap.get(investorId);
-        if (investorFirm && blockedFirms.has(investorFirm)) continue;
-
-        // Skip inactive investors
-        if (!investorScores.has(investorId)) continue;
+        if (investorFirm && blockedFirms.has(investorFirm)) { blockedByFirm++; continue; }
 
         // Skip investors on cooldown
         const cooldown = investorCooldowns.get(investorId);
-        if (cooldown?.onCooldown) continue;
+        if (cooldown?.onCooldown) { blockedByCooldown++; continue; }
 
         // Skip investors already claimed by another pending suggestion
         if (claimedInvestorIds.has(investorId)) continue;
@@ -671,6 +707,8 @@ export async function generateMatchSuggestions(
         const investorExclusions = data.investorExclusionMap.get(investorId);
         if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) continue;
 
+        availableCount++;
+
         const investorReliability = investorScores.get(investorId)!;
         const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength);
 
@@ -694,6 +732,24 @@ export async function generateMatchSuggestions(
         claimedInvestorIds.add(investorId);
       }
     }
+
+    const usedThisWeek = weeklyIntroCount.get(founder.id) || 0;
+    const target = effectiveTargets.get(founder.id) || currentTarget;
+    const weeksOfRunway = target > 0 ? Math.floor(availableCount / target) : 999;
+    liquidityStats.push({
+      founderId: founder.id,
+      founderName: founder.name,
+      weeklyTarget: target,
+      usedThisWeek,
+      remaining: Math.max(0, target - usedThisWeek),
+      totalReachableInvestors: totalReachable,
+      availableInvestors: availableCount,
+      blockedByCooldown,
+      blockedByFirm,
+      blockedByExisting,
+      generated: 0, // filled after filtering
+      status: weeksOfRunway >= 4 ? 'healthy' : weeksOfRunway >= 2 ? 'tight' : 'dry',
+    });
   }
 
   // Sort by match score descending
@@ -711,7 +767,13 @@ export async function generateMatchSuggestions(
     return true;
   });
 
-  return { suggestions: filtered, batchId, rampUps };
+  // Fill in generated counts
+  for (const s of filtered) {
+    const ls = liquidityStats.find(l => l.founderId === s.founderId);
+    if (ls) ls.generated++;
+  }
+
+  return { suggestions: filtered, batchId, rampUps, liquidity: liquidityStats };
 }
 
 // --- Score Computation (for visibility endpoints) ---

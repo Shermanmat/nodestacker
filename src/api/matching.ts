@@ -123,7 +123,7 @@ app.post('/generate', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const founderId = body.founderId ? parseInt(body.founderId) : undefined;
 
-  const { suggestions, batchId, rampUps } = await generateMatchSuggestions(founderId);
+  const { suggestions, batchId, rampUps, liquidity } = await generateMatchSuggestions(founderId);
 
   // Apply ramp-ups to founder intro targets
   for (const ramp of rampUps) {
@@ -178,6 +178,7 @@ app.post('/generate', async (c) => {
     averageMatchScore: suggestions.length > 0
       ? Math.round(suggestions.reduce((sum, s) => sum + s.matchScore, 0) / suggestions.length)
       : 0,
+    liquidity,
   });
 });
 

@@ -163,27 +163,26 @@ app.post('/public/voice-interview/:token/answer', async (c) => {
   });
   const companyName = company?.companyName || 'Unknown';
 
+  if (!isDriveConfigured()) {
+    console.error('[VOICE-INTERVIEW] Google Drive not configured — cannot store audio');
+    return c.json({ error: 'Audio storage is not configured. Please contact support.' }, 503);
+  }
+
   let audioUrl = '';
 
-  if (isDriveConfigured()) {
-    try {
-      // Upload to Google Drive
-      const arrayBuffer = await audioFile.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      const fileName = `voice-interview-q${questionIndex + 1}-${companyName}.webm`;
+  try {
+    // Upload to Google Drive
+    const arrayBuffer = await audioFile.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const fileName = `voice-interview-q${questionIndex + 1}-${companyName}.webm`;
 
-      // Use the onboarding folder as parent
-      const folderId = process.env.GOOGLE_DRIVE_ONBOARDING_FOLDER_ID || '';
-      const file = await uploadDocument(folderId, fileName, buffer, 'audio/webm');
-      audioUrl = file.webViewLink;
-    } catch (err) {
-      console.error('[VOICE-INTERVIEW] Drive upload failed, using fallback:', err);
-      audioUrl = `dev://voice-interview/${interview.id}/q${questionIndex}`;
-    }
-  } else {
-    // Dev mode: store placeholder
-    audioUrl = `dev://voice-interview/${interview.id}/q${questionIndex}`;
-    console.log(`[VOICE-INTERVIEW] Dev mode - would upload audio for Q${questionIndex + 1}`);
+    // Use the onboarding folder as parent
+    const folderId = process.env.GOOGLE_DRIVE_ONBOARDING_FOLDER_ID || '';
+    const file = await uploadDocument(folderId, fileName, buffer, 'audio/webm');
+    audioUrl = file.webViewLink;
+  } catch (err) {
+    console.error('[VOICE-INTERVIEW] Drive upload failed:', err);
+    return c.json({ error: 'Failed to save your recording. Please try again.' }, 500);
   }
 
   // Delete existing answer for this question (re-record)

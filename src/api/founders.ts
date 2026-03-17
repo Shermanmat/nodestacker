@@ -145,13 +145,14 @@ app.get('/pipeline-health', async (c) => {
     const remaining = fitInvestors - alreadyIntrod;
     const exhaustionPercent = fitInvestors > 0 ? Math.round((alreadyIntrod / fitInvestors) * 100) : 0;
 
-    // Weekly stats
-    const introsThisWeek = founderIntros.filter(ir => {
+    // Weekly stats — only count intros that have actually been sent/actioned, not suggestions
+    const sentIntros = founderIntros.filter(ir => ir.status !== 'pending_suggestion');
+    const introsThisWeek = sentIntros.filter(ir => {
       const d = ir.dateRequested || ir.createdAt;
       return d && new Date(d) >= weekStart;
     }).length;
 
-    const introsLastWeek = founderIntros.filter(ir => {
+    const introsLastWeek = sentIntros.filter(ir => {
       const d = ir.dateRequested || ir.createdAt;
       return d && new Date(d) >= lastWeekStart && new Date(d) < weekStart;
     }).length;

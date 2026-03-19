@@ -167,7 +167,9 @@ export function isInvestorOnCooldown(investorIntros: IntroRequest[]): CooldownRe
   const threeWeeksAgo = Date.now() - 21 * 24 * 60 * 60 * 1000;
   const recentlyIntroduced = investorIntros.filter(ir => {
     if (ir.status !== 'introduced') return false;
-    const d = ir.dateIntroduced ? new Date(ir.dateIntroduced).getTime() : 0;
+    // Use dateIntroduced, fall back to updatedAt for older records missing the date
+    const d = ir.dateIntroduced ? new Date(ir.dateIntroduced).getTime()
+      : ir.updatedAt ? new Date(ir.updatedAt).getTime() : 0;
     return d > threeWeeksAgo;
   });
 

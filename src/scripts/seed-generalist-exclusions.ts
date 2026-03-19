@@ -1,15 +1,28 @@
 import 'dotenv/config';
 import { db } from '../db/index.js';
-import { investorCategoryExclusions, investorCategoryAssignments } from '../db/index.js';
+import { investorCategoryExclusions, investorCategoryAssignments, investorCategories } from '../db/index.js';
 import { eq } from 'drizzle-orm';
 
 async function main() {
-  const GENERALIST_CAT_ID = 186;
-  const EXCLUDED_CAT_IDS = [154, 148, 160]; // HardTech, Climate, Defense
+  // Look up categories by name so IDs don't need to be hardcoded
+  const allCats = await db.select().from(investorCategories);
+  const findCat = (name: string) => allCats.find(c => c.name === name);
+
+  const generalistCat = findCat('Generalist');
+  if (!generalistCat) { console.error('Generalist category not found'); return; }
+
+  const excludedNames = ['HardTech / DeepTech', 'Climate / Energy', 'Defense / Government'];
+  const EXCLUDED_CAT_IDS = excludedNames.map(name => {
+    const cat = findCat(name);
+    if (!cat) { console.error(`Category "${name}" not found`); process.exit(1); }
+    return cat.id;
+  });
+
+  console.log(`Generalist category ID: ${generalistCat.id}, excluded IDs: ${EXCLUDED_CAT_IDS}`);
 
   const genAssignments = await db.select()
     .from(investorCategoryAssignments)
-    .where(eq(investorCategoryAssignments.categoryId, GENERALIST_CAT_ID));
+    .where(eq(investorCategoryAssignments.categoryId, generalistCat.id));
 
   console.log(`Found ${genAssignments.length} generalist investors`);
 

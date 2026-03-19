@@ -50,6 +50,80 @@ app.get('/', async (c) => {
   return c.json(result);
 });
 
+// Founder Leaderboard - accept rate ranking
+app.get('/leaderboard', async (c) => {
+  const period = c.req.query('period') || '28d';
+  const validPeriods = ['7d', '28d', 'quarter', '6m', 'year', 'all'];
+  if (!validPeriods.includes(period)) {
+    return c.json({ error: 'period must be one of: ' + validPeriods.join(', ') }, 400);
+  }
+
+  const periodDays: Record<string, number | null> = {
+    '7d': 7, '28d': 28, 'quarter': 90, '6m': 180, 'year': 365, 'all': null,
+  };
+
+  const days = periodDays[period];
+  const now = new Date();
+  const startDate = days !== null
+    ? new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+    : null;
+
+  const allFounderRows = await db.select().from(founders);
+  const allIntros = await db.select().from(introRequests);
+
+  const acceptStatuses = ['introduced', 'first_meeting_complete', 'second_meeting_complete', 'invested'];
+
+  const founderMap = new Map(allFounderRows.map(f => [f.id, f]));
+
+  // Filter intros by period
+  const filtered = allIntros.filter(ir => {
+    if (!startDate) return true;
+    const d = ir.dateRequested || ir.createdAt;
+    return d && d >= startDate;
+  });
+
+  // Group by founder
+  const grouped = new Map<number, typeof filtered>();
+  for (const ir of filtered) {
+    if (!grouped.has(ir.founderId)) grouped.set(ir.founderId, []);
+    grouped.get(ir.founderId)!.push(ir);
+  }
+
+  const leaderboard = [];
+  for (const [founderId, intros] of grouped) {
+    const founder = founderMap.get(founderId);
+    if (!founder) continue;
+
+    const totalSent = intros.length;
+    const introduced = intros.filter(ir => acceptStatuses.includes(ir.status)).length;
+    const passed = intros.filter(ir => ir.status === 'passed').length;
+    const ignored = intros.filter(ir => ir.status === 'ignored').length;
+    const pending = intros.filter(ir => ['intro_request_sent', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)).length;
+    const acceptRate = totalSent > 0 ? Math.round((introduced / totalSent) * 1000) / 10 : 0;
+
+    leaderboard.push({
+      founderId: founder.id,
+      name: founder.name,
+      companyName: founder.companyName,
+      companyStage: founder.companyStage,
+      totalSent,
+      introduced,
+      passed,
+      ignored,
+      pending,
+      acceptRate,
+    });
+  }
+
+  // Sort by accept rate desc, then volume desc
+  leaderboard.sort((a, b) => {
+    if (b.acceptRate !== a.acceptRate) return b.acceptRate - a.acceptRate;
+    return b.totalSent - a.totalSent;
+  });
+
+  return c.json({ data: leaderboard, period });
+});
+
 // Pipeline Health endpoint
 app.get('/pipeline-health', async (c) => {
   const allFounders = await db.select().from(founders);

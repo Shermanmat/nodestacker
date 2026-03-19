@@ -37,6 +37,7 @@ const updateIntroRequestSchema = z.object({
   nextFollowupDate: z.string().nullable().optional(),
   lastFollowupDate: z.string().nullable().optional(),
   followupOwner: z.enum(['founder', 'admin']).nullable().optional(),
+  datePassed: z.string().nullable().optional(),
   passReason: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 }).strip();
@@ -185,11 +186,21 @@ app.put('/:id', async (c) => {
   }
 
   const now = new Date().toISOString();
+  const today = now.split('T')[0];
+  const updates = { ...parsed.data, updatedAt: now };
+
+  // Auto-set dateIntroduced when status changes to 'introduced' (unless client provided one)
+  if (parsed.data.status === 'introduced' && existing.status !== 'introduced' && !parsed.data.dateIntroduced) {
+    updates.dateIntroduced = today;
+  }
+
+  // Auto-set datePassed when status changes to 'passed' (unless client provided one)
+  if (parsed.data.status === 'passed' && existing.status !== 'passed' && !parsed.data.datePassed) {
+    updates.datePassed = today;
+  }
+
   const result = await db.update(introRequests)
-    .set({
-      ...parsed.data,
-      updatedAt: now,
-    })
+    .set(updates)
     .where(eq(introRequests.id, id))
     .returning();
 

@@ -109,6 +109,7 @@
         <div class="sidebar-link" :class="{ active: activeTab === 'onboarding' }" @click="switchTab('onboarding')">Onboarding</div>
 
         <div class="sidebar-section">Analytics</div>
+        <div class="sidebar-link" :class="{ active: activeTab === 'leaderboard' }" @click="switchTab('leaderboard')">Founder Leaderboard</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'health' }" @click="switchTab('health')">Network Health</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'pipeline' }" @click="switchTab('pipeline')">Pipeline Health</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'marketplace' }" @click="switchTab('marketplace')">Marketplace Health</div>
@@ -1312,6 +1313,61 @@
       </div>
 
       <!-- Network Health Tab -->
+      <!-- Founder Leaderboard -->
+      <div v-if="activeTab === 'leaderboard'">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold">Founder Leaderboard</h2>
+        </div>
+
+        <!-- Period Toggle -->
+        <div class="flex gap-2 mb-6">
+          <button v-for="p in leaderboardPeriods" :key="p.value"
+            @click="loadFounderLeaderboard(p.value)"
+            :class="leaderboardPeriod === p.value ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'"
+            class="px-3 py-1.5 rounded text-sm font-medium shadow-sm border">
+            {{ p.label }}
+          </button>
+        </div>
+
+        <div v-if="!founderLeaderboard.length" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
+          No intro requests in this period.
+        </div>
+        <div v-else class="bg-white rounded-lg shadow overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+              <tr class="text-left text-gray-500">
+                <th class="py-3 px-4">#</th>
+                <th class="px-4">Founder</th>
+                <th class="px-4">Company</th>
+                <th class="px-4">Stage</th>
+                <th class="px-4 text-right">Total Sent</th>
+                <th class="px-4 text-right">Introduced</th>
+                <th class="px-4 text-right">Passed</th>
+                <th class="px-4 text-right">Ignored</th>
+                <th class="px-4 text-right">Pending</th>
+                <th class="px-4 text-right">Accept Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, idx) in founderLeaderboard" :key="row.founderId" class="border-t hover:bg-gray-50">
+                <td class="py-2.5 px-4 text-gray-400">{{ idx + 1 }}</td>
+                <td class="px-4 font-medium">{{ row.name }}</td>
+                <td class="px-4">{{ row.companyName }}</td>
+                <td class="px-4"><span class="text-xs px-1.5 py-0.5 rounded bg-gray-100">{{ formatStage(row.companyStage) }}</span></td>
+                <td class="px-4 text-right">{{ row.totalSent }}</td>
+                <td class="px-4 text-right text-green-600">{{ row.introduced }}</td>
+                <td class="px-4 text-right text-red-600">{{ row.passed }}</td>
+                <td class="px-4 text-right text-orange-500">{{ row.ignored }}</td>
+                <td class="px-4 text-right text-gray-500">{{ row.pending }}</td>
+                <td class="px-4 text-right font-bold" :class="row.acceptRate >= 50 ? 'text-green-600' : row.acceptRate >= 25 ? 'text-amber-600' : 'text-red-600'">
+                  {{ row.acceptRate }}%
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div v-if="activeTab === 'health'">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Network Health</h2>
@@ -2931,6 +2987,7 @@
           if (tabId === 'health') loadNetworkHealth();
           if (tabId === 'pipeline') loadPipelineHealth();
           if (tabId === 'marketplace') loadMarketplaceHealth();
+          if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
           if (tabId === 'signups') loadSignups();
         }
@@ -2954,6 +3011,18 @@
 
         // Pipeline Health
         const pipelineHealth = ref({ founders: [], summary: {} });
+
+        // Founder Leaderboard
+        const founderLeaderboard = ref([]);
+        const leaderboardPeriod = ref('28d');
+        const leaderboardPeriods = [
+          { value: '7d', label: 'Last 7 days' },
+          { value: '28d', label: 'Last 28 days' },
+          { value: 'quarter', label: 'Last quarter' },
+          { value: '6m', label: 'Last 6 months' },
+          { value: 'year', label: 'Last year' },
+          { value: 'all', label: 'All time' },
+        ];
 
         // Marketplace Health
         const marketplaceHealth = ref({
@@ -4129,6 +4198,12 @@
         };
 
         // Pipeline Health functions
+        const loadFounderLeaderboard = async (period) => {
+          if (period) leaderboardPeriod.value = period;
+          const data = await api(`/founders/leaderboard?period=${leaderboardPeriod.value}`);
+          founderLeaderboard.value = data.data;
+        };
+
         const loadPipelineHealth = async () => {
           const data = await api('/founders/pipeline-health');
           pipelineHealth.value = data;
@@ -5263,6 +5338,8 @@
           // Network Health
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
+          // Founder Leaderboard
+          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, loadFounderLeaderboard,
           // Pipeline Health
           pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
           updateFounderCadence, toggleFounderCadence,

@@ -135,6 +135,7 @@ export const introRequests = sqliteTable('intro_requests', {
   nextFollowupDate: text('next_followup_date'),
   lastFollowupDate: text('last_followup_date'),
   followupOwner: text('followup_owner').default('founder'),
+  datePassed: text('date_passed'),
   passReason: text('pass_reason'),
   investorBumpCount: integer('investor_bump_count').notNull().default(0),
   lastInvestorBumpAt: text('last_investor_bump_at'),

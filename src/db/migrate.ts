@@ -89,6 +89,8 @@ try {
 // investor pause columns
 safeAddColumn('investors', 'paused_until', 'text');
 safeAddColumn('investors', 'pause_reason', 'text');
+// intro request date tracking
+safeAddColumn('intro_requests', 'date_passed', 'text');
 
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });

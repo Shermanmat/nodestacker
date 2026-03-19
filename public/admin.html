@@ -1334,6 +1334,17 @@
             <input type="number" v-model.number="leaderboardMin" @change="loadFounderLeaderboard()"
               class="w-16 px-2 py-1 border rounded text-center" min="0">
           </div>
+          <button @click="leaderboardPrivacy = !leaderboardPrivacy"
+            :class="leaderboardPrivacy ? 'bg-purple-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'"
+            class="ml-auto px-3 py-1.5 rounded text-sm font-medium shadow-sm border flex items-center gap-1.5"
+            title="Hide founder & company names for screenshots">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path v-if="!leaderboardPrivacy" stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path v-if="!leaderboardPrivacy" stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              <path v-if="leaderboardPrivacy" stroke-linecap="round" stroke-linejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878l4.242 4.242M21 21l-4.879-4.879" />
+            </svg>
+            {{ leaderboardPrivacy ? 'Privacy On' : 'Privacy Mode' }}
+          </button>
         </div>
 
         <div v-if="!founderLeaderboard.length" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
@@ -1358,9 +1369,9 @@
             <tbody>
               <tr v-for="(row, idx) in founderLeaderboard" :key="row.founderId" class="border-t hover:bg-gray-50">
                 <td class="py-2.5 px-4 text-gray-400">{{ idx + 1 }}</td>
-                <td class="px-4 font-medium">{{ row.name }}</td>
-                <td class="px-4">{{ row.companyName }}</td>
-                <td class="px-4"><span class="text-xs px-1.5 py-0.5 rounded bg-gray-100">{{ formatStage(row.companyStage) }}</span></td>
+                <td class="px-4 font-medium" :style="leaderboardPrivacy ? { filter: 'blur(6px)', userSelect: 'none' } : {}">{{ row.name }}</td>
+                <td class="px-4" :style="leaderboardPrivacy ? { filter: 'blur(6px)', userSelect: 'none' } : {}">{{ row.companyName }}</td>
+                <td class="px-4" :style="leaderboardPrivacy ? { filter: 'blur(6px)', userSelect: 'none' } : {}"><span class="text-xs px-1.5 py-0.5 rounded bg-gray-100">{{ formatStage(row.companyStage) }}</span></td>
                 <td class="px-4 text-right">{{ row.totalSent }}</td>
                 <td class="px-4 text-right text-green-600">{{ row.introduced }}</td>
                 <td class="px-4 text-right text-red-600">{{ row.passed }}</td>
@@ -3023,6 +3034,7 @@
         const founderLeaderboard = ref([]);
         const leaderboardPeriod = ref('28d');
         const leaderboardMin = ref(10);
+        const leaderboardPrivacy = ref(false);
         const leaderboardPeriods = [
           { value: '7d', label: 'Last 7 days' },
           { value: '28d', label: 'Last 28 days' },
@@ -5347,7 +5359,7 @@
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
           // Founder Leaderboard
-          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, loadFounderLeaderboard,
+          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, leaderboardPrivacy, loadFounderLeaderboard,
           // Pipeline Health
           pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
           updateFounderCadence, toggleFounderCadence,

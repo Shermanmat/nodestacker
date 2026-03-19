@@ -128,23 +128,32 @@ app.post('/', async (c) => {
     return c.json({ error: 'Node does not have a connection to this investor' }, 400);
   }
 
-  // Check for existing active intro request for this founder-investor pair
-  const existingRequest = await db.query.introRequests.findFirst({
+  // Dedup: if a recent request exists for the same founder+investor (any status, within 14 days),
+  // silently merge into the existing one instead of creating a duplicate
+  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+  const recentDuplicate = await db.query.introRequests.findFirst({
     where: and(
       eq(introRequests.founderId, parsed.data.founderId),
       eq(introRequests.investorId, parsed.data.investorId),
-      inArray(introRequests.status, [
-        'intro_request_sent',
-        'introduced',
-        'first_meeting_complete',
-        'second_meeting_complete',
-        'follow_up_questions',
-      ])
     ),
+    orderBy: desc(introRequests.createdAt),
   });
 
-  if (existingRequest) {
-    return c.json({ error: 'Active intro request already exists for this founder-investor pair' }, 400);
+  if (recentDuplicate && recentDuplicate.createdAt >= twoWeeksAgo) {
+    // Append new notes if provided
+    if (parsed.data.notes) {
+      const existingNotes = recentDuplicate.notes || '';
+      const mergedNotes = existingNotes
+        ? `${existingNotes}\n---\n${parsed.data.notes}`
+        : parsed.data.notes;
+      const now = new Date().toISOString();
+      const [updated] = await db.update(introRequests)
+        .set({ notes: mergedNotes, updatedAt: now })
+        .where(eq(introRequests.id, recentDuplicate.id))
+        .returning();
+      return c.json(updated, 200);
+    }
+    return c.json(recentDuplicate, 200);
   }
 
   // Firm-level dedup: block if another investor at this firm already has an intro for this founder

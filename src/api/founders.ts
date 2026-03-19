@@ -53,6 +53,7 @@ app.get('/', async (c) => {
 // Founder Leaderboard - accept rate ranking
 app.get('/leaderboard', async (c) => {
   const period = c.req.query('period') || '28d';
+  const minRequests = parseInt(c.req.query('min') || '10') || 0;
   const validPeriods = ['7d', '28d', 'quarter', '6m', 'year', 'all'];
   if (!validPeriods.includes(period)) {
     return c.json({ error: 'period must be one of: ' + validPeriods.join(', ') }, 400);
@@ -76,15 +77,15 @@ app.get('/leaderboard', async (c) => {
   const founderMap = new Map(allFounderRows.map(f => [f.id, f]));
 
   // Filter intros by period
-  const filtered = allIntros.filter(ir => {
+  const periodIntros = allIntros.filter(ir => {
     if (!startDate) return true;
     const d = ir.dateRequested || ir.createdAt;
     return d && d >= startDate;
   });
 
   // Group by founder
-  const grouped = new Map<number, typeof filtered>();
-  for (const ir of filtered) {
+  const grouped = new Map<number, typeof periodIntros>();
+  for (const ir of periodIntros) {
     if (!grouped.has(ir.founderId)) grouped.set(ir.founderId, []);
     grouped.get(ir.founderId)!.push(ir);
   }
@@ -115,13 +116,16 @@ app.get('/leaderboard', async (c) => {
     });
   }
 
+  // Filter by minimum requests
+  const filtered = leaderboard.filter(f => f.totalSent >= minRequests);
+
   // Sort by accept rate desc, then volume desc
-  leaderboard.sort((a, b) => {
+  filtered.sort((a, b) => {
     if (b.acceptRate !== a.acceptRate) return b.acceptRate - a.acceptRate;
     return b.totalSent - a.totalSent;
   });
 
-  return c.json({ data: leaderboard, period });
+  return c.json({ data: filtered, period, minRequests });
 });
 
 // Pipeline Health endpoint

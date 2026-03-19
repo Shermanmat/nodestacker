@@ -1319,14 +1319,21 @@
           <h2 class="text-xl font-semibold">Founder Leaderboard</h2>
         </div>
 
-        <!-- Period Toggle -->
-        <div class="flex gap-2 mb-6">
-          <button v-for="p in leaderboardPeriods" :key="p.value"
-            @click="loadFounderLeaderboard(p.value)"
-            :class="leaderboardPeriod === p.value ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'"
-            class="px-3 py-1.5 rounded text-sm font-medium shadow-sm border">
-            {{ p.label }}
-          </button>
+        <!-- Period Toggle + Min Requests -->
+        <div class="flex items-center gap-4 mb-6">
+          <div class="flex gap-2">
+            <button v-for="p in leaderboardPeriods" :key="p.value"
+              @click="loadFounderLeaderboard(p.value)"
+              :class="leaderboardPeriod === p.value ? 'bg-blue-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'"
+              class="px-3 py-1.5 rounded text-sm font-medium shadow-sm border">
+              {{ p.label }}
+            </button>
+          </div>
+          <div class="flex items-center gap-2 text-sm">
+            <label class="text-gray-500">Min requests:</label>
+            <input type="number" v-model.number="leaderboardMin" @change="loadFounderLeaderboard()"
+              class="w-16 px-2 py-1 border rounded text-center" min="0">
+          </div>
         </div>
 
         <div v-if="!founderLeaderboard.length" class="bg-white rounded-lg shadow p-8 text-center text-gray-500">
@@ -3015,6 +3022,7 @@
         // Founder Leaderboard
         const founderLeaderboard = ref([]);
         const leaderboardPeriod = ref('28d');
+        const leaderboardMin = ref(10);
         const leaderboardPeriods = [
           { value: '7d', label: 'Last 7 days' },
           { value: '28d', label: 'Last 28 days' },
@@ -4200,7 +4208,7 @@
         // Pipeline Health functions
         const loadFounderLeaderboard = async (period) => {
           if (period) leaderboardPeriod.value = period;
-          const data = await api(`/founders/leaderboard?period=${leaderboardPeriod.value}`);
+          const data = await api(`/founders/leaderboard?period=${leaderboardPeriod.value}&min=${leaderboardMin.value}`);
           founderLeaderboard.value = data.data;
         };
 
@@ -5339,7 +5347,7 @@
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
           // Founder Leaderboard
-          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, loadFounderLeaderboard,
+          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, loadFounderLeaderboard,
           // Pipeline Health
           pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
           updateFounderCadence, toggleFounderCadence,

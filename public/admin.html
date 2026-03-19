@@ -3592,6 +3592,15 @@
               }
             }
 
+            // Stage filter: if both investor and founder have stage categories, require overlap
+            const invStages = (inv.categories || []).filter(c => c.type === 'stage');
+            const founderStages = (founder.categories || []).filter(c => c.type === 'stage');
+            if (invStages.length > 0 && founderStages.length > 0) {
+              const invStageIds = new Set(invStages.map(c => c.id));
+              const hasStageOverlap = founderStages.some(c => invStageIds.has(c.id));
+              if (!hasStageOverlap) continue;
+            }
+
             // Calculate fit score
             let score = 0;
             const fitReasons = [];

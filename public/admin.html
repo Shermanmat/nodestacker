@@ -3767,6 +3767,17 @@
             });
           }
 
+          // Apply node filter
+          if (filterByNodeId.value) {
+            const nodeId = parseInt(filterByNodeId.value);
+            const nodeInvestorIds = new Set(
+              niConnections.value
+                .filter(nc => nc.nodeId === nodeId)
+                .map(nc => nc.investorId)
+            );
+            filtered = filtered.filter(inv => nodeInvestorIds.has(inv.id));
+          }
+
           // Apply exact sector filter: exclude generalists, require direct sector overlap
           if (planningFilterExactSector.value && founderSectorIds.size > 0) {
             filtered = filtered.filter(inv => {

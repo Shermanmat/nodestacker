@@ -16,6 +16,11 @@ export interface SignalAnswer {
   answer: string;
 }
 
+export interface AnalyzeResult {
+  signals: Signal[];
+  sector: string;
+}
+
 export interface BlurbResult {
   blurb: string;
   oneLiner: string;
@@ -50,8 +55,11 @@ For each of the 3 strongest signals you detect:
 1. Identify what in the description suggests this signal
 2. Write a targeted follow-up question that will help the founder strengthen this signal in their blurb
 
+Also identify the primary sector/industry this startup operates in (e.g. "AI/ML", "Fintech", "Healthcare", "SaaS", "Climate Tech", "Consumer", "Cybersecurity", "Biotech", "Web3/Crypto", "EdTech", "PropTech", "DeepTech", etc.)
+
 Respond with ONLY valid JSON (no markdown):
 {
+  "sector": "detected sector name",
   "signals": [
     { "category": "category_name", "detected": "what you noticed", "followUpQuestion": "A specific question to strengthen this signal" },
     { "category": "category_name", "detected": "what you noticed", "followUpQuestion": "A specific question to strengthen this signal" },
@@ -139,7 +147,7 @@ function parseJsonResponse(content: string): any {
 export async function analyzeSignals(
   companyName: string,
   description: string,
-): Promise<Signal[]> {
+): Promise<AnalyzeResult> {
   const messages = [
     {
       role: 'user',
@@ -154,7 +162,10 @@ export async function analyzeSignals(
     throw new Error('Failed to detect 3 signals from the description');
   }
 
-  return parsed.signals.slice(0, 3);
+  return {
+    signals: parsed.signals.slice(0, 3),
+    sector: parsed.sector || 'Technology',
+  };
 }
 
 /**

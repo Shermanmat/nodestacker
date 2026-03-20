@@ -31,7 +31,7 @@
     body { background: #020617; }
     .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
-    textarea:focus, input:focus { outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); }
+    textarea:focus, input:focus, select:focus { outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); }
   </style>
 </head>
 <body class="font-sans antialiased text-white min-h-screen">
@@ -46,7 +46,7 @@
         <a href="/founders" class="text-sm text-slate-300 transition hover:text-white">For Founders</a>
         <a href="/investors" class="text-sm text-slate-300 transition hover:text-white">For Investors</a>
         <a href="/nodes" class="text-sm text-slate-300 transition hover:text-white">For Nodes</a>
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">Apply Now</a>
+        <a href="/blurb" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">Apply Now</a>
       </div>
     </div>
   </nav>
@@ -57,7 +57,7 @@
       <!-- Progress bar -->
       <div class="mb-10">
         <div class="flex items-center justify-between mb-2">
-          <span v-for="(label, i) in ['Describe', 'Sharpen', 'Review', 'Apply']" :key="i"
+          <span v-for="(label, i) in ['Describe', 'Sharpen', 'Review', 'Details', 'Done']" :key="i"
                 class="text-xs font-medium transition-colors"
                 :class="i <= step ? 'text-blue-400' : 'text-slate-600'">
             {{ label }}
@@ -65,7 +65,7 @@
         </div>
         <div class="h-1 rounded-full bg-slate-800">
           <div class="h-1 rounded-full bg-blue-500 transition-all duration-500"
-               :style="{ width: ((step) / 3 * 100) + '%' }"></div>
+               :style="{ width: ((step) / 4 * 100) + '%' }"></div>
         </div>
       </div>
 
@@ -82,9 +82,22 @@
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-slate-300 mb-1.5">Your name</label>
-            <input v-model="founderName" type="text" placeholder="Jane Smith"
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Company website <span class="text-slate-500 font-normal">(optional)</span></label>
+            <input v-model="companyUrl" type="text" placeholder="acme.com"
                    class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1.5">First name</label>
+              <input v-model="firstName" type="text" placeholder="Jane"
+                     class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-slate-300 mb-1.5">Last name</label>
+              <input v-model="lastName" type="text" placeholder="Smith"
+                     class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+            </div>
           </div>
 
           <div>
@@ -203,6 +216,36 @@
                       class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white resize-none"></textarea>
           </div>
 
+          <!-- Scanning animation -->
+          <div v-if="scanning" class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-8 text-center">
+            <div class="flex justify-center mb-4">
+              <div class="relative">
+                <svg class="animate-spin h-10 w-10 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              </div>
+            </div>
+            <p class="text-blue-400 font-medium mb-1">Scanning our investor network...</p>
+            <p class="text-slate-500 text-sm">Finding investors who match your startup</p>
+          </div>
+
+          <!-- Match results -->
+          <div v-if="matchesFound && !scanning" class="rounded-xl border border-green-500/20 bg-green-500/5 p-6">
+            <div class="flex items-start gap-4">
+              <div class="flex-shrink-0 w-12 h-12 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                <svg class="w-6 h-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div>
+                <p class="text-white font-semibold mb-1">
+                  We have <span class="text-green-400">{{ nodeCount }} nodes</span> who know <span class="text-green-400">{{ investorCount }} investors</span> who invest in <span class="text-white">{{ matchedSector }}</span> companies like yours.
+                </p>
+                <p class="text-slate-400 text-sm">Complete your profile to apply for warm intros.</p>
+              </div>
+            </div>
+            <button @click="step = 3"
+                    class="mt-4 w-full rounded-lg bg-green-600 px-6 py-3.5 font-semibold text-white transition hover:bg-green-700">
+              Complete Profile
+            </button>
+          </div>
+
           <div class="flex gap-3">
             <button @click="step = 1"
                     class="rounded-lg border border-white/10 px-6 py-3.5 font-medium text-slate-300 transition hover:bg-slate-800">
@@ -216,9 +259,9 @@
               </span>
               <span v-else>Regenerate</span>
             </button>
-            <button @click="step = 3"
-                    class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700">
-              Apply to MatCap
+            <button v-if="!matchesFound" @click="findMatches" :disabled="scanning || !sector"
+                    class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              Find Investor Matches
             </button>
           </div>
 
@@ -226,50 +269,76 @@
         </div>
       </div>
 
-      <!-- Step 3: Apply / Confirm -->
+      <!-- Step 3: Complete Profile -->
       <div v-if="step === 3 && !submitted">
-        <h1 class="text-3xl font-bold tracking-tight mb-2">Apply to MatCap</h1>
-        <p class="text-slate-400 mb-8">Review your details below. We'll match you with the right investors.</p>
+        <h1 class="text-3xl font-bold tracking-tight mb-2">Complete your profile</h1>
+        <p class="text-slate-400 mb-8">A few more details so we can match you with the right investors.</p>
 
-        <div class="space-y-4 mb-8">
-          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
-            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Company</div>
-            <div class="text-white font-medium">{{ companyName }}</div>
-          </div>
-          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
-            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Founder</div>
-            <div class="text-white font-medium">{{ founderName }} &middot; {{ email }}</div>
-          </div>
-          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
-            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">One-liner</div>
-            <div class="text-white">{{ oneLiner }}</div>
-          </div>
-          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
-            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Blurb</div>
-            <div class="text-white whitespace-pre-line">{{ blurb }}</div>
+        <!-- Investor match banner -->
+        <div v-if="investorCount > 0" class="rounded-xl border border-green-500/20 bg-green-500/5 p-5 mb-6">
+          <div class="flex items-center gap-3">
+            <div class="flex-shrink-0 w-10 h-10 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <p class="text-sm text-slate-300">
+              <strong class="text-green-400">{{ nodeCount }} nodes</strong> know <strong class="text-green-400">{{ investorCount }} investors</strong> who invest in <strong class="text-white">{{ matchedSector }}</strong> companies like yours.
+            </p>
           </div>
         </div>
 
-        <div class="flex gap-3">
-          <button @click="step = 2"
-                  class="rounded-lg border border-white/10 px-6 py-3.5 font-medium text-slate-300 transition hover:bg-slate-800">
-            Edit Blurb
-          </button>
-          <button @click="apply" :disabled="loading"
-                  class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
-            <span v-if="loading" class="flex items-center justify-center gap-2">
-              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-              Submitting...
-            </span>
-            <span v-else>Submit Application</span>
-          </button>
-        </div>
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">City *</label>
+            <input v-model="city" type="text" placeholder="San Francisco, CA"
+                   class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+          </div>
 
-        <p v-if="error" class="text-red-400 text-sm mt-3">{{ error }}</p>
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">LinkedIn URL</label>
+            <input v-model="linkedinUrl" type="text" placeholder="linkedin.com/in/yourprofile" @blur="normalizeLinkedin"
+                   class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Twitter/X handle</label>
+            <div class="flex">
+              <span class="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-white/10 bg-slate-800 text-slate-500">@</span>
+              <input v-model="twitterHandle" type="text" placeholder="yourhandle"
+                     class="flex-1 rounded-r-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Sector *</label>
+            <select v-model="selectedSector"
+                    class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white appearance-none">
+              <option value="" disabled>Select a sector</option>
+              <option v-for="s in sectors" :key="s" :value="s">{{ s }}</option>
+            </select>
+            <p v-if="sector" class="text-xs text-slate-500 mt-1">Pre-filled from AI detection. Change if needed.</p>
+          </div>
+
+          <div class="flex gap-3">
+            <button @click="step = 2"
+                    class="rounded-lg border border-white/10 px-6 py-3.5 font-medium text-slate-300 transition hover:bg-slate-800">
+              Back
+            </button>
+            <button @click="apply" :disabled="loading || !canApply"
+                    class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span v-if="loading" class="flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Submitting...
+              </span>
+              <span v-else>Submit Application</span>
+            </button>
+          </div>
+
+          <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
+        </div>
       </div>
 
-      <!-- Confirmation -->
-      <div v-if="step === 3 && submitted" class="text-center py-12">
+      <!-- Step 4: Confirmation -->
+      <div v-if="step === 4 || (step === 3 && submitted)" class="text-center py-12">
         <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 mb-6">
           <svg class="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
@@ -289,7 +358,7 @@
   </div>
 
   <script>
-    const { createApp, ref, computed } = Vue;
+    const { createApp, ref, computed, onMounted } = Vue;
 
     createApp({
       setup() {
@@ -300,24 +369,43 @@
 
         // Step 0 fields
         const companyName = ref('');
-        const founderName = ref('');
+        const companyUrl = ref('');
+        const firstName = ref('');
+        const lastName = ref('');
         const email = ref('');
         const description = ref('');
 
         // Step 1 fields
         const signals = ref([]);
         const signalAnswers = ref(['', '', '']);
+        const sector = ref('');
 
         // Step 2 fields
         const blurb = ref('');
         const oneLiner = ref('');
+        const investorCount = ref(0);
+        const nodeCount = ref(0);
+        const matchedSector = ref('');
+        const matchesFound = ref(false);
+        const scanning = ref(false);
+
+        // Step 3 fields
+        const city = ref('');
+        const linkedinUrl = ref('');
+        const twitterHandle = ref('');
+        const selectedSector = ref('');
+        const sectors = ref([]);
 
         const canAnalyze = computed(() =>
-          companyName.value.trim() && founderName.value.trim() && email.value.trim() && description.value.trim().length >= 20
+          companyName.value.trim() && firstName.value.trim() && lastName.value.trim() && email.value.trim() && description.value.trim().length >= 20
         );
 
         const canGenerate = computed(() =>
           signalAnswers.value.every(a => a.trim().length > 0)
+        );
+
+        const canApply = computed(() =>
+          city.value.trim() && selectedSector.value
         );
 
         const CATEGORY_LABELS = {
@@ -336,6 +424,36 @@
           return CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         }
 
+        function normalizeLinkedin() {
+          let url = linkedinUrl.value.trim();
+          if (!url) return;
+          url = url.replace(/^@/, '');
+          if (url && !url.match(/^https?:\/\//i)) {
+            url = 'https://' + url;
+          }
+          linkedinUrl.value = url;
+        }
+
+        function normalizeCompanyUrl() {
+          let url = companyUrl.value.trim();
+          if (!url) return;
+          if (url && !url.match(/^https?:\/\//i)) {
+            url = 'https://' + url;
+          }
+          companyUrl.value = url;
+        }
+
+        async function loadSectors() {
+          try {
+            const res = await fetch('/api/public/companies/sectors');
+            if (res.ok) {
+              sectors.value = await res.json();
+            }
+          } catch (err) {
+            console.error('Failed to load sectors:', err);
+          }
+        }
+
         async function analyze() {
           error.value = '';
           loading.value = true;
@@ -351,6 +469,12 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to analyze');
             signals.value = data.signals;
+            sector.value = data.sector || '';
+            // Pre-fill selected sector from AI detection
+            if (data.sector && sectors.value.length > 0) {
+              const match = sectors.value.find(s => s.toLowerCase().includes(data.sector.toLowerCase()) || data.sector.toLowerCase().includes(s.toLowerCase()));
+              if (match) selectedSector.value = match;
+            }
             signalAnswers.value = ['', '', ''];
             step.value = 1;
           } catch (e) {
@@ -363,6 +487,7 @@
         async function generate() {
           error.value = '';
           loading.value = true;
+          matchesFound.value = false;
           try {
             const res = await fetch('/api/blurb/generate', {
               method: 'POST',
@@ -388,31 +513,84 @@
           }
         }
 
+        async function findMatches() {
+          error.value = '';
+          scanning.value = true;
+          try {
+            // Brief animation delay for the "thinking" feel
+            await new Promise(r => setTimeout(r, 1200));
+            const res = await fetch('/api/blurb/match-count', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sector: sector.value }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to scan network');
+            investorCount.value = data.investorCount;
+            nodeCount.value = data.nodeCount || 0;
+            matchedSector.value = data.sector;
+            matchesFound.value = true;
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            scanning.value = false;
+          }
+        }
+
         async function apply() {
           error.value = '';
           loading.value = true;
+          normalizeLinkedin();
+          normalizeCompanyUrl();
           try {
-            const res = await fetch('/api/blurb/apply', {
+            // 1. Submit to public signup pipeline (publicUsers + publicCompanies)
+            const signupRes = await fetch('/api/public/signup', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                name: founderName.value,
+                firstName: firstName.value,
+                lastName: lastName.value,
                 email: email.value,
-                companyName: companyName.value,
-                description: description.value,
-                signals: signals.value.map((s, i) => ({
-                  category: s.category,
-                  detected: s.detected,
-                  followUpQuestion: s.followUpQuestion,
-                  answer: signalAnswers.value[i],
-                })),
-                blurb: blurb.value,
                 oneLiner: oneLiner.value,
+                city: city.value,
+                linkedinUrl: linkedinUrl.value || undefined,
+                twitterHandle: twitterHandle.value || undefined,
+                companyName: companyName.value,
+                companyOneLiner: oneLiner.value,
+                sector: selectedSector.value,
+                companyUrl: companyUrl.value || undefined,
               }),
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Failed to submit');
+            const signupData = await signupRes.json();
+            if (!signupRes.ok) throw new Error(signupData.error || 'Failed to submit application');
+
+            // 2. Also save blurb data to founderLeads (for blurb + signal context)
+            try {
+              await fetch('/api/blurb/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  name: firstName.value + ' ' + lastName.value,
+                  email: email.value,
+                  companyName: companyName.value,
+                  description: description.value,
+                  signals: signals.value.map((s, i) => ({
+                    category: s.category,
+                    detected: s.detected,
+                    followUpQuestion: s.followUpQuestion,
+                    answer: signalAnswers.value[i],
+                  })),
+                  blurb: blurb.value,
+                  oneLiner: oneLiner.value,
+                }),
+              });
+            } catch (blurbErr) {
+              // Non-critical — signup already succeeded
+              console.error('Failed to save blurb data:', blurbErr);
+            }
+
             submitted.value = true;
+            step.value = 4;
           } catch (e) {
             error.value = e.message;
           } finally {
@@ -420,14 +598,19 @@
           }
         }
 
+        onMounted(() => {
+          loadSectors();
+        });
+
         return {
-          step, loading, error, submitted,
-          companyName, founderName, email, description,
-          signals, signalAnswers,
-          blurb, oneLiner,
-          canAnalyze, canGenerate,
-          formatCategory,
-          analyze, generate, apply,
+          step, loading, error, submitted, scanning, matchesFound,
+          companyName, companyUrl, firstName, lastName, email, description,
+          signals, signalAnswers, sector,
+          blurb, oneLiner, investorCount, nodeCount, matchedSector,
+          city, linkedinUrl, twitterHandle, selectedSector, sectors,
+          canAnalyze, canGenerate, canApply,
+          formatCategory, normalizeLinkedin,
+          analyze, generate, findMatches, apply,
         };
       },
     }).mount('#app');

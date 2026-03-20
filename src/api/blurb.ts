@@ -5,7 +5,8 @@
 
 import { Hono } from 'hono';
 import { z } from 'zod';
-import { db, founderLeads } from '../db/index.js';
+import { sql, eq, and, or, inArray } from 'drizzle-orm';
+import { db, founderLeads, investors, investorCategories, investorCategoryAssignments, investorCategoryExclusions, nodeInvestorConnections } from '../db/index.js';
 import { analyzeSignals, generateBlurb } from '../services/blurb-ai.js';
 import { sendEmail } from '../services/email.js';
 
@@ -26,12 +27,142 @@ app.post('/analyze', async (c) => {
   }
 
   try {
-    const signals = await analyzeSignals(parsed.data.companyName, parsed.data.description);
-    return c.json({ signals });
+    const result = await analyzeSignals(parsed.data.companyName, parsed.data.description);
+    return c.json({ signals: result.signals, sector: result.sector });
   } catch (err) {
     console.error('Failed to analyze signals:', err);
     return c.json({
       error: err instanceof Error ? err.message : 'Failed to analyze description',
+    }, 500);
+  }
+});
+
+// POST /api/blurb/match-count — Count matching investors for a sector
+const matchCountSchema = z.object({
+  sector: z.string().min(1),
+});
+
+app.post('/match-count', async (c) => {
+  const body = await c.req.json();
+  const parsed = matchCountSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0].message }, 400);
+  }
+
+  try {
+    const { sector } = parsed.data;
+    const now = new Date().toISOString();
+
+    // Find the sector category by name (case-insensitive fuzzy match)
+    const sectorCategory = db.select({ id: investorCategories.id, name: investorCategories.name })
+      .from(investorCategories)
+      .where(and(
+        eq(investorCategories.type, 'sector'),
+        sql`LOWER(${investorCategories.name}) LIKE ${'%' + sector.toLowerCase() + '%'}`,
+      ))
+      .limit(1)
+      .all();
+
+    // Find generalist category
+    const generalistCategory = db.select({ id: investorCategories.id })
+      .from(investorCategories)
+      .where(sql`LOWER(${investorCategories.name}) = 'generalist'`)
+      .limit(1)
+      .all();
+
+    const sectorId = sectorCategory[0]?.id;
+    const generalistId = generalistCategory[0]?.id;
+
+    // Get all active, non-paused investors
+    const activeInvestors = db.select({ id: investors.id })
+      .from(investors)
+      .where(and(
+        eq(investors.active, true),
+        or(
+          sql`${investors.pausedUntil} IS NULL`,
+          sql`${investors.pausedUntil} < ${now}`,
+        ),
+      ))
+      .all();
+
+    const activeIds = activeInvestors.map(i => i.id);
+    if (activeIds.length === 0) {
+      return c.json({ investorCount: 0, sector: sectorCategory[0]?.name || sector });
+    }
+
+    // Get investors with the sector category assigned
+    const sectorInvestorIds = new Set<number>();
+    if (sectorId) {
+      const rows = db.select({ investorId: investorCategoryAssignments.investorId })
+        .from(investorCategoryAssignments)
+        .where(eq(investorCategoryAssignments.categoryId, sectorId))
+        .all();
+      rows.forEach(r => sectorInvestorIds.add(r.investorId));
+    }
+
+    // Get generalist investors
+    const generalistInvestorIds = new Set<number>();
+    if (generalistId) {
+      const rows = db.select({ investorId: investorCategoryAssignments.investorId })
+        .from(investorCategoryAssignments)
+        .where(eq(investorCategoryAssignments.categoryId, generalistId))
+        .all();
+      rows.forEach(r => generalistInvestorIds.add(r.investorId));
+    }
+
+    // Get investors with any sector category (to find those with none)
+    const allSectorCategoryIds = db.select({ id: investorCategories.id })
+      .from(investorCategories)
+      .where(eq(investorCategories.type, 'sector'))
+      .all()
+      .map(r => r.id);
+
+    const investorsWithAnySector = new Set<number>();
+    if (allSectorCategoryIds.length > 0) {
+      const rows = db.select({ investorId: investorCategoryAssignments.investorId })
+        .from(investorCategoryAssignments)
+        .where(inArray(investorCategoryAssignments.categoryId, allSectorCategoryIds))
+        .all();
+      rows.forEach(r => investorsWithAnySector.add(r.investorId));
+    }
+
+    // Get investors who exclude this sector
+    const excludedInvestorIds = new Set<number>();
+    if (sectorId) {
+      const rows = db.select({ investorId: investorCategoryExclusions.investorId })
+        .from(investorCategoryExclusions)
+        .where(eq(investorCategoryExclusions.categoryId, sectorId))
+        .all();
+      rows.forEach(r => excludedInvestorIds.add(r.investorId));
+    }
+
+    // Count: active investors who (have sector OR are generalist OR have no sector categories) AND don't exclude
+    const matchingInvestorIds = activeIds.filter(id =>
+      (sectorInvestorIds.has(id) || generalistInvestorIds.has(id) || !investorsWithAnySector.has(id))
+      && !excludedInvestorIds.has(id)
+    );
+
+    // Count distinct nodes connected to matching investors
+    let nodeCount = 0;
+    if (matchingInvestorIds.length > 0) {
+      const nodeRows = db.select({ nodeId: nodeInvestorConnections.nodeId })
+        .from(nodeInvestorConnections)
+        .where(inArray(nodeInvestorConnections.investorId, matchingInvestorIds))
+        .all();
+      const uniqueNodes = new Set(nodeRows.map(r => r.nodeId));
+      nodeCount = uniqueNodes.size;
+    }
+
+    return c.json({
+      investorCount: matchingInvestorIds.length,
+      nodeCount,
+      sector: sectorCategory[0]?.name || sector,
+    });
+  } catch (err) {
+    console.error('Failed to count matching investors:', err);
+    return c.json({
+      error: err instanceof Error ? err.message : 'Failed to count investors',
     }, 500);
   }
 });

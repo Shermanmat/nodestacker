@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
+  <title>Blurb Builder — Craft Your Investor Pitch | MatCap</title>
+  <meta name="description" content="Use AI to craft a compelling investor blurb for your startup. MatCap's Blurb Builder identifies your strongest signals and helps you write a pitch investors want to read.">
+  <meta property="og:title" content="Blurb Builder — Craft Your Investor Pitch | MatCap">
+  <meta property="og:description" content="Use AI to craft a compelling investor blurb for your startup.">
+  <meta property="og:image" content="https://matcap.vc/downloads/astro.png">
+  <meta property="og:url" content="https://matcap.vc/blurb">
+  <meta property="og:type" content="website">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    body { background: #020617; }
+    .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
+    .fade-enter-from, .fade-leave-to { opacity: 0; }
+    textarea:focus, input:focus { outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); }
+  </style>
+</head>
+<body class="font-sans antialiased text-white min-h-screen">
+
+  <!-- Nav -->
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-md">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <a href="/" class="flex items-center gap-2.5">
+        <img src="/downloads/matcap-wordmark.svg" alt="MatCap" style="height:32px;width:auto;" class="object-contain">
+      </a>
+      <div class="hidden items-center gap-8 md:flex">
+        <a href="/founders" class="text-sm text-slate-300 transition hover:text-white">For Founders</a>
+        <a href="/investors" class="text-sm text-slate-300 transition hover:text-white">For Investors</a>
+        <a href="/nodes" class="text-sm text-slate-300 transition hover:text-white">For Nodes</a>
+        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">Apply Now</a>
+      </div>
+    </div>
+  </nav>
+
+  <div id="app" class="pt-24 pb-20">
+    <div class="mx-auto max-w-2xl px-6">
+
+      <!-- Progress bar -->
+      <div class="mb-10">
+        <div class="flex items-center justify-between mb-2">
+          <span v-for="(label, i) in ['Describe', 'Sharpen', 'Review', 'Apply']" :key="i"
+                class="text-xs font-medium transition-colors"
+                :class="i <= step ? 'text-blue-400' : 'text-slate-600'">
+            {{ label }}
+          </span>
+        </div>
+        <div class="h-1 rounded-full bg-slate-800">
+          <div class="h-1 rounded-full bg-blue-500 transition-all duration-500"
+               :style="{ width: ((step) / 3 * 100) + '%' }"></div>
+        </div>
+      </div>
+
+      <!-- Step 0: Input -->
+      <div v-if="step === 0">
+        <h1 class="text-3xl font-bold tracking-tight mb-2">Build your investor blurb</h1>
+        <p class="text-slate-400 mb-8">We'll help you craft a pitch that gets investors to say yes to a meeting.</p>
+
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Company name</label>
+            <input v-model="companyName" type="text" placeholder="Acme Corp"
+                   class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Your name</label>
+            <input v-model="founderName" type="text" placeholder="Jane Smith"
+                   class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
+            <input v-model="email" type="email" placeholder="jane@acme.com"
+                   class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500">
+          </div>
+
+          <!-- Coaching section -->
+          <div class="rounded-xl border border-blue-500/20 bg-blue-500/5 p-5">
+            <p class="text-sm font-medium text-blue-400 mb-3">The strongest blurbs highlight what makes your company exceptional. Think about:</p>
+            <ul class="space-y-1.5 text-sm text-slate-400">
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">Traction</strong> — revenue, users, growth rate</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">Team</strong> — notable backgrounds, repeat founders, exits</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">Technology</strong> — what's novel or defensible</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">Customers</strong> — logos, enterprise contracts</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">Investors or programs</strong> — YC, notable angels</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">Education</strong> — Stanford, MIT, PhD</span>
+              </li>
+              <li class="flex items-start gap-2">
+                <span class="text-blue-400 mt-0.5">&#8226;</span>
+                <span><strong class="text-slate-300">A truly unique insight</strong> or market thesis</span>
+              </li>
+            </ul>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Tell us about your startup</label>
+            <textarea v-model="description" rows="6" placeholder="Include anything that makes your company stand out — your background, what you're building, traction, team, technology..."
+                      class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white placeholder-slate-500 resize-none"></textarea>
+          </div>
+
+          <button @click="analyze" :disabled="loading || !canAnalyze"
+                  class="w-full rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span v-if="loading" class="flex items-center justify-center gap-2">
+              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              Analyzing your startup...
+            </span>
+            <span v-else>Analyze My Startup</span>
+          </button>
+
+          <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
+        </div>
+      </div>
+
+      <!-- Step 1: Signal follow-ups -->
+      <div v-if="step === 1">
+        <h1 class="text-3xl font-bold tracking-tight mb-2">Sharpen your signals</h1>
+        <p class="text-slate-400 mb-8">We identified 3 things investors will care about most. Help us make each one stronger.</p>
+
+        <div class="space-y-6">
+          <div v-for="(signal, i) in signals" :key="i"
+               class="rounded-xl border border-white/10 bg-slate-800/30 p-6">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="inline-flex items-center rounded-full bg-blue-500/10 border border-blue-500/20 px-3 py-0.5 text-xs font-medium text-blue-400">
+                {{ formatCategory(signal.category) }}
+              </span>
+            </div>
+            <p class="text-sm text-slate-400 mb-1">{{ signal.detected }}</p>
+            <p class="text-sm font-medium text-white mb-3">{{ signal.followUpQuestion }}</p>
+            <textarea v-model="signalAnswers[i]" rows="3" placeholder="Your answer..."
+                      class="w-full rounded-lg border border-white/10 bg-slate-900/50 px-4 py-3 text-white placeholder-slate-500 resize-none text-sm"></textarea>
+          </div>
+
+          <div class="flex gap-3">
+            <button @click="step = 0"
+                    class="rounded-lg border border-white/10 px-6 py-3.5 font-medium text-slate-300 transition hover:bg-slate-800">
+              Back
+            </button>
+            <button @click="generate" :disabled="loading || !canGenerate"
+                    class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+              <span v-if="loading" class="flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Generating your blurb...
+              </span>
+              <span v-else>Generate Blurb</span>
+            </button>
+          </div>
+
+          <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
+        </div>
+      </div>
+
+      <!-- Step 2: Review blurb -->
+      <div v-if="step === 2">
+        <h1 class="text-3xl font-bold tracking-tight mb-2">Your investor blurb</h1>
+        <p class="text-slate-400 mb-8">Edit the blurb below or regenerate if you'd like a different take.</p>
+
+        <div class="space-y-5">
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">One-liner</label>
+            <textarea v-model="oneLiner" rows="2"
+                      class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white resize-none"></textarea>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-300 mb-1.5">Investor blurb</label>
+            <textarea v-model="blurb" rows="6"
+                      class="w-full rounded-lg border border-white/10 bg-slate-800/50 px-4 py-3 text-white resize-none"></textarea>
+          </div>
+
+          <div class="flex gap-3">
+            <button @click="step = 1"
+                    class="rounded-lg border border-white/10 px-6 py-3.5 font-medium text-slate-300 transition hover:bg-slate-800">
+              Back
+            </button>
+            <button @click="generate" :disabled="loading"
+                    class="rounded-lg border border-blue-500/30 bg-blue-500/10 px-6 py-3.5 font-medium text-blue-400 transition hover:bg-blue-500/20 disabled:opacity-50">
+              <span v-if="loading" class="flex items-center justify-center gap-2">
+                <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Regenerating...
+              </span>
+              <span v-else>Regenerate</span>
+            </button>
+            <button @click="step = 3"
+                    class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700">
+              Apply to MatCap
+            </button>
+          </div>
+
+          <p v-if="error" class="text-red-400 text-sm">{{ error }}</p>
+        </div>
+      </div>
+
+      <!-- Step 3: Apply / Confirm -->
+      <div v-if="step === 3 && !submitted">
+        <h1 class="text-3xl font-bold tracking-tight mb-2">Apply to MatCap</h1>
+        <p class="text-slate-400 mb-8">Review your details below. We'll match you with the right investors.</p>
+
+        <div class="space-y-4 mb-8">
+          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
+            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Company</div>
+            <div class="text-white font-medium">{{ companyName }}</div>
+          </div>
+          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
+            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Founder</div>
+            <div class="text-white font-medium">{{ founderName }} &middot; {{ email }}</div>
+          </div>
+          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
+            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">One-liner</div>
+            <div class="text-white">{{ oneLiner }}</div>
+          </div>
+          <div class="rounded-xl border border-white/10 bg-slate-800/30 p-5">
+            <div class="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Blurb</div>
+            <div class="text-white whitespace-pre-line">{{ blurb }}</div>
+          </div>
+        </div>
+
+        <div class="flex gap-3">
+          <button @click="step = 2"
+                  class="rounded-lg border border-white/10 px-6 py-3.5 font-medium text-slate-300 transition hover:bg-slate-800">
+            Edit Blurb
+          </button>
+          <button @click="apply" :disabled="loading"
+                  class="flex-1 rounded-lg bg-blue-600 px-6 py-3.5 font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span v-if="loading" class="flex items-center justify-center gap-2">
+              <svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+              Submitting...
+            </span>
+            <span v-else>Submit Application</span>
+          </button>
+        </div>
+
+        <p v-if="error" class="text-red-400 text-sm mt-3">{{ error }}</p>
+      </div>
+
+      <!-- Confirmation -->
+      <div v-if="step === 3 && submitted" class="text-center py-12">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 mb-6">
+          <svg class="w-8 h-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h1 class="text-3xl font-bold tracking-tight mb-3">Application submitted!</h1>
+        <p class="text-slate-400 max-w-md mx-auto mb-8">
+          We've received your application for <strong class="text-white">{{ companyName }}</strong>.
+          Our team will review it and reach out if there's a fit.
+        </p>
+        <a href="/founders" class="inline-flex items-center justify-center rounded-lg border border-white/10 px-6 py-3 font-medium text-slate-300 transition hover:bg-slate-800">
+          Learn more about MatCap
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+      setup() {
+        const step = ref(0);
+        const loading = ref(false);
+        const error = ref('');
+        const submitted = ref(false);
+
+        // Step 0 fields
+        const companyName = ref('');
+        const founderName = ref('');
+        const email = ref('');
+        const description = ref('');
+
+        // Step 1 fields
+        const signals = ref([]);
+        const signalAnswers = ref(['', '', '']);
+
+        // Step 2 fields
+        const blurb = ref('');
+        const oneLiner = ref('');
+
+        const canAnalyze = computed(() =>
+          companyName.value.trim() && founderName.value.trim() && email.value.trim() && description.value.trim().length >= 20
+        );
+
+        const canGenerate = computed(() =>
+          signalAnswers.value.every(a => a.trim().length > 0)
+        );
+
+        const CATEGORY_LABELS = {
+          team_pedigree: 'Team Pedigree',
+          education: 'Education',
+          traction: 'Traction',
+          novel_technology: 'Novel Technology',
+          unique_idea: 'Unique Idea',
+          customer_logos: 'Customer Logos',
+          programs_accelerators: 'Programs / Accelerators',
+          notable_investors: 'Notable Investors',
+          domain_expertise: 'Domain Expertise',
+        };
+
+        function formatCategory(cat) {
+          return CATEGORY_LABELS[cat] || cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        async function analyze() {
+          error.value = '';
+          loading.value = true;
+          try {
+            const res = await fetch('/api/blurb/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyName: companyName.value,
+                description: description.value,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to analyze');
+            signals.value = data.signals;
+            signalAnswers.value = ['', '', ''];
+            step.value = 1;
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        async function generate() {
+          error.value = '';
+          loading.value = true;
+          try {
+            const res = await fetch('/api/blurb/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                companyName: companyName.value,
+                description: description.value,
+                signals: signals.value.map((s, i) => ({
+                  category: s.category,
+                  answer: signalAnswers.value[i],
+                })),
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to generate');
+            blurb.value = data.blurb;
+            oneLiner.value = data.oneLiner;
+            step.value = 2;
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        async function apply() {
+          error.value = '';
+          loading.value = true;
+          try {
+            const res = await fetch('/api/blurb/apply', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: founderName.value,
+                email: email.value,
+                companyName: companyName.value,
+                description: description.value,
+                signals: signals.value.map((s, i) => ({
+                  category: s.category,
+                  detected: s.detected,
+                  followUpQuestion: s.followUpQuestion,
+                  answer: signalAnswers.value[i],
+                })),
+                blurb: blurb.value,
+                oneLiner: oneLiner.value,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to submit');
+            submitted.value = true;
+          } catch (e) {
+            error.value = e.message;
+          } finally {
+            loading.value = false;
+          }
+        }
+
+        return {
+          step, loading, error, submitted,
+          companyName, founderName, email, description,
+          signals, signalAnswers,
+          blurb, oneLiner,
+          canAnalyze, canGenerate,
+          formatCategory,
+          analyze, generate, apply,
+        };
+      },
+    }).mount('#app');
+  </script>
+</body>
+</html>

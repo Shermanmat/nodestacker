@@ -30,6 +30,7 @@ import matchingRoutes from './api/matching.js';
 import marketplaceHealthRoutes from './api/marketplace-health.js';
 import signupsRoutes from './api/signups.js';
 import voiceInterviewsRoutes from './api/voice-interviews.js';
+import blurbRoutes from './api/blurb.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -53,6 +54,8 @@ app.route('/api/public/companies', publicCompaniesRoutes);
 // Onboarding chat is public (founder intake interview)
 // Admin endpoints (/leads, /leads/:id/convert) are protected below
 app.route('/api/onboarding-chat', onboardingChatRoutes);
+// Blurb builder is public (founder self-service)
+app.route('/api/blurb', blurbRoutes);
 // Voice interview public endpoints (token-based auth)
 app.route('/api', voiceInterviewsRoutes);
 // Inbound webhook endpoint is public (uses token auth internally)
@@ -334,6 +337,9 @@ app.get('/dashboard', serveStatic({ path: './public/dashboard.html' }));
 
 // Voice interview (public, token-based)
 app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' }));
+
+// Blurb builder
+app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));

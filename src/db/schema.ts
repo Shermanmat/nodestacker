@@ -782,6 +782,10 @@ export const founderLeads = sqliteTable('founder_leads', {
   // Link to public signup (if applicant came through public signup flow)
   publicUserId: integer('public_user_id'),
   publicCompanyId: integer('public_company_id'),
+
+  // Blurb builder fields
+  source: text('source').default('onboarding_chat'), // 'onboarding_chat' or 'blurb_builder'
+  signalCategories: text('signal_categories'), // JSON string of detected signals + answers
 });
 
 export const founderLeadsRelations = relations(founderLeads, ({ one }) => ({

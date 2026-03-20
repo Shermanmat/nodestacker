@@ -2175,6 +2175,7 @@
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-amber-100 text-amber-700': app.applicationStatus === 'applied',
+                    'bg-purple-100 text-purple-700': app.applicationStatus === 'trial_sent',
                     'bg-blue-100 text-blue-700': app.applicationStatus === 'interview_sent',
                     'bg-green-100 text-green-700': app.applicationStatus === 'approved',
                     'bg-gray-100 text-gray-500': app.applicationStatus === 'declined',
@@ -2189,6 +2190,11 @@
                   <div class="flex gap-2 flex-wrap">
                     <template v-if="app.applicationStatus === 'applied'">
                       <button @click="sendVoiceInterview(app.id)" class="text-xs text-blue-600 hover:underline font-medium">Voice Interview</button>
+                      <button @click="sendTrial(app.id)" class="text-xs text-purple-600 hover:underline font-medium">Trial</button>
+                      <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
+                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
+                    </template>
+                    <template v-else-if="app.applicationStatus === 'trial_sent'">
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
                     </template>
@@ -3154,6 +3160,14 @@
           if (!confirm('Decline this application?')) return;
           try {
             await api(`/signups/applications/${companyId}/decline`, { method: 'POST' });
+            await loadSignups();
+          } catch (e) { /* handled by api() */ }
+        }
+
+        async function sendTrial(companyId) {
+          if (!confirm('Send trial invite? This will email the founder with a link to the trial page and blurb builder.')) return;
+          try {
+            await api(`/signups/applications/${companyId}/trial`, { method: 'POST' });
             await loadSignups();
           } catch (e) { /* handled by api() */ }
         }
@@ -5383,7 +5397,7 @@
           // Signups
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,
-          portfolioApplications, approveApplication, declineApplication,
+          portfolioApplications, approveApplication, declineApplication, sendTrial,
           sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer, audioProxyUrl,
         };
       }

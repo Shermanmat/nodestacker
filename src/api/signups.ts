@@ -55,7 +55,7 @@ app.post('/applications/:id/approve', async (c) => {
     where: eq(publicCompanies.id, companyId),
   });
   if (!company) return c.json({ error: 'Company not found' }, 404);
-  if (company.applicationStatus !== 'applied' && company.applicationStatus !== 'interview_sent') return c.json({ error: 'Not a pending application' }, 400);
+  if (!['applied', 'interview_sent', 'trial_sent'].includes(company.applicationStatus || '')) return c.json({ error: 'Not a pending application' }, 400);
 
   const user = await db.query.publicUsers.findFirst({
     where: eq(publicUsers.id, company.userId),
@@ -176,6 +176,58 @@ app.post('/applications/:id/decline', async (c) => {
       console.error('Failed to send decline email:', err);
     }
   }
+
+  return c.json({ success: true });
+});
+
+// Send trial invitation
+app.post('/applications/:id/trial', async (c) => {
+  const companyId = parseInt(c.req.param('id'));
+
+  const company = await db.select().from(publicCompanies).where(eq(publicCompanies.id, companyId)).get();
+  if (!company) return c.json({ error: 'Company not found' }, 404);
+
+  const user = await db.select().from(publicUsers).where(eq(publicUsers.id, company.userId)).get();
+  if (!user) return c.json({ error: 'User not found' }, 404);
+
+  const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+
+  // Update status
+  await db.update(publicCompanies)
+    .set({ applicationStatus: 'trial_sent' })
+    .where(eq(publicCompanies.id, companyId));
+
+  // Send trial email
+  if (postmarkClient) {
+    try {
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: user.email,
+        Subject: `${user.firstName}, let's do a trial — MatCap`,
+        HtmlBody: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <p>Hi ${user.firstName},</p>
+            <p>Thanks for applying to MatCap. I'd like to work together on a trial basis — I'll send your pitch to relevant investors in our network and we'll see if there's a fit.</p>
+            <p>Before we get started, take a look at how the trial works:</p>
+            <p style="margin: 24px 0;">
+              <a href="${baseUrl}/trial" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: 600;">
+                See How It Works
+              </a>
+            </p>
+            <p>At the bottom of that page, you'll find a link to build your investor blurb — that's the first step.</p>
+            <p>Looking forward to it.</p>
+            <p>Mat Sherman<br>Founder, MatCap</p>
+          </div>
+        `,
+        TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap. I'd like to work together on a trial basis — I'll send your pitch to relevant investors in our network and we'll see if there's a fit.\n\nBefore we get started, take a look at how the trial works:\n${baseUrl}/trial\n\nAt the bottom of that page, you'll find a link to build your investor blurb — that's the first step.\n\nLooking forward to it.\n\nMat Sherman\nFounder, MatCap`,
+      });
+    } catch (err) {
+      console.error('Failed to send trial email:', err);
+      return c.json({ error: 'Failed to send email' }, 500);
+    }
+  }
+
+  console.log(`[TRIAL] Sent trial invite to ${user.firstName} ${user.lastName} (${user.email}) for ${company.companyName}`);
 
   return c.json({ success: true });
 });

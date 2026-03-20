@@ -340,6 +340,7 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 
 // Blurb builder
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
+app.get('/trial', serveStatic({ path: './public/trial.html' }));
 
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));

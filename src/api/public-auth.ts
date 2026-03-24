@@ -47,7 +47,7 @@ const signupSchema = z.object({
   twitterHandle: z.string().optional(),
   companyName: z.string().min(1, 'Company name is required'),
   companyOneLiner: z.string().min(1, 'Company description is required'),
-  sector: z.string().min(1, 'Sector is required'),
+  sector: z.string().optional(),
   companyUrl: z.string().optional(),
 });
 

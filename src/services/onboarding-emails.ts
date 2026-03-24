@@ -129,7 +129,7 @@ function formatVestingSchedule(vestingMonths: number, vestingCliffMonths: number
  * Email: MatCap wants to work with you
  */
 export async function sendOfferEmail(founder: FounderInfo, equityPercent: string, offer: OfferDetails): Promise<EmailResult> {
-  const subject = `MatCap wants to work with you`;
+  const subject = `Your Offer To Join The MatCap Network`;
   const portalUrl = `${BASE_URL}/founder`;
   const vestingText = formatVestingSchedule(offer.vestingMonths, offer.vestingCliffMonths);
   const firstName = founder.name.split(' ')[0];

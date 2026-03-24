@@ -671,6 +671,7 @@
                 <span :class="workflowDetails.workflow?.offerSentAt ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Offer Sent</span>
                 <span v-if="workflowDetails.workflow?.offerSentAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.offerSentAt?.split('T')[0] }}</span>
+                <button v-if="workflowDetails.workflow?.offerSentAt" @click="resendOffer(workflowDetails.workflow.id)" class="text-xs text-blue-600 hover:underline ml-2">Resend</button>
               </div>
               <div class="flex items-center gap-2">
                 <span :class="workflowDetails.workflow?.offerAcceptedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
@@ -4489,6 +4490,15 @@
           }
         };
 
+        const resendOffer = async (workflowId) => {
+          if (!confirm('Resend offer email with current terms?')) return;
+          await api(`/onboarding/${workflowId}/resend-offer`, { method: 'POST' });
+          loadOnboardingWorkflows();
+          if (workflowDetails.value?.workflow?.id === workflowId) {
+            openWorkflowModal({ id: workflowId });
+          }
+        };
+
         const generateAdvisoryAgreement = async (workflowId) => {
           await api(`/onboarding/${workflowId}/generate-advisory-agreement`, {
             method: 'POST',
@@ -5378,7 +5388,7 @@
           selectedWorkflow, showWorkflowModal, workflowDetails,
           loadOnboardingWorkflows, getEligibleForOnboarding, openStartOnboardingModal, startOnboarding,
           offerTermsForm, offerTermsDirty, saveOfferTerms, introRequestsDirty, saveIntroRequestTerms,
-          openWorkflowModal, closeWorkflowModal, sendOffer, generateAdvisoryAgreement, checkSignatureStatus,
+          openWorkflowModal, closeWorkflowModal, sendOffer, resendOffer, generateAdvisoryAgreement, checkSignatureStatus,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,
           // Network Health

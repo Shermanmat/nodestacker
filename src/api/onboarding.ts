@@ -371,6 +371,47 @@ app.post('/:id/send-offer', async (c) => {
   return c.json({ success: true, message: 'Offer sent to founder' });
 });
 
+// ============== RESEND OFFER ==============
+
+app.post('/:id/resend-offer', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) {
+    return c.json({ error: 'Workflow not found' }, 404);
+  }
+
+  if (!workflow.offerSentAt) {
+    return c.json({ error: 'Offer has not been sent yet' }, 400);
+  }
+
+  const founder = workflow.portfolioCompany.founder;
+  const now = new Date().toISOString();
+
+  // Resend email with current terms
+  await onboardingEmails.sendOfferEmail(
+    { name: founder.name, email: founder.email, companyName: founder.companyName },
+    workflow.offerEquityPercent || '',
+    {
+      vestingMonths: workflow.vestingMonths ?? 48,
+      vestingCliffMonths: workflow.vestingCliffMonths ?? 0,
+      notes: workflow.offerNotes || undefined,
+    }
+  );
+
+  // Update sent timestamp
+  await db.update(onboardingWorkflows).set({ offerSentAt: now, updatedAt: now }).where(eq(onboardingWorkflows.id, workflowId));
+
+  await logEvent(workflowId, OnboardingEventType.OFFER_SENT, OnboardingActor.ADMIN, 'Offer resent with updated terms', {
+    founderEmail: founder.email,
+    equityPercent: workflow.offerEquityPercent,
+    vestingMonths: workflow.vestingMonths,
+    vestingCliffMonths: workflow.vestingCliffMonths,
+  });
+
+  return c.json({ success: true, message: 'Offer resent to founder' });
+});
+
 // ============== GENERATE ADVISORY AGREEMENT ==============
 
 app.post('/:id/generate-advisory-agreement', async (c) => {

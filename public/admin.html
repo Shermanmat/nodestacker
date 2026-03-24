@@ -627,23 +627,6 @@
                   </select>
                 </div>
               </div>
-              <!-- Intro Request Terms -->
-              <div class="border-t pt-3 mt-3">
-                <div class="text-xs font-medium text-gray-500 uppercase mb-2">Intro Requests</div>
-                <p class="text-xs text-gray-500 mb-3">We run on intro requests. The accept rate on your intro requests determines how well you're doing in the network. We start you at a number and our goal is to increase it — but we let investor behavior dictate that, since we're pinned to what investors think about our companies.</p>
-                <div class="grid grid-cols-2 gap-4">
-                  <div>
-                    <label class="text-xs text-gray-500">Intro requests per week</label>
-                    <select v-model="offerTermsForm.introRequestsPerWeek" class="w-full border rounded px-2 py-1">
-                      <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label class="text-xs text-gray-500">Revisit date</label>
-                    <input v-model="offerTermsForm.introRequestsRevisitDate" type="date" class="w-full border rounded px-2 py-1" />
-                  </div>
-                </div>
-              </div>
             </template>
             <template v-else>
               <div class="grid grid-cols-2 gap-4 mb-3">
@@ -656,17 +639,28 @@
                   <div class="text-sm font-medium text-gray-800">{{ formatVestingSchedule(workflowDetails.workflow?.vestingMonths, workflowDetails.workflow?.vestingCliffMonths) }}</div>
                 </div>
               </div>
-              <div v-if="workflowDetails.workflow?.introRequestsPerWeek" class="border-t pt-3 grid grid-cols-2 gap-4">
-                <div>
-                  <div class="text-xs text-gray-500">Intro Requests / Week</div>
-                  <div class="text-sm font-medium text-gray-800">{{ workflowDetails.workflow?.introRequestsPerWeek }}</div>
-                </div>
-                <div v-if="workflowDetails.workflow?.introRequestsRevisitDate">
-                  <div class="text-xs text-gray-500">Revisit Date</div>
-                  <div class="text-sm font-medium text-gray-800">{{ workflowDetails.workflow?.introRequestsRevisitDate }}</div>
-                </div>
-              </div>
             </template>
+          </div>
+
+          <!-- Intro Request Terms (always editable) -->
+          <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-medium text-gray-500 uppercase">Intro Requests</div>
+              <button v-if="introRequestsDirty" @click="saveIntroRequestTerms" class="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Save Changes</button>
+            </div>
+            <p class="text-xs text-gray-500 mb-3">We run on intro requests. The accept rate determines how well they're doing in the network. We start at a number and our goal is to increase it — but investor behavior dictates that.</p>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-gray-500">Intro requests per week</label>
+                <select v-model="offerTermsForm.introRequestsPerWeek" class="w-full border rounded px-2 py-1">
+                  <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500">Revisit date</label>
+                <input v-model="offerTermsForm.introRequestsRevisitDate" type="date" class="w-full border rounded px-2 py-1" />
+              </div>
+            </div>
           </div>
 
           <!-- Progress Steps -->
@@ -4431,6 +4425,25 @@
             parseInt(offerTermsForm.introRequestsPerWeek) !== (w.introRequestsPerWeek || 3) ||
             (offerTermsForm.introRequestsRevisitDate || '') !== (w.introRequestsRevisitDate || '');
         });
+        const introRequestsDirty = computed(() => {
+          const w = workflowDetails.value?.workflow;
+          if (!w) return false;
+          return parseInt(offerTermsForm.introRequestsPerWeek) !== (w.introRequestsPerWeek || 3) ||
+            (offerTermsForm.introRequestsRevisitDate || '') !== (w.introRequestsRevisitDate || '');
+        });
+        const saveIntroRequestTerms = async () => {
+          const w = workflowDetails.value?.workflow;
+          if (!w) return;
+          await api(`/onboarding/${w.id}/intro-request-terms`, {
+            method: 'PUT',
+            body: {
+              introRequestsPerWeek: parseInt(offerTermsForm.introRequestsPerWeek),
+              introRequestsRevisitDate: offerTermsForm.introRequestsRevisitDate || null,
+            },
+          });
+          loadOnboardingWorkflows();
+          openWorkflowModal({ id: w.id });
+        };
         const saveOfferTerms = async () => {
           const w = workflowDetails.value?.workflow;
           if (!w) return;
@@ -5363,7 +5376,7 @@
           onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,
           selectedWorkflow, showWorkflowModal, workflowDetails,
           loadOnboardingWorkflows, getEligibleForOnboarding, openStartOnboardingModal, startOnboarding,
-          offerTermsForm, offerTermsDirty, saveOfferTerms,
+          offerTermsForm, offerTermsDirty, saveOfferTerms, introRequestsDirty, saveIntroRequestTerms,
           openWorkflowModal, closeWorkflowModal, sendOffer, generateAdvisoryAgreement, checkSignatureStatus,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,

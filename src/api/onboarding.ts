@@ -309,6 +309,28 @@ app.put('/:id/offer-terms', async (c) => {
   return c.json({ success: true });
 });
 
+// ============== UPDATE INTRO REQUEST TERMS ==============
+
+app.put('/:id/intro-request-terms', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+
+  const body = await c.req.json();
+  const updates: Record<string, any> = {};
+  if (body.introRequestsPerWeek !== undefined) updates.introRequestsPerWeek = parseInt(body.introRequestsPerWeek);
+  if (body.introRequestsRevisitDate !== undefined) updates.introRequestsRevisitDate = body.introRequestsRevisitDate || null;
+
+  if (Object.keys(updates).length === 0) return c.json({ error: 'No fields to update' }, 400);
+
+  updates.updatedAt = new Date().toISOString();
+  await db.update(onboardingWorkflows).set(updates).where(eq(onboardingWorkflows.id, workflowId));
+
+  await logEvent(workflowId, OnboardingEventType.WORKFLOW_STARTED, OnboardingActor.ADMIN, 'Intro request terms updated', updates);
+
+  return c.json({ success: true });
+});
+
 // ============== SEND OFFER ==============
 
 app.post('/:id/send-offer', async (c) => {

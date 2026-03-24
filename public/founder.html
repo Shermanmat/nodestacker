@@ -1122,11 +1122,11 @@
 
         const formatVestingSchedule = (vestingMonths, vestingCliffMonths) => {
           const months = vestingMonths ?? 48;
-          if (months === 0) return 'No vesting';
           const cliff = vestingCliffMonths ?? 0;
-          const years = months / 12;
-          const cliffText = cliff === 0 ? 'no cliff' : `${cliff}-month cliff`;
-          return `${years}-year vest, ${cliffText}`;
+          const parts = [];
+          parts.push(months === 0 ? 'no vesting' : `${months / 12}-year vest`);
+          parts.push(cliff > 0 ? `${cliff}-month cliff` : 'no cliff');
+          return parts.join(', ');
         };
 
         const filteredInvestors = computed(() => {

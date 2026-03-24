@@ -107,13 +107,22 @@ interface OfferDetails {
  * Format vesting schedule for display
  */
 function formatVestingSchedule(vestingMonths: number, vestingCliffMonths: number): string {
-  if (vestingMonths === 0) return 'No vesting';
-  const years = vestingMonths / 12;
-  const cliffText = vestingCliffMonths === 0
-    ? 'no cliff'
-    : `${vestingCliffMonths}-month cliff`;
+  const parts: string[] = [];
 
-  return `${years}-year vesting, ${cliffText}`;
+  if (vestingMonths === 0) {
+    parts.push('no vesting');
+  } else {
+    const years = vestingMonths / 12;
+    parts.push(`${years}-year vesting`);
+  }
+
+  if (vestingCliffMonths > 0) {
+    parts.push(`${vestingCliffMonths}-month cliff`);
+  } else {
+    parts.push('no cliff');
+  }
+
+  return parts.join(', ');
 }
 
 /**
@@ -150,7 +159,7 @@ ${revisitDate ? `\nWe'll revisit your intro request volume on ${revisitDate} to 
     <p><strong>Terms:</strong></p>
     <ul>
       <li><strong>${equityPercent}% equity</strong></li>
-      ${vestingText !== 'No vesting' ? `<li><strong>${vestingText}</strong></li>` : ''}
+      <li><strong>${vestingText}</strong></li>
     </ul>
     ${introRequestHtml}
     ${offer.notes ? `<p>${offer.notes}</p>` : ''}
@@ -163,7 +172,8 @@ We'd like to offer you a spot in the MatCap portfolio. This includes access to o
 
 Terms:
 - ${equityPercent}% equity
-${vestingText !== 'No vesting' ? `- ${vestingText}\n` : ''}${introRequestText}
+- ${vestingText}
+${introRequestText}
 ${offer.notes ? `${offer.notes}\n` : ''}
 Review the offer here: ${portalUrl}
 

@@ -300,4 +300,66 @@ app.post('/apply', async (c) => {
   }
 });
 
+// POST /api/blurb/signup — Simple founder application (no blurb required)
+const signupSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  email: z.string().email(),
+  companyName: z.string().min(1),
+  companyUrl: z.string().optional(),
+  description: z.string().min(1),
+});
+
+app.post('/signup', async (c) => {
+  const body = await c.req.json();
+  const parsed = signupSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return c.json({ error: parsed.error.issues[0].message }, 400);
+  }
+
+  const { firstName, lastName, email, companyName, companyUrl, description } = parsed.data;
+  const now = new Date().toISOString();
+
+  try {
+    const [lead] = await db.insert(founderLeads).values({
+      firstName,
+      lastName,
+      email,
+      companyName,
+      companyDescription: description,
+      conversationHistory: JSON.stringify({ source: 'signup_form', companyUrl }),
+      source: 'signup_form',
+      status: 'completed',
+      createdAt: now,
+      completedAt: now,
+    }).returning();
+
+    // Send admin notification email
+    const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+    await sendEmail({
+      to: adminEmail,
+      subject: `New Founder Application: ${companyName}`,
+      html: `
+        <h2>New Founder Application</h2>
+        <p><strong>Name:</strong> ${firstName} ${lastName}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Company:</strong> ${companyName}</p>
+        ${companyUrl ? `<p><strong>Website:</strong> ${companyUrl}</p>` : ''}
+        <h3>Description</h3>
+        <p>${description}</p>
+        <p><a href="https://matcap.vc/admin">View in Admin</a></p>
+      `,
+      text: `New Founder Application\n\nName: ${firstName} ${lastName}\nEmail: ${email}\nCompany: ${companyName}\n${companyUrl ? `Website: ${companyUrl}\n` : ''}\nDescription:\n${description}`,
+    });
+
+    return c.json({ success: true, leadId: lead.id });
+  } catch (err) {
+    console.error('Failed to submit signup:', err);
+    return c.json({
+      error: err instanceof Error ? err.message : 'Failed to submit application',
+    }, 500);
+  }
+});
+
 export default app;

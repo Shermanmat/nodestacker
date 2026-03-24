@@ -32,9 +32,9 @@
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=Inter:wght@400;500;600;700;800&display=swap');
     html { scroll-behavior: auto; }
-    body { background: #020617; }
+    body { background: #ffffff; }
 
     #network-canvas {
       position: fixed;
@@ -76,31 +76,28 @@
     }
   </style>
 </head>
-<body class="font-sans antialiased text-white">
+<body class="font-sans antialiased text-slate-900">
 
   <!-- Canvas -->
   <canvas id="network-canvas"></canvas>
 
   <!-- Nav -->
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-md">
+  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-md">
     <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
       <a href="/" class="flex items-center gap-2.5">
-        <img src="/downloads/matcap-wordmark.svg" alt="MatCap" style="height:32px;width:auto;" class="object-contain">
+        <img src="/downloads/matcap-logo.png" alt="MatCap" style="height:40px;width:auto;" class="object-contain">
       </a>
       <div class="hidden items-center gap-8 md:flex">
-        <a href="/founders" class="text-sm text-slate-300 transition hover:text-white">For Founders</a>
-        <a href="/investors" class="text-sm text-slate-300 transition hover:text-white">For Investors</a>
-        <a href="/nodes" class="text-sm text-slate-300 transition hover:text-white">For Nodes</a>
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">Apply to Join</a>
+        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Apply as a Founder</a>
       </div>
       <div class="md:hidden">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700">Apply to Join</a>
+        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Apply as a Founder</a>
       </div>
     </div>
   </nav>
 
   <!-- Astronaut watermark -->
-  <div class="pointer-events-none fixed top-0 right-0 z-[1] opacity-[0.04]" style="width:45vw;max-width:500px;margin-top:8vh;margin-right:-5vw;">
+  <div class="pointer-events-none fixed top-0 right-0 z-[1] opacity-[0.03]" style="width:45vw;max-width:500px;margin-top:8vh;margin-right:-5vw;">
     <img src="/downloads/astro.svg" alt="" class="w-full h-auto">
   </div>
 
@@ -110,18 +107,15 @@
   <section id="scene-1" class="scene-section" style="height: 180vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
       <div id="hero-text" class="relative z-10 mx-auto max-w-4xl px-6 text-center">
-        <h1 class="text-4xl font-extrabold leading-tight tracking-tight text-white md:text-6xl">
+        <h1 class="text-4xl font-extrabold leading-tight tracking-tight text-slate-900 md:text-6xl">
           The social network that opens doors.
         </h1>
-        <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-300 md:text-xl">
+        <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-500 md:text-xl">
           MatCap builds you an investor network overnight — warm introductions through people who already know and trust each other.
         </p>
-        <div class="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-          <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-8 py-3 text-base font-medium text-white transition hover:bg-blue-700">
+        <div class="mt-10 flex justify-center">
+          <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-8 py-3 text-base font-medium text-white transition hover:bg-slate-800">
             Apply as a Founder
-          </a>
-          <a href="/nodes" class="inline-flex items-center justify-center rounded-md border border-slate-600 bg-transparent px-8 py-3 text-base font-medium text-white transition hover:bg-white/10">
-            Join the Network
           </a>
         </div>
       </div>
@@ -132,8 +126,8 @@
   <section id="scene-2" class="scene-section" style="height: 200vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
       <div id="scene-2-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
-        <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">You're a founder trying to break in.</h2>
-        <p class="mt-4 text-lg text-slate-400">Raising capital is a relationship game — and right now, you don't have the relationships. Cold emails go unanswered. Warm intros are the only currency that works.</p>
+        <h2 class="text-3xl font-bold tracking-tight text-slate-900 md:text-5xl">You're a founder trying to break in.</h2>
+        <p class="mt-4 text-lg text-slate-500">Raising capital is a relationship game — and right now, you don't have the relationships. Cold emails go unanswered. Warm intros are the only currency that works.</p>
       </div>
     </div>
   </section>
@@ -142,8 +136,8 @@
   <section id="scene-3" class="scene-section" style="height: 200vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
       <div id="scene-3-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
-        <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">You meet MatCap.</h2>
-        <p class="mt-4 text-lg text-slate-400">Tell us about your company, your raise, and the investors you want to meet. If we believe in what you're building, we go to work for you.</p>
+        <h2 class="text-3xl font-bold tracking-tight text-slate-900 md:text-5xl">You meet MatCap.</h2>
+        <p class="mt-4 text-lg text-slate-500">Tell us about your company, your raise, and the investors you want to meet. If we believe in what you're building, we go to work for you.</p>
       </div>
     </div>
   </section>
@@ -152,8 +146,8 @@
   <section id="scene-4" class="scene-section" style="height: 200vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
       <div id="scene-4-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
-        <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">We connect you with hyper-networked nodes.</h2>
-        <p class="mt-4 text-lg text-slate-400">Operators, angels, and advisors who sit at the center of investor networks. They become your allies — people who personally know the investors you need to meet.</p>
+        <h2 class="text-3xl font-bold tracking-tight text-slate-900 md:text-5xl">We connect you with hyper-networked nodes.</h2>
+        <p class="mt-4 text-lg text-slate-500">Operators, angels, and advisors who sit at the center of investor networks. They become your allies — people who personally know the investors you need to meet.</p>
       </div>
     </div>
   </section>
@@ -162,36 +156,372 @@
   <section id="scene-5" class="scene-section" style="height: 250vh;">
     <div class="scene-content" style="height: 100vh; position: sticky; top: 0;">
       <div id="scene-5-text" class="relative z-10 mx-auto max-w-3xl px-6 text-center" style="opacity:0">
-        <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">Their network becomes your network.</h2>
-        <p class="mt-4 text-lg text-slate-400">Nodes open doors to the right investors on your behalf. Your pitch reaches decision-makers through people they already trust — and meetings start happening.</p>
+        <h2 class="text-3xl font-bold tracking-tight text-slate-900 md:text-5xl">Their network becomes your network.</h2>
+        <p class="mt-4 text-lg text-slate-500">Nodes open doors to the right investors on your behalf. Your pitch reaches decision-makers through people they already trust — and meetings start happening.</p>
       </div>
     </div>
   </section>
 
-  <!-- ============ CTA — END OF PAGE ============ -->
-  <section class="content-section bg-slate-950/95 backdrop-blur-sm py-28">
-    <div class="mx-auto max-w-3xl px-6 text-center">
-      <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">An entire network — working for you — that appeared overnight.</h2>
-      <p class="mt-6 text-lg leading-relaxed text-slate-400">No cold outreach. No spray-and-pray. Just warm introductions through people who know and trust each other.</p>
-      <div class="mt-12 flex flex-col items-center gap-4">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-blue-600 px-10 py-4 text-lg font-semibold text-white transition hover:bg-blue-700">
-          Apply as a Founder
-        </a>
-        <div class="mt-2 flex items-center gap-6">
-          <a href="/nodes" class="text-sm text-slate-400 transition hover:text-white">Become a Node &rarr;</a>
-          <a href="/investors" class="text-sm text-slate-400 transition hover:text-white">For Investors &rarr;</a>
+  <!-- ============ COMMUNITY SECTIONS ============ -->
+
+  <!-- More Than Intros -->
+  <section class="content-section bg-white/95 backdrop-blur-sm py-24">
+    <div class="mx-auto max-w-5xl px-6">
+      <div class="text-center">
+        <h2 class="text-3xl font-bold tracking-tight text-slate-900 md:text-5xl">More than intros.</h2>
+        <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-500">MatCap isn't just an introduction service — it's a founder community built around the people and access you need to raise successfully.</p>
+      </div>
+      <div class="mt-16 grid gap-8 sm:grid-cols-3">
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+            <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          </div>
+          <h3 class="mt-5 text-xl font-semibold text-slate-900">Events</h3>
+          <p class="mt-3 text-base text-slate-500">IRL events in Arizona and virtual events for founders everywhere. Dinners, workshops, pitch practice, and more.</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+            <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+          </div>
+          <h3 class="mt-5 text-xl font-semibold text-slate-900">Speaker Access</h3>
+          <p class="mt-3 text-base text-slate-500">Hear directly from top investors, successful founders, and industry leaders in intimate settings.</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-8 text-center">
+          <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg bg-teal-100 text-teal-600">
+            <svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+          </div>
+          <h3 class="mt-5 text-xl font-semibold text-slate-900">Founder Directory</h3>
+          <p class="mt-3 text-base text-slate-500">Browse the network, find peers at your stage, and build relationships that last beyond fundraising.</p>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- Events -->
+  <section class="content-section bg-white/95 backdrop-blur-sm py-24">
+    <div class="mx-auto max-w-5xl px-6">
+      <h2 class="text-center text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Events that move the needle.</h2>
+      <p class="mx-auto mt-4 max-w-2xl text-center text-lg text-slate-500">Not another networking happy hour. In-person events in Arizona and virtual events for founders everywhere — every one designed to create real connections.</p>
+
+      <!-- Photo collage -->
+      <div class="mt-14">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-semibold uppercase tracking-widest text-teal-600">IRL in Arizona</span>
+          <span class="text-slate-300">/</span>
+          <span class="text-xs font-semibold uppercase tracking-widest text-blue-600">Virtual everywhere</span>
+        </div>
+
+        <!-- Big polaroid-style collage -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-1.5deg] hover:rotate-0 hover:scale-[1.02]">
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-1.png" alt="Founder meetup" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Scottsdale founder hangout</p>
+          </div>
+
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[1deg] hover:rotate-0 hover:scale-[1.02] md:mt-12">
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-2.png" alt="Speaker night" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">20+ founders packed the living room</p>
+          </div>
+
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[1.5deg] hover:rotate-0 hover:scale-[1.02]">
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-3.png" alt="Community gathering" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Community meetup at the park</p>
+          </div>
+
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-1deg] hover:rotate-0 hover:scale-[1.02] md:mt-10">
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-4.png" alt="Book club" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Fundraising book club at the coffee shop</p>
+          </div>
+
+          <!-- Empty slots — drop images into /events/irl-5.png through irl-15.png -->
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-2deg] hover:rotate-0 hover:scale-[1.02] hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-5.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[1.5deg] hover:rotate-0 hover:scale-[1.02] md:mt-8 hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-6.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[1deg] hover:rotate-0 hover:scale-[1.02] hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-7.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-1.5deg] hover:rotate-0 hover:scale-[1.02] md:mt-10 hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-8.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[2deg] hover:rotate-0 hover:scale-[1.02] hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-9.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-1deg] hover:rotate-0 hover:scale-[1.02] md:mt-6 hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-10.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[1.5deg] hover:rotate-0 hover:scale-[1.02] hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-11.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-2deg] hover:rotate-0 hover:scale-[1.02] md:mt-12 hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-12.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[1deg] hover:rotate-0 hover:scale-[1.02] hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-13.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[-1.5deg] hover:rotate-0 hover:scale-[1.02] md:mt-8 hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-14.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+          <div class="group relative bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 p-3 pb-16 rotate-[2deg] hover:rotate-0 hover:scale-[1.02] hidden" data-irl-slot>
+            <div class="overflow-hidden rounded aspect-[4/3]">
+              <img src="/events/irl-15.png" alt="" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+            </div>
+            <p class="absolute bottom-4 left-4 right-4 text-lg text-slate-700" style="font-family: 'Caveat', cursive, system-ui;">Caption here</p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Virtual Events -->
+      <div class="mt-20">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-xs font-semibold uppercase tracking-widest text-blue-600">Virtual events</span>
+        </div>
+        <p class="text-slate-500 mb-10">Live sessions with top investors and operators — open to all members, wherever you're building from.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Niko -->
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950">
+            <img src="/events/virtual-1.png" alt="Niko Bonatsos fireside chat" class="w-full aspect-[16/9] object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity">
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
+              <p class="text-white font-semibold text-base">Niko Bonatsos</p>
+              <p class="text-slate-300 text-sm mt-0.5">Formerly GP at General Catalyst, now founder at Verdict Capital</p>
+            </div>
+          </div>
+
+          <!-- Lori -->
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950">
+            <img src="/events/virtual-2.png" alt="Lori Berenberg fireside chat" class="w-full aspect-[16/9] object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity">
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
+              <p class="text-white font-semibold text-base">Lori Berenberg</p>
+              <p class="text-slate-300 text-sm mt-0.5">Investor at Bloomberg Beta</p>
+            </div>
+          </div>
+
+          <!-- Delian -->
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950">
+            <img src="/events/virtual-3.png" alt="Delian Asparouhov fireside chat" class="w-full aspect-[16/9] object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity">
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
+              <p class="text-white font-semibold text-base">Delian Asparouhov</p>
+              <p class="text-slate-300 text-sm mt-0.5">Partner at Founders Fund, cofounder of Varda Space Industries</p>
+            </div>
+          </div>
+
+          <!-- Jeff Morris Jr -->
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-950">
+            <img src="/events/virtual-4.jpg" alt="Jeff Morris Jr fireside chat" class="w-full aspect-[16/9] object-cover object-top opacity-90 group-hover:opacity-100 transition-opacity">
+            <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-5 pt-16">
+              <p class="text-white font-semibold text-base">Jeff Morris Jr</p>
+              <p class="text-slate-300 text-sm mt-0.5">Led growth at Tinder, founder of Chapter One VC</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Past Speakers & Guests -->
+  <section class="content-section bg-white/95 backdrop-blur-sm py-24">
+    <div class="mx-auto max-w-5xl px-6">
+      <h2 class="text-center text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Past speakers &amp; guests.</h2>
+      <p class="mx-auto mt-4 max-w-2xl text-center text-lg text-slate-500">Founders and investors who've shared their time and insights with the MatCap community.</p>
+      <div class="mt-14 grid grid-cols-2 gap-x-8 gap-y-10 sm:grid-cols-3 md:grid-cols-5">
+        <div class="flex flex-col items-center">
+          <img src="/speakers/speaker-1.jpeg" alt="Shriya Nevatia" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Shriya Nevatia</p>
+          <p class="text-xs text-slate-400 text-center">Superhuman</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/julian.png" alt="Julian Weisser" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Julian Weisser</p>
+          <p class="text-xs text-slate-400 text-center">On Deck</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/elizabeth-yin.jpg" alt="Elizabeth Yin" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Elizabeth Yin</p>
+          <p class="text-xs text-slate-400 text-center">Hustle Fund</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/cyan.png" alt="Cyan Banister" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Cyan Banister</p>
+          <p class="text-xs text-slate-400 text-center">Long Journey Ventures</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/charles-hudson.webp" alt="Charles Hudson" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Charles Hudson</p>
+          <p class="text-xs text-slate-400 text-center">Precursor Ventures</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/jeff-morris-jr.webp" alt="Jeff Morris Jr" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Jeff Morris Jr</p>
+          <p class="text-xs text-slate-400 text-center">Chapter One</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/eric-ries.webp" alt="Eric Ries" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Eric Ries</p>
+          <p class="text-xs text-slate-400 text-center">The Lean Startup</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/jack-selby.jpg" alt="Jack Selby" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Jack Selby</p>
+          <p class="text-xs text-slate-400 text-center">Thiel Capital</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/art-levy.webp" alt="Art Levy" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Art Levy</p>
+          <p class="text-xs text-slate-400 text-center">CBO, Brex</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/christian-keil.jpeg" alt="Christian Keil" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Christian Keil</p>
+          <p class="text-xs text-slate-400 text-center">a16z</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/speaker-grey.avif" alt="Cam Doody" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Cam Doody</p>
+          <p class="text-xs text-slate-400 text-center">Brickyard</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/speaker-teal.jpeg" alt="Mike Randall" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Mike Randall</p>
+          <p class="text-xs text-slate-400 text-center">Monsoon Venture Fund</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/speaker-denim.jpeg" alt="Delian Asparouhov" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Delian Asparouhov</p>
+          <p class="text-xs text-slate-400 text-center">Founders Fund / Varda</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/speaker-plaid.jpeg" alt="Lori Berenberg" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Lori Berenberg</p>
+          <p class="text-xs text-slate-400 text-center">Bloomberg Beta</p>
+        </div>
+        <div class="flex flex-col items-center">
+          <img src="/speakers/speaker-blue.webp" alt="Niko Bonatsos" class="h-20 w-20 rounded-full object-cover border-2 border-white shadow-md">
+          <p class="mt-3 text-sm font-medium text-slate-900">Niko Bonatsos</p>
+          <p class="text-xs text-slate-400 text-center">Verdict Capital</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Member Directory -->
+  <section class="content-section bg-white/95 backdrop-blur-sm py-24">
+    <div class="mx-auto max-w-4xl px-6 text-center">
+      <h2 class="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">See who's in the network.</h2>
+      <p class="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-slate-500">As a member, you get access to the full MatCap directory — browse founders, nodes, and investors. See who's connected to whom. Request warm introductions with a click.</p>
+      <div class="mt-10 inline-flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-6 py-4">
+        <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        <span class="text-sm text-slate-400">Search investors, founders, nodes&hellip;</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- The 1% Model -->
+  <section class="content-section bg-slate-50 py-28 border-y border-slate-200">
+    <div class="mx-auto max-w-4xl px-6">
+      <div class="text-center">
+        <p class="text-sm font-semibold uppercase tracking-widest text-blue-600 mb-4">How it works</p>
+      </div>
+
+      <div class="mt-16 grid gap-8 md:grid-cols-3">
+        <div class="text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-500 mb-4">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+          <p class="text-lg font-semibold text-slate-900">No subscription</p>
+          <p class="mt-1 text-sm text-slate-500">No monthly fees, no retainers, no hidden costs.</p>
+        </div>
+        <div class="text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 text-red-500 mb-4">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+          </div>
+          <p class="text-lg font-semibold text-slate-900">No success fee</p>
+          <p class="mt-1 text-sm text-slate-500">Aligned for the lifetime of the company, not just the next round.</p>
+        </div>
+        <div class="text-center">
+          <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-600 mb-4">
+            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <p class="text-lg font-semibold text-slate-900">Fully aligned</p>
+          <p class="mt-1 text-sm text-slate-500">We only succeed when you do. Our incentives are your incentives.</p>
+        </div>
+      </div>
+
+      <div class="mt-16 rounded-2xl bg-white border border-slate-200 p-8 md:p-10">
+        <div class="flex flex-col md:flex-row md:items-center md:gap-12">
+          <div class="flex-1">
+            <p class="text-lg leading-relaxed text-slate-700">You grant MatCap 1% equity in your company. In return, you get a community, a network of warm introductions, events, speaker access, and a team that's financially invested in helping you raise and grow.</p>
+          </div>
+          <div class="mt-6 md:mt-0 flex-shrink-0 text-center md:text-right">
+            <p class="text-6xl font-bold text-slate-900">1%</p>
+            <p class="mt-1 text-sm text-slate-400">equity grant</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CTA — END OF PAGE ============ -->
+  <section class="content-section bg-slate-900 py-28">
+    <div class="mx-auto max-w-3xl px-6 text-center">
+      <h2 class="text-3xl font-bold tracking-tight text-white md:text-5xl">Ready to open doors?</h2>
+      <p class="mt-6 text-lg leading-relaxed text-slate-300">Join the community of founders who are raising through warm introductions, real relationships, and a network that works for them.</p>
+      <div class="mt-12">
+        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-white px-10 py-4 text-lg font-semibold text-slate-900 transition hover:bg-slate-100">
+          Apply as a Founder
+        </a>
+      </div>
+    </div>
+  </section>
+
   <!-- Footer -->
-  <footer class="content-section border-t border-white/10 bg-slate-950">
+  <footer class="content-section border-t border-slate-200 bg-white">
     <div class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-6 py-10 md:flex-row">
       <div class="flex items-center gap-2.5">
-        <img src="/downloads/matcap-wordmark.svg" alt="MatCap" style="height:20px;width:auto;" class="object-contain">
+        <img src="/downloads/matcap-logo.png" alt="MatCap" style="height:28px;width:auto;" class="object-contain">
       </div>
-      <div class="text-xs text-slate-500">&copy; 2026 MatCap. All rights reserved.</div>
+      <div class="text-xs text-slate-400">&copy; 2026 MatCap. All rights reserved.</div>
     </div>
   </footer>
 
@@ -208,11 +538,11 @@
     console.log('[MatCap] Script loaded. isMobile:', isMobile, 'reducedMotion:', prefersReducedMotion, 'width:', window.innerWidth);
 
     const COLORS = {
-      ecosystem: '#94a3b8',
-      founder:   '#3b82f6',
-      matcap:    '#6366f1',
-      node:      '#14b8a6',
-      investor:  '#8b5cf6',
+      ecosystem: '#cbd5e1',
+      founder:   '#2563eb',
+      matcap:    '#4f46e5',
+      node:      '#0d9488',
+      investor:  '#7c3aed',
     };
 
     let W, H;
@@ -468,7 +798,7 @@
 
     function draw() {
       ctx.clearRect(0,0,W,H);
-      const canvasOpacity = scrollState.postScroll ? 0.65 : 1;
+      const canvasOpacity = scrollState.postScroll ? 0.45 : 1;
 
       // Connections
       for (const conn of connections) {
@@ -480,16 +810,16 @@
         ctx.beginPath();
         ctx.moveTo(from.x,from.y);
         ctx.lineTo(from.x+(to.x-from.x)*conn.progress, from.y+(to.y-from.y)*conn.progress);
-        ctx.strokeStyle=hexToRgba(lc,0.45*conn.progress*canvasOpacity);
+        ctx.strokeStyle=hexToRgba(lc,0.5*conn.progress*canvasOpacity);
         ctx.lineWidth=lw; ctx.stroke();
       }
 
-      // Flow particles (white — representing your pitch traveling the network)
+      // Flow particles (dark — representing your pitch traveling the network)
       for (const fp of flowParticles) {
         const from=particles[fp.from], to=particles[fp.to];
         ctx.beginPath();
         ctx.arc(from.x+(to.x-from.x)*fp.t, from.y+(to.y-from.y)*fp.t, fp.size, 0, Math.PI*2);
-        ctx.globalAlpha=canvasOpacity*0.9; ctx.fillStyle='#ffffff'; ctx.fill();
+        ctx.globalAlpha=canvasOpacity*0.9; ctx.fillStyle='#1e293b'; ctx.fill();
       }
 
       // Particles
@@ -497,9 +827,9 @@
         const alpha=canvasOpacity*p.opacity;
         if (p.glowing&&!isMobile) {
           ctx.beginPath(); ctx.arc(p.x,p.y,p.radius*3.5,0,Math.PI*2);
-          ctx.globalAlpha=alpha*0.2; ctx.fillStyle=hexToRgba(p.color,0.2); ctx.fill();
+          ctx.globalAlpha=alpha*0.15; ctx.fillStyle=hexToRgba(p.color,0.15); ctx.fill();
           ctx.beginPath(); ctx.arc(p.x,p.y,p.radius*1.8,0,Math.PI*2);
-          ctx.globalAlpha=alpha*0.3; ctx.fillStyle=hexToRgba(p.color,0.3); ctx.fill();
+          ctx.globalAlpha=alpha*0.25; ctx.fillStyle=hexToRgba(p.color,0.25); ctx.fill();
         }
         ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);
         ctx.globalAlpha=alpha; ctx.fillStyle=hexToRgba(p.color,1); ctx.fill();
@@ -575,11 +905,12 @@
       wireScene('#scene-4','scene4');
       wireScene('#scene-5','scene5');
 
-      // Mark post-scroll for canvas dimming
+      // Hide canvas once user reaches content sections
       const firstContent = document.querySelector('.content-section');
       if (firstContent) {
         ScrollTrigger.create({trigger:firstContent,start:'top bottom',
-          onEnter:()=>{scrollState.postScroll=true;},onLeaveBack:()=>{scrollState.postScroll=false;}});
+          onEnter:()=>{scrollState.postScroll=true; canvas.style.opacity='0'; canvas.style.transition='opacity 0.5s';},
+          onLeaveBack:()=>{scrollState.postScroll=false; canvas.style.opacity='1';}});
       }
 
       // Fade in content sections

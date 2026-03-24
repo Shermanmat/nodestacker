@@ -233,60 +233,30 @@
                     </button>
                   </div>
 
-                  <div v-if="showNotIncorporatedOptions" class="space-y-4 mt-4">
-                    <p class="text-sm text-gray-600 font-medium">How would you like to proceed?</p>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div @click="incorporationPath = 'partner'"
-                        :class="['border-2 rounded-lg p-4 cursor-pointer transition-colors', incorporationPath === 'partner' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
-                        <h4 class="font-semibold mb-1">Incorporate with a partner</h4>
-                        <p class="text-sm text-gray-500">We'll help you incorporate through one of our partners, ranging from a law firm who will defer fees to Stripe Atlas at $500. You have options. You'll sign a pre-incorporation equity commitment.</p>
-                      </div>
-                      <div @click="incorporationPath = 'side_project'"
-                        :class="['border-2 rounded-lg p-4 cursor-pointer transition-colors', incorporationPath === 'side_project' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300']">
-                        <h4 class="font-semibold mb-1">Side project for now</h4>
-                        <p class="text-sm text-gray-500">No rush. You'll sign a pre-incorporation equity commitment, have network access, and we'll check in quarterly.</p>
-                      </div>
+                  <div v-if="showNotIncorporatedOptions" class="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-6 space-y-4">
+                    <h4 class="font-semibold text-gray-900">You'll need to incorporate first</h4>
+                    <p class="text-sm text-gray-600">We require all companies to be incorporated before we can proceed with onboarding. Here are two great options to get started:</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <a href="https://stripe.com/atlas" target="_blank" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition">
+                        <div>
+                          <span class="font-semibold text-gray-900">Stripe Atlas</span>
+                          <p class="text-xs text-gray-500 mt-0.5">Delaware C-Corp — $500</p>
+                        </div>
+                        <span class="ml-auto text-gray-400">&rarr;</span>
+                      </a>
+                      <a href="https://www.clerky.com" target="_blank" class="flex items-center gap-3 p-4 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition">
+                        <div>
+                          <span class="font-semibold text-gray-900">Clerky</span>
+                          <p class="text-xs text-gray-500 mt-0.5">Delaware C-Corp — $799</p>
+                        </div>
+                        <span class="ml-auto text-gray-400">&rarr;</span>
+                      </a>
                     </div>
-
-                    <!-- Partner selection -->
-                    <div v-if="incorporationPath === 'partner'" class="space-y-3">
-                      <p class="text-sm font-medium text-gray-700">Choose an incorporation partner:</p>
-                      <div class="space-y-2">
-                        <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                          <input type="radio" v-model="selectedPartner" value="stripe_atlas" class="text-blue-600">
-                          <div>
-                            <span class="font-medium">Stripe Atlas</span>
-                            <span class="text-sm text-gray-500 ml-2">Delaware C-Corp, $500</span>
-                          </div>
-                        </label>
-                        <label class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                          <input type="radio" v-model="selectedPartner" value="clerky" class="text-blue-600">
-                          <div>
-                            <span class="font-medium">Clerky</span>
-                            <span class="text-sm text-gray-500 ml-2">Delaware C-Corp, $799</span>
-                          </div>
-                        </label>
-                        <label v-if="onboarding.workflow?.approvedForLawFirm" class="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                          <input type="radio" v-model="selectedPartner" value="goodwin" class="text-blue-600">
-                          <div>
-                            <span class="font-medium">Goodwin</span>
-                            <span class="text-sm text-gray-500 ml-2">Full-service law firm</span>
-                          </div>
-                        </label>
-                      </div>
-                      <button @click="answerIncorporation(false, 'partner', selectedPartner)" :disabled="!selectedPartner"
-                        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
-                        Continue
-                      </button>
-                    </div>
-
-                    <!-- Side project confirmation -->
-                    <div v-if="incorporationPath === 'side_project'">
-                      <button @click="answerIncorporation(false, 'side_project')"
-                        class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                        Confirm - Side project for now
-                      </button>
-                    </div>
+                    <p class="text-sm text-gray-500">Once you're incorporated, come back here and click "Yes, we're incorporated" to continue onboarding.</p>
+                    <button @click="answerIncorporation(false)"
+                      class="text-sm text-gray-500 underline hover:text-gray-700">
+                      Got it, I'll be back
+                    </button>
                   </div>
                 </div>
 
@@ -1079,20 +1049,13 @@
           }
         };
 
-        const answerIncorporation = async (incorporated, path, partner) => {
+        const answerIncorporation = async (incorporated) => {
           try {
-            const body = { incorporated };
-            if (!incorporated) {
-              body.path = path;
-              if (partner) body.incorporationPartner = partner;
-            }
             await api('/portal/onboarding/incorporation-answer', {
               method: 'POST',
-              body,
+              body: { incorporated },
             });
             showNotIncorporatedOptions.value = false;
-            incorporationPath.value = '';
-            selectedPartner.value = '';
             loadOnboarding();
           } catch (e) {
             alert('Failed: ' + e.message);

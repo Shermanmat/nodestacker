@@ -895,46 +895,21 @@ app.post('/onboarding/incorporation-answer', async (c) => {
     return c.json({ success: true, message: 'Great! Please submit your company details.' });
   }
 
-  if (path === 'side_project') {
-    // Side project → still needs equity commitment before light engagement
-    await db.update(onboardingWorkflows)
-      .set({
-        incorporated: false,
-        updatedAt: now,
-      })
-      .where(eq(onboardingWorkflows.id, workflow.id));
+  // Not incorporated — tell them to incorporate first and come back
+  await db.update(onboardingWorkflows)
+    .set({
+      incorporated: false,
+      updatedAt: now,
+    })
+    .where(eq(onboardingWorkflows.id, workflow.id));
 
-    await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: false, path: 'side_project' });
+  await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: false });
 
-    return c.json({ success: true, message: 'Next: sign the pre-incorporation equity commitment.' });
-  }
-
-  if (path === 'partner') {
-    // Validate partner selection
-    if (!incorporationPartner) {
-      return c.json({ error: 'Please select an incorporation partner' }, 400);
-    }
-
-    // Validate Goodwin is only available if approved
-    if (incorporationPartner === 'goodwin' && !workflow.approvedForLawFirm) {
-      return c.json({ error: 'Goodwin is not available for this workflow' }, 400);
-    }
-
-    // Partner path → stay in OFFER_ACCEPTED, need equity commitment next
-    await db.update(onboardingWorkflows)
-      .set({
-        incorporated: false,
-        incorporationPartner,
-        updatedAt: now,
-      })
-      .where(eq(onboardingWorkflows.id, workflow.id));
-
-    await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: false, path: 'partner', partner: incorporationPartner });
-
-    return c.json({ success: true, message: 'Next: sign the pre-incorporation equity commitment.' });
-  }
-
-  return c.json({ error: 'If not incorporated, please specify path (partner or side_project)' }, 400);
+  return c.json({
+    success: true,
+    notIncorporated: true,
+    message: 'You\'ll need to incorporate before we can proceed. We recommend Stripe Atlas or Clerky to get started. Let us know once you\'re incorporated!',
+  });
 });
 
 // Sign equity commitment (pre-incorporation)

@@ -4468,7 +4468,7 @@
           // Populate offer terms form
           const w = data.workflow;
           offerTermsForm.equityPercent = w?.offerEquityPercent || '';
-          offerTermsForm.vestingMonths = w?.vestingMonths || 48;
+          offerTermsForm.vestingMonths = w?.vestingMonths ?? 48;
           offerTermsForm.vestingCliffMonths = w?.vestingCliffMonths || 0;
           offerTermsForm.introRequestsPerWeek = w?.introRequestsPerWeek || 3;
           offerTermsForm.introRequestsRevisitDate = w?.introRequestsRevisitDate || '';

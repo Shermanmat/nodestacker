@@ -105,6 +105,7 @@ interface VestingInfo {
  * Format vesting schedule for display
  */
 function formatVestingSchedule(vestingMonths: number, vestingCliffMonths: number): string {
+  if (vestingMonths === 0) return 'No vesting';
   const years = vestingMonths / 12;
   const cliffText = vestingCliffMonths === 0
     ? 'no cliff'

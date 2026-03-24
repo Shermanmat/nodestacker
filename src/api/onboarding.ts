@@ -353,8 +353,8 @@ app.post('/:id/send-offer', async (c) => {
     { name: founder.name, email: founder.email, companyName: founder.companyName },
     workflow.offerEquityPercent || '',
     {
-      vestingMonths: workflow.vestingMonths || 48,
-      vestingCliffMonths: workflow.vestingCliffMonths || 0,
+      vestingMonths: workflow.vestingMonths ?? 48,
+      vestingCliffMonths: workflow.vestingCliffMonths ?? 0,
       notes: workflow.offerNotes || undefined,
     }
   );

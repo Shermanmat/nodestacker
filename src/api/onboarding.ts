@@ -355,6 +355,8 @@ app.post('/:id/send-offer', async (c) => {
     {
       vestingMonths: workflow.vestingMonths ?? 48,
       vestingCliffMonths: workflow.vestingCliffMonths ?? 0,
+      introRequestsPerWeek: workflow.introRequestsPerWeek ?? 3,
+      introRequestsRevisitDate: workflow.introRequestsRevisitDate || undefined,
       notes: workflow.offerNotes || undefined,
     }
   );
@@ -395,6 +397,8 @@ app.post('/:id/resend-offer', async (c) => {
     {
       vestingMonths: workflow.vestingMonths ?? 48,
       vestingCliffMonths: workflow.vestingCliffMonths ?? 0,
+      introRequestsPerWeek: workflow.introRequestsPerWeek ?? 3,
+      introRequestsRevisitDate: workflow.introRequestsRevisitDate || undefined,
       notes: workflow.offerNotes || undefined,
     }
   );

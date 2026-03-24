@@ -95,9 +95,11 @@ function emailButton(text: string, url: string): string {
 
 // ============== FOUNDER EMAILS ==============
 
-interface VestingInfo {
+interface OfferDetails {
   vestingMonths: number;
   vestingCliffMonths: number;
+  introRequestsPerWeek?: number;
+  introRequestsRevisitDate?: string;
   notes?: string;
 }
 
@@ -117,36 +119,56 @@ function formatVestingSchedule(vestingMonths: number, vestingCliffMonths: number
 /**
  * Email: MatCap wants to work with you
  */
-export async function sendOfferEmail(founder: FounderInfo, equityPercent: string, vesting: VestingInfo): Promise<EmailResult> {
+export async function sendOfferEmail(founder: FounderInfo, equityPercent: string, offer: OfferDetails): Promise<EmailResult> {
   const subject = `MatCap wants to work with you`;
   const portalUrl = `${BASE_URL}/founder`;
-  const vestingText = formatVestingSchedule(vesting.vestingMonths, vesting.vestingCliffMonths);
+  const vestingText = formatVestingSchedule(offer.vestingMonths, offer.vestingCliffMonths);
   const firstName = founder.name.split(' ')[0];
+
+  const introPerWeek = offer.introRequestsPerWeek || 3;
+  const revisitDate = offer.introRequestsRevisitDate
+    ? new Date(offer.introRequestsRevisitDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : null;
+
+  const introRequestHtml = `
+    <p style="margin-top: 16px;"><strong>How intro requests work</strong></p>
+    <p>MatCap runs on intro requests. We send intro requests on your behalf to investors in our network — these come from people the investors already trust. Your intro request accept rate tells us how well the network is responding to your company.</p>
+    <p>We're starting you at <strong>${introPerWeek} intro request${introPerWeek !== 1 ? 's' : ''} per week</strong>. Our goal is to increase that number over time, but we let investor behavior dictate the pace — we're pinned to what investors think about the companies we bring them.</p>
+    ${revisitDate ? `<p>We'll revisit your intro request volume on <strong>${revisitDate}</strong> to see how things are going and adjust accordingly.</p>` : ''}
+  `;
+
+  const introRequestText = `
+How intro requests work:
+MatCap runs on intro requests. We send intro requests on your behalf to investors in our network — these come from people the investors already trust. Your intro request accept rate tells us how well the network is responding to your company.
+
+We're starting you at ${introPerWeek} intro request${introPerWeek !== 1 ? 's' : ''} per week. Our goal is to increase that number over time, but we let investor behavior dictate the pace.
+${revisitDate ? `\nWe'll revisit your intro request volume on ${revisitDate} to see how things are going and adjust accordingly.\n` : ''}`;
 
   const htmlBody = wrapEmail(`
     <h2>Hi ${firstName},</h2>
-    <p>After careful consideration, we would like to extend a spot to you in the MatCap portfolio. This includes our network access, event access, and office hours.</p>
-    <p>Here are the terms:</p>
+    <p>We'd like to offer you a spot in the MatCap portfolio. This includes access to our investor network, events, and office hours.</p>
+    <p><strong>Terms:</strong></p>
     <ul>
       <li><strong>${equityPercent}% equity</strong></li>
-      <li><strong>${vestingText}</strong></li>
+      ${vestingText !== 'No vesting' ? `<li><strong>${vestingText}</strong></li>` : ''}
     </ul>
-    ${vesting.notes ? `<p>${vesting.notes}</p>` : ''}
+    ${introRequestHtml}
+    ${offer.notes ? `<p>${offer.notes}</p>` : ''}
     ${emailButton('Review Offer', portalUrl)}
   `);
 
   const textBody = `Hi ${firstName},
 
-After careful consideration, we would like to extend a spot to you in the MatCap portfolio. This includes our network access, event access, and office hours.
+We'd like to offer you a spot in the MatCap portfolio. This includes access to our investor network, events, and office hours.
 
-Here are the terms:
+Terms:
 - ${equityPercent}% equity
-- ${vestingText}
-${vesting.notes ? `\n${vesting.notes}\n` : ''}
+${vestingText !== 'No vesting' ? `- ${vestingText}\n` : ''}${introRequestText}
+${offer.notes ? `${offer.notes}\n` : ''}
 Review the offer here: ${portalUrl}
 
 Best,
-Mat`;
+The MatCap Team`;
 
   return sendEmail(founder.email, subject, htmlBody, textBody);
 }

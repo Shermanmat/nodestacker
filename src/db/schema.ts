@@ -583,6 +583,10 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   offerSentAt: text('offer_sent_at'),
   offerAcceptedAt: text('offer_accepted_at'),
 
+  // Intro request terms
+  introRequestsPerWeek: integer('intro_requests_per_week').default(3),
+  introRequestsRevisitDate: text('intro_requests_revisit_date'),
+
   // Vesting schedule
   vestingMonths: integer('vesting_months').default(48),
   vestingCliffMonths: integer('vesting_cliff_months').default(0),

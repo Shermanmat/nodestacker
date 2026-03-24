@@ -609,7 +609,7 @@
                 <div class="text-xs font-medium text-gray-500 uppercase">Offer Terms</div>
                 <button v-if="offerTermsDirty" @click="saveOfferTerms" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700">Save Changes</button>
               </div>
-              <div class="grid grid-cols-3 gap-4">
+              <div class="grid grid-cols-3 gap-4 mb-4">
                 <div>
                   <label class="text-xs text-gray-500">Equity %</label>
                   <input v-model="offerTermsForm.equityPercent" type="text" class="w-full border rounded px-2 py-1 text-lg font-bold text-blue-600" />
@@ -627,9 +627,26 @@
                   </select>
                 </div>
               </div>
+              <!-- Intro Request Terms -->
+              <div class="border-t pt-3 mt-3">
+                <div class="text-xs font-medium text-gray-500 uppercase mb-2">Intro Requests</div>
+                <p class="text-xs text-gray-500 mb-3">We run on intro requests. The accept rate on your intro requests determines how well you're doing in the network. We start you at a number and our goal is to increase it — but we let investor behavior dictate that, since we're pinned to what investors think about our companies.</p>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="text-xs text-gray-500">Intro requests per week</label>
+                    <select v-model="offerTermsForm.introRequestsPerWeek" class="w-full border rounded px-2 py-1">
+                      <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-500">Revisit date</label>
+                    <input v-model="offerTermsForm.introRequestsRevisitDate" type="date" class="w-full border rounded px-2 py-1" />
+                  </div>
+                </div>
+              </div>
             </template>
             <template v-else>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-2 gap-4 mb-3">
                 <div>
                   <div class="text-xs text-gray-500">Equity</div>
                   <div class="text-lg font-bold text-blue-600">{{ workflowDetails.workflow?.offerEquityPercent }}%</div>
@@ -637,6 +654,16 @@
                 <div>
                   <div class="text-xs text-gray-500">Vesting</div>
                   <div class="text-sm font-medium text-gray-800">{{ formatVestingSchedule(workflowDetails.workflow?.vestingMonths, workflowDetails.workflow?.vestingCliffMonths) }}</div>
+                </div>
+              </div>
+              <div v-if="workflowDetails.workflow?.introRequestsPerWeek" class="border-t pt-3 grid grid-cols-2 gap-4">
+                <div>
+                  <div class="text-xs text-gray-500">Intro Requests / Week</div>
+                  <div class="text-sm font-medium text-gray-800">{{ workflowDetails.workflow?.introRequestsPerWeek }}</div>
+                </div>
+                <div v-if="workflowDetails.workflow?.introRequestsRevisitDate">
+                  <div class="text-xs text-gray-500">Revisit Date</div>
+                  <div class="text-sm font-medium text-gray-800">{{ workflowDetails.workflow?.introRequestsRevisitDate }}</div>
                 </div>
               </div>
             </template>
@@ -4394,13 +4421,15 @@
           loadOnboardingWorkflows();
         };
 
-        const offerTermsForm = reactive({ equityPercent: '', vestingMonths: 48, vestingCliffMonths: 0 });
+        const offerTermsForm = reactive({ equityPercent: '', vestingMonths: 48, vestingCliffMonths: 0, introRequestsPerWeek: 3, introRequestsRevisitDate: '' });
         const offerTermsDirty = computed(() => {
           const w = workflowDetails.value?.workflow;
           if (!w) return false;
           return offerTermsForm.equityPercent !== w.offerEquityPercent ||
             parseInt(offerTermsForm.vestingMonths) !== w.vestingMonths ||
-            parseInt(offerTermsForm.vestingCliffMonths) !== w.vestingCliffMonths;
+            parseInt(offerTermsForm.vestingCliffMonths) !== w.vestingCliffMonths ||
+            parseInt(offerTermsForm.introRequestsPerWeek) !== (w.introRequestsPerWeek || 3) ||
+            (offerTermsForm.introRequestsRevisitDate || '') !== (w.introRequestsRevisitDate || '');
         });
         const saveOfferTerms = async () => {
           const w = workflowDetails.value?.workflow;
@@ -4411,6 +4440,8 @@
               equityPercent: offerTermsForm.equityPercent,
               vestingMonths: parseInt(offerTermsForm.vestingMonths),
               vestingCliffMonths: parseInt(offerTermsForm.vestingCliffMonths),
+              introRequestsPerWeek: parseInt(offerTermsForm.introRequestsPerWeek),
+              introRequestsRevisitDate: offerTermsForm.introRequestsRevisitDate || null,
             },
           });
           loadOnboardingWorkflows();
@@ -4426,6 +4457,8 @@
           offerTermsForm.equityPercent = w?.offerEquityPercent || '';
           offerTermsForm.vestingMonths = w?.vestingMonths || 48;
           offerTermsForm.vestingCliffMonths = w?.vestingCliffMonths || 0;
+          offerTermsForm.introRequestsPerWeek = w?.introRequestsPerWeek || 3;
+          offerTermsForm.introRequestsRevisitDate = w?.introRequestsRevisitDate || '';
           showWorkflowModal.value = true;
         };
 

@@ -86,6 +86,10 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// intro request terms (migration 0033)
+safeAddColumn('onboarding_workflows', 'intro_requests_per_week', 'integer DEFAULT 3');
+safeAddColumn('onboarding_workflows', 'intro_requests_revisit_date', 'text');
+
 // investor pause columns
 safeAddColumn('investors', 'paused_until', 'text');
 safeAddColumn('investors', 'pause_reason', 'text');

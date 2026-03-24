@@ -296,6 +296,8 @@ app.put('/:id/offer-terms', async (c) => {
   if (body.equityPercent !== undefined) updates.offerEquityPercent = body.equityPercent;
   if (body.vestingMonths !== undefined) updates.vestingMonths = parseInt(body.vestingMonths);
   if (body.vestingCliffMonths !== undefined) updates.vestingCliffMonths = parseInt(body.vestingCliffMonths);
+  if (body.introRequestsPerWeek !== undefined) updates.introRequestsPerWeek = parseInt(body.introRequestsPerWeek);
+  if (body.introRequestsRevisitDate !== undefined) updates.introRequestsRevisitDate = body.introRequestsRevisitDate || null;
 
   if (Object.keys(updates).length === 0) return c.json({ error: 'No fields to update' }, 400);
 

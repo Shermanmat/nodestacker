@@ -41,9 +41,10 @@ const signupSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Invalid email'),
+  phone: z.string().min(1, 'Phone number is required'),
   oneLiner: z.string().min(1, 'One-liner intro is required'),
   city: z.string().min(1, 'City is required'),
-  linkedinUrl: z.string().optional(),
+  linkedinUrl: z.string().min(1, 'LinkedIn URL is required'),
   twitterHandle: z.string().optional(),
   companyName: z.string().min(1, 'Company name is required'),
   companyOneLiner: z.string().min(1, 'Company description is required'),
@@ -120,6 +121,7 @@ app.post('/signup', async (c) => {
             <table style="border-collapse: collapse; width: 100%;">
               <tr><td style="padding: 6px 12px; color: #666;">Founder</td><td style="padding: 6px 12px; font-weight: bold;">${user.firstName} ${user.lastName}</td></tr>
               <tr><td style="padding: 6px 12px; color: #666;">Email</td><td style="padding: 6px 12px;">${user.email}</td></tr>
+              <tr><td style="padding: 6px 12px; color: #666;">Phone</td><td style="padding: 6px 12px;">${parsed.data.phone}</td></tr>
               <tr><td style="padding: 6px 12px; color: #666;">Company</td><td style="padding: 6px 12px; font-weight: bold;">${parsed.data.companyName}</td></tr>
               <tr><td style="padding: 6px 12px; color: #666;">Description</td><td style="padding: 6px 12px;">${parsed.data.companyOneLiner}</td></tr>
               <tr><td style="padding: 6px 12px; color: #666;">Sector</td><td style="padding: 6px 12px;">${parsed.data.sector}</td></tr>
@@ -128,7 +130,7 @@ app.post('/signup', async (c) => {
               ${parsed.data.linkedinUrl ? `<tr><td style="padding: 6px 12px; color: #666;">LinkedIn</td><td style="padding: 6px 12px;"><a href="${normalizeLinkedinUrl(parsed.data.linkedinUrl)}">${parsed.data.linkedinUrl}</a></td></tr>` : ''}
               ${companyUrl ? `<tr><td style="padding: 6px 12px; color: #666;">Website</td><td style="padding: 6px 12px;"><a href="${companyUrl}">${companyUrl}</a></td></tr>` : ''}
             </table>
-            <p style="margin-top: 20px;"><a href="${baseUrl}/admin" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review in Admin →</a></p>
+            <p style="margin-top: 20px;"><a href="${baseUrl}/admin#signups" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review in Admin →</a></p>
           </div>
         `,
         TextBody: `New Founder Application\n\nFounder: ${user.firstName} ${user.lastName} (${user.email})\nCompany: ${parsed.data.companyName}\nDescription: ${parsed.data.companyOneLiner}\nSector: ${parsed.data.sector}\nCity: ${parsed.data.city || '—'}\nBio: ${parsed.data.oneLiner || '—'}`,

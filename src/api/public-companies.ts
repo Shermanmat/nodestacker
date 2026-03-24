@@ -257,7 +257,7 @@ async function notifyAdminPortfolioApplication(user: any, company: any) {
             <tr><td style="padding: 6px 12px; color: #666;">City</td><td style="padding: 6px 12px;">${user.city || '—'}</td></tr>
             ${user.linkedinUrl ? `<tr><td style="padding: 6px 12px; color: #666;">LinkedIn</td><td style="padding: 6px 12px;"><a href="${user.linkedinUrl}">${user.linkedinUrl}</a></td></tr>` : ''}
           </table>
-          <p style="margin-top: 20px;"><a href="${baseUrl}/admin" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review in Admin →</a></p>
+          <p style="margin-top: 20px;"><a href="${baseUrl}/admin#signups" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; display: inline-block;">Review in Admin →</a></p>
         </div>
       `,
       TextBody: `New Portfolio Application\n\nFounder: ${user.firstName} ${user.lastName} (${user.email})\nCompany: ${company.companyName}\nOne-liner: ${company.oneLiner || '—'}\nSector: ${company.sector || '—'}\nCity: ${user.city || '—'}`,

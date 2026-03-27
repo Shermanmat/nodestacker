@@ -676,7 +676,7 @@ app.get('/onboarding/status', async (c) => {
   switch (workflow.status) {
     case OnboardingStatus.OFFER_PENDING:
       if (workflow.offerSentAt) {
-        nextAction = { type: 'accept_offer', message: 'Accept or decline the offer' };
+        nextAction = { type: 'accept_offer', message: 'Review and indicate your intent to join' };
       }
       break;
     case OnboardingStatus.OFFER_ACCEPTED:
@@ -1141,6 +1141,8 @@ app.post('/onboarding/entity-info', async (c) => {
           founder_title: founderTitle,
           founder_email: founder.email,
           equity_percent: workflow.offerEquityPercent || '',
+          vesting_months: String(workflow.vestingMonths ?? 48),
+          cliff_months: String(workflow.vestingCliffMonths ?? 0),
         },
         [
           { name: founder.name, email: founder.email, role: 'Founder' },

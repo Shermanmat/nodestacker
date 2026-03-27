@@ -455,6 +455,8 @@ app.post('/:id/generate-advisory-agreement', async (c) => {
         founder_title: workflow.founderTitle || 'Founder & CEO',
         founder_email: founder.email,
         equity_percent: workflow.offerEquityPercent || '',
+        vesting_months: String(workflow.vestingMonths ?? 48),
+        cliff_months: String(workflow.vestingCliffMonths ?? 0),
       },
       [
         { name: founder.name, email: founder.email, role: 'Founder' },

@@ -184,6 +184,10 @@ export function isInvestorOnCooldown(investorIntros: IntroRequest[]): CooldownRe
   return { onCooldown: false, reason: null, unresolvedCount: 0 };
 }
 
+// Firm names that represent individual investors, not actual firms.
+// These should never trigger firm-level dedup.
+const NON_FIRM_NAMES = new Set(['angel', 'angel investor', 'independent', 'individual']);
+
 /**
  * Get the set of firm names (normalized) that are blocked for a given founder.
  * A firm is blocked if any investor at that firm already has an intro request
@@ -203,7 +207,10 @@ export async function getFounderBlockedFirms(founderId: number): Promise<Set<str
 
   const firms = new Set<string>();
   for (const inv of relevantInvestors) {
-    if (inv.firm) firms.add(inv.firm.trim().toLowerCase());
+    if (inv.firm) {
+      const normalized = inv.firm.trim().toLowerCase();
+      if (!NON_FIRM_NAMES.has(normalized)) firms.add(normalized);
+    }
   }
   return firms;
 }
@@ -220,8 +227,10 @@ export async function checkFirmBlocked(founderId: number, investorId: number): P
 
   if (!investor?.firm) return null;
 
-  const blockedFirms = await getFounderBlockedFirms(founderId);
   const normalizedFirm = investor.firm.trim().toLowerCase();
+  if (NON_FIRM_NAMES.has(normalizedFirm)) return null;
+
+  const blockedFirms = await getFounderBlockedFirms(founderId);
   return blockedFirms.has(normalizedFirm) ? investor.firm : null;
 }
 
@@ -592,7 +601,10 @@ export async function generateMatchSuggestions(
   const investorGeoMap = new Map<number, string>();
   const investorFirmMap = new Map<number, string>(); // investorId → normalized firm name
   for (const inv of data.allInvestors) {
-    if (inv.firm) investorFirmMap.set(inv.id, inv.firm.trim().toLowerCase());
+    if (inv.firm) {
+      const normalized = inv.firm.trim().toLowerCase();
+      if (!NON_FIRM_NAMES.has(normalized)) investorFirmMap.set(inv.id, normalized);
+    }
     if (!inv.active) continue;
     // Skip paused investors (e.g. raising their fund)
     if (inv.pausedUntil && new Date(inv.pausedUntil) > new Date()) continue;

@@ -19,6 +19,8 @@ interface TemplateFields {
   effective_date: string;
   share_count: string;
   founder_title: string;
+  vesting_months: string;
+  cliff_months: string;
 }
 
 interface StockAgreementFields {
@@ -114,6 +116,8 @@ export async function createSignatureRequest(
     { name: 'founder_name', value: fields.founder_name },
     { name: 'founder_title', value: fields.founder_title },
     { name: 'founder_email', value: fields.founder_email },
+    { name: 'vesting_months', value: fields.vesting_months },
+    { name: 'cliff_months', value: fields.cliff_months },
   ]));
 
   const response = await fetch(`${API_BASE}/signature_request/send_with_template`, {

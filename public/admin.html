@@ -4304,11 +4304,9 @@
           // Stage
           const stages = allCategories.value.filter(c => c.type === 'stage');
           if (stages.length) groups.push({ label: 'Stage', categories: stages });
-          // Persona — only for founders (investors learn preferences from behavior)
-          if (!isInvestor) {
-            const personas = allCategories.value.filter(c => c.type === 'persona');
-            if (personas.length) groups.push({ label: 'Persona', categories: personas });
-          }
+          // Persona — assignable to both founders and investors
+          const personas = allCategories.value.filter(c => c.type === 'persona');
+          if (personas.length) groups.push({ label: 'Persona', categories: personas });
           // Sectors grouped by parent — include parent as selectable (covers all subcategories)
           for (const parent of sectorTree.value) {
             const items = parent.children.length

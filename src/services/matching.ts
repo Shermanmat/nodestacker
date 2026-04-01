@@ -304,6 +304,7 @@ async function loadMatchingData() {
     allFnRels,
     allNiConns,
     allPersonaTiers,
+    allNodes,
   ] = await Promise.all([
     db.select().from(founders),
     db.select().from(investors),
@@ -311,6 +312,7 @@ async function loadMatchingData() {
     db.select().from(founderNodeRelationships),
     db.select().from(nodeInvestorConnections),
     db.select().from(personaHotnessTiers),
+    db.select().from(nodes),
   ]);
 
   // Category assignments
@@ -418,6 +420,7 @@ async function loadMatchingData() {
     allIntroRequests,
     allFnRels,
     allNiConns,
+    allNodes,
     founderCatMap,
     investorCatMap,
     investorExclusionMap,
@@ -594,6 +597,12 @@ export async function generateMatchSuggestions(
     return aFillRate - bFillRate;
   });
 
+  // Build VIP node set — VIP nodes only get suggested if founder is doing well with non-VIP networks
+  const vipNodeIds = new Set<number>();
+  for (const node of data.allNodes) {
+    if (node.vip) vipNodeIds.add(node.id);
+  }
+
   // Pre-compute investor scores, cooldowns, VIP status, and geo restrictions
   const investorScores = new Map<number, number>();
   const investorCooldowns = new Map<number, CooldownResult>();
@@ -646,6 +655,23 @@ export async function generateMatchSuggestions(
       : 0;
     // VIP threshold: founder needs ≥50% acceptance rate with at least 3 intros
     const qualifiesForVip = founderAcceptRate >= 0.5 && introduced.length >= 3;
+
+    // VIP node qualification: check acceptance rate specifically from non-VIP node intros.
+    // Founders must prove they're "doing well" through the primary network before
+    // being matched with VIP node investors.
+    const nonVipIntros = founderIntros.filter(ir => !vipNodeIds.has(ir.nodeId));
+    const nonVipIntroduced = nonVipIntros.filter(ir =>
+      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
+        'invested', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)
+    );
+    const nonVipAccepted = nonVipIntros.filter(ir =>
+      ['first_meeting_complete', 'second_meeting_complete',
+        'invested', 'follow_up_questions'].includes(ir.status)
+    );
+    const nonVipAcceptRate = nonVipIntroduced.length >= 3
+      ? nonVipAccepted.length / nonVipIntroduced.length
+      : 0;
+    const qualifiesForVipNode = nonVipAcceptRate >= 0.5 && nonVipIntroduced.length >= 3;
 
     // Compute founder heat
     const staticHeat = computeFounderStaticHeat(founderCats, data.personaTierMap);
@@ -704,6 +730,9 @@ export async function generateMatchSuggestions(
 
         // VIP gate: only match VIP investors with founders who have strong acceptance rates
         if (investorVip.has(investorId) && !qualifiesForVip) continue;
+
+        // VIP node gate: only match investors from VIP nodes with founders doing well in non-VIP networks
+        if (vipNodeIds.has(fnRel.nodeId) && !qualifiesForVipNode) continue;
 
         // Geography gate: if investor has a specific geography, founder must be located there
         const invGeo = investorGeoMap.get(investorId);

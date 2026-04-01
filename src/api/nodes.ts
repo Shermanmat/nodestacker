@@ -12,6 +12,7 @@ const createNodeSchema = z.object({
   role: z.string().nullable().optional(),
   geography: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  vip: z.boolean().optional(),
 });
 
 const updateNodeSchema = createNodeSchema.partial();

@@ -31,6 +31,7 @@ import marketplaceHealthRoutes from './api/marketplace-health.js';
 import signupsRoutes from './api/signups.js';
 import voiceInterviewsRoutes from './api/voice-interviews.js';
 import blurbRoutes from './api/blurb.js';
+import instantlyRoutes from './api/instantly.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -99,6 +100,9 @@ app.use('/api/marketplace-health', adminGuard);
 app.use('/api/marketplace-health/*', adminGuard);
 app.use('/api/signups', adminGuard);
 app.use('/api/signups/*', adminGuard);
+// Instantly outreach
+app.use('/api/instantly', adminGuard);
+app.use('/api/instantly/*', adminGuard);
 // Voice interview admin endpoints
 app.use('/api/admin/voice-interviews', adminGuard);
 app.use('/api/admin/voice-interviews/*', adminGuard);
@@ -121,6 +125,7 @@ app.route('/api/matching', matchingRoutes);
 app.route('/api/marketplace-health', marketplaceHealthRoutes);
 app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
+app.route('/api/instantly', instantlyRoutes);
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
@@ -347,6 +352,7 @@ app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
 app.get('/founders', serveStatic({ path: './public/founders.html' }));
 app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
+app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
 
 // Admin dashboard - serve with no-cache headers to prevent proxy caching
 const serveAdminHtml = async (c: any) => {

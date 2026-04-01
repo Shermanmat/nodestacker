@@ -232,6 +232,13 @@
       "when": 1774800000000,
       "tag": "0032_voice_interviews",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1774900000000,
+      "tag": "0035_node_vip",
+      "breakpoints": true
     }
   ]
 }

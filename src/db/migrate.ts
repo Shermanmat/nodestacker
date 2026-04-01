@@ -99,6 +99,51 @@ safeAddColumn('intro_requests', 'date_passed', 'text');
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');
 
+// instantly_campaigns + instantly_leads tables (migration 0034)
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`instantly_campaigns\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`instantly_campaign_id\` text NOT NULL,
+    \`name\` text NOT NULL,
+    \`status\` text NOT NULL DEFAULT 'draft',
+    \`account_email\` text,
+    \`leads_count\` integer NOT NULL DEFAULT 0,
+    \`replied_count\` integer NOT NULL DEFAULT 0,
+    \`positive_count\` integer NOT NULL DEFAULT 0,
+    \`last_synced_at\` text,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`instantly_campaigns_instantly_campaign_id_unique\` ON \`instantly_campaigns\` (\`instantly_campaign_id\`)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`instantly_leads\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`instantly_campaign_id\` text NOT NULL,
+    \`investor_name\` text NOT NULL,
+    \`investor_firm\` text,
+    \`investor_email\` text NOT NULL,
+    \`lead_status\` text NOT NULL DEFAULT 'pending',
+    \`reply_text\` text,
+    \`investor_id\` integer REFERENCES \`investors\`(\`id\`),
+    \`processed\` integer NOT NULL DEFAULT 0,
+    \`processed_at\` text,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`instantly_leads_email_campaign_unique\` ON \`instantly_leads\` (\`investor_email\`, \`instantly_campaign_id\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_instantly_leads_status\` ON \`instantly_leads\` (\`lead_status\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_instantly_leads_campaign\` ON \`instantly_leads\` (\`instantly_campaign_id\`)`);
+  console.log('  Ensured instantly_campaigns + instantly_leads tables exist');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
+// node VIP flag (migration 0035) — VIP nodes only get intro suggestions
+// for founders who are doing well with the primary (Mat Sherman) network
+safeAddColumn('nodes', 'vip', 'integer NOT NULL DEFAULT 1');
+// Mat Sherman's network (id=2) is not VIP — always available for intros
+try {
+  sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
+} catch (_) { /* no-op if nodes table doesn't exist yet */ }
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

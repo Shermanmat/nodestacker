@@ -77,6 +77,7 @@ export const nodes = sqliteTable('nodes', {
   role: text('role'),
   geography: text('geography'),
   notes: text('notes'),
+  vip: integer('vip', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
@@ -999,3 +1000,68 @@ export type PersonaHotnessTier = typeof personaHotnessTiers.$inferSelect;
 export type NewPersonaHotnessTier = typeof personaHotnessTiers.$inferInsert;
 export type MatchSuggestion = typeof matchSuggestions.$inferSelect;
 export type NewMatchSuggestion = typeof matchSuggestions.$inferInsert;
+
+// Instantly.ai Outreach
+export const InstantlyCampaignStatus = {
+  DRAFT: 'draft',
+  ACTIVE: 'active',
+  PAUSED: 'paused',
+  COMPLETED: 'completed',
+} as const;
+
+export const InstantlyLeadStatus = {
+  PENDING: 'pending',
+  CONTACTED: 'contacted',
+  REPLIED: 'replied',
+  POSITIVE: 'positive',
+  NEGATIVE: 'negative',
+  NEUTRAL: 'neutral',
+} as const;
+
+export const instantlyCampaigns = sqliteTable('instantly_campaigns', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  instantlyCampaignId: text('instantly_campaign_id').notNull().unique(),
+  name: text('name').notNull(),
+  status: text('status').notNull().default('draft'),
+  accountEmail: text('account_email'),
+  leadsCount: integer('leads_count').notNull().default(0),
+  repliedCount: integer('replied_count').notNull().default(0),
+  positiveCount: integer('positive_count').notNull().default(0),
+  lastSyncedAt: text('last_synced_at'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const instantlyLeads = sqliteTable('instantly_leads', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  instantlyCampaignId: text('instantly_campaign_id').notNull(),
+  investorName: text('investor_name').notNull(),
+  investorFirm: text('investor_firm'),
+  investorEmail: text('investor_email').notNull(),
+  leadStatus: text('lead_status').notNull().default('pending'),
+  replyText: text('reply_text'),
+  investorId: integer('investor_id').references(() => investors.id),
+  processed: integer('processed', { mode: 'boolean' }).notNull().default(false),
+  processedAt: text('processed_at'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const instantlyCampaignsRelations = relations(instantlyCampaigns, ({ many }) => ({
+  leads: many(instantlyLeads),
+}));
+
+export const instantlyLeadsRelations = relations(instantlyLeads, ({ one }) => ({
+  campaign: one(instantlyCampaigns, {
+    fields: [instantlyLeads.instantlyCampaignId],
+    references: [instantlyCampaigns.instantlyCampaignId],
+  }),
+  investor: one(investors, {
+    fields: [instantlyLeads.investorId],
+    references: [investors.id],
+  }),
+}));
+
+export type InstantlyCampaign = typeof instantlyCampaigns.$inferSelect;
+export type NewInstantlyCampaign = typeof instantlyCampaigns.$inferInsert;
+export type InstantlyLead = typeof instantlyLeads.$inferSelect;
+export type NewInstantlyLead = typeof instantlyLeads.$inferInsert;

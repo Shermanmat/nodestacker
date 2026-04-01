@@ -25,6 +25,7 @@ const createIntroRequestSchema = z.object({
   status: z.enum(introStatusValues).optional(),
   dateRequested: z.string().optional(),
   notes: z.string().optional(),
+  skipFirmDedup: z.boolean().optional(),
 });
 
 const updateIntroRequestSchema = z.object({
@@ -157,14 +158,17 @@ app.post('/', async (c) => {
   }
 
   // Firm-level dedup: block if another investor at this firm already has an intro for this founder
-  const blockedFirm = await checkFirmBlocked(parsed.data.founderId, parsed.data.investorId);
-  if (blockedFirm) {
-    return c.json({ error: `Another investor at ${blockedFirm} already has an intro request for this founder` }, 400);
+  if (!parsed.data.skipFirmDedup) {
+    const blockedFirm = await checkFirmBlocked(parsed.data.founderId, parsed.data.investorId);
+    if (blockedFirm) {
+      return c.json({ error: `Another investor at ${blockedFirm} already has an intro request for this founder` }, 400);
+    }
   }
 
   const now = new Date().toISOString();
+  const { skipFirmDedup, ...insertData } = parsed.data;
   const result = await db.insert(introRequests).values({
-    ...parsed.data,
+    ...insertData,
     dateRequested: parsed.data.dateRequested || now.split('T')[0],
     status: parsed.data.status || 'intro_request_sent',
     createdAt: now,

@@ -2532,6 +2532,10 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
               <textarea v-model="introForm.notes" rows="3" class="w-full border rounded px-3 py-2"></textarea>
             </div>
+            <div v-if="!editingIntro" class="flex items-center space-x-2">
+              <input type="checkbox" id="skipFirmDedup" v-model="introForm.skipFirmDedup" class="rounded border-gray-300">
+              <label for="skipFirmDedup" class="text-sm text-gray-600">Skip firm-level duplicate check</label>
+            </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
             <button type="button" @click="closeIntroModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -3360,7 +3364,7 @@
           founderId: '', nodeId: '', investorId: '', status: 'intro_request_sent',
           dateRequested: '', dateNodeAsked: '', dateIntroduced: '', firstMeetingDate: '',
           nextFollowupDate: '', followupOwner: 'founder', passReason: '', notes: '',
-          founderName: '', nodeName: '', investorName: ''
+          founderName: '', nodeName: '', investorName: '', skipFirmDedup: false
         });
 
         // Intro form autocomplete search
@@ -5030,6 +5034,7 @@
               status: introForm.status,
               dateRequested: introForm.dateRequested || undefined,
               notes: introForm.notes || undefined,
+              skipFirmDedup: introForm.skipFirmDedup || undefined,
             }});
           }
           closeIntroModal();
@@ -5055,7 +5060,7 @@
             founderId: '', nodeId: '', investorId: '', status: 'intro_request_sent',
             dateRequested: '', dateNodeAsked: '', dateIntroduced: '', firstMeetingDate: '',
             nextFollowupDate: '', followupOwner: 'founder', passReason: '', notes: '',
-            founderName: '', nodeName: '', investorName: ''
+            founderName: '', nodeName: '', investorName: '', skipFirmDedup: false
           });
           // Clear autocomplete search fields
           introFounderSearch.value = '';

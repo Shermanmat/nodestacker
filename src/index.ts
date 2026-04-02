@@ -353,6 +353,7 @@ app.get('/founders', serveStatic({ path: './public/founders.html' }));
 app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
 app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
+app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));
 app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.html' }));
 
 // Admin dashboard - serve with no-cache headers to prevent proxy caching

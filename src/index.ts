@@ -32,6 +32,7 @@ import signupsRoutes from './api/signups.js';
 import voiceInterviewsRoutes from './api/voice-interviews.js';
 import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
+import brandsRoutes from './api/brands.js';
 import { sendWeeklyDigests } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
@@ -103,6 +104,9 @@ app.use('/api/signups/*', adminGuard);
 // Instantly outreach
 app.use('/api/instantly', adminGuard);
 app.use('/api/instantly/*', adminGuard);
+// Brands CRM
+app.use('/api/brands', adminGuard);
+app.use('/api/brands/*', adminGuard);
 // Voice interview admin endpoints
 app.use('/api/admin/voice-interviews', adminGuard);
 app.use('/api/admin/voice-interviews/*', adminGuard);
@@ -126,6 +130,7 @@ app.route('/api/marketplace-health', marketplaceHealthRoutes);
 app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
+app.route('/api/brands', brandsRoutes);
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));

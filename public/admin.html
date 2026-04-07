@@ -107,6 +107,7 @@
         <div class="sidebar-link" :class="{ active: activeTab === 'relationships' }" @click="switchTab('relationships')">Relationships</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'portfolio' }" @click="switchTab('portfolio')">Portfolio</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'onboarding' }" @click="switchTab('onboarding')">Onboarding</div>
+        <div class="sidebar-link" :class="{ active: activeTab === 'brands' }" @click="switchTab('brands')">Brands</div>
 
         <div class="sidebar-section">Analytics</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'leaderboard' }" @click="switchTab('leaderboard')">Founder Leaderboard</div>
@@ -1335,6 +1336,80 @@
       </div>
 
       <!-- Network Health Tab -->
+      <!-- Brands CRM -->
+      <div v-if="activeTab === 'brands'">
+        <div class="flex justify-between items-center mb-6">
+          <h2 class="text-xl font-semibold">Brands</h2>
+          <button @click="showBrandModal = true; editingBrand = null; brandForm = { name: '', contactName: '', contactEmail: '', status: 'lead', notes: '' }" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+            Add Brand
+          </button>
+        </div>
+
+        <!-- Status filter -->
+        <div class="flex items-center gap-3 mb-4">
+          <select v-model="brandStatusFilter" class="border rounded-lg px-3 py-2 text-sm">
+            <option value="">All Statuses</option>
+            <option value="lead">Lead</option>
+            <option value="contacted">Contacted</option>
+            <option value="in_conversation">In Conversation</option>
+            <option value="committed">Committed</option>
+            <option value="passed">Passed</option>
+          </select>
+          <span class="text-sm text-gray-500">{{ filteredBrands.length }} brands</span>
+        </div>
+
+        <!-- Brands table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <table class="w-full text-sm" v-if="filteredBrands.length">
+            <thead class="bg-gray-50 border-b">
+              <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-700">Brand</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-700">Contact</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-700">Status</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-700">Notes</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="brand in filteredBrands" :key="brand.id" class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <div class="font-medium">{{ brand.name }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <div v-if="brand.contactName" class="text-sm">{{ brand.contactName }}</div>
+                  <div v-if="brand.contactEmail" class="text-xs text-gray-500">{{ brand.contactEmail }}</div>
+                  <span v-if="!brand.contactName && !brand.contactEmail" class="text-xs text-gray-400">--</span>
+                </td>
+                <td class="px-4 py-3">
+                  <select :value="brand.status" @change="updateBrandStatus(brand, $event.target.value)" class="text-xs border rounded px-2 py-1"
+                    :class="{
+                      'bg-gray-100 text-gray-600': brand.status === 'lead',
+                      'bg-blue-100 text-blue-700': brand.status === 'contacted',
+                      'bg-amber-100 text-amber-700': brand.status === 'in_conversation',
+                      'bg-green-100 text-green-700': brand.status === 'committed',
+                      'bg-red-100 text-red-600': brand.status === 'passed',
+                    }">
+                    <option value="lead">Lead</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="in_conversation">In Conversation</option>
+                    <option value="committed">Committed</option>
+                    <option value="passed">Passed</option>
+                  </select>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">{{ brand.notes || '--' }}</td>
+                <td class="px-4 py-3">
+                  <div class="flex gap-2">
+                    <button @click="editBrand(brand)" class="text-xs text-blue-600 hover:underline">Edit</button>
+                    <button @click="deleteBrand(brand.id)" class="text-xs text-red-600 hover:underline">Delete</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="px-4 py-8 text-center text-gray-400">No brands yet. Click "Add Brand" to get started.</div>
+        </div>
+      </div>
+
       <!-- Founder Leaderboard -->
       <div v-if="activeTab === 'leaderboard'">
         <div class="flex justify-between items-center mb-6">
@@ -2766,6 +2841,47 @@
     </div>
 
     <!-- Portfolio Modal -->
+    <!-- Brand Modal -->
+    <div v-if="showBrandModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-4">{{ editingBrand ? 'Edit' : 'Add' }} Brand</h3>
+        <form @submit.prevent="saveBrand">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Brand Name</label>
+              <input v-model="brandForm.name" type="text" required placeholder="e.g. Nike, Notion" class="w-full border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Contact Name</label>
+              <input v-model="brandForm.contactName" type="text" placeholder="Who you're talking to" class="w-full border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
+              <input v-model="brandForm.contactEmail" type="email" placeholder="their@email.com" class="w-full border rounded px-3 py-2">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <select v-model="brandForm.status" class="w-full border rounded px-3 py-2">
+                <option value="lead">Lead</option>
+                <option value="contacted">Contacted</option>
+                <option value="in_conversation">In Conversation</option>
+                <option value="committed">Committed</option>
+                <option value="passed">Passed</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+              <textarea v-model="brandForm.notes" rows="3" placeholder="Any notes..." class="w-full border rounded px-3 py-2"></textarea>
+            </div>
+          </div>
+          <div class="flex justify-end gap-3 mt-6">
+            <button type="button" @click="showBrandModal = false" class="px-4 py-2 text-sm text-gray-600 hover:text-gray-800">Cancel</button>
+            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">{{ editingBrand ? 'Save' : 'Add' }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div v-if="showPortfolioModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         <h3 class="text-lg font-semibold mb-4">{{ editingPortfolio ? 'Edit' : 'Add' }} Portfolio Company</h3>
@@ -2980,6 +3096,7 @@
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
           if (tabId === 'signups') loadSignups();
+          if (tabId === 'brands') loadBrands();
         }
 
         // Data
@@ -3054,6 +3171,55 @@
         const inboundLogs = ref([]);
         const inboundFilterStatus = ref('pending');
         const pendingInboundCount = ref(0);
+
+        // Brands
+        const brandsData = ref([]);
+        const brandStatusFilter = ref('');
+        const showBrandModal = ref(false);
+        const editingBrand = ref(null);
+        const brandForm = ref({ name: '', contactName: '', contactEmail: '', status: 'lead', notes: '' });
+
+        const filteredBrands = computed(() => {
+          if (!brandStatusFilter.value) return brandsData.value;
+          return brandsData.value.filter(b => b.status === brandStatusFilter.value);
+        });
+
+        async function loadBrands() {
+          try { brandsData.value = await api('/brands'); } catch (e) { console.error('loadBrands failed:', e); }
+        }
+
+        async function saveBrand() {
+          try {
+            if (editingBrand.value) {
+              await api(`/brands/${editingBrand.value}`, { method: 'PUT', body: brandForm.value });
+            } else {
+              await api('/brands', { method: 'POST', body: brandForm.value });
+            }
+            showBrandModal.value = false;
+            await loadBrands();
+          } catch (e) { console.error('saveBrand failed:', e); }
+        }
+
+        function editBrand(brand) {
+          editingBrand.value = brand.id;
+          brandForm.value = { name: brand.name, contactName: brand.contactName || '', contactEmail: brand.contactEmail || '', status: brand.status, notes: brand.notes || '' };
+          showBrandModal.value = true;
+        }
+
+        async function deleteBrand(id) {
+          if (!confirm('Delete this brand?')) return;
+          try {
+            await api(`/brands/${id}`, { method: 'DELETE' });
+            await loadBrands();
+          } catch (e) { console.error('deleteBrand failed:', e); }
+        }
+
+        async function updateBrandStatus(brand, newStatus) {
+          try {
+            await api(`/brands/${brand.id}`, { method: 'PUT', body: { status: newStatus } });
+            await loadBrands();
+          } catch (e) { console.error('updateBrandStatus failed:', e); }
+        }
 
         // Signups
         const signups = ref([]);
@@ -5411,6 +5577,9 @@
           categoryTypeGroups, sectorTree, categoryAssignGroups,
           loadCategories, createCategory, startEditCategory, saveCategory, deleteCategory,
           categoryBadgeClass, openCategoryAssignModal, saveCategoryAssignment,
+          // Brands
+          brandsData, brandStatusFilter, filteredBrands, showBrandModal, editingBrand, brandForm,
+          loadBrands, saveBrand, editBrand, deleteBrand, updateBrandStatus,
           // Signups
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,

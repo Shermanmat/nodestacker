@@ -1065,3 +1065,27 @@ export type InstantlyCampaign = typeof instantlyCampaigns.$inferSelect;
 export type NewInstantlyCampaign = typeof instantlyCampaigns.$inferInsert;
 export type InstantlyLead = typeof instantlyLeads.$inferSelect;
 export type NewInstantlyLead = typeof instantlyLeads.$inferInsert;
+
+// Brands (sponsor CRM)
+
+export const BrandStatus = {
+  LEAD: 'lead',
+  CONTACTED: 'contacted',
+  IN_CONVERSATION: 'in_conversation',
+  COMMITTED: 'committed',
+  PASSED: 'passed',
+} as const;
+
+export const brands = sqliteTable('brands', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  contactName: text('contact_name'),
+  contactEmail: text('contact_email'),
+  status: text('status').notNull().default('lead'),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type Brand = typeof brands.$inferSelect;
+export type NewBrand = typeof brands.$inferInsert;

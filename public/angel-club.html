@@ -267,15 +267,15 @@
     /* Portfolio section */
     .portfolio-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
       margin-top: 48px;
     }
     .portfolio-card {
       background: var(--bg-card);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px 24px;
+      border-radius: 16px;
+      padding: 32px 24px 28px;
       text-align: center;
       transition: border-color 0.3s, box-shadow 0.3s;
     }
@@ -299,6 +299,74 @@
       opacity: 0.5;
     }
     .portfolio-card.placeholder .company-name { color: var(--text-muted); }
+
+    /* Co-investor logos */
+    .coinvestor-logos {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .coinvestor-logo {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      object-fit: contain;
+      background: #fff;
+      border: 1px solid var(--border);
+      padding: 3px;
+    }
+    .coinvestor-name {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      letter-spacing: 0.02em;
+    }
+    .coinvestor-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 4px 10px 4px 4px;
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      transition: border-color 0.2s;
+    }
+    .coinvestor-pill:hover {
+      border-color: rgba(13, 148, 136, 0.3);
+    }
+    .coinvestor-pill img {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      object-fit: contain;
+      background: #fff;
+    }
+
+    /* Logo cloud banner */
+    .logo-cloud {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+      gap: 32px;
+      margin-top: 48px;
+      padding: 32px 0;
+    }
+    .logo-cloud img {
+      height: 28px;
+      width: auto;
+      opacity: 0.45;
+      filter: grayscale(100%);
+      transition: opacity 0.3s, filter 0.3s;
+    }
+    .logo-cloud img:hover {
+      opacity: 0.9;
+      filter: grayscale(0%);
+    }
 
     /* Benefits */
     .benefits-grid {
@@ -604,27 +672,51 @@
   <div class="container" style="text-align: center;">
     <p class="label section-label fade-up">Portfolio Access</p>
     <h2 class="section-heading fade-up">Invest before or alongside top firms</h2>
-    <p class="section-sub center fade-up">As a MatCap Angel Club member, you invest in companies before or alongside firms like Susa Ventures, Hustle Fund, and Outlander Labs.</p>
+    <p class="section-sub center fade-up">As a MatCap Angel Club member, you invest in companies before or alongside these firms.</p>
+
+    <!-- Logo cloud of co-investor firms -->
+    <div class="logo-cloud fade-up">
+      <img src="https://logo.clearbit.com/susaventures.com" alt="Susa Ventures" title="Susa Ventures">
+      <img src="https://logo.clearbit.com/peakxv.com" alt="Peak XV" title="Peak XV (formerly Sequoia India & SEA)">
+      <img src="https://logo.clearbit.com/hustlefund.vc" alt="Hustle Fund" title="Hustle Fund">
+      <img src="https://logo.clearbit.com/outlander.vc" alt="Outlander Labs" title="Outlander Labs">
+      <img src="https://logo.clearbit.com/incisiveventures.com" alt="Incisive Ventures" title="Incisive Ventures">
+      <img src="https://logo.clearbit.com/sf1.vc" alt="SF1" title="SF1">
+    </div>
+
     <div class="portfolio-grid fade-up-stagger">
       <div class="portfolio-card fade-up">
         <div class="company-name">Supermemory</div>
         <div class="company-desc">Raised $2M</div>
-        <div class="company-desc" style="margin-top: 4px; font-size: 0.8rem;">Co-investors: Susa Ventures, Browder Capital, SF1</div>
+        <div class="coinvestor-logos" style="margin-top: 14px;">
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/susaventures.com" alt="Susa"> Susa Ventures</span>
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/browdercap.com" alt="Browder"> Browder Capital</span>
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/sf1.vc" alt="SF1"> SF1</span>
+        </div>
       </div>
       <div class="portfolio-card fade-up">
         <div class="company-name">GameStock</div>
         <div class="company-desc">Raised $2M</div>
-        <div class="company-desc" style="margin-top: 4px; font-size: 0.8rem;">Co-investors: Peak XV (formerly Sequoia Capital India & SEA)</div>
+        <div class="coinvestor-logos" style="margin-top: 14px;">
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/peakxv.com" alt="Peak XV"> Peak XV</span>
+        </div>
       </div>
       <div class="portfolio-card fade-up">
         <div class="company-name">Stealth Company</div>
         <div class="company-desc">Raised $650K</div>
-        <div class="company-desc" style="margin-top: 4px; font-size: 0.8rem;">Co-investors: Hustle Fund, MonsoonVC, Josh Constine, Copper Sky Capital</div>
+        <div class="coinvestor-logos" style="margin-top: 14px;">
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/hustlefund.vc" alt="Hustle Fund"> Hustle Fund</span>
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/signalfire.com" alt="Josh Constine"> Josh Constine</span>
+        </div>
       </div>
       <div class="portfolio-card fade-up">
         <div class="company-name">Stealth Company</div>
         <div class="company-desc">Raised $2M</div>
-        <div class="company-desc" style="margin-top: 4px; font-size: 0.8rem;">Co-investors: Outlander Labs, Incisive Ventures, Untapped VC</div>
+        <div class="coinvestor-logos" style="margin-top: 14px;">
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/outlander.vc" alt="Outlander"> Outlander Labs</span>
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/incisiveventures.com" alt="Incisive"> Incisive Ventures</span>
+          <span class="coinvestor-pill"><img src="https://logo.clearbit.com/untapped.vc" alt="Untapped"> Untapped VC</span>
+        </div>
       </div>
     </div>
   </div>

@@ -135,6 +135,34 @@ app.route('/api/brands', brandsRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// Angel Club application (public, no auth)
+app.post('/api/angel-club-apply', async (c) => {
+  const body = await c.req.json();
+  const { name, email, linkedin, firm, note } = body;
+
+  if (!name || !email || !linkedin) {
+    return c.json({ error: 'Name, email, and LinkedIn are required' }, 400);
+  }
+
+  // Notify Mat via email
+  const { sendEmail } = await import('./services/email.js');
+  await sendEmail({
+    to: 'mat@matsherman.com',
+    subject: `Angel Club Application: ${name}`,
+    html: `
+      <h2>New Angel Club Application</h2>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>LinkedIn:</strong> <a href="${linkedin}">${linkedin}</a></p>
+      ${firm ? `<p><strong>Firm/Website:</strong> <a href="${firm}">${firm}</a></p>` : ''}
+      ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
+    `,
+    text: `New Angel Club Application\n\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}${firm ? `\nFirm: ${firm}` : ''}${note ? `\nNote: ${note}` : ''}`,
+  });
+
+  return c.json({ success: true });
+});
+
 // Temporary seed endpoint for Ben Ehrlich intro
 app.post('/api/debug/seed-ben-intro', async (c) => {
   const now = new Date().toISOString();

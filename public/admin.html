@@ -253,7 +253,7 @@
         <!-- Unique Firms Contacted -->
         <div v-if="uniqueFirms.year" class="bg-white rounded-lg shadow p-4 mb-6">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="font-medium">Unique Firms Contacted ({{ uniqueFirms[uniqueFirmsPeriod]?.count || 0 }})</h3>
+            <h3 class="font-medium">Unique Firms Replied ({{ uniqueFirms[uniqueFirmsPeriod]?.count || 0 }})</h3>
             <div class="flex gap-1">
               <button @click="uniqueFirmsPeriod = 'month'"
                 :class="uniqueFirmsPeriod === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"

@@ -253,7 +253,7 @@
         <!-- Unique Firms Contacted -->
         <div v-if="uniqueFirms.year" class="bg-white rounded-lg shadow p-4 mb-6">
           <div class="flex items-center justify-between mb-3">
-            <h3 class="font-medium">Unique Firms Contacted</h3>
+            <h3 class="font-medium">Unique Firms Contacted ({{ uniqueFirms[uniqueFirmsPeriod]?.count || 0 }})</h3>
             <div class="flex gap-1">
               <button @click="uniqueFirmsPeriod = 'month'"
                 :class="uniqueFirmsPeriod === 'month' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600'"
@@ -266,47 +266,7 @@
                 class="text-xs px-2 py-1 rounded">{{ uniqueFirms.year?.label }}</button>
             </div>
           </div>
-          <div class="grid grid-cols-3 gap-4 mb-4">
-            <div class="text-center p-3 rounded bg-gray-50 cursor-pointer" @click="uniqueFirmsPeriod = 'month'">
-              <div class="text-xs text-gray-500">This Month</div>
-              <div class="text-2xl font-bold">{{ uniqueFirms.month?.count || 0 }}</div>
-            </div>
-            <div class="text-center p-3 rounded bg-gray-50 cursor-pointer" @click="uniqueFirmsPeriod = 'quarter'">
-              <div class="text-xs text-gray-500">This Quarter</div>
-              <div class="text-2xl font-bold">{{ uniqueFirms.quarter?.count || 0 }}</div>
-            </div>
-            <div class="text-center p-3 rounded bg-gray-50 cursor-pointer" @click="uniqueFirmsPeriod = 'year'">
-              <div class="text-xs text-gray-500">This Year</div>
-              <div class="text-2xl font-bold">{{ uniqueFirms.year?.count || 0 }}</div>
-            </div>
-          </div>
-          <div class="max-h-64 overflow-y-auto">
-            <table class="w-full text-sm">
-              <thead class="sticky top-0 bg-white">
-                <tr class="text-left text-xs text-gray-500 border-b">
-                  <th class="pb-2">Firm</th>
-                  <th class="pb-2">Investors</th>
-                  <th class="pb-2">Best Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="f in (uniqueFirms[uniqueFirmsPeriod]?.firms || [])" :key="f.firm" class="border-b border-gray-50">
-                  <td class="py-1.5 font-medium">{{ f.firm }}</td>
-                  <td class="py-1.5 text-gray-600">{{ f.investors.join(', ') }}</td>
-                  <td class="py-1.5">
-                    <span class="text-xs px-2 py-0.5 rounded-full"
-                      :class="{
-                        'bg-green-100 text-green-700': ['invested','second_meeting_complete','first_meeting_complete'].includes(f.bestStatus),
-                        'bg-blue-100 text-blue-700': ['introduced','follow_up_questions','circle_back_round_opens'].includes(f.bestStatus),
-                        'bg-yellow-100 text-yellow-700': f.bestStatus === 'intro_request_sent',
-                        'bg-red-100 text-red-700': f.bestStatus === 'passed',
-                        'bg-gray-100 text-gray-500': f.bestStatus === 'ignored',
-                      }">{{ formatStatus(f.bestStatus) }}</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <p class="text-sm text-gray-700 leading-relaxed">{{ (uniqueFirms[uniqueFirmsPeriod]?.firms || []).map(f => f.firm).join(', ') }}</p>
         </div>
 
         <!-- My Tasks (Node Tasks) - Grouped by Founder -->

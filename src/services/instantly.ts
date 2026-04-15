@@ -104,6 +104,7 @@ export async function activateCampaign(
 ): Promise<InstantlyResult> {
   return instantlyFetch(`/campaigns/${campaignId}/activate`, {
     method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 
@@ -112,6 +113,7 @@ export async function pauseCampaign(
 ): Promise<InstantlyResult> {
   return instantlyFetch(`/campaigns/${campaignId}/pause`, {
     method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 
@@ -199,6 +201,150 @@ export async function getAllRepliedLeads(
       (l) => l.interest_status === 'replied' || l.interest_status === 'interested',
     );
     allLeads.push(...replied);
+
+    if (!result.data.next_starting_after) break;
+    cursor = result.data.next_starting_after;
+  }
+
+  return { success: true, data: allLeads };
+}
+
+// SuperSearch Enrichment
+
+interface SuperSearchFilters {
+  name?: string[];
+  company_name?: { include?: string[]; exclude?: string[] };
+  title?: { include?: string[]; exclude?: string[] };
+  industry?: { include?: string[]; exclude?: string[] };
+  subIndustry?: { include?: string[]; exclude?: string[] };
+  locations?: { include?: { country?: string; state?: string; city?: string }[] };
+  level?: string[];
+  employeeCount?: string[];
+  skip_owned_leads?: boolean;
+  show_one_lead_per_company?: boolean;
+}
+
+interface SuperSearchPreviewLead {
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  jobTitle: string;
+  location: string;
+  linkedIn: string;
+  companyName: string;
+  companyLogo?: string;
+  companyId?: string;
+}
+
+interface SuperSearchCountResult {
+  number_of_leads: number;
+}
+
+interface SuperSearchPreviewResult {
+  number_of_leads: number;
+  leads: SuperSearchPreviewLead[];
+}
+
+interface SuperSearchEnrichResult {
+  id: string;
+  resource_id: string;
+  search_filters: SuperSearchFilters;
+  limit: number;
+  list_name?: string;
+}
+
+interface SuperSearchStatusResult {
+  resource_id: string;
+  in_progress: boolean;
+  has_no_leads: boolean;
+  exists: boolean;
+}
+
+export async function superSearchCount(
+  filters: SuperSearchFilters,
+): Promise<InstantlyResult<SuperSearchCountResult>> {
+  return instantlyFetch('/supersearch-enrichment/count-leads-from-supersearch', {
+    method: 'POST',
+    body: JSON.stringify({ search_filters: filters }),
+  });
+}
+
+export async function superSearchPreview(
+  filters: SuperSearchFilters,
+): Promise<InstantlyResult<SuperSearchPreviewResult>> {
+  return instantlyFetch('/supersearch-enrichment/preview-leads-from-supersearch', {
+    method: 'POST',
+    body: JSON.stringify({ search_filters: filters }),
+  });
+}
+
+export async function superSearchEnrich(
+  filters: SuperSearchFilters,
+  options: {
+    limit: number;
+    listName?: string;
+    resourceId?: string;
+    resourceType?: 1 | 2; // 1=campaign, 2=list
+    searchName?: string;
+  },
+): Promise<InstantlyResult<SuperSearchEnrichResult>> {
+  return instantlyFetch('/supersearch-enrichment/enrich-leads-from-supersearch', {
+    method: 'POST',
+    body: JSON.stringify({
+      search_filters: filters,
+      limit: options.limit,
+      list_name: options.listName,
+      resource_id: options.resourceId,
+      resource_type: options.resourceType,
+      search_name: options.searchName,
+      work_email_enrichment: true,
+      skip_rows_without_email: true,
+    }),
+  });
+}
+
+export async function superSearchStatus(
+  resourceId: string,
+): Promise<InstantlyResult<SuperSearchStatusResult>> {
+  return instantlyFetch(`/supersearch-enrichment/${resourceId}`);
+}
+
+// Lead list management
+
+export async function listLeadLists(): Promise<InstantlyResult<{ items: { id: string; name: string; lead_count: number }[] }>> {
+  return instantlyFetch('/lead-lists');
+}
+
+export async function getLeadListLeads(
+  listId: string,
+  options: { limit?: number; starting_after?: string } = {},
+): Promise<InstantlyResult<{ items: InstantlyLeadRecord[]; next_starting_after?: string }>> {
+  const params = new URLSearchParams({ list_id: listId });
+  if (options.limit) params.set('limit', String(options.limit));
+  if (options.starting_after) params.set('starting_after', options.starting_after);
+  return instantlyFetch(`/lead-lists/leads?${params.toString()}`);
+}
+
+/**
+ * Fetch all leads from a lead list, paginating through results.
+ */
+export async function getAllLeadListLeads(
+  listId: string,
+): Promise<InstantlyResult<InstantlyLeadRecord[]>> {
+  const allLeads: InstantlyLeadRecord[] = [];
+  let cursor: string | undefined;
+
+  while (true) {
+    const result = await getLeadListLeads(listId, {
+      limit: 100,
+      starting_after: cursor,
+    });
+
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error || 'Failed to fetch leads' };
+    }
+
+    allLeads.push(...result.data.items);
 
     if (!result.data.next_starting_after) break;
     cursor = result.data.next_starting_after;

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, lt, isNull, inArray, sql, desc } from 'drizzle-orm';
-import { db, introRequests, founderNodeRelationships, nodeInvestorConnections, followupLogs } from '../db/index.js';
+import { db, introRequests, founderNodeRelationships, nodeInvestorConnections, followupLogs, investors } from '../db/index.js';
 import { z } from 'zod';
 import { checkFirmBlocked } from '../services/matching.js';
 
@@ -620,6 +620,83 @@ app.get('/stats/investor-mau', async (c) => {
 
   return c.json({
     monthlyStats: monthlyStats.reverse(), // Oldest first for charting
+  });
+});
+
+// Unique firms contacted - grouped by period (month, quarter, year)
+app.get('/stats/unique-firms', async (c) => {
+  const allRequests = await db.select({
+    investorId: introRequests.investorId,
+    status: introRequests.status,
+    dateRequested: introRequests.dateRequested,
+    createdAt: introRequests.createdAt,
+  }).from(introRequests);
+
+  // Join with investors to get firm names
+  const investorRows = await db.select({
+    id: investors.id,
+    name: investors.name,
+    firm: investors.firm,
+  }).from(investors);
+
+  const investorMap = new Map(investorRows.map(i => [i.id, i]));
+
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed
+  const currentQuarter = Math.floor(currentMonth / 3);
+
+  // Helper to check period membership
+  const isInMonth = (d: Date) => d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+  const isInQuarter = (d: Date) => d.getFullYear() === currentYear && Math.floor(d.getMonth() / 3) === currentQuarter;
+  const isInYear = (d: Date) => d.getFullYear() === currentYear;
+
+  const firmsByMonth = new Map<string, Set<string>>();
+  const firmsByQuarter = new Map<string, Set<string>>();
+  const firmsByYear = new Map<string, Set<string>>();
+
+  // Track investor details and statuses per firm per period
+  const firmDataByMonth = new Map<string, { statuses: Set<string>; investors: Set<string> }>();
+  const firmDataByQuarter = new Map<string, { statuses: Set<string>; investors: Set<string> }>();
+  const firmDataByYear = new Map<string, { statuses: Set<string>; investors: Set<string> }>();
+
+  for (const req of allRequests) {
+    const inv = investorMap.get(req.investorId);
+    if (!inv?.firm) continue;
+
+    const dateStr = req.dateRequested || req.createdAt;
+    if (!dateStr) continue;
+    const d = new Date(dateStr);
+
+    const firm = inv.firm.trim();
+
+    const addTo = (map: typeof firmDataByYear) => {
+      if (!map.has(firm)) map.set(firm, { statuses: new Set(), investors: new Set() });
+      map.get(firm)!.statuses.add(req.status);
+      map.get(firm)!.investors.add(inv.name);
+    };
+
+    if (isInYear(d)) addTo(firmDataByYear);
+    if (isInQuarter(d)) addTo(firmDataByQuarter);
+    if (isInMonth(d)) addTo(firmDataByMonth);
+  }
+
+  const statusPriority = ['invested', 'second_meeting_complete', 'first_meeting_complete', 'follow_up_questions', 'circle_back_round_opens', 'introduced', 'intro_request_sent', 'passed', 'ignored'];
+
+  const buildFirmList = (map: typeof firmDataByYear) =>
+    [...map.entries()].map(([firm, data]) => ({
+      firm,
+      investors: [...data.investors],
+      bestStatus: statusPriority.find(s => data.statuses.has(s)) || 'unknown',
+    })).sort((a, b) => a.firm.localeCompare(b.firm));
+
+  const quarterLabel = `Q${currentQuarter + 1} ${currentYear}`;
+  const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  return c.json({
+    month: { label: monthLabel, count: firmDataByMonth.size, firms: buildFirmList(firmDataByMonth) },
+    quarter: { label: quarterLabel, count: firmDataByQuarter.size, firms: buildFirmList(firmDataByQuarter) },
+    year: { label: String(currentYear), count: firmDataByYear.size, firms: buildFirmList(firmDataByYear) },
   });
 });
 

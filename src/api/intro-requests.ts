@@ -660,7 +660,15 @@ app.get('/stats/unique-firms', async (c) => {
   const firmDataByQuarter = new Map<string, { statuses: Set<string>; investors: Set<string> }>();
   const firmDataByYear = new Map<string, { statuses: Set<string>; investors: Set<string> }>();
 
+  // Only count firms that actually took an intro (not pending, passed, or ignored)
+  const introTakenStatuses = new Set([
+    'introduced', 'first_meeting_complete', 'second_meeting_complete',
+    'invested', 'follow_up_questions', 'circle_back_round_opens',
+  ]);
+
   for (const req of allRequests) {
+    if (!introTakenStatuses.has(req.status)) continue;
+
     const inv = investorMap.get(req.investorId);
     if (!inv?.firm) continue;
 

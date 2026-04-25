@@ -388,6 +388,7 @@ app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
 app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
 app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));
 app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.html' }));
+app.get('/project2045', serveStatic({ path: './public/project2045.html' }));
 
 // Admin dashboard - serve with no-cache headers to prevent proxy caching
 const serveAdminHtml = async (c: any) => {

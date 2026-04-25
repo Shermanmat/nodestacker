@@ -227,6 +227,7 @@ app.get('/campaigns/:id/leads', async (c) => {
 
 // Manually trigger reply sync across all active campaigns
 app.post('/sync-replies', async (c) => {
+  // @ts-ignore - sync script not yet committed
   const { syncAllCampaigns } = await import('../scripts/sync-instantly-replies.js');
   const result = await syncAllCampaigns();
   return c.json(result);

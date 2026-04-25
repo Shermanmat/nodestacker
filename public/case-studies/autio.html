@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Autio raised $500K via intros — MatCap Case Study</title>
+  <meta name="description" content="How Woody Sears raised $500K+ for Autio (formerly Hearhere) via MatCap intros — total raise $10.7M.">
+  <meta property="og:title" content="Autio raised $500K via intros — MatCap Case Study">
+  <meta property="og:type" content="article">
+  <link rel="icon" href="/favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#FFFFFF;--bg-alt:#F5F5F5;--bg-alt2:#FAFAFA;--text:#000;--muted:#555;--accent:#00C2E0;--accent-dim:rgba(0,194,224,.12);--rule:#e5e5e5}
+    *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+    a{color:inherit}
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#000;color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid #333;padding-left:14px}
+    nav.topnav .links{display:flex;gap:28px;align-items:center}
+    nav.topnav .links a{color:#fff;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{background:var(--accent);color:#000;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:#fff;color:#000}
+    .inner{max-width:920px;margin:0 auto;padding:0 24px}
+    .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
+    .reveal.in{opacity:1;transform:translateY(0)}
+    .kicker{font-family:'Bebas Neue',sans-serif;letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px}
+    .back{display:inline-block;padding:90px 0 0;font-size:13px;color:var(--muted);text-decoration:none;text-transform:uppercase;letter-spacing:1.5px;font-weight:700}
+    .back:hover{color:var(--accent)}
+    .hero{padding:30px 0 60px;border-bottom:1px solid var(--rule)}
+    .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,6.5vw,86px);line-height:.95;letter-spacing:1px;margin-bottom:22px}
+    .hero h1 .accent{color:var(--accent)}
+    .hero .one-liner{font-size:clamp(18px,1.8vw,22px);color:#222;max-width:760px}
+    .snapshot{padding:50px 0;background:var(--bg-alt2);border-bottom:1px solid var(--rule)}
+    .snapshot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
+    .snapshot-grid > div{background:#fff;padding:22px 24px}
+    .snapshot-grid .label{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:6px}
+    .snapshot-grid .value{font-size:16px;font-weight:600;line-height:1.4}
+    .snapshot-grid .value.big{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--accent);letter-spacing:1px;line-height:1}
+    .body-section{padding:80px 0;border-bottom:1px solid var(--rule)}
+    .body-section.alt{background:var(--bg-alt)}
+    .body-section h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,4vw,42px);letter-spacing:2px;line-height:1;margin-bottom:24px}
+    .body-section h2 .accent{color:var(--accent)}
+    .body-section p{font-size:18px;line-height:1.75;margin-bottom:16px;color:#222}
+    .body-section ul{list-style:none;padding:0;margin-top:8px}
+    .body-section ul li{padding:14px 0 14px 28px;border-bottom:1px solid var(--rule);position:relative;font-size:17px;line-height:1.6}
+    .body-section ul li::before{content:"→";position:absolute;left:0;top:14px;color:var(--accent);font-weight:800}
+    .body-section ul li strong{font-weight:700}
+    .quote-section{padding:90px 0;background:#000;color:#fff}
+    .quote{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,4vw,44px);line-height:1.15;letter-spacing:1px;color:#fff;margin-bottom:24px;max-width:820px}
+    .quote::before{content:"\201C";color:var(--accent);font-size:1.4em;margin-right:6px;line-height:0}
+    .quote::after{content:"\201D";color:var(--accent);font-size:1.4em;margin-left:4px;line-height:0}
+    .quote-attribution{font-size:14px;text-transform:uppercase;letter-spacing:2px;color:var(--accent);font-weight:700}
+    .cta-band{padding:90px 0;background:#fff;text-align:center}
+    .cta-band h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,5vw,52px);letter-spacing:2px;line-height:1;margin-bottom:20px}
+    .cta-band h2 .accent{color:var(--accent)}
+    .cta-band p{color:var(--muted);margin-bottom:32px;font-size:17px}
+    .cta-btn{display:inline-block;background:var(--accent);color:#000;padding:18px 40px;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:2px;text-decoration:none;border:2px solid var(--accent);transition:all .2s;margin:0 6px}
+    .cta-btn:hover{background:transparent;color:var(--accent)}
+    .cta-btn.ghost{background:transparent;color:#000;border-color:#000}
+    .cta-btn.ghost:hover{background:#000;color:#fff}
+    footer{padding:40px 24px;background:#000;color:#666;text-align:center;font-size:13px;border-top:1px solid #222}
+    footer a{color:var(--accent);text-decoration:none}
+    @media (max-width:820px){nav.topnav{padding:8px 14px}nav.topnav .tag{display:none}nav.topnav .links{gap:14px}nav.topnav .links a{font-size:11px;letter-spacing:1px}nav.topnav .links a.btn{padding:8px 12px}.snapshot-grid{grid-template-columns:repeat(2,1fr)}.snapshot-grid > div{padding:18px}.body-section{padding:60px 0}}
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="https://matcap.vc"><img src="/downloads/matcap-logo.png" alt="MatCap"><span class="tag">CASE STUDIES</span></a>
+  <div class="links"><a href="/case-studies">All cases</a><a class="btn" href="/community">Apply</a></div>
+</nav>
+
+<div class="inner"><a class="back" href="/case-studies">← All case studies</a></div>
+
+<section class="hero">
+  <div class="inner">
+    <div class="kicker reveal">CASE STUDY · 2023 · CONSUMER</div>
+    <h1 class="reveal">Autio raised <span class="accent">$500K+</span> via MatCap intros — and went on to raise $10.7M.</h1>
+    <p class="one-liner reveal">Location-based audio storytelling for road trips. Stories about people, places, and history near you.</p>
+  </div>
+</section>
+
+<section class="snapshot">
+  <div class="inner">
+    <div class="snapshot-grid reveal">
+      <div><div class="label">FOUNDER</div><div class="value">Woody Sears</div></div>
+      <div><div class="label">SECTOR</div><div class="value">Consumer · Audio · Travel</div></div>
+      <div><div class="label">STAGE</div><div class="value">Multi-round (early → growth)</div></div>
+      <div><div class="label">FORMERLY</div><div class="value">Hearhere</div></div>
+      <div><div class="label">RAISED VIA INTROS</div><div class="value big">$500K+</div></div>
+      <div><div class="label">TOTAL RAISED</div><div class="value">$10.7M</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="body-section">
+  <div class="inner">
+    <h2 class="reveal">The <span class="accent">challenge</span></h2>
+    <p class="reveal">Consumer apps are notoriously hard to fundraise. They don't fit the standard B2B SaaS pitch, and most investors haven't built one. Woody needed access to investors who actually understood the consumer audio category — and a way to get back in the room over multiple rounds, not just one.</p>
+  </div>
+</section>
+
+<section class="body-section alt">
+  <div class="inner">
+    <h2 class="reveal">What MatCap <span class="accent">did</span></h2>
+    <ul>
+      <li class="reveal">Featured Woody on the Forward Thinking Founders podcast.</li>
+      <li class="reveal">Recruited him into the Forward Thinking City community.</li>
+      <li class="reveal">Made warm intros via the platform's automated system.</li>
+      <li class="reveal">Connected him to Eric Ries, who made additional referrals downstream.</li>
+      <li class="reveal">Supported through multiple funding rounds across multiple years.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="body-section">
+  <div class="inner">
+    <h2 class="reveal">The <span class="accent">outcome</span></h2>
+    <ul>
+      <li class="reveal"><strong>$500K+</strong> raised directly from intros in the MatCap ecosystem.</li>
+      <li class="reveal"><strong>$10.7M total</strong> raised over time.</li>
+      <li class="reveal">Featured on <strong>Shark Tank.</strong></li>
+      <li class="reveal">Zero equity given to MatCap.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="quote-section">
+  <div class="inner">
+    <p class="quote reveal">I attribute more than $500K to the intros I've gotten through Seedscout.</p>
+    <div class="quote-attribution reveal">— Woody Sears, Founder &amp; CEO · Autio</div>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="inner">
+    <h2>Building something <span class="accent">venture-scale?</span></h2>
+    <p>If MatCap is the right fit, the door is open.</p>
+    <a class="cta-btn" href="/community">Apply to MatCap Community</a>
+    <a class="cta-btn ghost" href="/case-studies">More case studies</a>
+  </div>
+</section>
+
+<footer><div>MatCap · <a href="https://matcap.vc">matcap.vc</a> · This case covers work done as Seedscout (MatCap's previous name).</div></footer>
+
+<script>
+var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting) e.target.classList.add('in')})},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+</script>
+</body>
+</html>

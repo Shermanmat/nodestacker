@@ -163,6 +163,36 @@ app.post('/api/angel-club-apply', async (c) => {
   return c.json({ success: true });
 });
 
+// MatCap Community application (public, no auth)
+app.post('/api/community-apply', async (c) => {
+  const body = await c.req.json();
+  const { name, email, linkedin, cityState, companyName, companyUrl, oneLiner, tier, note } = body;
+
+  if (!name || !email || !linkedin || !cityState || !companyName || !oneLiner || !tier) {
+    return c.json({ error: 'Name, email, LinkedIn, city/state, company, one-liner, and tier are required' }, 400);
+  }
+
+  const { sendEmail } = await import('./services/email.js');
+  await sendEmail({
+    to: 'mat@matsherman.com',
+    subject: `Community Application: ${name} (${tier})`,
+    html: `
+      <h2>New MatCap Community Application</h2>
+      <p><strong>Tier:</strong> ${tier}</p>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>LinkedIn:</strong> <a href="${linkedin}">${linkedin}</a></p>
+      <p><strong>City / state:</strong> ${cityState}</p>
+      <p><strong>Company:</strong> ${companyName}${companyUrl ? ` — <a href="${companyUrl}">${companyUrl}</a>` : ''}</p>
+      <p><strong>One-liner:</strong> ${oneLiner}</p>
+      ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
+    `,
+    text: `New MatCap Community Application\n\nTier: ${tier}\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}\nCity/state: ${cityState}\nCompany: ${companyName}${companyUrl ? ` (${companyUrl})` : ''}\nOne-liner: ${oneLiner}${note ? `\nNote: ${note}` : ''}`,
+  });
+
+  return c.json({ success: true });
+});
+
 // Temporary seed endpoint for Ben Ehrlich intro
 app.post('/api/debug/seed-ben-intro', async (c) => {
   const now = new Date().toISOString();
@@ -389,6 +419,17 @@ app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
 app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));
 app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.html' }));
 app.get('/project2045', serveStatic({ path: './public/project2045.html' }));
+app.get('/community', serveStatic({ path: './public/community.html' }));
+app.get('/case-studies', serveStatic({ path: './public/case-studies.html' }));
+app.get('/case-studies/rosotics', serveStatic({ path: './public/case-studies/rosotics.html' }));
+app.get('/case-studies/autio', serveStatic({ path: './public/case-studies/autio.html' }));
+app.get('/case-studies/peachpay', serveStatic({ path: './public/case-studies/peachpay.html' }));
+app.get('/case-studies/insured-nomads', serveStatic({ path: './public/case-studies/insured-nomads.html' }));
+app.get('/case-studies/breathe-ev', serveStatic({ path: './public/case-studies/breathe-ev.html' }));
+app.get('/case-studies/othersideai', serveStatic({ path: './public/case-studies/othersideai.html' }));
+app.get('/case-studies/kalendar-ai', serveStatic({ path: './public/case-studies/kalendar-ai.html' }));
+app.get('/case-studies/stealth-vertical-ai', serveStatic({ path: './public/case-studies/stealth-vertical-ai.html' }));
+app.get('/case-studies/stealth-proptech', serveStatic({ path: './public/case-studies/stealth-proptech.html' }));
 
 // Admin dashboard - serve with no-cache headers to prevent proxy caching
 const serveAdminHtml = async (c: any) => {

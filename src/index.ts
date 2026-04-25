@@ -425,7 +425,6 @@ app.get('/case-studies/rosotics', serveStatic({ path: './public/case-studies/ros
 app.get('/case-studies/autio', serveStatic({ path: './public/case-studies/autio.html' }));
 app.get('/case-studies/peachpay', serveStatic({ path: './public/case-studies/peachpay.html' }));
 app.get('/case-studies/insured-nomads', serveStatic({ path: './public/case-studies/insured-nomads.html' }));
-app.get('/case-studies/breathe-ev', serveStatic({ path: './public/case-studies/breathe-ev.html' }));
 app.get('/case-studies/othersideai', serveStatic({ path: './public/case-studies/othersideai.html' }));
 app.get('/case-studies/kalendar-ai', serveStatic({ path: './public/case-studies/kalendar-ai.html' }));
 app.get('/case-studies/stealth-vertical-ai', serveStatic({ path: './public/case-studies/stealth-vertical-ai.html' }));

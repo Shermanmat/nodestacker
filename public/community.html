@@ -423,15 +423,6 @@
       fill:var(--accent);stroke:#fff;stroke-width:3;
       filter:drop-shadow(0 0 12px rgba(0,194,224,0.7));
     }
-    .us-map .pin-pulse{
-      fill:var(--accent);opacity:.35;
-      transform-origin:center;
-      animation:pulse 2.4s ease-out infinite;
-    }
-    @keyframes pulse{
-      0%{transform:scale(1);opacity:.5}
-      100%{transform:scale(2.6);opacity:0}
-    }
     .us-map .pin-label{
       font-family:'Bebas Neue',sans-serif;font-size:14px;
       letter-spacing:2px;fill:#000;
@@ -1043,7 +1034,6 @@
 
         <!-- Active chapter: Phoenix, AZ -->
         <g transform="translate(195,380)">
-          <circle class="pin-pulse" r="14"/>
           <circle class="pin" r="10"/>
           <text class="pin-label" x="20" y="-2">PHOENIX</text>
           <text class="pin-sub" x="20" y="14">ARIZONA · ACTIVE</text>

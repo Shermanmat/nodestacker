@@ -208,24 +208,61 @@
 
     .cadence-list{list-style:none;border-left:3px solid var(--accent);padding-left:0}
     .cadence-row{
-      display:grid;grid-template-columns:180px 1fr;
-      gap:32px;align-items:baseline;
-      padding:24px 0 24px 32px;
+      display:grid;
+      grid-template-columns:140px minmax(0,1fr) 280px;
+      gap:28px;align-items:center;
+      padding:28px 0 28px 32px;
       border-bottom:1px solid var(--rule);
       position:relative;
     }
     .cadence-row::before{
-      content:"";position:absolute;left:-9px;top:34px;
+      content:"";position:absolute;left:-9px;top:42px;
       width:15px;height:15px;border-radius:50%;
       background:var(--accent);border:3px solid #fff;
     }
     .cadence-row:last-child{border-bottom:none}
     .cadence-row .when{
       font-family:'Bebas Neue',sans-serif;
-      font-size:32px;letter-spacing:3px;color:#000;line-height:1;
+      font-size:30px;letter-spacing:3px;color:#000;line-height:1;
+      align-self:center;
     }
     .cadence-row .what{font-size:16px;line-height:1.55}
     .cadence-row .what strong{font-weight:700;color:#000}
+    .cadence-row .visual{
+      width:100%;display:flex;gap:6px;
+    }
+    .cadence-row .visual img{
+      width:100%;height:140px;object-fit:cover;
+      display:block;border:1px solid var(--rule);
+    }
+    .cadence-row .visual.dual img{height:140px}
+
+    /* Custom weekly prompt card */
+    .weekly-card{
+      width:100%;height:140px;background:#000;color:#fff;
+      padding:14px 16px;
+      display:flex;flex-direction:column;justify-content:space-between;
+      border:2px solid var(--accent);
+      font-family:'Inter',sans-serif;
+    }
+    .weekly-card .head{
+      display:flex;justify-content:space-between;align-items:center;
+      font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+      color:var(--accent);font-weight:700;
+    }
+    .weekly-card .dot{
+      width:6px;height:6px;border-radius:50%;background:var(--accent);
+      box-shadow:0 0 8px var(--accent);
+    }
+    .weekly-card .prompt{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:22px;line-height:1.05;letter-spacing:1.5px;
+      color:#fff;
+    }
+    .weekly-card .meta{
+      font-size:10px;color:#888;letter-spacing:.5px;
+    }
+    .weekly-card .meta span{color:var(--accent)}
 
     /* ========== For / Not For ========== */
     .filter-section{padding:110px 0;background:var(--bg-alt)}
@@ -263,16 +300,52 @@
 
     /* ========== Geo / Chapters ========== */
     .geo{padding:110px 0;background:#fff;text-align:center}
-    .geo .inner{max-width:820px}
+    .geo .inner{max-width:960px}
     .geo h2{
       font-family:'Bebas Neue',sans-serif;
       font-size:clamp(40px,6vw,64px);
       letter-spacing:2px;line-height:1;margin-bottom:24px;
     }
     .geo h2 .accent{color:var(--accent)}
-    .geo p{font-size:18px;line-height:1.7;color:#222;margin-bottom:18px}
+    .geo p{font-size:18px;line-height:1.7;color:#222;margin-bottom:18px;max-width:680px;margin-left:auto;margin-right:auto}
+
+    .us-map{
+      max-width:780px;margin:48px auto 8px;position:relative;
+    }
+    .us-map svg{width:100%;height:auto;display:block}
+    .us-map .outline{fill:#f5f7f8;stroke:#000;stroke-width:1.5}
+    .us-map .pin{
+      fill:var(--accent);stroke:#fff;stroke-width:3;
+      filter:drop-shadow(0 0 12px rgba(0,194,224,0.7));
+    }
+    .us-map .pin-pulse{
+      fill:var(--accent);opacity:.35;
+      transform-origin:center;
+      animation:pulse 2.4s ease-out infinite;
+    }
+    @keyframes pulse{
+      0%{transform:scale(1);opacity:.5}
+      100%{transform:scale(2.6);opacity:0}
+    }
+    .us-map .pin-label{
+      font-family:'Bebas Neue',sans-serif;font-size:14px;
+      letter-spacing:2px;fill:#000;
+    }
+    .us-map .pin-sub{
+      font-family:'Inter',sans-serif;font-size:9px;
+      letter-spacing:1.5px;fill:var(--muted);font-weight:700;
+    }
+    .map-legend{
+      display:flex;justify-content:center;gap:32px;margin-top:8px;
+      font-size:12px;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--muted);font-weight:700;
+    }
+    .map-legend .key{display:flex;align-items:center;gap:8px}
+    .map-legend .dot-active{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+    .map-legend .dot-open{width:10px;height:10px;border-radius:50%;border:2px dashed #999}
+
     .geo .chapter-cta{
-      margin-top:40px;padding:36px;background:var(--accent-dim);
+      margin-top:48px;padding:36px;background:var(--accent-dim);
       border-left:6px solid var(--accent);
       text-align:left;
     }
@@ -363,9 +436,122 @@
     }
     .form-error.show{display:block}
 
+    /* ========== Proof (case studies strip) ========== */
+    .proof-section{padding:110px 0;background:#fff;border-top:1px solid var(--rule)}
+    .proof-section .inner{max-width:1100px}
+    .proof-section h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(36px,5vw,56px);letter-spacing:2px;line-height:1;
+      margin-bottom:14px;
+    }
+    .proof-section h2 .accent{color:var(--accent)}
+    .proof-sub{color:var(--muted);font-size:17px;margin-bottom:40px;max-width:720px}
+    .proof-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+    .proof-card{
+      background:#fff;border:1px solid var(--rule);
+      padding:32px 28px;
+      display:flex;flex-direction:column;
+      text-decoration:none;color:inherit;
+      transition:border-color .2s,transform .2s;
+      position:relative;
+    }
+    .proof-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+    .proof-card .year{
+      position:absolute;top:20px;right:24px;
+      font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:2px;color:var(--muted);
+    }
+    .proof-card .stat{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:54px;line-height:1;letter-spacing:1px;
+      color:var(--accent);margin-bottom:18px;margin-top:8px;
+    }
+    .proof-card .stat-sub{
+      font-size:11px;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--muted);font-weight:700;margin-top:-12px;margin-bottom:22px;
+    }
+    .proof-card .company{
+      font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:2px;line-height:1;margin-bottom:6px;
+    }
+    .proof-card .one-liner{font-size:14px;color:#333;line-height:1.5;flex:1;margin-bottom:16px}
+    .proof-card .meta{
+      display:flex;justify-content:space-between;align-items:baseline;
+      padding-top:14px;border-top:1px solid var(--rule);
+      font-size:12px;color:var(--muted);
+    }
+    .proof-card .meta .read{color:var(--accent);font-weight:700;letter-spacing:.5px}
+    .proof-cta{
+      text-align:center;margin-top:36px;
+    }
+    .proof-cta a{
+      color:var(--accent);font-weight:700;text-decoration:none;
+      border-bottom:1px solid var(--accent);padding-bottom:2px;
+      font-size:15px;letter-spacing:.5px;
+    }
+
+    /* ========== About (who's behind) ========== */
+    .about-section{padding:110px 0;background:var(--bg-alt)}
+    .about-section .inner{max-width:880px}
+    .about-section h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(36px,5vw,56px);letter-spacing:2px;line-height:1;
+      margin-bottom:36px;
+    }
+    .about-section h2 .accent{color:var(--accent)}
+    .about-card{
+      background:#fff;border:1px solid var(--rule);padding:40px;
+    }
+    .about-card .name-row{
+      display:flex;align-items:baseline;gap:16px;flex-wrap:wrap;
+      padding-bottom:18px;margin-bottom:22px;
+      border-bottom:2px solid var(--accent);
+    }
+    .about-card .name{
+      font-family:'Bebas Neue',sans-serif;font-size:36px;letter-spacing:2px;line-height:1;
+    }
+    .about-card .role{
+      font-size:13px;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--muted);font-weight:700;
+    }
+    .about-card p{font-size:17px;line-height:1.7;color:#222;margin-bottom:14px}
+    .about-card p strong{color:#000}
+    .about-stats{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+      background:var(--rule);border:1px solid var(--rule);
+      margin-top:28px;
+    }
+    .about-stats > div{background:#fff;padding:18px 16px;text-align:center}
+    .about-stats .num{
+      font-family:'Bebas Neue',sans-serif;font-size:28px;
+      color:var(--accent);letter-spacing:1px;line-height:1;margin-bottom:4px;
+    }
+    .about-stats .lbl{
+      font-size:11px;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--muted);font-weight:700;
+    }
+
     /* ========== Footer ========== */
-    footer{padding:60px 24px 40px;background:#000;color:#666;text-align:center;font-size:13px;border-top:1px solid #222}
-    footer a{color:var(--accent);text-decoration:none}
+    footer{background:#000;color:#999;border-top:2px solid var(--accent);padding:64px 0 24px}
+    footer .inner{max-width:1100px;margin:0 auto;padding:0 24px}
+    footer .top{
+      display:grid;grid-template-columns:1.5fr 1fr 1fr 1fr;gap:48px;
+      padding-bottom:40px;border-bottom:1px solid #222;
+    }
+    footer .brand img{height:32px;width:auto;margin-bottom:14px;display:block}
+    footer .brand p{font-size:13px;line-height:1.6;color:#888;max-width:280px}
+    footer .col h4{
+      font-family:'Bebas Neue',sans-serif;letter-spacing:3px;
+      color:var(--accent);font-size:13px;margin-bottom:14px;
+    }
+    footer .col a{
+      display:block;color:#bbb;text-decoration:none;font-size:13px;
+      padding:5px 0;
+    }
+    footer .col a:hover{color:var(--accent)}
+    footer .bottom{
+      display:flex;justify-content:space-between;align-items:center;
+      padding-top:24px;font-size:12px;color:#666;flex-wrap:wrap;gap:12px;
+    }
+    footer .bottom a{color:var(--accent);text-decoration:none}
 
     /* ========== Mobile ========== */
     @media (max-width:820px){
@@ -381,14 +567,21 @@
       .tier-grid{grid-template-columns:1fr;gap:24px}
       .tier{min-height:0;padding:32px 24px}
 
-      .cadence-row{grid-template-columns:1fr;gap:6px;padding:18px 0 18px 24px}
+      .cadence-row{grid-template-columns:1fr;gap:14px;padding:24px 0 24px 24px;align-items:start}
       .cadence-row .when{font-size:26px}
+      .cadence-row .visual img,.cadence-row .weekly-card{height:180px}
 
       .filter-grid{grid-template-columns:1fr;gap:20px}
       .filter-card{padding:28px 22px}
 
       .form-row{grid-template-columns:1fr}
       .tier-radios{grid-template-columns:1fr}
+
+      .proof-grid{grid-template-columns:1fr;gap:16px}
+      .about-card{padding:28px 22px}
+      .about-stats{grid-template-columns:1fr}
+      footer .top{grid-template-columns:1fr;gap:32px;padding-bottom:32px}
+      footer .bottom{flex-direction:column;text-align:center}
     }
   </style>
 </head>
@@ -400,7 +593,8 @@
     <span class="tag">COMMUNITY</span>
   </a>
   <div class="links">
-    <a href="https://matcap.vc">matcap.vc</a>
+    <a href="/case-studies">Case Studies</a>
+    <a href="/project2045">Project 2045</a>
     <a class="btn" href="#apply">Apply</a>
   </div>
 </nav>
@@ -424,6 +618,48 @@
     <p class="reveal"><span class="hl">MatCap Community is neither.</span></p>
     <p class="reveal">It's a tight room of swing-big founders sharing what's actually working, week by week. The cadence is the product. The peer group is the moat. The equity model means the people in the room are aligned with each other for the long arc — not the next quarter.</p>
     <p class="reveal">If you're building a venture-scale company and you want a real peer group instead of a feed — this is the room.</p>
+  </div>
+</section>
+
+<!-- ============ PROOF / CASE STUDIES ============ -->
+<section class="proof-section">
+  <div class="inner">
+    <div class="kicker reveal">PROOF</div>
+    <h2 class="reveal">Real founders. Real <span class="accent">outcomes.</span></h2>
+    <p class="proof-sub reveal">A few of the founders MatCap has helped raise capital and scale. Each one's a single deal, a single round, a single relationship — not aggregates.</p>
+
+    <div class="proof-grid">
+      <a class="proof-card reveal" href="/case-studies/othersideai">
+        <div class="year">2021</div>
+        <div class="stat">$2.6M</div>
+        <div class="stat-sub">Hustle Fund led · Chapter One + Active Capital followed</div>
+        <div class="company">OTHERSIDEAI</div>
+        <div class="one-liner">AI-powered written communication built on GPT-3.</div>
+        <div class="meta"><span>Matt Shumer · AI</span><span class="read">Read →</span></div>
+      </a>
+
+      <a class="proof-card reveal" href="/case-studies/rosotics">
+        <div class="year">2022</div>
+        <div class="stat">$1M</div>
+        <div class="stat-sub">Draper · Vibe Capital · Sequoia Scout</div>
+        <div class="company">ROSOTICS</div>
+        <div class="one-liner">3D-printing drones for massive structures, starting with rockets.</div>
+        <div class="meta"><span>Christian LaRosa · Aerospace</span><span class="read">Read →</span></div>
+      </a>
+
+      <a class="proof-card reveal" href="/case-studies/insured-nomads">
+        <div class="year">2023</div>
+        <div class="stat">$750K</div>
+        <div class="stat-sub">Via intros · $3.2M total raised</div>
+        <div class="company">INSURED NOMADS</div>
+        <div class="one-liner">Insurance for global companies and remote workers.</div>
+        <div class="meta"><span>Andrew Jernigan · InsurTech</span><span class="read">Read →</span></div>
+      </a>
+    </div>
+
+    <div class="proof-cta reveal">
+      <a href="/case-studies">See all case studies →</a>
+    </div>
   </div>
 </section>
 
@@ -478,22 +714,36 @@
       <li class="cadence-row reveal">
         <div class="when">WEEKLY</div>
         <div class="what"><strong>Async progress updates.</strong> Every Friday, one prompt lands: <em>what did you get done last week?</em> A few sentences, no more. Keeps you accountable, and keeps the MatCap team in the loop on how you're progressing.</div>
+        <div class="visual">
+          <div class="weekly-card" aria-label="Friday weekly prompt">
+            <div class="head"><span>FRIDAY · 9:00 AM</span><span class="dot"></span></div>
+            <div class="prompt">What did you get done last week?</div>
+            <div class="meta">From <span>MatCap</span> · Reply with a few sentences</div>
+          </div>
+        </div>
       </li>
       <li class="cadence-row reveal">
         <div class="when">BIWEEKLY</div>
         <div class="what"><strong>Workshops.</strong> A member or invited operator teaches what's actually working. Hiring, pricing, fundraising mechanics, AI workflows, GTM — the unglamorous stuff that moves the number.</div>
+        <div class="visual"><img src="/images/community/workshops.jpg" alt="Founders gathered around a table at a workshop" loading="lazy"></div>
       </li>
       <li class="cadence-row reveal">
         <div class="when">MONTHLY</div>
         <div class="what"><strong>Social events.</strong> Poker nights, dinners, go-kart racing. Anchored locally per chapter. Built for bonding — and the conversations that come with it.</div>
+        <div class="visual"><img src="/images/community/socials.jpg" alt="Group photo of founders at a MatCap social event" loading="lazy"></div>
       </li>
       <li class="cadence-row reveal">
         <div class="when">QUARTERLY</div>
         <div class="what"><strong>Retreats.</strong> A few days off the grind with the rest of the founders. Come for the day or stay the night — a chance to get closer to the community and the MatCap team.</div>
+        <div class="visual dual">
+          <img src="/images/community/retreat-1.jpg" alt="Founders working together at a retreat" loading="lazy">
+          <img src="/images/community/retreat-2.jpg" alt="Group session at a MatCap retreat" loading="lazy">
+        </div>
       </li>
       <li class="cadence-row reveal">
         <div class="when">ANNUAL</div>
         <div class="what"><strong>MatCap Community Conference.</strong> A full-send annual conference — speakers, a curated room, and the full network in one place. We go all out to showcase the founders in the MatCap ecosystem.</div>
+        <div class="visual"><img src="/images/community/conference.jpg" alt="MatCap Community Conference venue" loading="lazy"></div>
       </li>
     </ul>
   </div>
@@ -530,15 +780,70 @@
 <!-- ============ GEO / CHAPTERS ============ -->
 <section class="geo">
   <div class="inner">
-    <div class="kicker reveal">WHERE WE'RE ROLLING OUT</div>
-    <h2 class="reveal">Arizona first. <span class="accent">Other cities next.</span></h2>
-    <p class="reveal">The first community chapter is for Arizona founders.</p>
-    <p class="reveal">The expansion unit is a <strong>MatCap chapter</strong> — one per city, locally led. Access stays centralized through MatCap.</p>
+    <div class="kicker reveal">CHAPTER MAP</div>
+    <h2 class="reveal">Arizona first. <span class="accent">Open for chapters everywhere else.</span></h2>
+    <p class="reveal">The first MatCap chapter is for Arizona founders. The expansion unit is a chapter — one per city, locally led. Access stays centralized through MatCap.</p>
+
+    <div class="us-map reveal" aria-label="MatCap chapter map of the United States">
+      <svg viewBox="0 0 960 600" xmlns="http://www.w3.org/2000/svg">
+        <!-- US contiguous silhouette (simplified) -->
+        <path class="outline" d="M 60,180 L 175,165 L 295,140 L 425,110 L 530,120 L 645,95 L 760,105 L 815,135 L 820,180 L 800,225 L 770,265 L 760,320 L 730,375 L 690,415 L 685,455 L 700,475 L 685,505 L 660,500 L 645,455 L 615,440 L 555,440 L 470,455 L 405,485 L 360,495 L 320,475 L 270,460 L 230,420 L 195,415 L 165,400 L 130,385 L 105,355 L 80,300 L 65,250 Z" />
+
+        <!-- Open chapter cities (dashed circles, signal "open for leads") -->
+        <g class="open-cities" stroke="#aaa" stroke-width="2" stroke-dasharray="3,3" fill="none">
+          <circle cx="100" cy="180" r="9"/>   <!-- Seattle -->
+          <circle cx="80"  cy="290" r="9"/>   <!-- SF Bay -->
+          <circle cx="115" cy="360" r="9"/>   <!-- LA -->
+          <circle cx="295" cy="290" r="9"/>   <!-- Denver -->
+          <circle cx="430" cy="450" r="9"/>   <!-- Austin -->
+          <circle cx="555" cy="200" r="9"/>   <!-- Chicago -->
+          <circle cx="700" cy="475" r="9"/>   <!-- Miami -->
+          <circle cx="785" cy="200" r="9"/>   <!-- NYC -->
+          <circle cx="810" cy="170" r="9"/>   <!-- Boston -->
+        </g>
+
+        <!-- Active chapter: Phoenix, AZ -->
+        <g transform="translate(195,380)">
+          <circle class="pin-pulse" r="14"/>
+          <circle class="pin" r="10"/>
+          <text class="pin-label" x="20" y="-2">PHOENIX</text>
+          <text class="pin-sub" x="20" y="14">ARIZONA · ACTIVE</text>
+        </g>
+      </svg>
+    </div>
+
+    <div class="map-legend reveal">
+      <span class="key"><span class="dot-active"></span>Active chapter</span>
+      <span class="key"><span class="dot-open"></span>Open for chapter lead</span>
+    </div>
 
     <div class="chapter-cta reveal">
-      <strong>Want to lead a MatCap chapter in your city?</strong>
-      <p style="margin-bottom:12px">We're actively looking for operators in other markets to anchor a local chapter. If you're a respected founder or operator with strong roots in your city, we want to talk.</p>
-      <a href="mailto:mat@matsherman.com?subject=MatCap%20chapter%20lead%20%E2%80%94%20%5Byour%20city%5D">→ Email mat@matsherman.com</a>
+      <strong>Want to open your own chapter?</strong>
+      <p style="margin-bottom:12px">If you're a respected founder or operator with strong roots in your city, we want to talk. Chapters are locally led — you bring the room together, MatCap brings the playbook.</p>
+      <a href="mailto:mat@matsherman.com?subject=MatCap%20chapter%20lead%20%E2%80%94%20%5Byour%20city%5D">→ Shoot us a note: mat@matsherman.com</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ABOUT / WHO'S BEHIND ============ -->
+<section class="about-section">
+  <div class="inner">
+    <div class="kicker reveal">WHO'S BEHIND THIS</div>
+    <h2 class="reveal">Built by an <span class="accent">operator</span>, not a marketer.</h2>
+
+    <div class="about-card reveal">
+      <div class="name-row">
+        <div class="name">MAT SHERMAN</div>
+        <div class="role">Founder · MatCap</div>
+      </div>
+      <p>Mat has spent the last several years connecting outsider founders to investor capital — first under the Seedscout brand, now as MatCap. The work has produced real outcomes: <strong>$5M+ in attributable raises</strong> across companies like OthersideAI ($2.6M), Rosotics ($1M), Kalendar AI ($3.2M total), Autio ($10.7M total), and Insured Nomads ($3.2M total). Investors who've taken MatCap intros include Hustle Fund, Village Global, Draper, Eric Ries, a Sequoia Scout, Vibe Capital, Race Capital, and many more.</p>
+      <p>MatCap Community is the next phase: the peer group, the cadence, and the chapter network that the next generation of swing-big founders will run their decade through.</p>
+
+      <div class="about-stats">
+        <div><div class="num">$5M+</div><div class="lbl">Attributable raises</div></div>
+        <div><div class="num">9+</div><div class="lbl">Public case studies</div></div>
+        <div><div class="num">7 yrs</div><div class="lbl">Building this</div></div>
+      </div>
     </div>
   </div>
 </section>
@@ -622,7 +927,36 @@
 </section>
 
 <footer>
-  <div>MatCap Community is a MatCap initiative. <a href="https://matcap.vc">matcap.vc</a></div>
+  <div class="inner">
+    <div class="top">
+      <div class="brand">
+        <img src="/downloads/matcap-logo.png" alt="MatCap">
+        <p>MatCap helps swing-big founders find investor capital and the peer group to grow alongside.</p>
+      </div>
+      <div class="col">
+        <h4>COMMUNITY</h4>
+        <a href="/community">Apply to join</a>
+        <a href="/community#tiers">The two tiers</a>
+        <a href="/community#cadence">The cadence</a>
+        <a href="mailto:mat@matsherman.com?subject=MatCap%20chapter%20lead%20%E2%80%94%20%5Byour%20city%5D">Lead a chapter</a>
+      </div>
+      <div class="col">
+        <h4>EVIDENCE</h4>
+        <a href="/case-studies">Case studies</a>
+        <a href="/project2045">Project 2045</a>
+        <a href="/angel-club">Angel Club</a>
+      </div>
+      <div class="col">
+        <h4>CONTACT</h4>
+        <a href="mailto:mat@matsherman.com">mat@matsherman.com</a>
+        <a href="https://matcap.vc">matcap.vc</a>
+      </div>
+    </div>
+    <div class="bottom">
+      <div>&copy; 2026 MatCap. All rights reserved.</div>
+      <div>Built in Arizona. Expanding everywhere.</div>
+    </div>
+  </div>
 </footer>
 
 <script>

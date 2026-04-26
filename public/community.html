@@ -80,51 +80,34 @@
 
     /* ========== Hero ========== */
     .hero{
-      padding:110px 0 70px;
+      min-height:calc(100vh - 60px);
+      display:flex;align-items:center;justify-content:center;
+      padding:120px 0 80px;
       border-bottom:1px solid var(--rule);
+      text-align:center;
     }
-    .hero .inner{max-width:1200px}
-    .hero-grid{
-      display:grid;
-      grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);
-      gap:56px;
-      align-items:center;
-    }
+    .hero .inner{max-width:1100px}
+    .hero .kicker{margin-bottom:18px}
     .hero h1{
       font-family:'Bebas Neue',sans-serif;
-      font-size:clamp(56px,9vw,128px);
-      line-height:.95;letter-spacing:2px;
-      margin-bottom:22px;
+      font-size:clamp(72px,12vw,176px);
+      line-height:.95;letter-spacing:3px;
+      margin-bottom:28px;
     }
     .hero h1 .accent{color:var(--accent)}
     .hero-sub{
-      font-size:clamp(17px,1.7vw,22px);
-      font-weight:500;max-width:560px;
-      color:#222;margin-bottom:32px;
+      font-size:clamp(18px,1.8vw,24px);
+      font-weight:500;max-width:640px;
+      color:#222;margin:0 auto 36px;
     }
     .hero-cta{
       display:inline-block;background:var(--accent);color:#000;
-      padding:16px 36px;font-weight:800;font-size:14px;
-      text-transform:uppercase;letter-spacing:2px;
+      padding:18px 44px;font-weight:800;font-size:15px;
+      text-transform:uppercase;letter-spacing:2.5px;
       text-decoration:none;border:2px solid var(--accent);
       transition:all .2s;
     }
     .hero-cta:hover{background:transparent;color:var(--accent)}
-
-    .hero-summary{
-      list-style:none;border-top:2px solid #000;
-    }
-    .hero-summary li{
-      display:flex;gap:14px;align-items:baseline;
-      padding:13px 0;
-      border-bottom:1px solid var(--rule);
-      font-size:15px;line-height:1.5;
-    }
-    .hero-summary li .bullet{
-      flex-shrink:0;width:8px;height:8px;border-radius:50%;
-      background:var(--accent);margin-top:7px;
-    }
-    .hero-summary strong{font-weight:800}
 
     /* ========== Manifesto (black band) ========== */
     .manifesto{background:#000;color:#fff;padding:110px 0}
@@ -392,8 +375,8 @@
       nav.topnav .links a{font-size:11px;letter-spacing:1px}
       nav.topnav .links a.btn{padding:8px 12px}
 
-      .hero{padding:90px 0 50px}
-      .hero-grid{grid-template-columns:1fr;gap:32px}
+      .hero{min-height:auto;padding:100px 0 70px}
+      .hero h1{font-size:clamp(56px,16vw,96px)}
 
       .tier-grid{grid-template-columns:1fr;gap:24px}
       .tier{min-height:0;padding:32px 24px}
@@ -423,22 +406,12 @@
 </nav>
 
 <!-- ============ HERO ============ -->
-<section class="hero">
+<section class="hero hero-center">
   <div class="inner">
-    <div class="hero-grid">
-      <div>
-        <div class="kicker reveal">MATCAP COMMUNITY</div>
-        <h1 class="reveal">Go big.<br>Go fast. <span class="accent">Together.</span></h1>
-        <p class="hero-sub reveal">A private peer community for founders building venture-scale companies. Highly filtered. Paid in equity, never cash. Designed to outlast any single round.</p>
-        <a class="hero-cta reveal" href="#apply">Apply →</a>
-      </div>
-      <ul class="hero-summary reveal">
-        <li><span class="bullet"></span><span><strong>Weekly</strong> progress updates · biweekly workshops · monthly socials · quarterly events · annual conference.</span></li>
-        <li><span class="bullet"></span><span><strong>Paid in equity</strong> — 0.25% or 1%, once. Never cash.</span></li>
-        <li><span class="bullet"></span><span><strong>Top 1%</strong> of founders. Coachable, generous, swinging for category-defining outcomes.</span></li>
-        <li><span class="bullet"></span><span><strong>Arizona first.</strong> Local chapters expanding to other cities.</span></li>
-      </ul>
-    </div>
+    <div class="kicker reveal">MATCAP COMMUNITY</div>
+    <h1 class="reveal">Go big.<br>Go fast. <span class="accent">Together.</span></h1>
+    <p class="hero-sub reveal">A private peer community for founders building venture-scale companies.</p>
+    <a class="hero-cta reveal" href="#apply">Apply →</a>
   </div>
 </section>
 

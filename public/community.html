@@ -196,6 +196,52 @@
     }
     .tier-coda .accent{color:var(--accent)}
 
+    /* ========== Process (how the intros work) ========== */
+    .process-section{padding:110px 0;background:#000;color:#fff}
+    .process-section .inner{max-width:1100px}
+    .process-section .kicker{color:var(--accent)}
+    .process-section h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(40px,6vw,68px);letter-spacing:2px;line-height:1;
+      margin-bottom:14px;
+    }
+    .process-section h2 .accent{color:var(--accent)}
+    .process-sub{color:#aaa;font-size:17px;margin-bottom:48px;max-width:700px}
+    .process-grid{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:18px;
+    }
+    .step-card{
+      background:#0c0c0c;border:1px solid #222;
+      padding:30px 26px 28px;
+      transition:border-color .2s,transform .2s;
+    }
+    .step-card:hover{border-color:var(--accent);transform:translateY(-3px)}
+    .step-label{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:11px;letter-spacing:2.5px;color:#888;margin-bottom:4px;
+    }
+    .step-num{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:54px;line-height:1;letter-spacing:1px;
+      color:var(--accent);margin-bottom:14px;
+    }
+    .step-title{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:22px;letter-spacing:2px;line-height:1.05;
+      margin-bottom:12px;color:#fff;
+    }
+    .step-desc{font-size:14px;line-height:1.6;color:#bbb}
+    .step-desc strong{color:#fff;font-weight:700}
+    .step-detail{
+      margin-top:14px;padding-top:12px;border-top:1px solid #222;
+      font-size:11px;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--accent);font-weight:700;
+    }
+    .process-foot{
+      margin-top:36px;text-align:center;color:#888;font-size:14px;
+    }
+    .process-foot strong{color:var(--accent)}
+
     /* ========== Cadence ========== */
     .cadence{padding:110px 0;background:#fff}
     .cadence .inner{max-width:900px}
@@ -578,6 +624,8 @@
       .tier-radios{grid-template-columns:1fr}
 
       .proof-grid{grid-template-columns:1fr;gap:16px}
+      .process-grid{grid-template-columns:1fr;gap:14px}
+      .step-card{padding:24px 22px}
       .about-card{padding:28px 22px}
       .about-stats{grid-template-columns:1fr}
       footer .top{grid-template-columns:1fr;gap:32px;padding-bottom:32px}
@@ -700,6 +748,51 @@
     </div>
 
     <div class="tier-coda reveal">No cash dues, ever. <span class="accent">One-time equity, paid forward.</span></div>
+  </div>
+</section>
+
+<!-- ============ PROCESS / HOW INTROS WORK ============ -->
+<section class="process-section">
+  <div class="inner">
+    <div class="kicker reveal">ACCESS · HOW THE INTROS WORK</div>
+    <h2 class="reveal">From blurb to <span class="accent">first check.</span></h2>
+    <p class="process-sub reveal">Access tier members get the full intro process. Four steps, one playbook, run by MatCap end-to-end.</p>
+
+    <div class="process-grid">
+      <div class="step-card reveal">
+        <div class="step-label">STEP</div>
+        <div class="step-num">01</div>
+        <div class="step-title">CRAFT THE BLURB</div>
+        <div class="step-desc">We work with you to shape a tight founder + company blurb. Clear thesis, real traction, the ask. The version that earns a meeting.</div>
+        <div class="step-detail">Forwardable in one paste</div>
+      </div>
+
+      <div class="step-card reveal">
+        <div class="step-label">STEP</div>
+        <div class="step-num">02</div>
+        <div class="step-title">HIT THE NETWORK</div>
+        <div class="step-desc">We send it to MatCap's <strong>200+ investor network</strong> — local angels, Tier&nbsp;1 VCs, sector specialists. They see what's actually moving. No spam, no blast lists.</div>
+        <div class="step-detail">200+ active investors</div>
+      </div>
+
+      <div class="step-card reveal">
+        <div class="step-label">STEP</div>
+        <div class="step-num">03</div>
+        <div class="step-title">DOUBLE OPT-IN INTROS</div>
+        <div class="step-desc">When an investor wants to meet, we connect you. Both sides have already said yes. <strong>No cold forwards.</strong> No wasted calendars.</div>
+        <div class="step-detail">Both sides opted in</div>
+      </div>
+
+      <div class="step-card reveal">
+        <div class="step-label">STEP</div>
+        <div class="step-num">04</div>
+        <div class="step-title">COACH THROUGH THE RAISE</div>
+        <div class="step-desc">Pitch reviews, follow-up sequencing, term-sheet feedback, negotiation. We stay in the loop until the round closes — and after.</div>
+        <div class="step-detail">Until the round closes</div>
+      </div>
+    </div>
+
+    <p class="process-foot reveal">All of this is included in the <strong>Access tier</strong> · 1% equity, one-time, no cash.</p>
   </div>
 </section>
 

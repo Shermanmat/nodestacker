@@ -76,6 +76,29 @@
     .bar-legend .item strong{font-weight:700}
     .bar-legend .item .pct{color:var(--muted);margin-left:4px}
 
+    /* Firm wall */
+    .firms{padding:100px 0;background:#fff;border-top:1px solid var(--rule)}
+    .firms .inner{max-width:1100px}
+    .firms h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,4.5vw,52px);letter-spacing:2px;line-height:1;margin-bottom:14px}
+    .firms h2 .accent{color:var(--accent)}
+    .firms p.sub{color:var(--muted);font-size:16px;margin-bottom:36px;max-width:740px}
+    .firms-grid{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+      background:var(--rule);border:1px solid var(--rule);
+    }
+    .firms-grid .firm{
+      background:#fff;padding:14px 16px;
+      font-size:14px;font-weight:600;color:#222;
+      border:none;text-align:center;
+      display:flex;align-items:center;justify-content:center;
+      min-height:54px;line-height:1.2;
+      transition:background .15s,color .15s;
+    }
+    .firms-grid .firm:hover{background:var(--accent-dim);color:#000}
+    .firms-foot{
+      margin-top:24px;font-size:13px;color:var(--muted);text-align:center;font-style:italic;
+    }
+
     /* Detail rows */
     .detail{padding:90px 0;background:#fff;border-top:1px solid var(--rule)}
     .detail .inner{max-width:960px}
@@ -116,6 +139,8 @@
       .stat{padding:26px 16px}
       .detail-grid{grid-template-columns:1fr}
       .bar .seg{font-size:11px}
+      .firms-grid{grid-template-columns:repeat(2,1fr)}
+      .firms-grid .firm{font-size:13px;padding:12px 10px;min-height:48px}
     }
   </style>
 </head>
@@ -187,42 +212,120 @@
   </div>
 </section>
 
-<section class="detail">
+<section class="firms">
   <div class="inner">
-    <div class="kicker reveal">DEEPER DETAIL</div>
-    <h2 class="reveal">The <span class="accent">"yes"</span> column, broken out.</h2>
-    <div class="detail-grid">
-      <div class="detail-card reveal">
-        <div class="num">203</div>
-        <div class="title">INTRODUCED</div>
-        <div class="desc">Investor opted in. Founder + investor connected. The first meeting got booked.</div>
-      </div>
-      <div class="detail-card reveal">
-        <div class="num">17</div>
-        <div class="title">FIRST MEETING COMPLETE</div>
-        <div class="desc">Initial conversation happened. Both sides have real signal on each other.</div>
-      </div>
-      <div class="detail-card reveal">
-        <div class="num">10</div>
-        <div class="title">FOLLOW-UP QUESTIONS</div>
-        <div class="desc">Investor came back with diligence questions — active interest, multi-touch.</div>
-      </div>
-      <div class="detail-card reveal">
-        <div class="num">11</div>
-        <div class="title">CIRCLE BACK NEXT ROUND</div>
-        <div class="desc">Not the right round, but the investor is tracking for next time.</div>
-      </div>
-      <div class="detail-card reveal">
-        <div class="num">8</div>
-        <div class="title">INVESTED</div>
-        <div class="desc">A check landed. The full arc — intro to wire — closed through MatCap.</div>
-      </div>
-      <div class="detail-card reveal">
-        <div class="num">$5M+</div>
-        <div class="title">ATTRIBUTABLE RAISES</div>
-        <div class="desc">Documented dollars raised across published case studies. Real number is higher.</div>
-      </div>
+    <div class="kicker reveal">FIRMS IN THE NETWORK</div>
+    <h2 class="reveal">105 firms have <span class="accent">opted in</span> to a MatCap intro.</h2>
+    <p class="sub reveal">Every firm below has actively engaged with at least one MatCap intro request — replied yes, taken a meeting, asked diligence questions, or invested. Not a "we sent emails" list.</p>
+
+    <div class="firms-grid reveal">
+      <div class="firm">1517 Fund</div>
+      <div class="firm">2048 Ventures</div>
+      <div class="firm">A* Capital</div>
+      <div class="firm">a16z</div>
+      <div class="firm">Active Capital</div>
+      <div class="firm">Afore VC</div>
+      <div class="firm">Aglaé Ventures</div>
+      <div class="firm">Animo VC</div>
+      <div class="firm">Anthropocene Ventures</div>
+      <div class="firm">Array Ventures</div>
+      <div class="firm">ascend.vc</div>
+      <div class="firm">Asymmetry</div>
+      <div class="firm">Avalanche VC</div>
+      <div class="firm">Barrell Ventures</div>
+      <div class="firm">BBQ Capital</div>
+      <div class="firm">Bedford Bridge</div>
+      <div class="firm">Belief Capital</div>
+      <div class="firm">Bloomberg Beta</div>
+      <div class="firm">Blue Collective</div>
+      <div class="firm">Boost VC</div>
+      <div class="firm">Brickyard</div>
+      <div class="firm">Builders.vc</div>
+      <div class="firm">Campus Founders Fund</div>
+      <div class="firm">Category Ventures</div>
+      <div class="firm">Chapter One Ventures</div>
+      <div class="firm">Collaborative Fund</div>
+      <div class="firm">Compound VC</div>
+      <div class="firm">Copper Sky Capital</div>
+      <div class="firm">Costanoa</div>
+      <div class="firm">Crucible Capital</div>
+      <div class="firm">Daydream VC</div>
+      <div class="firm">DecibelVC</div>
+      <div class="firm">Discipulus Ventures</div>
+      <div class="firm">Dorm Room Fund</div>
+      <div class="firm">Earthling</div>
+      <div class="firm">Emerging Ventures</div>
+      <div class="firm">Everywhere Ventures</div>
+      <div class="firm">ex/ante</div>
+      <div class="firm">Fc Centripetal</div>
+      <div class="firm">First Round</div>
+      <div class="firm">Flex Capital</div>
+      <div class="firm">Flybridge</div>
+      <div class="firm">Footwork VC</div>
+      <div class="firm">Formation Capital</div>
+      <div class="firm">Forum Ventures</div>
+      <div class="firm">Founder Collective</div>
+      <div class="firm">FPV Ventures</div>
+      <div class="firm">Freestyle Capital</div>
+      <div class="firm">Geometry</div>
+      <div class="firm">Gradient Ventures</div>
+      <div class="firm">Greylock</div>
+      <div class="firm">Ground Up Ventures</div>
+      <div class="firm">Hannah Grey</div>
+      <div class="firm">Hustle Fund</div>
+      <div class="firm">Incisive Ventures</div>
+      <div class="firm">Javelin Ventures</div>
+      <div class="firm">Kickstart Fund</div>
+      <div class="firm">Lobby Capital</div>
+      <div class="firm">Long Journey Ventures</div>
+      <div class="firm">Mantis VC</div>
+      <div class="firm">Matchstick Ventures</div>
+      <div class="firm">Matrix</div>
+      <div class="firm">Menlo Ventures</div>
+      <div class="firm">Mojo VC</div>
+      <div class="firm">MonsoonVC</div>
+      <div class="firm">MXV</div>
+      <div class="firm">NFX</div>
+      <div class="firm">Outlander Labs</div>
+      <div class="firm">Outlaw VC</div>
+      <div class="firm">Pareto Holdings</div>
+      <div class="firm">Park Rangers Capital</div>
+      <div class="firm">Pasadena Angels</div>
+      <div class="firm">Pear VC</div>
+      <div class="firm">Pelion</div>
+      <div class="firm">PerceptiveVC</div>
+      <div class="firm">PHX Ventures</div>
+      <div class="firm">Precursor Ventures</div>
+      <div class="firm">Pureplay VC</div>
+      <div class="firm">Race Capital</div>
+      <div class="firm">Root VC</div>
+      <div class="firm">Seraph Group</div>
+      <div class="firm">SF1</div>
+      <div class="firm">Signalfire</div>
+      <div class="firm">Silicon Desert Ventures</div>
+      <div class="firm">Social Leverage</div>
+      <div class="firm">Solo Founders / ODF</div>
+      <div class="firm">South Park Commons</div>
+      <div class="firm">Spark Angels</div>
+      <div class="firm">Stage 2 Capital</div>
+      <div class="firm">Sterling Road</div>
+      <div class="firm">Stone Mountain Ventures</div>
+      <div class="firm">SwellVC</div>
+      <div class="firm">Techstars Boulder</div>
+      <div class="firm">Tribe Capital</div>
+      <div class="firm">Tucker Seed Fund</div>
+      <div class="firm">Twelve Below</div>
+      <div class="firm">UntappedVC</div>
+      <div class="firm">Urban Innovation Fund</div>
+      <div class="firm">Verdict Capital</div>
+      <div class="firm">Village Global</div>
+      <div class="firm">Weekend Fund</div>
+      <div class="firm">Wischoff Ventures</div>
+      <div class="firm">Yonder Ventures</div>
+      <div class="firm">Z Fellows</div>
+      <div class="firm">Zetta Venture Partners</div>
     </div>
+    <p class="firms-foot">Sourced from MatCap intro database · April 2026 snapshot · Sorted alphabetically</p>
   </div>
 </section>
 

@@ -310,6 +310,65 @@
     }
     .weekly-card .meta span{color:var(--accent)}
 
+    /* ========== Signal (why the filter) ========== */
+    .signal-section{padding:120px 0;background:#fff;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+    .signal-section .inner{max-width:1000px}
+    .signal-section h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(38px,5vw,62px);
+      letter-spacing:1.5px;line-height:1.05;
+      margin-bottom:28px;max-width:860px;
+    }
+    .signal-section h2 .accent{color:var(--accent)}
+    .signal-section p{
+      font-size:18px;line-height:1.7;color:#222;
+      margin-bottom:18px;max-width:780px;
+    }
+    .signal-section p strong{color:#000;font-weight:700}
+    .signal-diagram{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:18px;
+      margin:48px 0 32px;
+    }
+    .signal-panel{
+      border:1px solid var(--rule);background:var(--bg-alt2);
+      padding:22px 18px 18px;text-align:center;
+      position:relative;
+    }
+    .signal-panel.active{border-color:var(--accent);background:rgba(0,194,224,0.05)}
+    .signal-panel .panel-label{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:13px;letter-spacing:2px;color:var(--muted);
+      margin-bottom:4px;
+    }
+    .signal-panel .panel-title{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:24px;letter-spacing:2px;color:#000;line-height:1;
+      margin-bottom:14px;
+    }
+    .signal-panel.active .panel-title{color:var(--accent)}
+    .signal-panel .density{
+      width:100%;height:140px;
+      display:grid;grid-template-columns:repeat(8,1fr);gap:6px;
+      align-content:center;justify-items:center;
+      padding:0 8px;
+    }
+    .signal-panel .density i{
+      width:8px;height:8px;border-radius:50%;
+      background:#d8dee0;display:block;
+    }
+    .signal-panel .density i.on{background:var(--accent);box-shadow:0 0 6px rgba(0,194,224,.5)}
+    .signal-panel.active .density i.on{box-shadow:0 0 10px rgba(0,194,224,.8)}
+    .signal-panel .density-label{
+      margin-top:10px;font-size:12px;text-transform:uppercase;
+      letter-spacing:1.5px;color:var(--muted);font-weight:700;
+    }
+    .signal-close{
+      font-family:'Bebas Neue',sans-serif;font-size:22px;
+      letter-spacing:2px;color:#000;line-height:1.2;
+      max-width:780px;
+    }
+    .signal-close .accent{color:var(--accent)}
+
     /* ========== For / Not For ========== */
     .filter-section{padding:110px 0;background:var(--bg-alt)}
     .filter-grid{
@@ -626,6 +685,8 @@
       .proof-grid{grid-template-columns:1fr;gap:16px}
       .process-grid{grid-template-columns:1fr;gap:14px}
       .step-card{padding:24px 22px}
+      .signal-diagram{grid-template-columns:1fr;gap:14px}
+      .signal-panel .density{height:110px;grid-template-columns:repeat(10,1fr)}
       .about-card{padding:28px 22px}
       .about-stats{grid-template-columns:1fr}
       footer .top{grid-template-columns:1fr;gap:32px;padding-bottom:32px}
@@ -839,6 +900,56 @@
         <div class="visual"><img src="/images/community/conference.jpg" alt="MatCap Community Conference venue" loading="lazy"></div>
       </li>
     </ul>
+  </div>
+</section>
+
+<!-- ============ SIGNAL / WHY THE FILTER ============ -->
+<section class="signal-section">
+  <div class="inner">
+    <div class="kicker reveal">WHY THE FILTER</div>
+    <h2 class="reveal">Outside a Tier&nbsp;1 hub, the signal around you is lower. We <span class="accent">raise it</span> by raising the bar on who gets in.</h2>
+    <p class="reveal">In SF or New York, signal density is automatic. The founder next to you at the coffee shop is also building a venture-scale company. Benchmarks are visible. Standards are obvious because they're everywhere.</p>
+    <p class="reveal">Outside those hubs, you have to work to find your peers — and to know whether what you're building actually clears the bar. We solve that by being aggressive about who gets in. <strong>Every person in the room earns their seat.</strong></p>
+
+    <div class="signal-diagram reveal" aria-label="Signal density comparison">
+      <div class="signal-panel">
+        <div class="panel-label">DEFAULT</div>
+        <div class="panel-title">TIER&nbsp;1 HUB</div>
+        <div class="density">
+          <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i>
+          <i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i>
+          <i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i>
+          <i class="on"></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i>
+        </div>
+        <div class="density-label">Signal: high · ambient</div>
+      </div>
+
+      <div class="signal-panel">
+        <div class="panel-label">DEFAULT</div>
+        <div class="panel-title">YOUR CITY</div>
+        <div class="density">
+          <i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i>
+          <i></i><i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i>
+          <i></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i class="on"></i>
+          <i></i><i></i><i></i><i class="on"></i><i></i><i></i><i></i><i></i>
+        </div>
+        <div class="density-label">Signal: low · diffuse</div>
+      </div>
+
+      <div class="signal-panel active">
+        <div class="panel-label">CURATED</div>
+        <div class="panel-title">MATCAP ROOM</div>
+        <div class="density">
+          <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+          <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i>
+        </div>
+        <div class="density-label">Signal: high · earned</div>
+      </div>
+    </div>
+
+    <p class="signal-close reveal">When everyone in the room is swinging big, the bar moves up. <span class="accent">That's the whole game.</span></p>
   </div>
 </section>
 

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Intro Metrics — MatCap</title>
+  <meta name="description" content="MatCap by the numbers — 373 investors, 51 founders, 1,010 intros, 184 unique firms in the last 6 months, 25% accept rate.">
+  <meta property="og:title" content="MatCap Intro Metrics">
+  <meta property="og:description" content="The intro engine, in numbers.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root{--bg:#FFFFFF;--bg-alt:#F5F5F5;--bg-alt2:#FAFAFA;--text:#000;--muted:#555;--accent:#00C2E0;--accent-dim:rgba(0,194,224,.12);--rule:#e5e5e5}
+    *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+    a{color:inherit}
+
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#000;color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid #333;padding-left:14px}
+    nav.topnav .links{display:flex;gap:28px;align-items:center}
+    nav.topnav .links a{color:#fff;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{background:var(--accent);color:#000;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:#fff;color:#000}
+
+    .inner{max-width:1100px;margin:0 auto;padding:0 24px}
+    .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
+    .reveal.in{opacity:1;transform:translateY(0)}
+    .kicker{font-family:'Bebas Neue',sans-serif;letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px}
+
+    .hero{padding:140px 0 60px;border-bottom:1px solid var(--rule)}
+    .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(56px,9vw,128px);line-height:.95;letter-spacing:2px;margin-bottom:22px}
+    .hero h1 .accent{color:var(--accent)}
+    .hero p{font-size:clamp(17px,1.6vw,21px);max-width:760px;color:#222}
+    .hero .updated{
+      display:inline-block;margin-top:18px;
+      font-size:12px;text-transform:uppercase;letter-spacing:1.5px;
+      color:var(--muted);font-weight:700;border:1px solid var(--rule);padding:6px 12px;
+    }
+    .hero .updated .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:middle;box-shadow:0 0 6px var(--accent)}
+
+    /* Big stat grid */
+    .stats-section{padding:80px 0 60px;background:#000;color:#fff}
+    .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:#222;border:1px solid #222}
+    .stat{background:#000;padding:34px 22px;text-align:center}
+    .stat .v{font-family:'Bebas Neue',sans-serif;font-size:clamp(48px,5vw,72px);line-height:1;letter-spacing:1px;color:var(--accent);margin-bottom:10px}
+    .stat .l{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#aaa;font-weight:700;line-height:1.3}
+    .stat .l strong{color:#fff;display:block;font-size:13px;letter-spacing:2px;margin-bottom:4px}
+
+    /* Status breakdown bar */
+    .breakdown{padding:90px 0;background:var(--bg-alt2)}
+    .breakdown .inner{max-width:960px}
+    .breakdown h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,4.5vw,52px);letter-spacing:2px;line-height:1;margin-bottom:14px}
+    .breakdown h2 .accent{color:var(--accent)}
+    .breakdown p.sub{color:var(--muted);font-size:16px;margin-bottom:32px;max-width:680px}
+    .bar{display:flex;width:100%;height:54px;border:2px solid #000;background:#000;overflow:hidden;margin-bottom:18px}
+    .bar .seg{display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1px;color:#000;transition:flex 0.3s}
+    .bar .seg.accept{background:var(--accent)}
+    .bar .seg.passed{background:#999;color:#000}
+    .bar .seg.ignored{background:#444;color:#bbb}
+    .bar .seg.pending{background:#222;color:#666}
+    .bar-legend{display:flex;flex-wrap:wrap;gap:24px;margin-top:18px;font-size:13px}
+    .bar-legend .item{display:flex;align-items:center;gap:8px}
+    .bar-legend .swatch{width:14px;height:14px}
+    .bar-legend .swatch.accept{background:var(--accent)}
+    .bar-legend .swatch.passed{background:#999}
+    .bar-legend .swatch.ignored{background:#444}
+    .bar-legend .swatch.pending{background:#222;border:1px solid #444}
+    .bar-legend .item strong{font-weight:700}
+    .bar-legend .item .pct{color:var(--muted);margin-left:4px}
+
+    /* Detail rows */
+    .detail{padding:90px 0;background:#fff;border-top:1px solid var(--rule)}
+    .detail .inner{max-width:960px}
+    .detail h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4vw,48px);letter-spacing:2px;line-height:1;margin-bottom:32px}
+    .detail h2 .accent{color:var(--accent)}
+    .detail-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+    .detail-card{border:1px solid var(--rule);padding:28px 26px;background:#fff}
+    .detail-card .num{font-family:'Bebas Neue',sans-serif;font-size:42px;color:var(--accent);letter-spacing:1px;line-height:1;margin-bottom:8px}
+    .detail-card .title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;margin-bottom:10px;color:#000}
+    .detail-card .desc{font-size:14px;color:#444;line-height:1.55}
+
+    /* Method */
+    .method{padding:80px 0;background:var(--bg-alt);border-top:1px solid var(--rule)}
+    .method .inner{max-width:880px}
+    .method h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,3.5vw,40px);letter-spacing:2px;line-height:1;margin-bottom:24px}
+    .method ul{list-style:none}
+    .method ul li{padding:12px 0 12px 24px;border-bottom:1px solid var(--rule);font-size:15px;color:#222;position:relative;line-height:1.6}
+    .method ul li::before{content:"·";color:var(--accent);font-weight:800;position:absolute;left:0;top:8px;font-size:24px;line-height:1}
+    .method ul li strong{font-weight:700;color:#000}
+
+    /* CTA */
+    .cta-band{padding:100px 0;background:#000;color:#fff;text-align:center}
+    .cta-band h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,5vw,56px);letter-spacing:2px;line-height:1;margin-bottom:20px}
+    .cta-band h2 .accent{color:var(--accent)}
+    .cta-band p{color:#bbb;margin-bottom:32px;font-size:17px}
+    .cta-btn{display:inline-block;background:var(--accent);color:#000;padding:18px 44px;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:2px;text-decoration:none;border:2px solid var(--accent);transition:all .2s;margin:0 6px}
+    .cta-btn:hover{background:transparent;color:var(--accent)}
+    .cta-btn.ghost{background:transparent;color:#fff;border-color:#fff}
+    .cta-btn.ghost:hover{background:#fff;color:#000}
+
+    footer{padding:40px 24px;background:#000;color:#666;text-align:center;font-size:13px;border-top:1px solid #222}
+    footer a{color:var(--accent);text-decoration:none}
+
+    @media (max-width:820px){
+      nav.topnav{padding:8px 14px}nav.topnav .tag{display:none}nav.topnav .links{gap:14px}nav.topnav .links a{font-size:11px;letter-spacing:1px}nav.topnav .links a.btn{padding:8px 12px}
+      .hero{padding:110px 0 50px}
+      .stats-grid{grid-template-columns:repeat(2,1fr)}
+      .stat{padding:26px 16px}
+      .detail-grid{grid-template-columns:1fr}
+      .bar .seg{font-size:11px}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="https://matcap.vc"><img src="/downloads/matcap-logo.png" alt="MatCap"><span class="tag">INTRO METRICS</span></a>
+  <div class="links">
+    <a href="/community">Community</a>
+    <a href="/case-studies">Case Studies</a>
+    <a class="btn" href="/community#apply">Apply</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="inner">
+    <div class="kicker reveal">INTRO METRICS</div>
+    <h1 class="reveal">The intro engine, <span class="accent">by the numbers.</span></h1>
+    <p class="reveal">Every founder MatCap works with goes through the same playbook: craft the blurb, hit the network, double opt-in intros, coach through the raise. Here's what that looks like at scale.</p>
+    <div class="updated reveal"><span class="dot"></span>Updated April 2026 · From the MatCap intro database</div>
+  </div>
+</section>
+
+<section class="stats-section">
+  <div class="inner">
+    <div class="stats-grid reveal">
+      <div class="stat">
+        <div class="v">373</div>
+        <div class="l"><strong>INVESTORS</strong>in the network</div>
+      </div>
+      <div class="stat">
+        <div class="v">51</div>
+        <div class="l"><strong>FOUNDERS</strong>worked with</div>
+      </div>
+      <div class="stat">
+        <div class="v">1,010</div>
+        <div class="l"><strong>INTROS</strong>made all-time</div>
+      </div>
+      <div class="stat">
+        <div class="v">184</div>
+        <div class="l"><strong>UNIQUE FIRMS</strong>took an intro · last 6mo</div>
+      </div>
+      <div class="stat">
+        <div class="v">25%</div>
+        <div class="l"><strong>ACCEPT RATE</strong>investors who say yes</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="breakdown">
+  <div class="inner">
+    <div class="kicker reveal">RESPONSE BREAKDOWN</div>
+    <h2 class="reveal">What happens when MatCap sends an <span class="accent">intro request.</span></h2>
+    <p class="sub reveal">Of the 1,010 intro requests sent across the MatCap platform, here's how investors actually responded. Accept rate is the share who said yes — full meeting, follow-up questions, circle-back, or invested.</p>
+
+    <div class="bar reveal" aria-label="Investor response breakdown">
+      <div class="seg accept" style="flex:249">YES · 25%</div>
+      <div class="seg passed" style="flex:387">PASSED · 38%</div>
+      <div class="seg ignored" style="flex:329">IGNORED · 33%</div>
+      <div class="seg pending" style="flex:45">PENDING · 4%</div>
+    </div>
+    <div class="bar-legend reveal">
+      <div class="item"><span class="swatch accept"></span><strong>Yes — opted in</strong><span class="pct">249 intros · 25%</span></div>
+      <div class="item"><span class="swatch passed"></span><strong>Passed</strong><span class="pct">387 intros · 38%</span></div>
+      <div class="item"><span class="swatch ignored"></span><strong>Ignored</strong><span class="pct">329 intros · 33%</span></div>
+      <div class="item"><span class="swatch pending"></span><strong>Pending</strong><span class="pct">45 intros · 4%</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="detail">
+  <div class="inner">
+    <div class="kicker reveal">DEEPER DETAIL</div>
+    <h2 class="reveal">The <span class="accent">"yes"</span> column, broken out.</h2>
+    <div class="detail-grid">
+      <div class="detail-card reveal">
+        <div class="num">203</div>
+        <div class="title">INTRODUCED</div>
+        <div class="desc">Investor opted in. Founder + investor connected. The first meeting got booked.</div>
+      </div>
+      <div class="detail-card reveal">
+        <div class="num">17</div>
+        <div class="title">FIRST MEETING COMPLETE</div>
+        <div class="desc">Initial conversation happened. Both sides have real signal on each other.</div>
+      </div>
+      <div class="detail-card reveal">
+        <div class="num">10</div>
+        <div class="title">FOLLOW-UP QUESTIONS</div>
+        <div class="desc">Investor came back with diligence questions — active interest, multi-touch.</div>
+      </div>
+      <div class="detail-card reveal">
+        <div class="num">11</div>
+        <div class="title">CIRCLE BACK NEXT ROUND</div>
+        <div class="desc">Not the right round, but the investor is tracking for next time.</div>
+      </div>
+      <div class="detail-card reveal">
+        <div class="num">8</div>
+        <div class="title">INVESTED</div>
+        <div class="desc">A check landed. The full arc — intro to wire — closed through MatCap.</div>
+      </div>
+      <div class="detail-card reveal">
+        <div class="num">$5M+</div>
+        <div class="title">ATTRIBUTABLE RAISES</div>
+        <div class="desc">Documented dollars raised across published case studies. Real number is higher.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="method">
+  <div class="inner">
+    <div class="kicker reveal">METHODOLOGY</div>
+    <h2 class="reveal">How we count.</h2>
+    <ul>
+      <li><strong>Intros made</strong> — every intro request submitted through the MatCap platform, all-time. Includes the prior Seedscout era.</li>
+      <li><strong>Accept rate</strong> — share of intros where the investor opted in (introduced, first meeting, follow-up, circle-back, or invested), divided by all responded intros (excludes pending).</li>
+      <li><strong>Unique firms</strong> — distinct investor firms that took at least one intro in the trailing 6 months.</li>
+      <li><strong>Investors in network</strong> — investor records currently in the MatCap database. Active and inactive combined.</li>
+      <li><strong>Founders worked with</strong> — distinct founders who have used the MatCap intro process.</li>
+      <li><strong>Privacy</strong> — no individual founder, company, or investor performance is published. All numbers are aggregate.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="cta-band">
+  <div class="inner">
+    <h2>Want intros from this engine?</h2>
+    <p>Apply to MatCap Community · Access tier includes the full intro playbook.</p>
+    <a class="cta-btn" href="/community#apply">Apply →</a>
+    <a class="cta-btn ghost" href="/case-studies">See case studies</a>
+  </div>
+</section>
+
+<footer>
+  <div>MatCap · <a href="https://matcap.vc">matcap.vc</a> · Numbers updated April 2026 from the MatCap intro database.</div>
+</footer>
+
+<script>
+var io = new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting) e.target.classList.add('in')})},{threshold:.1});
+document.querySelectorAll('.reveal').forEach(function(el){io.observe(el)});
+</script>
+</body>
+</html>

@@ -541,6 +541,36 @@
     }
     .form-error.show{display:block}
 
+    /* ========== Metrics strip ========== */
+    .metrics-strip{padding:60px 0;background:#000;color:#fff;border-top:2px solid var(--accent)}
+    .metrics-strip .inner{max-width:1100px}
+    .metrics-strip .row{
+      display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#222;
+      border:1px solid #222;
+    }
+    .metrics-strip .stat{background:#000;padding:24px 18px;text-align:center}
+    .metrics-strip .stat .v{
+      font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,4.5vw,56px);
+      line-height:1;letter-spacing:1px;color:var(--accent);margin-bottom:8px;
+    }
+    .metrics-strip .stat .l{
+      font-size:11px;text-transform:uppercase;letter-spacing:1.5px;
+      color:#aaa;font-weight:700;line-height:1.3;
+    }
+    .metrics-strip .strip-foot{
+      text-align:center;margin-top:22px;
+    }
+    .metrics-strip .strip-foot a{
+      color:var(--accent);font-weight:700;text-decoration:none;
+      border-bottom:1px solid var(--accent);padding-bottom:2px;
+      font-size:14px;letter-spacing:.5px;
+    }
+    .metrics-strip .strip-label{
+      text-align:center;margin-bottom:18px;
+      font-family:'Bebas Neue',sans-serif;letter-spacing:4px;
+      font-size:12px;color:var(--accent);
+    }
+
     /* ========== Proof (case studies strip) ========== */
     .proof-section{padding:110px 0;background:#fff;border-top:1px solid var(--rule)}
     .proof-section .inner{max-width:1100px}
@@ -687,6 +717,8 @@
       .step-card{padding:24px 22px}
       .signal-diagram{grid-template-columns:1fr;gap:14px}
       .signal-panel .density{height:110px;grid-template-columns:repeat(10,1fr)}
+      .metrics-strip .row{grid-template-columns:repeat(2,1fr)}
+      .metrics-strip .stat{padding:18px 12px}
       .about-card{padding:28px 22px}
       .about-stats{grid-template-columns:1fr}
       footer .top{grid-template-columns:1fr;gap:32px;padding-bottom:32px}
@@ -703,6 +735,7 @@
   </a>
   <div class="links">
     <a href="/case-studies">Case Studies</a>
+    <a href="/intros">Intro Metrics</a>
     <a href="/project2045">Project 2045</a>
     <a class="btn" href="#apply">Apply</a>
   </div>
@@ -727,6 +760,22 @@
     <p class="reveal"><span class="hl">MatCap Community is neither.</span></p>
     <p class="reveal">It's a tight room of swing-big founders sharing what's actually working, week by week. The cadence is the product. The peer group is the moat. The equity model means the people in the room are aligned with each other for the long arc — not the next quarter.</p>
     <p class="reveal">If you're building a venture-scale company and you want a real peer group instead of a feed — this is the room.</p>
+  </div>
+</section>
+
+<!-- ============ METRICS STRIP ============ -->
+<section class="metrics-strip">
+  <div class="inner">
+    <div class="strip-label reveal">THE INTRO ENGINE · BY THE NUMBERS</div>
+    <div class="row reveal">
+      <div class="stat"><div class="v">373</div><div class="l">Investors in network</div></div>
+      <div class="stat"><div class="v">1,010</div><div class="l">Intros made all-time</div></div>
+      <div class="stat"><div class="v">184</div><div class="l">Unique firms · last 6mo</div></div>
+      <div class="stat"><div class="v">25%</div><div class="l">Investor accept rate</div></div>
+    </div>
+    <div class="strip-foot reveal">
+      <a href="/intros">See full intro metrics →</a>
+    </div>
   </div>
 </section>
 
@@ -1133,6 +1182,7 @@
       <div class="col">
         <h4>EVIDENCE</h4>
         <a href="/case-studies">Case studies</a>
+        <a href="/intros">Intro metrics</a>
         <a href="/project2045">Project 2045</a>
         <a href="/angel-club">Angel Club</a>
       </div>

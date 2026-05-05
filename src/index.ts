@@ -25,6 +25,8 @@ import weeklyDigestRoutes from './api/weekly-digest.js';
 import publicAuthRoutes from './api/public-auth.js';
 import publicProfileRoutes from './api/public-profile.js';
 import publicCompaniesRoutes from './api/public-companies.js';
+import publicIntrosRoutes from './api/public-intros.js';
+import publicPortfolioRoutes from './api/public-portfolio.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
 import marketplaceHealthRoutes from './api/marketplace-health.js';
@@ -53,6 +55,8 @@ app.route('/api/portal', founderPortalRoutes);
 app.route('/api/public', publicAuthRoutes);
 app.route('/api/public', publicProfileRoutes);
 app.route('/api/public/companies', publicCompaniesRoutes);
+app.route('/api/public/intros', publicIntrosRoutes);
+app.route('/api/public/portfolio', publicPortfolioRoutes);
 // Onboarding chat is public (founder intake interview)
 // Admin endpoints (/leads, /leads/:id/convert) are protected below
 app.route('/api/onboarding-chat', onboardingChatRoutes);
@@ -412,8 +416,8 @@ app.get('/trial', serveStatic({ path: './public/trial.html' }));
 
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
-app.get('/founders', serveStatic({ path: './public/founders.html' }));
-app.get('/investors', serveStatic({ path: './public/investors.html' }));
+app.get('/founders', (c) => c.redirect('/signup', 302));
+app.get('/investors', (c) => c.redirect('/angel-club', 302));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
 app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
 app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));

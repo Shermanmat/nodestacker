@@ -7,720 +7,143 @@
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
   <title>Angel Club — MatCap</title>
-  <meta name="description" content="Learn how to invest in pre-seed startups with as little as $1K per investment.">
+  <meta name="description" content="Learn how to invest in pre-seed startups with as little as $5K per investment.">
   <meta property="og:title" content="MatCap Angel Club">
-  <meta property="og:description" content="Learn how to invest in pre-seed startups with as little as $1K per investment.">
+  <meta property="og:description" content="Learn how to invest in pre-seed startups with as little as $5K per investment.">
   <meta property="og:image" content="https://matcap.vc/downloads/astro.png">
   <meta property="og:url" content="https://matcap.vc/angel-club">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="MatCap Angel Club">
-  <meta name="twitter:description" content="Learn how to invest in pre-seed startups with as little as $1K per investment.">
+  <meta name="twitter:description" content="Learn how to invest in pre-seed startups with as little as $5K per investment.">
   <meta name="twitter:image" content="https://matcap.vc/downloads/astro.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-
-    :root {
-      --bg: #ffffff;
-      --bg-card: #f8fafc;
-      --bg-card-hover: #f1f5f9;
-      --border: #e2e8f0;
-      --border-glow: #2563eb;
-      --text: #1e293b;
-      --text-dim: #64748b;
-      --text-muted: #94a3b8;
-      --accent: #1e293b;
-      --accent-light: #3b82f6;
-      --indigo: #4f46e5;
-      --teal: #0d9488;
-      --purple: #7c3aed;
-      --heading: 'Inter', system-ui, -apple-system, sans-serif;
-      --body: 'Inter', system-ui, -apple-system, sans-serif;
-      --mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-    }
-
-    html { scroll-behavior: smooth; }
-
-    body {
-      font-family: var(--body);
-      background: var(--bg);
-      color: var(--text);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      overflow-x: hidden;
-    }
-
-    /* Noise texture overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      z-index: 9999;
-      pointer-events: none;
-      opacity: 0.018;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-      background-repeat: repeat;
-      background-size: 256px 256px;
-    }
-
-    /* Ambient glow blobs */
-    .glow-blob {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(140px);
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.5;
-    }
-
-    /* Fade-up animation */
-    .fade-up {
-      opacity: 0;
-      transform: translateY(32px);
-      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
-                  transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
-    }
-    .fade-up.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* Stagger children */
-    .fade-up-stagger > .fade-up:nth-child(1) { transition-delay: 0s; }
-    .fade-up-stagger > .fade-up:nth-child(2) { transition-delay: 0.1s; }
-    .fade-up-stagger > .fade-up:nth-child(3) { transition-delay: 0.2s; }
-    .fade-up-stagger > .fade-up:nth-child(4) { transition-delay: 0.3s; }
-    .fade-up-stagger > .fade-up:nth-child(5) { transition-delay: 0.4s; }
-    .fade-up-stagger > .fade-up:nth-child(6) { transition-delay: 0.5s; }
-
-    h1, h2, h3 { font-family: var(--heading); font-weight: 800; }
-
-    .label {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #2563eb;
-    }
-
-    a { color: inherit; text-decoration: none; }
-
-    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-
-    /* Nav */
-    nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 100;
-      background: rgba(255, 255, 255, 0.8);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border-bottom: 1px solid var(--border);
-    }
-    nav .inner {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 16px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    nav .logo-area { display: flex; align-items: center; gap: 12px; }
-    nav .logo-area img { height: 36px; width: auto; }
-    nav .badge {
-      font-family: var(--mono);
-      font-size: 0.65rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #2563eb;
-      background: rgba(37, 99, 235, 0.08);
-      border: 1px solid rgba(37, 99, 235, 0.2);
-      padding: 4px 10px;
-      border-radius: 999px;
-    }
-    .btn-primary {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--body);
-      font-size: 0.875rem;
-      font-weight: 600;
-      color: #fff;
-      background: #1e293b;
-      border: none;
-      border-radius: 8px;
-      padding: 10px 24px;
-      cursor: pointer;
-      transition: background 0.2s, box-shadow 0.2s;
-    }
-    .btn-primary:hover {
-      background: #334155;
-    }
-
-    /* Hero */
-    .hero {
-      position: relative;
-      padding: 180px 0 120px;
-      text-align: center;
-      overflow: hidden;
-    }
-    .hero h1 {
-      font-size: clamp(2.5rem, 5.5vw, 4rem);
-      line-height: 1.1;
-      letter-spacing: -0.025em;
-      color: #0f172a;
-      max-width: 800px;
-      margin: 0 auto;
-    }
-    .pills {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 12px;
-      margin-top: 40px;
-    }
-    .pill {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      letter-spacing: 0.06em;
-      color: #334155;
-      background: rgba(37, 99, 235, 0.06);
-      border: 1px solid rgba(37, 99, 235, 0.15);
-      padding: 10px 20px;
-      border-radius: 999px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.3s, background 0.3s;
-    }
-    .pill:hover {
-      border-color: rgba(37, 99, 235, 0.35);
-      background: rgba(37, 99, 235, 0.1);
-    }
-
-    /* Section spacing */
-    section { position: relative; padding: 120px 0; }
-    section + section { border-top: 1px solid var(--border); }
-
-    .section-label { margin-bottom: 16px; }
-    .section-heading {
-      font-size: clamp(1.8rem, 4vw, 3rem);
-      letter-spacing: -0.025em;
-      color: #0f172a;
-      margin-bottom: 20px;
-    }
-    .section-sub {
-      font-size: 1.1rem;
-      line-height: 1.7;
-      color: var(--text-dim);
-      max-width: 640px;
-    }
-    .section-sub.center { margin-left: auto; margin-right: auto; }
-
-    /* Stat cards */
-    .stat-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 24px;
-      margin-top: 56px;
-    }
-    .stat-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 40px 32px;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-    .stat-card:hover {
-      border-color: rgba(37, 99, 235, 0.25);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-    }
-    .stat-card .stat-value {
-      font-family: var(--heading);
-      font-size: 3.5rem;
-      font-weight: 800;
-      color: #0f172a;
-      line-height: 1;
-    }
-    .stat-card .stat-label {
-      font-family: var(--mono);
-      font-size: 0.75rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      margin-top: 12px;
-    }
-    .stat-card .stat-desc {
-      color: var(--text-dim);
-      font-size: 0.95rem;
-      margin-top: 16px;
-      line-height: 1.6;
-    }
-
-    /* Portfolio section */
-    .portfolio-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 24px;
-      margin-top: 48px;
-    }
-    @media (max-width: 640px) {
-      .portfolio-grid { grid-template-columns: 1fr; }
-    }
-    .portfolio-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 32px 24px 28px;
-      text-align: center;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-    .portfolio-card:hover {
-      border-color: rgba(13, 148, 136, 0.35);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-    }
-    .portfolio-card .company-name {
-      font-family: var(--body);
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: #0f172a;
-    }
-    .portfolio-card .company-desc {
-      font-size: 0.85rem;
-      color: var(--text-muted);
-      margin-top: 8px;
-    }
-    .portfolio-card.placeholder {
-      border-style: dashed;
-      opacity: 0.5;
-    }
-    .portfolio-card.placeholder .company-name { color: var(--text-muted); }
-
-    /* Co-investor logos */
-    .coinvestor-logos {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-      margin-top: 14px;
-    }
-    .coinvestor-logo {
-      width: 28px;
-      height: 28px;
-      border-radius: 6px;
-      object-fit: contain;
-      background: #fff;
-      border: 1px solid var(--border);
-      padding: 3px;
-    }
-    .coinvestor-name {
-      font-size: 0.7rem;
-      color: var(--text-muted);
-      letter-spacing: 0.02em;
-    }
-    .coinvestor-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #fff;
-      border: 1px solid var(--border);
-      border-radius: 999px;
-      padding: 4px 10px 4px 4px;
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      transition: border-color 0.2s;
-    }
-    .coinvestor-pill:hover {
-      border-color: rgba(13, 148, 136, 0.3);
-    }
-    .coinvestor-pill img {
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      object-fit: contain;
-      background: #fff;
-    }
-
-    /* Logo cloud banner */
-    .logo-cloud {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
-      gap: 32px;
-      margin-top: 48px;
-      padding: 32px 0;
-    }
-    .logo-cloud img {
-      height: 28px;
-      width: auto;
-      opacity: 0.45;
-      filter: grayscale(100%);
-      transition: opacity 0.3s, filter 0.3s;
-    }
-    .logo-cloud img:hover {
-      opacity: 0.9;
-      filter: grayscale(0%);
-    }
-
-    /* Benefits */
-    .benefits-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
-      margin-top: 56px;
-    }
-    .benefit-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 32px;
-      transition: border-color 0.3s, box-shadow 0.3s;
-    }
-    .benefit-card:hover {
-      border-color: rgba(79, 70, 229, 0.25);
-      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-    }
-    .benefit-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 20px;
-    }
-    .benefit-icon svg { width: 22px; height: 22px; }
-    .benefit-card h3 {
-      font-size: 1.25rem;
-      color: #0f172a;
-      margin-bottom: 10px;
-    }
-    .benefit-card p {
-      font-size: 0.95rem;
-      line-height: 1.65;
-      color: var(--text-dim);
-    }
-
-    /* Steps */
-    .steps {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 32px;
-      margin-top: 56px;
-      counter-reset: step;
-    }
-    .step {
-      position: relative;
-      padding: 32px 24px;
-      counter-increment: step;
-    }
-    .step::before {
-      content: counter(step);
-      font-family: var(--heading);
-      font-size: 3.5rem;
-      font-weight: 800;
-      color: rgba(37, 99, 235, 0.15);
-      line-height: 1;
-      display: block;
-      margin-bottom: 16px;
-    }
-    .step h3 {
-      font-size: 1.2rem;
-      color: #0f172a;
-      margin-bottom: 10px;
-    }
-    .step p {
-      font-size: 0.9rem;
-      line-height: 1.65;
-      color: var(--text-dim);
-    }
-
-    /* Comparison table */
-    .comparison-wrap {
-      margin-top: 56px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .comparison-table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 600px;
-    }
-    .comparison-table th,
-    .comparison-table td {
-      padding: 16px 20px;
-      text-align: left;
-      border-bottom: 1px solid var(--border);
-    }
-    .comparison-table thead th {
-      font-family: var(--mono);
-      font-size: 0.7rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      font-weight: 500;
-    }
-    .comparison-table thead th:nth-child(2) {
-      color: #2563eb;
-    }
-    .comparison-table tbody td {
-      font-size: 0.95rem;
-      color: var(--text-dim);
-    }
-    .comparison-table tbody td:first-child {
-      font-family: var(--mono);
-      font-size: 0.8rem;
-      color: var(--text-muted);
-      letter-spacing: 0.04em;
-    }
-    .comparison-table tbody td:nth-child(2) {
-      color: #0f172a;
-      font-weight: 500;
-    }
-    .check { color: var(--teal); }
-    .cross { color: #ef4444; opacity: 0.5; }
-
-    /* CTA band */
-    .cta-band {
-      text-align: center;
-      background: #0f172a;
-      padding: 120px 0;
-      position: relative;
-      overflow: hidden;
-    }
-    .cta-band h2 {
-      font-size: clamp(2rem, 4.5vw, 3.2rem);
-      color: #fff;
-      margin-bottom: 20px;
-    }
-    .cta-band p {
-      font-size: 1.1rem;
-      color: #94a3b8;
-      max-width: 520px;
-      margin: 0 auto 40px;
-      line-height: 1.7;
-    }
-    .btn-large {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--body);
-      font-size: 1rem;
-      font-weight: 600;
-      color: #0f172a;
-      background: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 16px 40px;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.2s;
-    }
-    .btn-large:hover {
-      background: #f1f5f9;
-      transform: translateY(-1px);
-    }
-
-    /* Footer */
-    footer {
-      border-top: 1px solid var(--border);
-      padding: 40px 0;
-    }
-    footer .inner {
-      max-width: 1120px;
-      margin: 0 auto;
-      padding: 0 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 16px;
-    }
-    footer img { height: 24px; width: auto; }
-    footer .copy {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-    }
-
-    /* Apply form */
-    .apply-form {
-      max-width: 480px;
-      margin-left: auto;
-      margin-right: auto;
-      text-align: left;
-    }
-    .form-group {
-      margin-bottom: 20px;
-    }
-    .form-group label {
-      display: block;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: #cbd5e1;
-      margin-bottom: 6px;
-    }
-    .form-group input,
-    .form-group textarea {
-      width: 100%;
-      font-family: var(--body);
-      font-size: 0.95rem;
-      color: #fff;
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 8px;
-      padding: 12px 16px;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    .form-group input::placeholder,
-    .form-group textarea::placeholder {
-      color: rgba(255, 255, 255, 0.25);
-    }
-    .form-group input:focus,
-    .form-group textarea:focus {
-      outline: none;
-      border-color: rgba(59, 130, 246, 0.5);
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-    }
-    .form-group textarea {
-      resize: vertical;
-      min-height: 80px;
-    }
-
-    /* Stars background — hidden on light theme */
-    .stars {
-      display: none;
-    }
-
-    @media (max-width: 768px) {
-      .hero { padding: 140px 0 80px; }
-      section { padding: 80px 0; }
-      .stat-grid, .benefits-grid, .steps { gap: 16px; }
-      .stat-card { padding: 28px 20px; }
-      .stat-card .stat-value { font-size: 2.5rem; }
-      nav .badge { display: none; }
-      .pills { flex-direction: column; align-items: center; }
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/matcap.css">
 </head>
 <body>
 
-<!-- Stars canvas -->
-<canvas class="stars" id="stars-canvas"></canvas>
-
-<!-- Nav -->
-<nav>
-  <div class="inner">
-    <a href="/" class="logo-area">
-      <img src="/downloads/matcap-logo.png" alt="MatCap">
-      <span class="badge">Angel Club</span>
-    </a>
-    <a href="#apply" class="btn-primary">Apply Now</a>
+<nav class="topnav">
+  <a class="brand" href="/">
+    <img src="/downloads/matcap-logo.png" alt="MatCap">
+    <span class="tag">ANGEL CLUB</span>
+  </a>
+  <div class="links">
+    <a href="/">Home</a>
+    <a href="/project2045">Project 2045</a>
+    <a class="btn" href="#apply">Apply</a>
   </div>
 </nav>
 
 <!-- ============ HERO ============ -->
-<section class="hero">
-  <div class="glow-blob" style="width: 600px; height: 600px; background: rgba(37, 99, 235, 0.06); top: -200px; left: 50%; transform: translateX(-50%);"></div>
-  <div class="container">
-    <div class="fade-up">
-      <p class="label section-label">MatCap Angel Club</p>
+<section class="hero-centered has-bg" style="--hero-bg:url('/images/hero/angel-club-builder.webp');--hero-overlay-top:0.62;--hero-overlay-bot:0.85">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">MatCap Angel Club</span></div>
+    <h1 class="reveal">Invest in pre-seed startups for as little as <span class="accent">$5K</span> per deal.</h1>
+    <p class="lede reveal">No annual fee. No carry. No commitment to any deal. Just curated deal flow, founder access, and a network of investors who actually show up.</p>
+    <div class="cta-stack reveal">
+      <a href="#apply" class="btn-primary">Apply to Join</a>
     </div>
-    <h1 class="fade-up">Learn how to invest in pre-seed startups with as little as $1K per investment</h1>
-    <div class="pills fade-up">
+    <div class="pill-row reveal">
       <span class="pill">No Annual Fee</span>
-      <span class="pill">No Carry Fee</span>
-      <span class="pill">$1K+ Checks Welcome</span>
+      <span class="pill">No Carry</span>
+      <span class="pill">$5K+ Checks</span>
     </div>
   </div>
 </section>
 
 <!-- ============ THE DEAL ============ -->
-<section>
-  <div class="glow-blob" style="width: 500px; height: 500px; background: rgba(79, 70, 229, 0.06); top: 0; right: -200px;"></div>
-  <div class="container" style="text-align: center;">
-    <p class="label section-label fade-up">The Deal</p>
-    <h2 class="section-heading fade-up">Your money works harder here</h2>
-    <p class="section-sub center fade-up">No annual fee. No carry. Every dollar goes directly into equity. Invest as little as $1,000 per deal — we keep the barrier low so more people can participate.</p>
-    <div class="stat-grid fade-up-stagger">
-      <div class="stat-card fade-up">
-        <div class="stat-value">$0</div>
-        <div class="stat-label">Annual Fee</div>
-        <p class="stat-desc">No membership fee. Being part of the club costs nothing.</p>
+<section class="section-centered">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">The deal</span></div>
+    <h2 class="h-section reveal">Your money <span class="accent">works harder</span> here.</h2>
+    <p class="section-lede reveal">No annual fee. No carry. Every dollar goes directly into equity. Invest as little as $5,000 per deal — we keep the barrier low so more people can participate.</p>
+
+    <div class="card-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+        </div>
+        <h3>$0 Annual Fee</h3>
+        <p>No membership fee. Being part of the club costs nothing.</p>
       </div>
-      <div class="stat-card fade-up">
-        <div class="stat-value">0%</div>
-        <div class="stat-label">Carry</div>
-        <p class="stat-desc">We don't take a cut of your returns. Your upside is yours alone.</p>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <h3>0% Carry</h3>
+        <p>We don't take a cut of your returns. Your upside is yours alone.</p>
       </div>
-      <div class="stat-card fade-up">
-        <div class="stat-value">$1K+</div>
-        <div class="stat-label">Min Check Size</div>
-        <p class="stat-desc">Small checks are welcome. Invest $1,000 or more per deal — no pressure to write big checks.</p>
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <h3>$5K+ Min Check</h3>
+        <p>Small checks welcome. Invest $5,000 or more per deal — no pressure to write big checks.</p>
       </div>
     </div>
   </div>
 </section>
 
 <!-- ============ PORTFOLIO ACCESS ============ -->
-<section>
-  <div class="glow-blob" style="width: 400px; height: 400px; background: rgba(13, 148, 136, 0.06); bottom: -100px; left: -150px;"></div>
-  <div class="container" style="text-align: center;">
-    <p class="label section-label fade-up">Portfolio Access</p>
-    <h2 class="section-heading fade-up">Invest before or alongside top firms</h2>
-    <p class="section-sub center fade-up">As a MatCap Angel Club member, you invest in companies before or alongside these firms.</p>
+<section class="section-centered bg-alt">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">Portfolio access</span></div>
+    <h2 class="h-section reveal">Invest before or alongside <span class="accent">top firms.</span></h2>
+    <p class="section-lede reveal">As a MatCap Angel Club member, you invest in companies before or alongside these firms.</p>
 
-    <!-- Logo cloud of co-investor firms -->
-    <div class="logo-cloud fade-up">
+    <div class="logo-cloud reveal">
       <img src="https://www.google.com/s2/favicons?sz=128&domain=susaventures.com" alt="Susa Ventures" title="Susa Ventures">
-      <img src="https://www.google.com/s2/favicons?sz=128&domain=peakxv.com" alt="Peak XV" title="Peak XV (formerly Sequoia India & SEA)">
+      <img src="https://www.google.com/s2/favicons?sz=128&domain=peakxv.com" alt="Peak XV" title="Peak XV">
       <img src="https://www.google.com/s2/favicons?sz=128&domain=hustlefund.vc" alt="Hustle Fund" title="Hustle Fund">
       <img src="https://www.google.com/s2/favicons?sz=128&domain=outlander.vc" alt="Outlander Labs" title="Outlander Labs">
       <img src="https://www.google.com/s2/favicons?sz=128&domain=incisiveventures.com" alt="Incisive Ventures" title="Incisive Ventures">
       <img src="https://www.google.com/s2/favicons?sz=128&domain=sf1.vc" alt="SF1" title="SF1">
     </div>
 
-    <div class="portfolio-grid fade-up-stagger">
-      <div class="portfolio-card fade-up">
-        <div class="company-name">Supermemory</div>
-        <div class="company-desc">Raised $2M</div>
-        <div class="coinvestor-logos" style="margin-top: 14px;">
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=susaventures.com" alt="Susa"> Susa Ventures</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=browdercap.com" alt="Browder"> Browder Capital</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=sf1.vc" alt="SF1"> SF1</span>
+    <div class="portfolio-grid" style="grid-template-columns:repeat(2,1fr);max-width:880px">
+      <div class="portfolio-card reveal" style="cursor:default">
+        <div class="p-stat">$2M</div>
+        <div class="p-stat-sub">Round closed</div>
+        <div class="p-name">Supermemory</div>
+        <div class="coinv-row">
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=susaventures.com" alt="">Susa Ventures</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=browdercap.com" alt="">Browder Capital</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=sf1.vc" alt="">SF1</span>
         </div>
       </div>
-      <div class="portfolio-card fade-up">
-        <div class="company-name">GameStock</div>
-        <div class="company-desc">Raised $2M</div>
-        <div class="coinvestor-logos" style="margin-top: 14px;">
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=peakxv.com" alt="Peak XV"> Peak XV</span>
+
+      <div class="portfolio-card reveal" style="cursor:default">
+        <div class="p-stat">$2M</div>
+        <div class="p-stat-sub">Round closed</div>
+        <div class="p-name">GameStock</div>
+        <div class="coinv-row">
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=peakxv.com" alt="">Peak XV</span>
         </div>
       </div>
-      <div class="portfolio-card fade-up">
-        <div class="company-name">Stealth Company</div>
-        <div class="company-desc">Raised $650K</div>
-        <div class="coinvestor-logos" style="margin-top: 14px;">
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=hustlefund.vc" alt="Hustle Fund"> Hustle Fund</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=monsoon.vc" alt="Monsoon"> Monsoon Venture Fund</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=signalfire.com" alt="Josh Constine"> Josh Constine</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=copperskycapital.com" alt="Copper Sky"> Copper Sky Capital</span>
+
+      <div class="portfolio-card reveal" style="cursor:default">
+        <div class="p-stat">$650K</div>
+        <div class="p-stat-sub">Stealth · names withheld</div>
+        <div class="p-name">Stealth Company</div>
+        <div class="coinv-row">
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=hustlefund.vc" alt="">Hustle Fund</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=monsoon.vc" alt="">Monsoon</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=signalfire.com" alt="">Josh Constine</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=copperskycapital.com" alt="">Copper Sky</span>
         </div>
       </div>
-      <div class="portfolio-card fade-up">
-        <div class="company-name">Stealth Company</div>
-        <div class="company-desc">Raised $2M</div>
-        <div class="coinvestor-logos" style="margin-top: 14px;">
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=outlander.vc" alt="Outlander"> Outlander Labs</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=incisiveventures.com" alt="Incisive"> Incisive Ventures</span>
-          <span class="coinvestor-pill"><img src="https://www.google.com/s2/favicons?sz=128&domain=untapped.vc" alt="Untapped"> Untapped VC</span>
+
+      <div class="portfolio-card reveal" style="cursor:default">
+        <div class="p-stat">$1.5M</div>
+        <div class="p-stat-sub">Stealth · names withheld</div>
+        <div class="p-name">Stealth Company</div>
+        <div class="coinv-row">
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=outlander.vc" alt="">Outlander Labs</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=incisiveventures.com" alt="">Incisive Ventures</span>
+          <span class="coinv-pill"><img src="https://www.google.com/s2/favicons?sz=64&domain=untapped.vc" alt="">Untapped VC</span>
         </div>
       </div>
     </div>
@@ -728,32 +151,32 @@
 </section>
 
 <!-- ============ MEMBER BENEFITS ============ -->
-<section>
-  <div class="glow-blob" style="width: 500px; height: 500px; background: rgba(79, 70, 229, 0.05); top: 50%; right: -200px; transform: translateY(-50%);"></div>
-  <div class="container">
-    <div style="text-align: center;">
-      <p class="label section-label fade-up">Member Benefits</p>
-      <h2 class="section-heading fade-up">More than deal flow</h2>
-      <p class="section-sub center fade-up">The Angel Club is a community of investors with access to founders, events, and a network that compounds over time.</p>
-    </div>
-    <div class="benefits-grid fade-up-stagger">
-      <div class="benefit-card fade-up">
-        <div class="benefit-icon" style="background: rgba(37, 99, 235, 0.12);">
-          <svg fill="none" viewBox="0 0 24 24" stroke="#3b82f6" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/></svg>
+<section class="section-centered">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">Member benefits</span></div>
+    <h2 class="h-section reveal">More than <span class="accent">deal flow.</span></h2>
+    <p class="section-lede reveal">The Angel Club is a community of investors with access to founders, events, and a network that compounds over time.</p>
+
+    <div class="card-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         </div>
         <h3>Quarterly Investor Events</h3>
         <p>IRL events in Arizona and virtual events open to all members. Dinners, demo days, and deep dives with founders.</p>
       </div>
-      <div class="benefit-card fade-up">
-        <div class="benefit-icon" style="background: rgba(13, 148, 136, 0.12);">
-          <svg fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
         <h3>Direct Founder Access</h3>
         <p>Talk to founders directly before and after you invest. No gatekeepers, no intermediaries — real relationships.</p>
       </div>
-      <div class="benefit-card fade-up">
-        <div class="benefit-icon" style="background: rgba(124, 58, 237, 0.12);">
-          <svg fill="none" viewBox="0 0 24 24" stroke="#7c3aed" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
         </div>
         <h3>Speaker Nights</h3>
         <p>Hear from successful founders, top VCs, and industry leaders in intimate, members-only sessions.</p>
@@ -763,14 +186,14 @@
 </section>
 
 <!-- ============ COMPARISON ============ -->
-<section>
-  <div class="glow-blob" style="width: 500px; height: 500px; background: rgba(37, 99, 235, 0.05); bottom: -200px; left: 50%; transform: translateX(-50%);"></div>
-  <div class="container" style="text-align: center;">
-    <p class="label section-label fade-up">Compare</p>
-    <h2 class="section-heading fade-up">Built different</h2>
-    <p class="section-sub center fade-up">See how the MatCap Angel Club stacks up against angel groups and syndicates.</p>
-    <div class="comparison-wrap fade-up">
-      <table class="comparison-table">
+<section class="section-centered bg-alt">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">Compare</span></div>
+    <h2 class="h-section reveal">Built <span class="accent">different.</span></h2>
+    <p class="section-lede reveal">See how the MatCap Angel Club stacks up against angel groups and syndicates.</p>
+
+    <div class="compare-wrap reveal">
+      <table>
         <thead>
           <tr>
             <th>Feature</th>
@@ -782,45 +205,45 @@
         <tbody>
           <tr>
             <td>Annual Fee</td>
-            <td><span class="check">$0 — no fee</span></td>
-            <td>$1,000 &ndash; $5,000+</td>
-            <td><span class="check">$0</span></td>
+            <td><span class="yes">$0</span></td>
+            <td>$1K – $5K+</td>
+            <td>$0</td>
           </tr>
           <tr>
             <td>Carry</td>
-            <td><span class="check">0%</span></td>
-            <td>0 &ndash; 10%</td>
-            <td>20 &ndash; 30%</td>
+            <td><span class="yes">0%</span></td>
+            <td>0 – 10%</td>
+            <td>20 – 30%</td>
           </tr>
           <tr>
             <td>Min Check</td>
-            <td><span class="check">$1,000+</span></td>
-            <td>$5,000 &ndash; $25,000+</td>
-            <td>$1,000 &ndash; $5,000+</td>
+            <td><span class="yes">$5K+</span></td>
+            <td>$5K – $25K+</td>
+            <td>$1K – $5K+</td>
           </tr>
           <tr>
             <td>Full Equity</td>
-            <td><span class="check">&#10003; 100%</span></td>
-            <td><span class="cross">&#10007;</span> Fees reduce equity</td>
-            <td><span class="cross">&#10007;</span> Carry reduces upside</td>
+            <td><span class="yes">✓ 100%</span></td>
+            <td><span class="no">✗</span> Fees reduce equity</td>
+            <td><span class="no">✗</span> Carry reduces upside</td>
           </tr>
           <tr>
             <td>Deal Selection</td>
-            <td><span class="check">&#10003;</span> You choose every deal</td>
-            <td><span class="check">&#10003;</span> Varies</td>
-            <td><span class="check">&#10003;</span> You choose every deal</td>
+            <td><span class="yes">✓</span> You choose</td>
+            <td>Varies</td>
+            <td>You choose</td>
           </tr>
           <tr>
             <td>Quarterly Events</td>
-            <td><span class="check">&#10003;</span> IRL + Virtual</td>
-            <td><span class="check">&#10003;</span> Common</td>
-            <td><span class="cross">&#10007;</span> Rare or none</td>
+            <td><span class="yes">✓</span> IRL + Virtual</td>
+            <td>Common</td>
+            <td><span class="no">✗</span> Rare</td>
           </tr>
           <tr>
             <td>Network Access</td>
-            <td><span class="check">&#10003;</span> Full MatCap network</td>
+            <td><span class="yes">✓</span> Full MatCap network</td>
             <td>Local only</td>
-            <td><span class="cross">&#10007;</span> Limited</td>
+            <td><span class="no">✗</span> Limited</td>
           </tr>
         </tbody>
       </table>
@@ -829,194 +252,130 @@
 </section>
 
 <!-- ============ HOW IT WORKS ============ -->
-<section>
-  <div class="container" style="text-align: center;">
-    <p class="label section-label fade-up">How It Works</p>
-    <h2 class="section-heading fade-up">Four steps to your first investment</h2>
-    <div class="steps fade-up-stagger">
-      <div class="step fade-up">
+<section class="section-centered">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">How it works</span></div>
+    <h2 class="h-section reveal">Four steps to your <span class="accent">first investment.</span></h2>
+
+    <div class="steps-grid">
+      <div class="step-card reveal">
+        <div class="step-num">01</div>
         <h3>Apply</h3>
         <p>Submit a short application. We review every one personally and look for aligned, long-term investors.</p>
       </div>
-      <div class="step fade-up">
+      <div class="step-card reveal">
+        <div class="step-num">02</div>
         <h3>Get Deal Flow</h3>
         <p>Receive curated deals from the MatCap portfolio with full deal memos, founder intros, and terms.</p>
       </div>
-      <div class="step fade-up">
-        <h3>Choose Your Deals</h3>
-        <p>Invest in what excites you. Checks start at $1,000 — no pressure and no commitment to every round.</p>
+      <div class="step-card reveal">
+        <div class="step-num">03</div>
+        <h3>Choose Deals</h3>
+        <p>Invest in what excites you. Checks start at $5,000 — no pressure and no commitment to every round.</p>
       </div>
-      <div class="step fade-up">
-        <h3>Your Money Becomes Equity</h3>
+      <div class="step-card reveal">
+        <div class="step-num">04</div>
+        <h3>Money → Equity</h3>
         <p>100% of your investment converts to equity. No fees siphoned off. You own exactly what you paid for.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============ APPLY FORM ============ -->
-<section id="apply" class="cta-band">
-  <div class="glow-blob" style="width: 700px; height: 700px; background: rgba(37, 99, 235, 0.06); top: 50%; left: 50%; transform: translate(-50%, -50%);"></div>
-  <div class="container">
-    <h2 class="fade-up">Apply to the Angel Club</h2>
-    <p class="fade-up">Tell us a bit about yourself. We'll be in touch.</p>
+<!-- ============ APPLY ============ -->
+<section class="section-centered" id="apply" style="padding-top:40px">
+  <div class="cta-card reveal">
+    <h3>Apply to the <span class="accent">Angel Club.</span></h3>
+    <p>Tell us a bit about yourself. We review every application personally.</p>
 
-    <!-- Success state -->
-    <div id="apply-success" class="fade-up" style="display: none; margin-top: 40px;">
-      <div style="width: 56px; height: 56px; border-radius: 50%; background: rgba(13, 148, 136, 0.15); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px;">
-        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#0d9488" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-      </div>
-      <h3 style="font-size: 1.3rem; color: #fff; margin-bottom: 8px;">Application received</h3>
-      <p style="color: #94a3b8; font-size: 1rem;">We review every application personally. You'll hear from us soon.</p>
-    </div>
-
-    <!-- Form -->
-    <form id="apply-form" class="apply-form fade-up" style="margin-top: 40px;">
-      <div class="form-group">
+    <form id="apply-form" class="apply-form">
+      <div>
         <label for="apply-name">Name *</label>
         <input type="text" id="apply-name" name="name" required placeholder="Jane Smith">
       </div>
-      <div class="form-group">
+      <div>
         <label for="apply-email">Email *</label>
         <input type="email" id="apply-email" name="email" required placeholder="jane@example.com">
       </div>
-      <div class="form-group">
+      <div>
         <label for="apply-linkedin">LinkedIn *</label>
         <input type="url" id="apply-linkedin" name="linkedin" required placeholder="https://linkedin.com/in/janesmith">
       </div>
-      <div class="form-group">
-        <label for="apply-firm">Firm / Website <span style="color: #64748b; font-weight: 400;">(optional)</span></label>
+      <div>
+        <label for="apply-firm">Firm / Website (optional)</label>
         <input type="url" id="apply-firm" name="firm" placeholder="https://yourfirm.com">
       </div>
-      <div class="form-group">
-        <label for="apply-note">Note <span style="color: #64748b; font-weight: 400;">(optional)</span></label>
-        <textarea id="apply-note" name="note" rows="3" placeholder="Any extra context — investment interests, how you heard about us, etc."></textarea>
+      <div>
+        <label for="apply-note">Note (optional)</label>
+        <textarea id="apply-note" name="note" rows="3" placeholder="Investment interests, how you heard about us, etc."></textarea>
       </div>
-      <button type="submit" class="btn-large" style="width: 100%; margin-top: 8px;">Submit Application</button>
+      <button type="submit">Submit Application</button>
     </form>
+
+    <div class="apply-success" id="apply-success">
+      <div class="icon">
+        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      </div>
+      <h4>Application received</h4>
+      <p>We review every application personally. You'll hear from us soon.</p>
+    </div>
   </div>
 </section>
 
 <!-- ============ FOOTER ============ -->
-<footer>
+<footer class="site-footer" style="margin-top:80px">
   <div class="inner">
-    <a href="/">
-      <img src="/downloads/matcap-logo.png" alt="MatCap">
-    </a>
-    <span class="copy">&copy; 2026 MatCap. All rights reserved.</span>
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="/downloads/matcap-logo.png" alt="MatCap">
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/angel-club">Angel Club</a>
+        <a href="/project2045">Project 2045</a>
+        <a href="/signup">Apply (Founders)</a>
+      </div>
+    </div>
+    <div class="footer-foot">&copy; 2026 MatCap · Scottsdale, Arizona</div>
   </div>
 </footer>
 
-<!-- ============ SCRIPTS ============ -->
+<script src="/scripts/matcap.js"></script>
 <script>
 (function() {
-  'use strict';
-
-  // --- Stars background ---
-  const canvas = document.getElementById('stars-canvas');
-  const ctx = canvas.getContext('2d');
-  const dpr = window.devicePixelRatio || 1;
-  let W, H, stars = [];
-
-  function resizeCanvas() {
-    W = window.innerWidth;
-    H = window.innerHeight;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  }
-
-  function createStars() {
-    stars = [];
-    const count = Math.min(200, Math.floor((W * H) / 6000));
-    for (let i = 0; i < count; i++) {
-      stars.push({
-        x: Math.random() * W,
-        y: Math.random() * H,
-        r: Math.random() * 1.2 + 0.3,
-        alpha: Math.random() * 0.6 + 0.1,
-        speed: Math.random() * 0.0008 + 0.0003,
-        phase: Math.random() * Math.PI * 2
-      });
-    }
-  }
-
-  function drawStars(t) {
-    ctx.clearRect(0, 0, W, H);
-    for (const s of stars) {
-      const a = s.alpha * (0.5 + 0.5 * Math.sin(t * s.speed * 1000 + s.phase));
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(203, 213, 225, ' + a + ')';
-      ctx.fill();
-    }
-    requestAnimationFrame(drawStars);
-  }
-
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    resizeCanvas();
-    createStars();
-    requestAnimationFrame(drawStars);
-    window.addEventListener('resize', function() {
-      resizeCanvas();
-      createStars();
-    });
-  }
-
-  // --- IntersectionObserver for fade-up ---
-  const observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-      }
-    });
-  }, {
-    threshold: 0.1,
-    rootMargin: '0px 0px -40px 0px'
-  });
-
-  document.querySelectorAll('.fade-up').forEach(function(el) {
-    observer.observe(el);
-  });
-
-  // --- Form submission ---
   var form = document.getElementById('apply-form');
-  if (form) {
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
-      var btn = form.querySelector('button[type="submit"]');
-      btn.textContent = 'Submitting...';
-      btn.disabled = true;
+  if (!form) return;
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var btn = form.querySelector('button[type="submit"]');
+    btn.textContent = 'Submitting...';
+    btn.disabled = true;
 
-      var data = {
-        name: form.querySelector('#apply-name').value,
-        email: form.querySelector('#apply-email').value,
-        linkedin: form.querySelector('#apply-linkedin').value,
-        firm: form.querySelector('#apply-firm').value || '',
-        note: form.querySelector('#apply-note').value || '',
-        source: 'angel-club'
-      };
+    var data = {
+      name: form.querySelector('#apply-name').value,
+      email: form.querySelector('#apply-email').value,
+      linkedin: form.querySelector('#apply-linkedin').value,
+      firm: form.querySelector('#apply-firm').value || '',
+      note: form.querySelector('#apply-note').value || '',
+      source: 'angel-club'
+    };
 
-      fetch('/api/angel-club-apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      })
-      .then(function(res) {
-        if (!res.ok) throw new Error('Failed');
-        form.style.display = 'none';
-        document.getElementById('apply-success').style.display = 'block';
-      })
-      .catch(function() {
-        btn.textContent = 'Something went wrong — try again';
-        btn.disabled = false;
-      });
+    fetch('/api/angel-club-apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+    .then(function(res) {
+      if (!res.ok) throw new Error('Failed');
+      form.style.display = 'none';
+      document.getElementById('apply-success').style.display = 'block';
+    })
+    .catch(function() {
+      btn.textContent = 'Something went wrong — try again';
+      btn.disabled = false;
     });
-  }
+  });
 })();
 </script>
-
 </body>
 </html>

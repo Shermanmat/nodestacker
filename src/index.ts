@@ -35,7 +35,7 @@ import voiceInterviewsRoutes from './api/voice-interviews.js';
 import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
-import { sendWeeklyDigests } from './services/weekly-digest.js';
+import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
@@ -116,6 +116,7 @@ app.use('/api/admin/voice-interviews', adminGuard);
 app.use('/api/admin/voice-interviews/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
+app.use('/api/weekly-digest/preview-admin', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -474,6 +475,22 @@ cron.schedule('0 0 * * 6', async () => {
 });
 
 console.log('[CRON] Weekly digest scheduled for Saturday 00:00 UTC (Friday 5pm Arizona)');
+
+// Schedule admin preview email — 1 hour before the digest
+// Friday 4pm Arizona = Friday 23:00 UTC
+cron.schedule('0 23 * * 5', async () => {
+  console.log('[CRON] Sending digest preview to admin...');
+  try {
+    const result = await sendDigestPreviewToAdmin();
+    console.log('[CRON] Digest preview complete:', result);
+  } catch (err) {
+    console.error('[CRON] Digest preview failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Digest preview scheduled for Friday 23:00 UTC (4pm Arizona, 1 hour before digest)');
 
 serve({
   fetch: app.fetch,

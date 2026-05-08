@@ -398,6 +398,122 @@ export async function sendWeeklyDigests(): Promise<{ sent: number; skipped: numb
 }
 
 /**
+ * Build and send a high-level summary of what's about to go out in the
+ * weekly digest, addressed to the admin. Intended to fire ~1 hour before
+ * sendWeeklyDigests so the admin can spot-check or intervene.
+ */
+export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; sent: boolean; founderCount: number; skipCount: number }> {
+  const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+
+  const allFounders = await db.query.founders.findMany({
+    where: eq(founders.hidden, false),
+  });
+
+  type Row = {
+    name: string;
+    company: string;
+    newRequests: number;
+    introsMade: number;
+    meetingsScheduled: number;
+    passes: number;
+    investments: number;
+    highlights: string[];
+  };
+
+  const willSend: Row[] = [];
+  const skipped: { name: string; company: string }[] = [];
+
+  for (const founder of allFounders) {
+    const activity = await getFounderWeeklyActivity(founder.id);
+    if (!activity) {
+      skipped.push({ name: founder.name, company: founder.companyName });
+      continue;
+    }
+
+    const highlights: string[] = [];
+    for (const u of activity.introUpdates) {
+      const firm = u.investorFirm || u.investorName;
+      const status = formatStatus(u.status);
+      highlights.push(`${status}: ${firm}`);
+    }
+
+    willSend.push({
+      name: founder.name,
+      company: founder.companyName,
+      newRequests: activity.newRequests,
+      introsMade: activity.introsMade,
+      meetingsScheduled: activity.meetingsScheduled,
+      passes: activity.passes,
+      investments: activity.investments,
+      highlights: highlights.slice(0, 6),
+    });
+  }
+
+  const subject = `Digest preview — ${willSend.length} founder${willSend.length === 1 ? '' : 's'} in 1 hour`;
+
+  const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
+
+  const founderBlocksHtml = willSend.length === 0
+    ? '<p style="color:#777"><em>No founder digests will go out this week.</em></p>'
+    : willSend.map(r => `
+        <div style="margin-bottom:18px;padding:14px 16px;border:1px solid #e5e5e5;border-radius:8px;background:#fafafa">
+          <div style="font-weight:700;font-size:15px">${escapeHtml(r.company)} <span style="color:#777;font-weight:500">— ${escapeHtml(r.name)}</span></div>
+          <div style="margin-top:6px;color:#444;font-size:13px">
+            ${r.newRequests} new req · ${r.introsMade} intros · ${r.meetingsScheduled} meetings · ${r.passes} passes · ${r.investments} invested
+          </div>
+          ${r.highlights.length > 0 ? `
+            <ul style="margin:8px 0 0 18px;padding:0;color:#222;font-size:13px;line-height:1.5">
+              ${r.highlights.map(h => `<li>${escapeHtml(h)}</li>`).join('')}
+            </ul>
+          ` : ''}
+        </div>
+      `).join('');
+
+  const skippedHtml = skipped.length > 0
+    ? `<p style="color:#777;font-size:13px;margin-top:24px"><strong>Skipped (no activity):</strong> ${skipped.map(s => escapeHtml(s.company)).join(', ')}</p>`
+    : '';
+
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:640px;margin:0 auto;padding:24px">
+      <div style="font-family:'Bebas Neue',sans-serif;letter-spacing:3px;color:#00C2E0;font-size:13px;font-weight:700">DIGEST PREVIEW</div>
+      <h1 style="font-size:22px;margin:8px 0 4px">Going out in ~1 hour.</h1>
+      <p style="color:#555;font-size:14px;margin:0 0 24px">
+        ${willSend.length} founder${willSend.length === 1 ? '' : 's'} will receive a digest.
+        ${skipped.length} skipped (no activity this week).
+      </p>
+      ${founderBlocksHtml}
+      ${skippedHtml}
+      <p style="margin-top:32px;color:#888;font-size:12px">
+        If anything looks off, fix it in <a href="https://matcap.vc/admin" style="color:#00C2E0">/admin</a> before 5pm AZ.
+      </p>
+    </div>
+  `;
+
+  const text = [
+    `DIGEST PREVIEW — going out in ~1 hour`,
+    ``,
+    `${willSend.length} founder digest(s) queued. ${skipped.length} skipped.`,
+    ``,
+    ...willSend.map(r => [
+      `${r.company} — ${r.name}`,
+      `  ${r.newRequests} new req · ${r.introsMade} intros · ${r.meetingsScheduled} meetings · ${r.passes} passes · ${r.investments} invested`,
+      ...r.highlights.map(h => `  • ${h}`),
+      ``,
+    ].join('\n')),
+    skipped.length > 0 ? `Skipped: ${skipped.map(s => s.company).join(', ')}` : '',
+  ].join('\n');
+
+  const result = await sendEmail({ to: adminEmail, subject, html, text });
+
+  return {
+    recipient: adminEmail,
+    sent: result.success,
+    founderCount: willSend.length,
+    skipCount: skipped.length,
+  };
+}
+
+/**
  * Preview digest for a specific founder (for testing)
  */
 export async function previewDigest(founderId: number): Promise<{ html: string; text: string; subject: string } | null> {

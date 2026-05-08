@@ -1172,6 +1172,9 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Intro Requests</h2>
           <div class="flex gap-2">
+            <button @click="sendDigestPreview" class="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800" :disabled="sendingDigestPreview" :title="'Email me a summary of what next Friday\'s digest will look like'">
+              {{ sendingDigestPreview ? 'Sending...' : 'Email Digest Preview' }}
+            </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
@@ -4246,6 +4249,24 @@
           allIntroRequests.value = await api('/intro-requests');
         };
 
+        // Digest preview email (high-level summary, sent to admin email)
+        const sendingDigestPreview = ref(false);
+        const sendDigestPreview = async () => {
+          if (sendingDigestPreview.value) return;
+          sendingDigestPreview.value = true;
+          try {
+            const result = await api('/weekly-digest/preview-admin', { method: 'POST' });
+            const recipient = result?.recipient || 'admin';
+            const founderCount = result?.founderCount ?? 0;
+            const skipCount = result?.skipCount ?? 0;
+            alert(`Digest preview sent to ${recipient}.\n${founderCount} founder digest(s) queued, ${skipCount} skipped.`);
+          } catch (e) {
+            alert('Failed to send preview: ' + (e?.message || 'unknown error'));
+          } finally {
+            sendingDigestPreview.value = false;
+          }
+        };
+
         // Match suggestion management
         const generatingMatches = ref(false);
         const generateMatches = async () => {
@@ -5584,6 +5605,7 @@
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
+          sendingDigestPreview, sendDigestPreview,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, shuffleInvestors, requestIntroFor,

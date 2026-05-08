@@ -3124,6 +3124,10 @@
         const nodeStats = ref({});
         const investors = ref([]);
         const introRequests = ref([]);
+        // Unfiltered intro requests, used for accurate "last contact" calc on the
+        // matching tab. Keeps the Intros tab's filter state separate so that
+        // filtering by status/founder there doesn't break recency math here.
+        const allIntroRequests = ref([]);
         const fnRelationships = ref([]);
         const niConnections = ref([]);
         const stats = ref({});
@@ -3667,21 +3671,21 @@
 
           // Get existing intro requests for this founder
           const existingIntroInvestorIds = new Set(
-            introRequests.value
+            allIntroRequests.value
               .filter(ir => ir.founderId === founderId)
               .map(ir => ir.investorId)
           );
 
           // Get firms that already have intros with this founder (exclude other members)
           const existingIntroFirms = new Set(
-            introRequests.value
+            allIntroRequests.value
               .filter(ir => ir.founderId === founderId && ir.investor?.firm)
               .map(ir => ir.investor.firm.toLowerCase().trim())
           );
 
           // Calculate most recent intro request date for each investor (across all founders)
           const investorLastContactMap = new Map();
-          for (const ir of introRequests.value) {
+          for (const ir of allIntroRequests.value) {
             const requestDate = ir.dateRequested || ir.createdAt;
             if (requestDate) {
               const existing = investorLastContactMap.get(ir.investorId);
@@ -3914,7 +3918,7 @@
             const nodeName = nodes.value.find(n => n.id === bestConnection.nodeId)?.name || 'Unknown';
 
             // Get last 3 intro requests for this investor (across all founders)
-            const recentIntros = introRequests.value
+            const recentIntros = allIntroRequests.value
               .filter(ir => ir.investorId === inv.id)
               .sort((a, b) => (b.dateRequested || b.createdAt || '').localeCompare(a.dateRequested || a.createdAt || ''))
               .slice(0, 3)
@@ -4190,6 +4194,7 @@
           loadNodeStats();
           loadInvestors();
           loadIntroRequests();
+          loadAllIntroRequests();
           loadRelationships();
           loadStats();
           loadNodeTasks();
@@ -4223,7 +4228,22 @@
           let url = '/intro-requests?';
           if (introFilter.status) url += `status=${introFilter.status}&`;
           if (introFilter.founderId) url += `founderId=${introFilter.founderId}&`;
-          introRequests.value = await api(url);
+
+          // When a UI filter is active, fetch both the filtered (for the Intros
+          // tab) and the unfiltered (for the matching tab's recency calc).
+          // When no filter, one fetch suffices for both.
+          if (introFilter.status || introFilter.founderId) {
+            const [filtered, all] = await Promise.all([api(url), api('/intro-requests')]);
+            introRequests.value = filtered;
+            allIntroRequests.value = all;
+          } else {
+            introRequests.value = await api(url);
+            allIntroRequests.value = introRequests.value;
+          }
+        };
+
+        const loadAllIntroRequests = async () => {
+          allIntroRequests.value = await api('/intro-requests');
         };
 
         // Match suggestion management
@@ -5563,7 +5583,7 @@
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filteredAdminInvestors,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
-          loadIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
+          loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, shuffleInvestors, requestIntroFor,

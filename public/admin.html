@@ -4258,8 +4258,9 @@
             const result = await api('/weekly-digest/preview-admin', { method: 'POST' });
             const recipient = result?.recipient || 'admin';
             const founderCount = result?.founderCount ?? 0;
+            const nudgeCount = result?.nudgeCount ?? 0;
             const skipCount = result?.skipCount ?? 0;
-            alert(`Digest preview sent to ${recipient}.\n${founderCount} founder digest(s) queued, ${skipCount} skipped.`);
+            alert(`Digest preview sent to ${recipient}.\n${founderCount} full digest(s) · ${nudgeCount} no-activity nudge(s) · ${skipCount} skipped.`);
           } catch (e) {
             alert('Failed to send preview: ' + (e?.message || 'unknown error'));
           } finally {

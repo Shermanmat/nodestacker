@@ -351,32 +351,100 @@ MatCap | You're receiving this because you're a MatCap portfolio founder.
 }
 
 /**
- * Send weekly digest to all founders with activity
+ * Build a short "no activity this week" email for actively-raising founders
+ * who didn't have any intros, meetings, or status changes this week. Goal is
+ * to close the loop so they know the system is working and to flag back if
+ * they expected activity.
  */
-export async function sendWeeklyDigests(): Promise<{ sent: number; skipped: number; errors: string[] }> {
+function generateNoActivityEmail(founderName: string, portalUrl: string): { subject: string; html: string; text: string } {
+  const subject = `Your weekly MatCap update — quiet week`;
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f7fa;margin:0;padding:32px 16px;color:#1a1a1a">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:32px 28px">
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.5">Hi ${founderName},</p>
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.6">
+      <strong>You didn't get any intro requests this week.</strong>
+    </p>
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#444">
+      Some weeks are quiet — that's normal. We're constantly looking for the right intros to make for you, but we'd rather not force ones that aren't a fit.
+    </p>
+    <p style="margin:0 0 24px;font-size:15px;line-height:1.6;color:#444">
+      If you think this was a mistake, or you want to talk through your raise, just reply to this email or reach out directly.
+    </p>
+    <p style="margin:0 0 18px;font-size:14px;line-height:1.5">
+      <a href="${portalUrl}" style="color:#00C2E0;text-decoration:none;font-weight:600">View your dashboard →</a>
+    </p>
+    <p style="margin:24px 0 0;font-size:15px;line-height:1.5">— Mat</p>
+    <hr style="border:none;border-top:1px solid #eee;margin:28px 0 16px">
+    <p style="margin:0;font-size:11px;color:#999">MatCap · You're receiving this because you're a MatCap portfolio founder.</p>
+  </div>
+</body>
+</html>
+`.trim();
+
+  const text = `
+Hi ${founderName},
+
+You didn't get any intro requests this week.
+
+Some weeks are quiet — that's normal. We're constantly looking for the right intros to make for you, but we'd rather not force ones that aren't a fit.
+
+If you think this was a mistake, or you want to talk through your raise, just reply to this email or reach out directly.
+
+Dashboard: ${portalUrl}
+
+— Mat
+
+---
+MatCap · You're receiving this because you're a MatCap portfolio founder.
+`.trim();
+
+  return { subject, html, text };
+}
+
+/**
+ * Send weekly digest to all non-hidden founders. Founders with activity get
+ * the full digest. Founders with no activity but who are in active raise mode
+ * (introCadenceActive=true) get a short "quiet week, reach out if this looks
+ * wrong" email. Dormant founders are skipped entirely.
+ */
+export async function sendWeeklyDigests(): Promise<{ sent: number; nudged: number; skipped: number; errors: string[] }> {
   const allFounders = await db.query.founders.findMany({
     where: eq(founders.hidden, false),
   });
 
   let sent = 0;
+  let nudged = 0;
   let skipped = 0;
   const errors: string[] = [];
 
   const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+  const portalUrl = `${baseUrl}/founder.html`;
 
   for (const founder of allFounders) {
     try {
       const activity = await getFounderWeeklyActivity(founder.id);
 
       if (!activity) {
-        skipped++;
-        console.log(`[WEEKLY-DIGEST] Skipping ${founder.name} - no activity this week`);
+        // No activity — only nudge actively-raising founders, skip dormant ones
+        if (!founder.introCadenceActive) {
+          skipped++;
+          console.log(`[WEEKLY-DIGEST] Skipping ${founder.name} - cadence inactive`);
+          continue;
+        }
+
+        const { subject, html, text } = generateNoActivityEmail(founder.name, portalUrl);
+        await sendEmail({ to: founder.email, subject, html, text });
+        nudged++;
+        console.log(`[WEEKLY-DIGEST] Nudged ${founder.name} (${founder.email}) - no activity`);
         continue;
       }
 
-      const portalUrl = `${baseUrl}/founder.html`;
       const { subject, html, text } = generateDigestEmail(founder.name, activity, portalUrl);
-
       await sendEmail({
         to: founder.email,
         subject,
@@ -393,8 +461,8 @@ export async function sendWeeklyDigests(): Promise<{ sent: number; skipped: numb
     }
   }
 
-  console.log(`[WEEKLY-DIGEST] Complete: ${sent} sent, ${skipped} skipped, ${errors.length} errors`);
-  return { sent, skipped, errors };
+  console.log(`[WEEKLY-DIGEST] Complete: ${sent} digests, ${nudged} no-activity nudges, ${skipped} skipped, ${errors.length} errors`);
+  return { sent, nudged, skipped, errors };
 }
 
 /**
@@ -402,7 +470,7 @@ export async function sendWeeklyDigests(): Promise<{ sent: number; skipped: numb
  * weekly digest, addressed to the admin. Intended to fire ~1 hour before
  * sendWeeklyDigests so the admin can spot-check or intervene.
  */
-export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; sent: boolean; founderCount: number; skipCount: number }> {
+export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; sent: boolean; founderCount: number; nudgeCount: number; skipCount: number }> {
   const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
 
   const allFounders = await db.query.founders.findMany({
@@ -421,12 +489,18 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
   };
 
   const willSend: Row[] = [];
+  const nudges: { name: string; company: string }[] = [];
   const skipped: { name: string; company: string }[] = [];
 
   for (const founder of allFounders) {
     const activity = await getFounderWeeklyActivity(founder.id);
     if (!activity) {
-      skipped.push({ name: founder.name, company: founder.companyName });
+      // No activity — split by cadence-active flag (matches sendWeeklyDigests)
+      if (founder.introCadenceActive) {
+        nudges.push({ name: founder.name, company: founder.companyName });
+      } else {
+        skipped.push({ name: founder.name, company: founder.companyName });
+      }
       continue;
     }
 
@@ -449,7 +523,8 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
     });
   }
 
-  const subject = `Digest preview — ${willSend.length} founder${willSend.length === 1 ? '' : 's'} in 1 hour`;
+  const totalEmails = willSend.length + nudges.length;
+  const subject = `Digest preview — ${totalEmails} email${totalEmails === 1 ? '' : 's'} in 1 hour`;
 
   const escapeHtml = (s: string) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] || c));
 
@@ -469,8 +544,12 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
         </div>
       `).join('');
 
+  const nudgeHtml = nudges.length > 0
+    ? `<p style="color:#444;font-size:13px;margin-top:20px;padding:12px 14px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px"><strong>${nudges.length} no-activity nudge${nudges.length === 1 ? '' : 's'}</strong> (active cadence, no intros this week — they'll get a "quiet week" email): ${nudges.map(n => escapeHtml(n.company)).join(', ')}</p>`
+    : '';
+
   const skippedHtml = skipped.length > 0
-    ? `<p style="color:#777;font-size:13px;margin-top:24px"><strong>Skipped (no activity):</strong> ${skipped.map(s => escapeHtml(s.company)).join(', ')}</p>`
+    ? `<p style="color:#777;font-size:13px;margin-top:20px"><strong>Skipped (cadence inactive):</strong> ${skipped.map(s => escapeHtml(s.company)).join(', ')}</p>`
     : '';
 
   const html = `
@@ -478,10 +557,12 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
       <div style="font-family:'Bebas Neue',sans-serif;letter-spacing:3px;color:#00C2E0;font-size:13px;font-weight:700">DIGEST PREVIEW</div>
       <h1 style="font-size:22px;margin:8px 0 4px">Going out in ~1 hour.</h1>
       <p style="color:#555;font-size:14px;margin:0 0 24px">
-        ${willSend.length} founder${willSend.length === 1 ? '' : 's'} will receive a digest.
-        ${skipped.length} skipped (no activity this week).
+        ${willSend.length} full digest${willSend.length === 1 ? '' : 's'} ·
+        ${nudges.length} no-activity nudge${nudges.length === 1 ? '' : 's'} ·
+        ${skipped.length} skipped (cadence inactive).
       </p>
       ${founderBlocksHtml}
+      ${nudgeHtml}
       ${skippedHtml}
       <p style="margin-top:32px;color:#888;font-size:12px">
         If anything looks off, fix it in <a href="https://matcap.vc/admin" style="color:#00C2E0">/admin</a> before 5pm AZ.
@@ -492,7 +573,7 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
   const text = [
     `DIGEST PREVIEW — going out in ~1 hour`,
     ``,
-    `${willSend.length} founder digest(s) queued. ${skipped.length} skipped.`,
+    `${willSend.length} full digest(s) · ${nudges.length} no-activity nudge(s) · ${skipped.length} skipped (cadence inactive).`,
     ``,
     ...willSend.map(r => [
       `${r.company} — ${r.name}`,
@@ -500,7 +581,8 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
       ...r.highlights.map(h => `  • ${h}`),
       ``,
     ].join('\n')),
-    skipped.length > 0 ? `Skipped: ${skipped.map(s => s.company).join(', ')}` : '',
+    nudges.length > 0 ? `No-activity nudge: ${nudges.map(n => n.company).join(', ')}` : '',
+    skipped.length > 0 ? `Skipped (cadence inactive): ${skipped.map(s => s.company).join(', ')}` : '',
   ].join('\n');
 
   const result = await sendEmail({ to: adminEmail, subject, html, text });
@@ -509,6 +591,7 @@ export async function sendDigestPreviewToAdmin(): Promise<{ recipient: string; s
     recipient: adminEmail,
     sent: result.success,
     founderCount: willSend.length,
+    nudgeCount: nudges.length,
     skipCount: skipped.length,
   };
 }

@@ -153,8 +153,14 @@ export interface CooldownResult {
  * Check if an investor is on cooldown (should not receive new intros).
  */
 export function isInvestorOnCooldown(investorIntros: IntroRequest[]): CooldownResult {
-  // Unresolved = intro_request_sent (waiting for investor response)
-  const unresolved = investorIntros.filter(ir => ir.status === 'intro_request_sent');
+  // Unresolved = intro_request_sent (waiting for investor response), only if < 2 weeks old
+  const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const unresolved = investorIntros.filter(ir => {
+    if (ir.status !== 'intro_request_sent') return false;
+    const d = ir.createdAt ? new Date(ir.createdAt).getTime()
+      : ir.dateRequested ? new Date(ir.dateRequested).getTime() : 0;
+    return d > twoWeeksAgo;
+  });
   if (unresolved.length > 0) {
     return {
       onCooldown: true,
@@ -237,12 +243,20 @@ export async function checkFirmBlocked(founderId: number, investorId: number): P
 // --- Inverse Match Scoring ---
 
 /**
- * Core inverse matching logic. Returns 0-100.
+ * Core inverse matching logic. Returns 0-130 (with optional recency bonus).
+ *
+ * `recencyBonus` adds 0–30 points based on how many weeks since this investor
+ * was last contacted (mirrors the client-side bonus in admin.html). The cap is
+ * raised from 100 to 130 to preserve ordering among stale investors — without
+ * it, every fresh investor with strong fit would tie at 100 and the recency
+ * signal would be lost. Display surfaces should treat anything ≥ 100 as a
+ * "strong fit + needs attention" rank.
  */
 export function computeInverseMatchScore(
   founderHeat: number,
   investorReliability: number,
   connectionStrength: string,
+  recencyBonus: number = 0,
 ): number {
   // Connection strength bonus
   const strengthBonus = connectionStrength === 'strong' ? 15
@@ -275,10 +289,11 @@ export function computeInverseMatchScore(
   const baseScore = Math.round(
     (founderHeat + investorReliability) / 2 * 0.5 +
     inverseBonus +
-    strengthBonus
+    strengthBonus +
+    Math.max(0, Math.min(30, recencyBonus))
   );
 
-  return Math.max(0, Math.min(100, baseScore));
+  return Math.max(0, Math.min(130, baseScore));
 }
 
 function describeMatchLogic(founderHeat: number, investorReliability: number): string {
@@ -609,6 +624,13 @@ export async function generateMatchSuggestions(
   const investorVip = new Set<number>();
   const investorGeoMap = new Map<number, string>();
   const investorFirmMap = new Map<number, string>(); // investorId → normalized firm name
+  // weeksSinceContact per investor — used as a recency bonus in scoring so the
+  // matching algorithm naturally biases toward investors we haven't pinged in a
+  // while. Mirrors the client-side `weeksSinceContact * 5, cap 30` from
+  // admin.html so manual planning + auto-generation rank investors consistently.
+  // Never-contacted investors default to 52 weeks (1 year stale) → max bonus.
+  const nowMs = Date.now();
+  const investorWeeksSinceContact = new Map<number, number>();
   for (const inv of data.allInvestors) {
     if (inv.firm) {
       const normalized = inv.firm.trim().toLowerCase();
@@ -622,6 +644,19 @@ export async function generateMatchSuggestions(
     if (inv.geography) investorGeoMap.set(inv.id, inv.geography.toLowerCase().trim());
     investorCooldowns.set(inv.id, isInvestorOnCooldown(intros));
     if (inv.vip) investorVip.add(inv.id);
+
+    // Find most recent contact date across all intros for this investor
+    let mostRecentMs = 0;
+    for (const ir of intros) {
+      const dateStr = ir.dateRequested || ir.createdAt;
+      if (!dateStr) continue;
+      const t = new Date(dateStr).getTime();
+      if (!isNaN(t) && t > mostRecentMs) mostRecentMs = t;
+    }
+    const weeks = mostRecentMs === 0
+      ? 52
+      : Math.floor((nowMs - mostRecentMs) / (1000 * 60 * 60 * 24 * 7));
+    investorWeeksSinceContact.set(inv.id, Math.max(0, weeks));
   }
 
   const suggestions: GeneratedSuggestion[] = [];
@@ -753,7 +788,9 @@ export async function generateMatchSuggestions(
         availableCount++;
 
         const investorReliability = investorScores.get(investorId)!;
-        const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength);
+        const weeksSinceContact = investorWeeksSinceContact.get(investorId) ?? 52;
+        const recencyBonus = Math.min(30, weeksSinceContact * 5);
+        const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength, recencyBonus);
 
         suggestions.push({
           founderId: founder.id,

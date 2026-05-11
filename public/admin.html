@@ -1044,13 +1044,14 @@
             </label>
             <label v-if="planningFounderId" class="flex items-center gap-2 text-sm text-gray-600">
               <input type="checkbox" v-model="planningFilterStale" class="rounded">
-              Not contacted in 6+ weeks
+              Stale open investors only (≥3 weeks)
             </label>
             <button v-if="planningFounderId" @click="shuffleInvestors" class="text-sm text-gray-500 hover:text-gray-700">
               Shuffle
             </button>
             <span v-if="planningFounderId" class="text-sm text-gray-500 ml-auto">
               {{ plannedInvestors.length }} investors available
+              <span v-if="planningFounderId &amp;&amp; plannedStaleFitCount > 0" class="ml-2 text-amber-600 font-medium">· {{ plannedStaleFitCount }} stale ≥3w</span>
             </span>
           </div>
         </div>
@@ -1079,7 +1080,7 @@
                   <span v-if="planningFounderId && item.fitReasons?.includes('founder_pref')" class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">Founder fit</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('active_investor')" class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Active</span>
                   <span v-if="planningFounderId && item.fitReasons?.includes('first_time_friendly')" class="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded">1st-time friendly</span>
-                  <span v-if="planningFounderId && item.fitReasons?.includes('not_recent')" class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Not recently contacted</span>
+                  <span v-if="planningFounderId && item.fitReasons?.includes('not_recent')" class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Stale ({{ item.weeksSinceContact }}w)</span>
                 </div>
                 <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
                 <p v-if="(item.city || item.investor?.city) || (item.country || item.investor?.country)" class="text-sm text-gray-400">{{ [item.city || item.investor?.city, countryName(item.country || item.investor?.country)].filter(Boolean).join(', ') }}</p>
@@ -1785,7 +1786,124 @@
       <div v-if="activeTab === 'marketplace'">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Marketplace Health</h2>
-          <button @click="loadMarketplaceHealth" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen();" class="text-blue-600 text-sm hover:underline">Refresh</button>
+        </div>
+
+        <!-- Throughput (generalist stale-rate + 12w trend) -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+          <div class="flex items-baseline justify-between mb-4">
+            <div>
+              <h3 class="font-semibold text-lg">Throughput</h3>
+              <p class="text-sm text-gray-500">% of generalist investors stale (≥3 weeks since contact). Specialty firms excluded — they have legitimate gaps.</p>
+            </div>
+          </div>
+
+          <div v-if="!throughput.current" class="text-sm text-gray-400 py-8 text-center">Loading…</div>
+
+          <div v-else class="grid grid-cols-12 gap-6 items-center">
+            <!-- Big % -->
+            <div class="col-span-3">
+              <div class="text-5xl font-bold" :class="{
+                'text-green-600': throughput.current.pct < 10,
+                'text-amber-500': throughput.current.pct >= 10 &amp;&amp; throughput.current.pct < 25,
+                'text-red-600': throughput.current.pct >= 25,
+              }">{{ throughput.current.pct }}%</div>
+              <div class="text-sm text-gray-500 mt-1">{{ throughput.current.stale }} of {{ throughput.current.total }} generalists</div>
+              <div class="text-xs text-gray-400 mt-1">{{ throughput.current.pct < 10 ? 'Healthy' : throughput.current.pct < 25 ? 'Watch' : 'Action needed' }}</div>
+            </div>
+
+            <!-- 12-week sparkline -->
+            <div class="col-span-9">
+              <div class="text-xs text-gray-500 mb-1">Last 12 weeks · % stale generalists</div>
+              <svg :viewBox="'0 0 360 96'" class="w-full h-24">
+                <!-- Threshold guide lines -->
+                <line x1="0" :y1="96 - (10 * 0.96)" x2="360" :y2="96 - (10 * 0.96)" stroke="#a7f3d0" stroke-width="1" stroke-dasharray="3,3"/>
+                <line x1="0" :y1="96 - (25 * 0.96)" x2="360" :y2="96 - (25 * 0.96)" stroke="#fcd34d" stroke-width="1" stroke-dasharray="3,3"/>
+                <!-- Area fill -->
+                <path :d="trendAreaPath" fill="rgba(59, 130, 246, 0.12)"/>
+                <!-- Line -->
+                <path :d="trendLinePath" fill="none" stroke="#3b82f6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <!-- Dots -->
+                <circle v-for="(pt, i) in trendPoints" :key="i" :cx="pt.x" :cy="pt.y" r="3" fill="#3b82f6"/>
+              </svg>
+              <div class="flex justify-between text-xs text-gray-400 mt-1">
+                <span>{{ throughput.trend[0]?.weekStart }}</span>
+                <span>now</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Stale generalists list -->
+          <div v-if="throughput.staleItems &amp;&amp; throughput.staleItems.length > 0" class="mt-6 border-t pt-4">
+            <button @click="throughputExpanded = !throughputExpanded" class="text-sm font-medium text-gray-700 hover:text-gray-900">
+              {{ throughputExpanded ? '▾' : '▸' }} {{ throughput.staleItems.length }} stale generalist{{ throughput.staleItems.length === 1 ? '' : 's' }}
+            </button>
+            <div v-if="throughputExpanded" class="mt-3">
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-xs text-gray-500 border-b">
+                    <th class="pb-2">Name</th>
+                    <th class="pb-2">Firm</th>
+                    <th class="pb-2 text-right">Weeks since contact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in (throughputShowAll ? throughput.staleItems : throughput.staleItems.slice(0, 10))" :key="item.id" class="border-b last:border-0">
+                    <td class="py-2 font-medium">{{ item.name }}</td>
+                    <td class="py-2 text-gray-600">{{ item.firm || '—' }}</td>
+                    <td class="py-2 text-right" :class="{ 'text-red-600 font-semibold': item.weeksSinceContact >= 6 }">{{ item.weeksSinceContact }}w</td>
+                  </tr>
+                </tbody>
+              </table>
+              <button v-if="throughput.staleItems.length > 10" @click="throughputShowAll = !throughputShowAll" class="text-xs text-blue-600 hover:underline mt-2">
+                {{ throughputShowAll ? 'Show top 10 only' : `Show all ${throughput.staleItems.length}` }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Stale Open Investors (all, not just generalist) -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <div class="flex items-baseline justify-between mb-4">
+            <div>
+              <h3 class="font-semibold text-lg">Stale open investors</h3>
+              <p class="text-sm text-gray-500">Active, not on cooldown, not dormant — and ≥3 weeks since contact. Includes generalists + specialists.</p>
+            </div>
+            <div class="text-right">
+              <div class="text-3xl font-bold" :class="{
+                'text-green-600': staleOpen.stalePct < 10,
+                'text-amber-500': staleOpen.stalePct >= 10 &amp;&amp; staleOpen.stalePct < 25,
+                'text-red-600': staleOpen.stalePct >= 25,
+              }">{{ staleOpen.stalePct ?? '—' }}%</div>
+              <div class="text-xs text-gray-500">{{ staleOpen.staleCount ?? '—' }} of {{ staleOpen.totalActive ?? '—' }} active</div>
+            </div>
+          </div>
+
+          <div v-if="!staleOpen.items" class="text-sm text-gray-400 py-4 text-center">Loading…</div>
+          <div v-else-if="staleOpen.items.length === 0" class="text-sm text-gray-400 py-4 text-center">All open investors are fresh. Nice.</div>
+          <div v-else>
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs text-gray-500 border-b">
+                  <th class="pb-2">Name</th>
+                  <th class="pb-2">Firm</th>
+                  <th class="pb-2 text-right">Last contact</th>
+                  <th class="pb-2 text-right">Weeks</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in (staleOpenShowAll ? staleOpen.items : staleOpen.items.slice(0, 10))" :key="item.id" class="border-b last:border-0">
+                  <td class="py-2 font-medium">{{ item.name }}</td>
+                  <td class="py-2 text-gray-600">{{ item.firm || '—' }}</td>
+                  <td class="py-2 text-right text-gray-500">{{ item.lastContactDate || 'never' }}</td>
+                  <td class="py-2 text-right" :class="{ 'text-red-600 font-semibold': item.weeksSinceContact >= 6 }">{{ item.weeksSinceContact }}w</td>
+                </tr>
+              </tbody>
+            </table>
+            <button v-if="staleOpen.items.length > 10" @click="staleOpenShowAll = !staleOpenShowAll" class="text-xs text-blue-600 hover:underline mt-2">
+              {{ staleOpenShowAll ? 'Show top 10 only' : `Show all ${staleOpen.items.length}` }}
+            </button>
+          </div>
         </div>
 
         <!-- Summary Cards -->
@@ -3114,7 +3232,11 @@
           if (tabId === 'onboarding') loadOnboardingWorkflows();
           if (tabId === 'health') loadNetworkHealth();
           if (tabId === 'pipeline') loadPipelineHealth();
-          if (tabId === 'marketplace') loadMarketplaceHealth();
+          if (tabId === 'marketplace') {
+            loadMarketplaceHealth();
+            loadThroughput();
+            loadStaleOpen();
+          }
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
           if (tabId === 'signups') loadSignups();
@@ -3170,6 +3292,13 @@
         const marketplaceUtilFilter = ref('all');
         const marketplaceExpandedGap = ref(null);
         const networkAvailability = ref(null);
+
+        // Throughput (generalist stale-rate + 12-week trend)
+        const throughput = ref({ current: null, trend: [], staleItems: null });
+        const throughputExpanded = ref(false);
+        const throughputShowAll = ref(false);
+        const staleOpen = ref({ totalActive: null, staleCount: null, stalePct: null, items: null });
+        const staleOpenShowAll = ref(false);
 
         // Categories
         const allCategories = ref([]);
@@ -3665,6 +3794,13 @@
         });
 
         // Computed: investors filtered and sorted for intro planning
+        // Count of stale (≥3w) investors among the per-founder match list — used
+        // to surface a quick "X stale fits" hint above the planning list.
+        const plannedStaleFitCount = computed(() => {
+          if (!planningFounderId.value) return 0;
+          return plannedInvestors.value.filter(inv => (inv.weeksSinceContact ?? 0) >= 3).length;
+        });
+
         const plannedInvestors = computed(() => {
           if (!planningFounderId.value) return [];
 
@@ -3908,7 +4044,8 @@
             // Scale: 0 weeks = 0 points, 6+ weeks = 30 points
             const recencyBonus = Math.min(30, weeksSinceContact * 5);
             score += recencyBonus;
-            if (weeksSinceContact >= 6) {
+            // "Stale" badge fires at 3+ weeks, matching the system-wide throughput threshold
+            if (weeksSinceContact >= 3) {
               fitReasons.push('not_recent');
             }
 
@@ -3981,9 +4118,10 @@
             });
           }
 
-          // Apply stale filter if enabled (6+ weeks since contact)
+          // Apply stale filter if enabled (3+ weeks since contact, matching
+          // the system-wide throughput threshold)
           if (planningFilterStale.value) {
-            filtered = filtered.filter(inv => inv.weeksSinceContact >= 6);
+            filtered = filtered.filter(inv => inv.weeksSinceContact >= 3);
             // Sort by weeks since contact descending (oldest first)
             return filtered.sort((a, b) => b.weeksSinceContact - a.weeksSinceContact);
           }
@@ -4287,6 +4425,11 @@
             }
             alert(msg);
             loadIntroRequests();
+            // Refresh throughput so admin sees the post-batch impact on stale-rate
+            if (activeTab.value === 'marketplace') {
+              loadThroughput();
+              loadStaleOpen();
+            }
           } catch (e) {
             alert('Failed to generate matches: ' + e.message);
           } finally {
@@ -4502,6 +4645,50 @@
           const data = await api('/marketplace-health');
           marketplaceHealth.value = data;
         };
+
+        const loadThroughput = async () => {
+          try {
+            throughput.value = await api('/marketplace-health/generalist-throughput');
+          } catch (e) {
+            console.error('Failed to load throughput', e);
+          }
+        };
+
+        const loadStaleOpen = async () => {
+          try {
+            staleOpen.value = await api('/marketplace-health/stale-open-investors');
+          } catch (e) {
+            console.error('Failed to load stale-open', e);
+          }
+        };
+
+        // Sparkline path computation for throughput chart.
+        // Viewport: 360x96. Y maps 0-100% (inverted, since SVG y grows down).
+        // We use 0.96 scale so 100% lands at y=0 with a tiny margin.
+        const trendPoints = computed(() => {
+          const trend = throughput.value.trend || [];
+          if (trend.length === 0) return [];
+          const stepX = trend.length > 1 ? 360 / (trend.length - 1) : 0;
+          return trend.map((d, i) => ({
+            x: i * stepX,
+            y: 96 - Math.min(100, Math.max(0, d.pct)) * 0.96,
+            pct: d.pct,
+            weekStart: d.weekStart,
+          }));
+        });
+
+        const trendLinePath = computed(() => {
+          const pts = trendPoints.value;
+          if (pts.length === 0) return '';
+          return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+        });
+
+        const trendAreaPath = computed(() => {
+          const pts = trendPoints.value;
+          if (pts.length === 0) return '';
+          const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+          return `${line} L${pts[pts.length - 1].x.toFixed(1)},96 L${pts[0].x.toFixed(1)},96 Z`;
+        });
 
         const filteredUtilizationInvestors = computed(() => {
           const inv = marketplaceHealth.value.investorUtilization.investors;
@@ -5609,7 +5796,7 @@
           sendingDigestPreview, sendDigestPreview,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount,
-          planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, shuffleInvestors, requestIntroFor,
+          planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, plannedStaleFitCount, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, toggleInvestorVip, closeInvestorModal,
@@ -5640,6 +5827,9 @@
           // Marketplace Health
           marketplaceHealth, marketplaceUtilFilter, marketplaceExpandedGap,
           loadMarketplaceHealth, filteredUtilizationInvestors, toggleGapExpansion,
+          throughput, throughputExpanded, throughputShowAll, staleOpen, staleOpenShowAll,
+          trendPoints, trendLinePath, trendAreaPath,
+          loadThroughput, loadStaleOpen,
           // Categories
           allCategories, newCategoryForm, editingCategoryId, editCategoryForm,
           showCategoryAssignModal, categoryAssignTarget, selectedCategoryIds,

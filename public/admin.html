@@ -1108,6 +1108,7 @@
                   class="hover:underline text-sm">
                   {{ (item.investor || item).active === false ? 'Activate' : 'Deactivate' }}
                 </button>
+                <button @click="openMergeInvestor(item.investor || item)" class="text-orange-600 hover:underline text-sm">Merge</button>
                 <button @click="deleteInvestor((item.investor || item).id)" class="text-red-600 hover:underline text-sm">Delete</button>
               </div>
             </div>
@@ -3191,6 +3192,63 @@
       </div>
     </div>
 
+    <!-- Merge Investor Modal -->
+    <div v-if="showMergeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Merge Investor</h3>
+          <button @click="closeMergeModal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <div v-if="mergeSource" class="bg-orange-50 border border-orange-200 rounded p-3 mb-4 text-sm">
+          <div class="font-medium text-orange-900">This investor (duplicate, will be deleted):</div>
+          <div class="text-orange-800 mt-1">{{ mergeSource.name }}<span v-if="mergeSource.firm"> @ {{ mergeSource.firm }}</span> <span class="text-orange-600 text-xs">(id: {{ mergeSource.id }})</span></div>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Merge into (keep this one):</label>
+          <input
+            type="text"
+            v-model="mergeSearch"
+            @focus="mergeSearchOpen = true"
+            @input="mergeSearchOpen = true; mergeTarget = null"
+            placeholder="Type to search investor to keep..."
+            class="w-full border rounded px-3 py-2"
+            :class="{ 'border-green-500 bg-green-50': mergeTarget }"
+          />
+          <div v-if="mergeSearchOpen && mergeSearchResults.length" class="border rounded mt-1 max-h-60 overflow-y-auto bg-white shadow">
+            <div
+              v-for="i in mergeSearchResults"
+              :key="i.id"
+              @mousedown="selectMergeTarget(i)"
+              class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+            >
+              <span class="font-medium">{{ i.name }}</span>
+              <span v-if="i.firm" class="text-gray-500"> @ {{ i.firm }}</span>
+              <span class="text-gray-400 text-xs ml-2">id: {{ i.id }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="mergeTarget" class="bg-green-50 border border-green-200 rounded p-3 mb-4 text-sm">
+          <div class="font-medium text-green-900">Will keep (all data merged into):</div>
+          <div class="text-green-800 mt-1">{{ mergeTarget.name }}<span v-if="mergeTarget.firm"> @ {{ mergeTarget.firm }}</span> <span class="text-green-600 text-xs">(id: {{ mergeTarget.id }})</span></div>
+        </div>
+        <div v-if="mergeError" class="text-red-600 text-sm mb-3">{{ mergeError }}</div>
+        <div v-if="mergeResult" class="bg-blue-50 border border-blue-200 rounded p-3 mb-3 text-sm text-blue-900">
+          <div class="font-medium">Merged.</div>
+          <pre class="text-xs mt-1 overflow-x-auto">{{ JSON.stringify(mergeResult, null, 2) }}</pre>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button @click="closeMergeModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+          <button
+            @click="confirmMerge"
+            :disabled="!mergeTarget || mergeSubmitting"
+            :class="(!mergeTarget || mergeSubmitting) ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'"
+            class="px-4 py-2 text-white rounded">
+            {{ mergeSubmitting ? 'Merging...' : 'Merge & Delete Duplicate' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     </div><!-- /flex -->
     </template>
   </div>
@@ -3576,6 +3634,69 @@
         const canRefreshResearch = ref(false);
         const currentResearchInvestorId = ref(null);
         let researchPollingInterval = null;
+
+        // Merge investor modal state
+        const showMergeModal = ref(false);
+        const mergeSource = ref(null);
+        const mergeTarget = ref(null);
+        const mergeSearch = ref('');
+        const mergeSearchOpen = ref(false);
+        const mergeError = ref('');
+        const mergeResult = ref(null);
+        const mergeSubmitting = ref(false);
+        const mergeSearchResults = computed(() => {
+          const q = mergeSearch.value.toLowerCase().trim();
+          const src = mergeSource.value;
+          let list = investors.value;
+          if (src) list = list.filter(i => i.id !== src.id);
+          if (!q) return list.slice(0, 20);
+          return list.filter(i => (i.name || '').toLowerCase().includes(q) || (i.firm || '').toLowerCase().includes(q)).slice(0, 20);
+        });
+        const openMergeInvestor = (investor) => {
+          mergeSource.value = investor;
+          mergeTarget.value = null;
+          mergeSearch.value = '';
+          mergeSearchOpen.value = false;
+          mergeError.value = '';
+          mergeResult.value = null;
+          mergeSubmitting.value = false;
+          showMergeModal.value = true;
+        };
+        const closeMergeModal = () => {
+          showMergeModal.value = false;
+          mergeSource.value = null;
+          mergeTarget.value = null;
+          mergeSearch.value = '';
+          mergeError.value = '';
+          mergeResult.value = null;
+        };
+        const selectMergeTarget = (i) => {
+          mergeTarget.value = i;
+          mergeSearch.value = `${i.name}${i.firm ? ' @ ' + i.firm : ''}`;
+          mergeSearchOpen.value = false;
+        };
+        const confirmMerge = async () => {
+          if (!mergeSource.value || !mergeTarget.value) return;
+          const srcLabel = `${mergeSource.value.name}${mergeSource.value.firm ? ' @ ' + mergeSource.value.firm : ''}`;
+          const tgtLabel = `${mergeTarget.value.name}${mergeTarget.value.firm ? ' @ ' + mergeTarget.value.firm : ''}`;
+          if (!confirm(`Merge "${srcLabel}" INTO "${tgtLabel}"?\n\nAll intro requests, connections, categories, research, and history from the duplicate will be reassigned to the keeper. The duplicate will be deleted.\n\nThis cannot be undone.`)) return;
+          mergeSubmitting.value = true;
+          mergeError.value = '';
+          mergeResult.value = null;
+          try {
+            const result = await api(`/investors/${mergeSource.value.id}/merge-into/${mergeTarget.value.id}`, { method: 'POST' });
+            mergeResult.value = result.stats;
+            await loadInvestors();
+            if (activeTab.value === 'marketplace') {
+              loadThroughput();
+              loadStaleOpen();
+            }
+          } catch (e) {
+            mergeError.value = e?.message || 'Merge failed';
+          } finally {
+            mergeSubmitting.value = false;
+          }
+        };
 
         // Inbound confirm modal
         const showInboundConfirmModal = ref(false);
@@ -5872,6 +5993,10 @@
           generateLoginLink, copyLoginLink, impersonateFounder, sendInviteEmail, emailSending, emailSent,
           showResearchModal, researchState, researchError, researchData, researchModalTitle, canRefreshResearch,
           openResearchModal, closeResearchModal, triggerResearch, getUrlDomain, formatDate,
+          // Merge investor modal
+          showMergeModal, mergeSource, mergeTarget, mergeSearch, mergeSearchOpen, mergeSearchResults,
+          mergeError, mergeResult, mergeSubmitting,
+          openMergeInvestor, closeMergeModal, selectMergeTarget, confirmMerge,
           bulkResearch,
           // Onboarding
           onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,

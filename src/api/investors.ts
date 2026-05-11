@@ -1,6 +1,18 @@
 import { Hono } from 'hono';
 import { eq, desc, and, sql } from 'drizzle-orm';
-import { db, investors, investorResearch, introRequests, nodeInvestorConnections, investorCategoryAssignments, investorCategories } from '../db/index.js';
+import {
+  db,
+  investors,
+  investorResearch,
+  introRequests,
+  nodeInvestorConnections,
+  investorCategoryAssignments,
+  investorCategoryExclusions,
+  investorCategories,
+  matchSuggestions,
+  inboundIntroLogs,
+  instantlyLeads,
+} from '../db/index.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -367,6 +379,157 @@ app.delete('/:id', async (c) => {
     return c.json({ error: 'Investor not found' }, 404);
   }
   return c.json({ success: true });
+});
+
+/**
+ * Merge a duplicate investor into a canonical one.
+ *
+ * Reassigns every FK reference from `fromId` → `toId`, then deletes the
+ * source investor. For relationship tables where (investorId, otherCol)
+ * is logically unique (node connections, category assignments / exclusions,
+ * AI research), duplicates are deduped — the target's row wins.
+ *
+ * For event tables (intro_requests, match_suggestions, inbound_intro_logs,
+ * instantly_leads, angel_leaderboard) all rows get reassigned with no
+ * dedup — they're history, not state.
+ *
+ * POST /api/investors/:fromId/merge-into/:toId
+ */
+app.post('/:fromId/merge-into/:toId', async (c) => {
+  const fromId = parseInt(c.req.param('fromId'));
+  const toId = parseInt(c.req.param('toId'));
+
+  if (isNaN(fromId) || isNaN(toId)) {
+    return c.json({ error: 'Invalid investor ids' }, 400);
+  }
+  if (fromId === toId) {
+    return c.json({ error: 'Cannot merge an investor into itself' }, 400);
+  }
+
+  const [fromInv] = await db.select().from(investors).where(eq(investors.id, fromId)).limit(1);
+  const [toInv] = await db.select().from(investors).where(eq(investors.id, toId)).limit(1);
+  if (!fromInv) return c.json({ error: 'Source (duplicate) investor not found' }, 404);
+  if (!toInv) return c.json({ error: 'Target (keep) investor not found' }, 404);
+
+  const stats = {
+    introRequests: 0,
+    matchSuggestions: 0,
+    nodeConnections: { reassigned: 0, deduped: 0 },
+    categoryAssignments: { reassigned: 0, deduped: 0 },
+    categoryExclusions: { reassigned: 0, deduped: 0 },
+    research: { reassigned: 0, deduped: 0 },
+    inboundLogs: 0,
+    instantlyLeads: 0,
+  };
+
+  // 1. intro_requests — history, simple reassign
+  const introResult = await db.update(introRequests)
+    .set({ investorId: toId })
+    .where(eq(introRequests.investorId, fromId))
+    .returning();
+  stats.introRequests = introResult.length;
+
+  // 2. match_suggestions — history, simple reassign
+  const msResult = await db.update(matchSuggestions)
+    .set({ investorId: toId })
+    .where(eq(matchSuggestions.investorId, fromId))
+    .returning();
+  stats.matchSuggestions = msResult.length;
+
+  // 3. node_investor_connections — dedupe by (nodeId, investorId)
+  const fromConns = await db.select().from(nodeInvestorConnections)
+    .where(eq(nodeInvestorConnections.investorId, fromId));
+  const toConns = await db.select().from(nodeInvestorConnections)
+    .where(eq(nodeInvestorConnections.investorId, toId));
+  const toConnNodeIds = new Set(toConns.map(c => c.nodeId));
+  for (const conn of fromConns) {
+    if (toConnNodeIds.has(conn.nodeId)) {
+      await db.delete(nodeInvestorConnections).where(eq(nodeInvestorConnections.id, conn.id));
+      stats.nodeConnections.deduped++;
+    } else {
+      await db.update(nodeInvestorConnections)
+        .set({ investorId: toId })
+        .where(eq(nodeInvestorConnections.id, conn.id));
+      stats.nodeConnections.reassigned++;
+    }
+  }
+
+  // 4. investor_category_assignments — dedupe by (investorId, categoryId)
+  const fromCats = await db.select().from(investorCategoryAssignments)
+    .where(eq(investorCategoryAssignments.investorId, fromId));
+  const toCats = await db.select().from(investorCategoryAssignments)
+    .where(eq(investorCategoryAssignments.investorId, toId));
+  const toCatIds = new Set(toCats.map(c => c.categoryId));
+  for (const a of fromCats) {
+    if (toCatIds.has(a.categoryId)) {
+      await db.delete(investorCategoryAssignments).where(eq(investorCategoryAssignments.id, a.id));
+      stats.categoryAssignments.deduped++;
+    } else {
+      await db.update(investorCategoryAssignments)
+        .set({ investorId: toId })
+        .where(eq(investorCategoryAssignments.id, a.id));
+      stats.categoryAssignments.reassigned++;
+    }
+  }
+
+  // 5. investor_category_exclusions — dedupe by (investorId, categoryId)
+  const fromExcl = await db.select().from(investorCategoryExclusions)
+    .where(eq(investorCategoryExclusions.investorId, fromId));
+  const toExcl = await db.select().from(investorCategoryExclusions)
+    .where(eq(investorCategoryExclusions.investorId, toId));
+  const toExclIds = new Set(toExcl.map(e => e.categoryId));
+  for (const e of fromExcl) {
+    if (toExclIds.has(e.categoryId)) {
+      await db.delete(investorCategoryExclusions).where(eq(investorCategoryExclusions.id, e.id));
+      stats.categoryExclusions.deduped++;
+    } else {
+      await db.update(investorCategoryExclusions)
+        .set({ investorId: toId })
+        .where(eq(investorCategoryExclusions.id, e.id));
+      stats.categoryExclusions.reassigned++;
+    }
+  }
+
+  // 6. investor_research — usually one per investor; if target has one, drop source's
+  const fromResearch = await db.select().from(investorResearch)
+    .where(eq(investorResearch.investorId, fromId));
+  const targetHasResearch = (await db.select({ id: investorResearch.id }).from(investorResearch)
+    .where(eq(investorResearch.investorId, toId)).limit(1)).length > 0;
+  for (const r of fromResearch) {
+    if (targetHasResearch) {
+      await db.delete(investorResearch).where(eq(investorResearch.id, r.id));
+      stats.research.deduped++;
+    } else {
+      await db.update(investorResearch)
+        .set({ investorId: toId })
+        .where(eq(investorResearch.id, r.id));
+      stats.research.reassigned++;
+    }
+  }
+
+  // 7. inbound_intro_logs.detectedInvestorId — nullable, simple reassign
+  const inboundResult = await db.update(inboundIntroLogs)
+    .set({ detectedInvestorId: toId })
+    .where(eq(inboundIntroLogs.detectedInvestorId, fromId))
+    .returning();
+  stats.inboundLogs = inboundResult.length;
+
+  // 8. instantly_leads — nullable, simple reassign
+  const instResult = await db.update(instantlyLeads)
+    .set({ investorId: toId })
+    .where(eq(instantlyLeads.investorId, fromId))
+    .returning();
+  stats.instantlyLeads = instResult.length;
+
+  // Finally, delete the source investor
+  await db.delete(investors).where(eq(investors.id, fromId));
+
+  return c.json({
+    success: true,
+    mergedInto: { id: toInv.id, name: toInv.name, firm: toInv.firm },
+    deleted: { id: fromInv.id, name: fromInv.name, firm: fromInv.firm },
+    stats,
+  });
 });
 
 export default app;

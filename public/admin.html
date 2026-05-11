@@ -1058,7 +1058,8 @@
 
         <div class="space-y-4">
           <div v-for="item in (planningFounderId ? plannedInvestors : filteredAdminInvestors)" :key="item.id || item.investor?.id"
-            class="bg-white rounded-lg shadow overflow-hidden">
+            :id="'investor-row-' + (item.id || item.investor?.id)"
+            class="bg-white rounded-lg shadow overflow-hidden transition-shadow">
             <!-- Investor Header -->
             <div class="p-4 border-b flex justify-between items-start">
               <div>
@@ -1858,8 +1859,11 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="item in (throughputShowAll ? throughput.staleItems : throughput.staleItems.slice(0, 10))" :key="item.id" class="border-b last:border-0">
-                    <td class="py-2 font-medium">{{ item.name }}</td>
+                  <tr v-for="item in (throughputShowAll ? throughput.staleItems : throughput.staleItems.slice(0, 10))" :key="item.id"
+                      @click="goToInvestor(item.id)"
+                      class="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                      title="Open in Investors tab">
+                    <td class="py-2 font-medium text-blue-700">{{ item.name }}</td>
                     <td class="py-2 text-gray-600">{{ item.firm || '—' }}</td>
                     <td class="py-2 text-right" :class="{ 'text-red-600 font-semibold': item.weeksSinceContact >= 6 }">{{ item.weeksSinceContact }}w</td>
                   </tr>
@@ -1902,8 +1906,11 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in (staleOpenShowAll ? staleOpen.items : staleOpen.items.slice(0, 10))" :key="item.id" class="border-b last:border-0">
-                  <td class="py-2 font-medium">{{ item.name }}</td>
+                <tr v-for="item in (staleOpenShowAll ? staleOpen.items : staleOpen.items.slice(0, 10))" :key="item.id"
+                    @click="goToInvestor(item.id)"
+                    class="border-b last:border-0 cursor-pointer hover:bg-gray-50"
+                    title="Open in Investors tab">
+                  <td class="py-2 font-medium text-blue-700">{{ item.name }}</td>
                   <td class="py-2 text-gray-600">{{ item.firm || '—' }}</td>
                   <td class="py-2 text-right text-gray-500">{{ item.lastContactDate || 'never' }}</td>
                   <td class="py-2 text-right" :class="{ 'text-red-600 font-semibold': item.weeksSinceContact >= 6 }">{{ item.weeksSinceContact }}w</td>
@@ -4658,6 +4665,29 @@
           marketplaceHealth.value = data;
         };
 
+        // Jump to a specific investor's row in the Investors tab. Clears any
+        // filters that would hide the row, switches tabs, scrolls to the row,
+        // and gives it a brief highlight so the user sees where it landed.
+        const goToInvestor = (id) => {
+          if (!id) return;
+          // Clear filters so the target row is guaranteed to render
+          planningFounderId.value = '';
+          investorSearchQuery.value = '';
+          filterByNodeId.value = '';
+          filterByCategoryId.value = '';
+          filterByCountry.value = '';
+          activeTab.value = 'investors';
+
+          // Wait for the v-if tab swap to render, then scroll + flash
+          setTimeout(() => {
+            const el = document.getElementById('investor-row-' + id);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.boxShadow = '0 0 0 3px #fbbf24';
+            setTimeout(() => { el.style.boxShadow = ''; }, 1800);
+          }, 80);
+        };
+
         const loadThroughput = async () => {
           try {
             const q = throughputNetworkFilter.value ? `?nodeId=${throughputNetworkFilter.value}` : '';
@@ -5854,7 +5884,7 @@
           throughput, throughputExpanded, throughputShowAll, staleOpen, staleOpenShowAll,
           throughputNetworkFilter, nodesWithConnections,
           trendPoints, trendLinePath, trendAreaPath,
-          loadThroughput, loadStaleOpen,
+          loadThroughput, loadStaleOpen, goToInvestor,
           // Categories
           allCategories, newCategoryForm, editingCategoryId, editCategoryForm,
           showCategoryAssignModal, categoryAssignTarget, selectedCategoryIds,

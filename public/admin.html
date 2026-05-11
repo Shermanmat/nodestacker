@@ -1795,7 +1795,7 @@
       <div v-if="activeTab === 'marketplace'">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Marketplace Health</h2>
-          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen();" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen(); loadSupplyDemand();" class="text-blue-600 text-sm hover:underline">Refresh</button>
         </div>
 
         <!-- Network filter (applies to both Throughput and Stale Open cards) -->
@@ -1931,72 +1931,80 @@
           </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-4 gap-4 mb-8">
+        <!-- Capacity Summary -->
+        <div v-if="supplyDemand" class="grid grid-cols-4 gap-4 mb-4">
           <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-gray-900">{{ marketplaceHealth.sectorBalance.summary.totalSectors }}</div>
-            <div class="text-sm text-gray-500">Total Sectors</div>
+            <div class="text-3xl font-bold text-gray-900">{{ supplyDemand.totals.activeFounders }}</div>
+            <div class="text-sm text-gray-500">Active founders (cadence on)</div>
           </div>
           <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-green-600">{{ marketplaceHealth.sectorBalance.summary.balanced }}</div>
-            <div class="text-sm text-gray-500">Balanced</div>
+            <div class="text-3xl font-bold text-gray-900">{{ supplyDemand.totals.eligibleInvestors }}</div>
+            <div class="text-sm text-gray-500">Eligible investors</div>
           </div>
           <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-amber-600">{{ marketplaceHealth.sectorBalance.summary.tight }}</div>
-            <div class="text-sm text-gray-500">Tight</div>
+            <div class="text-3xl font-bold text-blue-600">{{ supplyDemand.totals.weeklyDemand }}<span class="text-base text-gray-400 font-normal">/wk</span></div>
+            <div class="text-sm text-gray-500">Total demand (intros wanted)</div>
           </div>
           <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-red-600">{{ marketplaceHealth.sectorBalance.summary.severe }}</div>
-            <div class="text-sm text-gray-500">Severe</div>
+            <div class="text-3xl font-bold text-purple-600">{{ supplyDemand.totals.weeklySupply }}<span class="text-base text-gray-400 font-normal">/wk</span></div>
+            <div class="text-sm text-gray-500">Total supply (1 intro / 3wks each)</div>
           </div>
         </div>
 
-        <!-- Sector Balance Table -->
+        <!-- Data quality nudge -->
+        <div v-if="supplyDemand &amp;&amp; (supplyDemand.totals.untaggedFounders > 0 || supplyDemand.totals.untaggedInvestors > 0)" class="mb-4 bg-amber-50 border border-amber-200 text-amber-900 rounded p-3 text-sm">
+          <strong>Data gap:</strong>
+          <span v-if="supplyDemand.totals.untaggedFounders > 0">{{ supplyDemand.totals.untaggedFounders }} active founder(s) have no sector tag</span>
+          <span v-if="supplyDemand.totals.untaggedFounders > 0 &amp;&amp; supplyDemand.totals.untaggedInvestors > 0"> · </span>
+          <span v-if="supplyDemand.totals.untaggedInvestors > 0">{{ supplyDemand.totals.untaggedInvestors }} eligible investor(s) have no sector tag</span>.
+          They're missing from the per-sector rows below — tag them to get accurate signal.
+        </div>
+
+        <!-- Capacity by sector -->
         <div class="bg-white rounded-lg shadow p-6 mb-8">
-          <h3 class="font-semibold mb-4">Supply / Demand by Sector</h3>
-          <table class="w-full text-sm">
+          <h3 class="font-semibold mb-1">Supply / Demand by Sector</h3>
+          <p class="text-xs text-gray-500 mb-4">
+            Weekly capacity model. <strong>Demand</strong> = founders × their per-week target. <strong>Supply</strong> = investors × (1 intro / 3 weeks).
+            Ratio &gt;1.3 = under-supplied (recruit investors), &lt;0.7 = over-supplied (recruit founders).
+            Generalists are sized against all founders; specialists against their own sector.
+          </p>
+          <div v-if="!supplyDemand" class="text-sm text-gray-400 py-4 text-center">Loading…</div>
+          <table v-else class="w-full text-sm">
             <thead>
               <tr class="text-left border-b">
                 <th class="pb-2">Sector</th>
-                <th class="pb-2">Founders</th>
-                <th class="pb-2">Investors (Available / Total)</th>
-                <th class="pb-2">Ratio</th>
+                <th class="pb-2 text-right">Founders</th>
+                <th class="pb-2 text-right">Investors</th>
+                <th class="pb-2 text-right">Demand /wk</th>
+                <th class="pb-2 text-right">Supply /wk</th>
+                <th class="pb-2 text-right">Ratio</th>
                 <th class="pb-2">Status</th>
+                <th class="pb-2">What to do</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="sector in marketplaceHealth.sectorBalance.sectors" :key="sector.categoryId" class="border-b last:border-0">
-                <td class="py-3 font-medium">{{ sector.categoryName }}</td>
-                <td class="py-3">{{ sector.founderCount }}</td>
-                <td class="py-3">
-                  <span class="font-medium">{{ sector.investorsAvailable }}</span>
-                  <span class="text-gray-400"> / {{ sector.investorCountTotal }}</span>
-                  <span v-if="sector.investorsOnCooldown > 0" class="text-xs text-amber-500 ml-1">({{ sector.investorsOnCooldown }} on cooldown)</span>
+              <tr v-for="row in supplyDemand.rows" :key="row.sectorId" class="border-b last:border-0 align-top">
+                <td class="py-3 font-medium">
+                  {{ row.sectorName }}
+                  <span v-if="row.isGeneralist" class="ml-1 text-xs text-gray-400">(all founders)</span>
                 </td>
-                <td class="py-3">
-                  <div class="flex items-center gap-2">
-                    <div class="w-24 bg-gray-200 rounded-full h-2">
-                      <div class="h-2 rounded-full" :class="{
-                        'bg-green-500': sector.status === 'balanced',
-                        'bg-amber-500': sector.status === 'tight',
-                        'bg-red-500': sector.status === 'severe',
-                        'bg-gray-300': sector.status === 'no_demand',
-                      }" :style="{ width: Math.min(100, (sector.ratio !== null ? Math.min(sector.ratio / 20 * 100, 100) : 100)) + '%' }"></div>
-                    </div>
-                    <span class="text-xs text-gray-500">{{ sector.ratio !== null ? sector.ratio + ':1' : 'No investors' }}</span>
-                  </div>
-                </td>
+                <td class="py-3 text-right">{{ row.founders }}</td>
+                <td class="py-3 text-right">{{ row.investors }}</td>
+                <td class="py-3 text-right text-blue-600">{{ row.weeklyDemand }}</td>
+                <td class="py-3 text-right text-purple-600">{{ row.weeklySupply }}</td>
+                <td class="py-3 text-right font-mono text-xs">{{ row.ratio !== null ? row.ratio : '—' }}</td>
                 <td class="py-3">
                   <span class="px-2 py-1 rounded-full text-xs font-medium" :class="{
-                    'bg-green-100 text-green-700': sector.status === 'balanced',
-                    'bg-amber-100 text-amber-700': sector.status === 'tight',
-                    'bg-red-100 text-red-700': sector.status === 'severe',
-                    'bg-gray-100 text-gray-500': sector.status === 'no_demand',
-                  }">{{ sector.status === 'no_demand' ? 'No Demand' : sector.status.charAt(0).toUpperCase() + sector.status.slice(1) }}</span>
+                    'bg-red-100 text-red-700': row.status === 'undersupplied',
+                    'bg-green-100 text-green-700': row.status === 'balanced',
+                    'bg-amber-100 text-amber-700': row.status === 'oversupplied',
+                    'bg-gray-100 text-gray-500': row.status === 'dormant',
+                  }">{{ {undersupplied:'Under-supplied', balanced:'Balanced', oversupplied:'Over-supplied', dormant:'Dormant'}[row.status] }}</span>
                 </td>
+                <td class="py-3 text-xs text-gray-600 max-w-xs">{{ row.actionHint }}</td>
               </tr>
-              <tr v-if="marketplaceHealth.sectorBalance.sectors.length === 0">
-                <td colspan="5" class="py-4 text-center text-gray-400">No sector data available</td>
+              <tr v-if="supplyDemand.rows.length === 0">
+                <td colspan="8" class="py-4 text-center text-gray-400">No sector data — add categories first.</td>
               </tr>
             </tbody>
           </table>
@@ -3351,6 +3359,7 @@
             loadMarketplaceHealth();
             loadThroughput();
             loadStaleOpen();
+            loadSupplyDemand();
           }
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
@@ -3407,6 +3416,9 @@
         const marketplaceUtilFilter = ref('all');
         const marketplaceExpandedGap = ref(null);
         const networkAvailability = ref(null);
+
+        // Supply / Demand by sector (weekly capacity-based)
+        const supplyDemand = ref(null);
 
         // Throughput (generalist stale-rate + 12-week trend)
         const throughput = ref({ current: null, trend: [], staleItems: null });
@@ -4904,6 +4916,14 @@
           }
         };
 
+        const loadSupplyDemand = async () => {
+          try {
+            supplyDemand.value = await api('/marketplace-health/supply-demand');
+          } catch (e) {
+            console.error('Failed to load supply-demand', e);
+          }
+        };
+
         // Nodes that actually have investor connections — used to populate the
         // network filter dropdown without listing every node that has 0
         // connections (which would just be noise).
@@ -6082,6 +6102,8 @@
           openMergeInvestor, closeMergeModal, selectMergeTarget, confirmMerge,
           // Required categories for add-investor
           stageCategoryOptions, personaCategoryOptions, sectorCategoryOptions,
+          // Supply/demand by sector
+          supplyDemand, loadSupplyDemand,
           bulkResearch,
           // Onboarding
           onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,

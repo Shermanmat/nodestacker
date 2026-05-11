@@ -583,4 +583,231 @@ app.get('/generalist-throughput', async (c) => {
   return c.json({ current, trend, staleItems });
 });
 
+/**
+ * Per-sector supply/demand snapshot. Tells you which sectors need more
+ * founders, more investors, or are balanced.
+ *
+ * GET /api/marketplace-health/supply-demand
+ *
+ * Demand = active+cadence-on founders in that sector × their introTargetPerWeek.
+ * Supply = eligible investors in that sector × (1 intro / 3 weeks).
+ * Generalist is sized against ALL active founders (since generalists fit
+ * everyone); specialists are sized against their own sector only.
+ *
+ * Rows roll up children into top-level parents so the table stays digestible.
+ */
+app.get('/supply-demand', async (c) => {
+  const [allFounders, allInvestors, allIntros, fcaRows, icaRows, allCats, allNiConns] = await Promise.all([
+    db.select().from(founders),
+    db.select().from(investors),
+    db.select().from(introRequests),
+    db.select().from(founderCategoryAssignments),
+    db.select().from(investorCategoryAssignments),
+    db.select().from(investorCategories),
+    db.select().from(nodeInvestorConnections),
+  ]);
+
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  // Build parent → [self + descendants] map for sector rollup
+  const sectorParents = allCats.filter(c => c.type === 'sector' && !c.parentId);
+  const sectorChildIdsByParent = new Map<number, Set<number>>();
+  for (const p of sectorParents) {
+    const ids = new Set<number>([p.id]);
+    for (const c of allCats) if (c.parentId === p.id && c.type === 'sector') ids.add(c.id);
+    sectorChildIdsByParent.set(p.id, ids);
+  }
+  const generalistParent = sectorParents.find(c => c.name.toLowerCase() === 'generalist');
+  const generalistIds = generalistParent ? sectorChildIdsByParent.get(generalistParent.id)! : new Set<number>();
+
+  // Founder → category id set
+  const founderCatSet = new Map<number, Set<number>>();
+  for (const a of fcaRows) {
+    if (!founderCatSet.has(a.founderId)) founderCatSet.set(a.founderId, new Set());
+    founderCatSet.get(a.founderId)!.add(a.categoryId);
+  }
+  // Investor → category id set
+  const investorCatSet = new Map<number, Set<number>>();
+  for (const a of icaRows) {
+    if (!investorCatSet.has(a.investorId)) investorCatSet.set(a.investorId, new Set());
+    investorCatSet.get(a.investorId)!.add(a.categoryId);
+  }
+  // Intros by investor
+  const introsByInvestor = new Map<number, IntroRequest[]>();
+  for (const ir of allIntros) {
+    if (!introsByInvestor.has(ir.investorId)) introsByInvestor.set(ir.investorId, []);
+    introsByInvestor.get(ir.investorId)!.push(ir);
+  }
+
+  // Active founders = not hidden + cadence on. These are the founders we're
+  // actually trying to feed intros to.
+  const activeFounders = allFounders.filter(f => !f.hidden && f.introCadenceActive);
+
+  // Eligibility filter for investors (matches stale-open + matching cooldown logic)
+  const isInvestorEligible = (inv: typeof allInvestors[number]): boolean => {
+    if (!inv.active) return false;
+    if (inv.pausedUntil && new Date(inv.pausedUntil) > now) return false;
+    const intros = introsByInvestor.get(inv.id) || [];
+    if (isInvestorOnCooldown(intros).onCooldown) return false;
+    // Dormancy
+    const lastIntroDate = intros
+      .filter(ir => ir.dateIntroduced)
+      .sort((a, b) => new Date(b.dateIntroduced!).getTime() - new Date(a.dateIntroduced!).getTime())[0]?.dateIntroduced;
+    const daysSinceLastIntro = lastIntroDate
+      ? Math.floor((nowMs - new Date(lastIntroDate).getTime()) / (1000 * 60 * 60 * 24))
+      : null;
+    const isDormant = (daysSinceLastIntro !== null && daysSinceLastIntro > 90) ||
+      (intros.length >= 3 && intros.every(ir => ir.status === 'ignored'));
+    if (isDormant) return false;
+    return true;
+  };
+
+  const eligibleInvestors = allInvestors.filter(isInvestorEligible);
+
+  // Connection guard: when computing per-sector supply, only count investors
+  // who have at least one node connection (else they can't actually receive
+  // intros via the matching flow). Keeps the supply number honest.
+  const connectedInvestorIds = new Set(allNiConns.map(c => c.investorId));
+
+  type Row = {
+    sectorId: number;
+    sectorName: string;
+    isGeneralist: boolean;
+    founders: number;
+    investors: number;
+    weeklyDemand: number;
+    weeklySupply: number;
+    ratio: number | null;
+    status: 'undersupplied' | 'balanced' | 'oversupplied' | 'dormant';
+    actionHint: string;
+  };
+
+  const rows: Row[] = [];
+
+  for (const parent of sectorParents) {
+    const idSet = sectorChildIdsByParent.get(parent.id)!;
+    const isGen = parent.id === generalistParent?.id;
+
+    // Founders in this sector — generalist row counts all active founders
+    let founderIds: number[];
+    if (isGen) {
+      founderIds = activeFounders.map(f => f.id);
+    } else {
+      founderIds = activeFounders
+        .filter(f => {
+          const cats = founderCatSet.get(f.id);
+          if (!cats) return false;
+          for (const cid of cats) if (idSet.has(cid)) return true;
+          return false;
+        })
+        .map(f => f.id);
+    }
+
+    // Investors tagged with this sector. Generalists are sized in their own
+    // row against all founders; they don't double-count into specialist rows.
+    const sectorInvestors = eligibleInvestors.filter(inv => {
+      if (!connectedInvestorIds.has(inv.id)) return false;
+      const cats = investorCatSet.get(inv.id);
+      if (!cats) return false;
+      for (const cid of cats) if (idSet.has(cid)) return true;
+      return false;
+    });
+
+    // Founders' weekly demand (sum of their targets, default 2)
+    const founderRows = activeFounders.filter(f => founderIds.includes(f.id));
+    const weeklyDemand = founderRows.reduce((sum, f) => sum + (f.introTargetPerWeek ?? 2), 0);
+    // Investor capacity: 1 intro per 3 weeks each
+    const weeklySupply = Math.round((sectorInvestors.length / 3) * 10) / 10;
+
+    let ratio: number | null = null;
+    let status: Row['status'] = 'dormant';
+    let actionHint = '';
+    if (founderRows.length === 0) {
+      status = 'dormant';
+      actionHint = sectorInvestors.length > 0
+        ? `${sectorInvestors.length} investors idle — no founders in this sector yet`
+        : 'No activity';
+    } else if (weeklySupply === 0) {
+      status = 'undersupplied';
+      ratio = Infinity;
+      actionHint = `${founderRows.length} founder(s) need ${weeklyDemand}/wk — no eligible investors. Recruit ${parent.name} investors.`;
+    } else {
+      ratio = Math.round((weeklyDemand / weeklySupply) * 100) / 100;
+      if (ratio > 1.3) {
+        status = 'undersupplied';
+        actionHint = `Recruit more ${parent.name} investors, or pause new ${parent.name} founders until supply catches up.`;
+      } else if (ratio < 0.7) {
+        status = 'oversupplied';
+        actionHint = `${sectorInvestors.length} investors with room — recruit ${parent.name} founders, or pause new ${parent.name} investor signups.`;
+      } else {
+        status = 'balanced';
+        actionHint = 'Healthy — keep doing what you\'re doing.';
+      }
+    }
+
+    rows.push({
+      sectorId: parent.id,
+      sectorName: parent.name,
+      isGeneralist: isGen,
+      founders: founderRows.length,
+      investors: sectorInvestors.length,
+      weeklyDemand,
+      weeklySupply,
+      ratio: ratio === Infinity ? null : ratio,
+      status,
+      actionHint,
+    });
+  }
+
+  // Sort: undersupplied first, then balanced, then oversupplied, then dormant.
+  // Generalist always sticks at the top since it's the headline.
+  const statusOrder = { undersupplied: 0, balanced: 1, oversupplied: 2, dormant: 3 } as const;
+  rows.sort((a, b) => {
+    if (a.isGeneralist) return -1;
+    if (b.isGeneralist) return 1;
+    if (statusOrder[a.status] !== statusOrder[b.status]) return statusOrder[a.status] - statusOrder[b.status];
+    return b.founders - a.founders;
+  });
+
+  // Totals
+  const totalActiveFounders = activeFounders.length;
+  const totalEligibleInvestors = eligibleInvestors.filter(i => connectedInvestorIds.has(i.id)).length;
+  const totalWeeklyDemand = activeFounders.reduce((sum, f) => sum + (f.introTargetPerWeek ?? 2), 0);
+  const totalWeeklySupply = Math.round((totalEligibleInvestors / 3) * 10) / 10;
+  const untaggedFounders = activeFounders.filter(f => {
+    const cats = founderCatSet.get(f.id);
+    if (!cats) return true;
+    for (const cid of cats) {
+      const cat = allCats.find(c => c.id === cid);
+      if (cat?.type === 'sector') return false;
+    }
+    return true;
+  }).length;
+  const untaggedInvestors = eligibleInvestors.filter(inv => {
+    if (!connectedInvestorIds.has(inv.id)) return false;
+    const cats = investorCatSet.get(inv.id);
+    if (!cats) return true;
+    for (const cid of cats) {
+      const cat = allCats.find(c => c.id === cid);
+      if (cat?.type === 'sector') return false;
+    }
+    return true;
+  }).length;
+
+  c.header('Cache-Control', 'no-store');
+  return c.json({
+    rows,
+    totals: {
+      activeFounders: totalActiveFounders,
+      eligibleInvestors: totalEligibleInvestors,
+      weeklyDemand: totalWeeklyDemand,
+      weeklySupply: totalWeeklySupply,
+      overallRatio: totalWeeklySupply > 0 ? Math.round((totalWeeklyDemand / totalWeeklySupply) * 100) / 100 : null,
+      untaggedFounders,
+      untaggedInvestors,
+    },
+  });
+});
+
 export default app;

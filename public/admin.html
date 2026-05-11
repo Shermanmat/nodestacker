@@ -857,8 +857,15 @@
       <!-- Founders Tab -->
       <div v-if="activeTab === 'founders'">
         <div class="flex justify-between items-center mb-4">
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-4 flex-wrap">
             <h2 class="text-xl font-semibold">Founders</h2>
+            <select v-model="founderListFilter" class="text-sm border rounded px-2 py-1">
+              <option value="active">Active (cadence on or in portfolio)</option>
+              <option value="cadence">Cadence on only</option>
+              <option value="portfolio">Portfolio only</option>
+              <option value="all">All founders</option>
+            </select>
+            <span class="text-xs text-gray-400">{{ filteredFounders.length }} shown</span>
             <label class="flex items-center text-sm text-gray-500 cursor-pointer">
               <input type="checkbox" v-model="showHiddenFounders" class="mr-2">
               Show hidden ({{ hiddenFounderCount }})
@@ -3908,6 +3915,8 @@
         const introFilter = reactive({ status: '', founderId: '' });
         const investorSearchQuery = ref('');
         const showHiddenFounders = ref(false);
+        // Founders list view filter: 'active' (cadence on or in portfolio), 'cadence', 'portfolio', 'all'
+        const founderListFilter = ref('active');
 
         // Intro Planning
         const planningFounderId = ref('');
@@ -3948,12 +3957,24 @@
           return c ? c.name : code;
         };
 
-        // Computed: filtered founders (hide hidden unless toggled)
+        // Set of founder ids who have at least one portfolio company
+        const portfolioFounderIds = computed(() => {
+          return new Set((portfolio.value?.companies || []).map(c => c.founderId).filter(Boolean));
+        });
+
+        // Computed: filtered founders (hide hidden unless toggled, plus active/portfolio filter)
         const filteredFounders = computed(() => {
-          if (showHiddenFounders.value) {
-            return founders.value;
+          let list = showHiddenFounders.value ? founders.value : founders.value.filter(f => !f.hidden);
+          const portfolioIds = portfolioFounderIds.value;
+          if (founderListFilter.value === 'cadence') {
+            list = list.filter(f => f.introCadenceActive);
+          } else if (founderListFilter.value === 'portfolio') {
+            list = list.filter(f => portfolioIds.has(f.id));
+          } else if (founderListFilter.value === 'active') {
+            list = list.filter(f => f.introCadenceActive || portfolioIds.has(f.id));
           }
-          return founders.value.filter(f => !f.hidden);
+          // 'all' = no further filter
+          return list;
         });
 
         const hiddenFounderCount = computed(() => {
@@ -6043,7 +6064,7 @@
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
-          showHiddenFounders, filteredFounders, hiddenFounderCount,
+          showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, plannedStaleFitCount, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,

@@ -453,7 +453,9 @@ app.get('/stale-open-investors', async (c) => {
   items.sort((a, b) => b.weeksSinceContact - a.weeksSinceContact);
   const stalePct = totalActive > 0 ? Math.round((items.length / totalActive) * 1000) / 10 : 0;
 
-  c.header('Cache-Control', 'private, max-age=60');
+  // Admin-only endpoint — never cache, otherwise a fresh intro_request doesn't
+  // show up in the dashboard until the cache window expires.
+  c.header('Cache-Control', 'no-store');
   return c.json({ totalActive, staleCount: items.length, stalePct, items });
 });
 
@@ -577,7 +579,7 @@ app.get('/generalist-throughput', async (c) => {
   }
   staleItems.sort((a, b) => b.weeksSinceContact - a.weeksSinceContact);
 
-  c.header('Cache-Control', 'private, max-age=300');
+  c.header('Cache-Control', 'no-store');
   return c.json({ current, trend, staleItems });
 });
 

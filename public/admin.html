@@ -4460,6 +4460,10 @@
           try {
             await api(`/matching/approve-intro/${id}`, { method: 'PUT' });
             loadIntroRequests();
+            if (activeTab.value === 'marketplace') {
+              loadThroughput();
+              loadStaleOpen();
+            }
           } catch (e) {
             alert('Failed to approve: ' + e.message);
           }
@@ -5515,6 +5519,13 @@
           closeIntroModal();
           loadIntroRequests();
           loadStats();
+          // Keep throughput cards in sync — the fresh intro should bump the
+          // investor's weeksSinceContact to 0 and (likely) drop them from the
+          // stale lists immediately.
+          if (activeTab.value === 'marketplace') {
+            loadThroughput();
+            loadStaleOpen();
+          }
         };
 
         const editIntro = (intro) => {

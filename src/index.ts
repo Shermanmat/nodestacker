@@ -168,6 +168,38 @@ app.post('/api/angel-club-apply', async (c) => {
   return c.json({ success: true });
 });
 
+// Scout / YC application (public, no auth) — founders with an accelerator offer
+// who want a market read before committing
+app.post('/api/scout-apply', async (c) => {
+  const body = await c.req.json();
+  const { name, email, linkedin, company, oneLiner, accelerator, batch, stage, sector, note, source } = body;
+
+  if (!name || !email || !linkedin || !company || !oneLiner || !accelerator || !stage || !sector) {
+    return c.json({ error: 'Name, email, LinkedIn, company, one-liner, accelerator, stage, and sector are required' }, 400);
+  }
+
+  const { sendEmail } = await import('./services/email.js');
+  await sendEmail({
+    to: 'mat@matsherman.com',
+    subject: `Scout application: ${name} — ${company} (${accelerator})`,
+    html: `
+      <h2>New Scout Application (${source || 'yc'})</h2>
+      <p><strong>Accelerator:</strong> ${accelerator}${batch ? ` &mdash; ${batch}` : ''}</p>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>LinkedIn:</strong> <a href="${linkedin}">${linkedin}</a></p>
+      <p><strong>Company:</strong> ${company}</p>
+      <p><strong>One-liner:</strong> ${oneLiner}</p>
+      <p><strong>Stage:</strong> ${stage}</p>
+      <p><strong>Sector:</strong> ${sector}</p>
+      ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
+    `,
+    text: `New Scout Application (${source || 'yc'})\n\nAccelerator: ${accelerator}${batch ? ` — ${batch}` : ''}\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}\nCompany: ${company}\nOne-liner: ${oneLiner}\nStage: ${stage}\nSector: ${sector}${note ? `\nNote: ${note}` : ''}`,
+  });
+
+  return c.json({ success: true });
+});
+
 // MatCap Community application (public, no auth)
 app.post('/api/community-apply', async (c) => {
   const body = await c.req.json();
@@ -421,6 +453,8 @@ app.get('/founders', (c) => c.redirect('/signup', 302));
 app.get('/investors', (c) => c.redirect('/angel-club', 302));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
 app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
+app.get('/yc', serveStatic({ path: './public/yc.html' }));
+app.get('/scout', (c) => c.redirect('/yc', 302));
 app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));
 app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.html' }));
 app.get('/project2045', serveStatic({ path: './public/project2045.html' }));

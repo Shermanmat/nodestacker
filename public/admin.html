@@ -1789,6 +1789,16 @@
           <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen();" class="text-blue-600 text-sm hover:underline">Refresh</button>
         </div>
 
+        <!-- Network filter (applies to both Throughput and Stale Open cards) -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4 flex items-center gap-3">
+          <label class="text-sm font-medium text-gray-700">Network:</label>
+          <select v-model="throughputNetworkFilter" @change="loadThroughput(); loadStaleOpen();" class="border rounded px-3 py-1 text-sm">
+            <option :value="null">All networks</option>
+            <option v-for="n in nodesWithConnections" :key="n.id" :value="n.id">{{ n.name }}</option>
+          </select>
+          <span class="text-xs text-gray-500">Filter the throughput metrics to a single intro source. Useful when one network's backlog is skewing the global numbers.</span>
+        </div>
+
         <!-- Throughput (generalist stale-rate + 12w trend) -->
         <div class="bg-white rounded-lg shadow p-6 mb-6">
           <div class="flex items-baseline justify-between mb-4">
@@ -3299,6 +3309,8 @@
         const throughputShowAll = ref(false);
         const staleOpen = ref({ totalActive: null, staleCount: null, stalePct: null, items: null });
         const staleOpenShowAll = ref(false);
+        // null = all networks; otherwise nodeId
+        const throughputNetworkFilter = ref(null);
 
         // Categories
         const allCategories = ref([]);
@@ -4648,7 +4660,8 @@
 
         const loadThroughput = async () => {
           try {
-            throughput.value = await api('/marketplace-health/generalist-throughput');
+            const q = throughputNetworkFilter.value ? `?nodeId=${throughputNetworkFilter.value}` : '';
+            throughput.value = await api('/marketplace-health/generalist-throughput' + q);
           } catch (e) {
             console.error('Failed to load throughput', e);
           }
@@ -4656,11 +4669,22 @@
 
         const loadStaleOpen = async () => {
           try {
-            staleOpen.value = await api('/marketplace-health/stale-open-investors');
+            const q = throughputNetworkFilter.value ? `?nodeId=${throughputNetworkFilter.value}` : '';
+            staleOpen.value = await api('/marketplace-health/stale-open-investors' + q);
           } catch (e) {
             console.error('Failed to load stale-open', e);
           }
         };
+
+        // Nodes that actually have investor connections — used to populate the
+        // network filter dropdown without listing every node that has 0
+        // connections (which would just be noise).
+        const nodesWithConnections = computed(() => {
+          const connectedIds = new Set(niConnections.value.map(c => c.nodeId));
+          return nodes.value
+            .filter(n => connectedIds.has(n.id))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        });
 
         // Sparkline path computation for throughput chart.
         // Viewport: 360x96. Y maps 0-100% (inverted, since SVG y grows down).
@@ -5828,6 +5852,7 @@
           marketplaceHealth, marketplaceUtilFilter, marketplaceExpandedGap,
           loadMarketplaceHealth, filteredUtilizationInvestors, toggleGapExpansion,
           throughput, throughputExpanded, throughputShowAll, staleOpen, staleOpenShowAll,
+          throughputNetworkFilter, nodesWithConnections,
           trendPoints, trendLinePath, trendAreaPath,
           loadThroughput, loadStaleOpen,
           // Categories

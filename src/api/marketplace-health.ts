@@ -378,13 +378,26 @@ function weeksSinceLastContact(intros: IntroRequest[], asOfMs: number = Date.now
 /**
  * Stale open investors — active, not paused, not on cooldown, not dormant,
  * and 3+ weeks since last contact (or never contacted).
- * GET /api/marketplace-health/stale-open-investors
+ * GET /api/marketplace-health/stale-open-investors[?nodeId=X]
+ *
+ * When nodeId is provided, only investors connected to that node (via
+ * node_investor_connections) are counted. Useful for filtering out networks
+ * that skew the overall metric (e.g. recently-added bulk networks).
  */
 app.get('/stale-open-investors', async (c) => {
-  const [allInvestors, allIntros] = await Promise.all([
+  const nodeIdParam = c.req.query('nodeId');
+  const nodeId = nodeIdParam ? parseInt(nodeIdParam, 10) : null;
+
+  const [allInvestors, allIntros, niConns] = await Promise.all([
     db.select().from(investors),
     db.select().from(introRequests),
+    db.select().from(nodeInvestorConnections),
   ]);
+
+  // If nodeId filter is set, build the allowed investor set
+  const allowedInvestorIds = nodeId
+    ? new Set(niConns.filter(c => c.nodeId === nodeId).map(c => c.investorId))
+    : null;
 
   const introsByInvestor = new Map<number, IntroRequest[]>();
   for (const ir of allIntros) {
@@ -402,6 +415,7 @@ app.get('/stale-open-investors', async (c) => {
   for (const inv of allInvestors) {
     if (!inv.active) continue;
     if (inv.pausedUntil && new Date(inv.pausedUntil) > now) continue;
+    if (allowedInvestorIds && !allowedInvestorIds.has(inv.id)) continue;
 
     totalActive++;
 
@@ -447,15 +461,26 @@ app.get('/stale-open-investors', async (c) => {
  * Generalist throughput trend — % of generalist investors stale (≥3 weeks
  * since contact), current + last 12 weeks. Headline health metric for the
  * intro pipeline since generalists are expected to have weekly fits.
- * GET /api/marketplace-health/generalist-throughput
+ * GET /api/marketplace-health/generalist-throughput[?nodeId=X]
+ *
+ * When nodeId is provided, only generalists connected to that node count
+ * toward the metric.
  */
 app.get('/generalist-throughput', async (c) => {
-  const [allInvestors, allIntros, invCatRows, allCats] = await Promise.all([
+  const nodeIdParam = c.req.query('nodeId');
+  const nodeId = nodeIdParam ? parseInt(nodeIdParam, 10) : null;
+
+  const [allInvestors, allIntros, invCatRows, allCats, niConns] = await Promise.all([
     db.select().from(investors),
     db.select().from(introRequests),
     db.select().from(investorCategoryAssignments),
     db.select().from(investorCategories),
+    db.select().from(nodeInvestorConnections),
   ]);
+
+  const allowedInvestorIds = nodeId
+    ? new Set(niConns.filter(c => c.nodeId === nodeId).map(c => c.investorId))
+    : null;
 
   // Find the Generalist category ids (type=sector, name=generalist, case-insensitive)
   const generalistCatIds = new Set(
@@ -493,7 +518,8 @@ app.get('/generalist-throughput', async (c) => {
   const generalists = allInvestors.filter(inv =>
     inv.active &&
     !(inv.pausedUntil && new Date(inv.pausedUntil) > now) &&
-    isGeneralist(inv.id)
+    isGeneralist(inv.id) &&
+    (!allowedInvestorIds || allowedInvestorIds.has(inv.id))
   );
 
   // Anchor to Monday 00:00 UTC for week boundaries

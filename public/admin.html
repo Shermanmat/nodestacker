@@ -2627,6 +2627,39 @@
               </div>
               <p class="text-xs text-gray-500 mt-1">Every investor must be connected to a node</p>
             </div>
+            <div v-if="!editingInvestor" class="border-t pt-4">
+              <p class="text-xs font-medium text-gray-700 mb-2">Required categories — used for matching & marketplace balance</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Stage *</label>
+                  <select v-model="investorForm.newStageId" required class="w-full border rounded px-3 py-2"
+                    :class="{ 'border-red-300': !investorForm.newStageId }">
+                    <option value="">— Select stage —</option>
+                    <option v-for="c in stageCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Founder persona *</label>
+                  <select v-model="investorForm.newPersonaId" required class="w-full border rounded px-3 py-2"
+                    :class="{ 'border-red-300': !investorForm.newPersonaId }">
+                    <option value="">— Select persona —</option>
+                    <option v-for="c in personaCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Sector *</label>
+                  <select v-model="investorForm.newSectorId" required class="w-full border rounded px-3 py-2"
+                    :class="{ 'border-red-300': !investorForm.newSectorId }">
+                    <option value="">— Select sector —</option>
+                    <template v-for="group in sectorCategoryOptions" :key="group.parent.id">
+                      <option :value="group.parent.id">{{ group.parent.name }}</option>
+                      <option v-for="child in group.children" :key="child.id" :value="child.id">&nbsp;&nbsp;↳ {{ child.name }}</option>
+                    </template>
+                  </select>
+                  <p class="text-xs text-gray-500 mt-1">Pick "Generalist" if this investor has no sector specialty</p>
+                </div>
+              </div>
+            </div>
             <div v-if="editingInvestor" class="flex items-center gap-2">
               <input type="checkbox" v-model="investorForm.active" id="investor-active" class="rounded">
               <label for="investor-active" class="text-sm font-medium text-gray-700">Active</label>
@@ -3822,7 +3855,26 @@
         // Forms
         const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
+
+        // Categories grouped by type for the add-investor required dropdowns
+        const stageCategoryOptions = computed(() => allCategories.value
+          .filter(c => c.type === 'stage')
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+        const personaCategoryOptions = computed(() => allCategories.value
+          .filter(c => c.type === 'persona')
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+        const sectorCategoryOptions = computed(() => {
+          // Group sectors: top-level parents first (or flat if no children)
+          const sectors = allCategories.value.filter(c => c.type === 'sector');
+          const parents = sectors.filter(c => !c.parentId);
+          const groups = [];
+          for (const parent of parents.sort((a, b) => (a.name || '').localeCompare(b.name || ''))) {
+            const children = sectors.filter(c => c.parentId === parent.id);
+            groups.push({ parent, children });
+          }
+          return groups;
+        });
         const introForm = reactive({
           founderId: '', nodeId: '', investorId: '', status: 'intro_request_sent',
           dateRequested: '', dateNodeAsked: '', dateIntroduced: '', firstMeetingDate: '',
@@ -5555,7 +5607,7 @@
         const saveInvestor = async () => {
           try {
             if (editingInvestor.value) {
-              const { nodeId, ...investorData } = investorForm;
+              const { nodeId, newStageId, newPersonaId, newSectorId, ...investorData } = investorForm;
               await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorData });
             } else {
               // Require node for new investors
@@ -5563,7 +5615,12 @@
                 alert('Please select a node to assign this investor to');
                 return;
               }
-              const { nodeId, ...investorData } = investorForm;
+              // Require all three categories
+              if (!investorForm.newStageId || !investorForm.newPersonaId || !investorForm.newSectorId) {
+                alert('Stage, founder persona, and sector are all required. Pick "Generalist" if no specialty.');
+                return;
+              }
+              const { nodeId, newStageId, newPersonaId, newSectorId, ...investorData } = investorForm;
               const newInvestor = await api('/investors', { method: 'POST', body: investorData });
               // Create the node-investor connection
               await api(`/nodes/${investorForm.nodeId}/investors`, {
@@ -5573,6 +5630,11 @@
                   connectionStrength: 'medium',
                   validated: true,
                 }
+              });
+              // Assign the three required categories
+              await api(`/investors/${newInvestor.id}/categories`, {
+                method: 'POST',
+                body: { categoryIds: [parseInt(newStageId), parseInt(newPersonaId), parseInt(newSectorId)] },
               });
             }
             closeInvestorModal();
@@ -5620,7 +5682,7 @@
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '' });
+          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
         };
 
         const saveIntro = async () => {
@@ -5997,6 +6059,8 @@
           showMergeModal, mergeSource, mergeTarget, mergeSearch, mergeSearchOpen, mergeSearchResults,
           mergeError, mergeResult, mergeSubmitting,
           openMergeInvestor, closeMergeModal, selectMergeTarget, confirmMerge,
+          // Required categories for add-investor
+          stageCategoryOptions, personaCategoryOptions, sectorCategoryOptions,
           bulkResearch,
           // Onboarding
           onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,

@@ -1239,6 +1239,7 @@
                     <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
                   </template>
                   <template v-else>
+                    <button @click="openIntroDraft(req)" class="text-purple-600 hover:underline mr-2">Draft</button>
                     <button @click="editIntro(req)" class="text-blue-600 hover:underline mr-2">Update</button>
                     <button @click="showAddFollowup(req)" class="text-green-600 hover:underline">Log</button>
                   </template>
@@ -3284,6 +3285,64 @@
       </div>
     </div>
 
+    <!-- Intro Draft Modal — pre-drafted email to copy into Superhuman/Gmail -->
+    <div v-if="showIntroDraftModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Intro email draft</h3>
+          <button @click="showIntroDraftModal = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">Pre-drafted from the founder + investor data. Tweak as needed, copy, paste into Superhuman.</p>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">To</label>
+            <div class="flex gap-2">
+              <input type="text" v-model="introDraft.to" class="flex-1 border rounded px-3 py-2 text-sm font-mono">
+              <button @click="copyToClipboard(introDraft.to, 'to')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                {{ introDraftCopied === 'to' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Cc</label>
+            <div class="flex gap-2">
+              <input type="text" v-model="introDraft.cc" class="flex-1 border rounded px-3 py-2 text-sm font-mono">
+              <button @click="copyToClipboard(introDraft.cc, 'cc')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                {{ introDraftCopied === 'cc' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+            <div class="flex gap-2">
+              <input type="text" v-model="introDraft.subject" class="flex-1 border rounded px-3 py-2 text-sm">
+              <button @click="copyToClipboard(introDraft.subject, 'subject')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                {{ introDraftCopied === 'subject' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Body</label>
+            <textarea v-model="introDraft.body" rows="14" class="w-full border rounded px-3 py-2 text-sm font-mono"></textarea>
+            <button @click="copyToClipboard(introDraft.body, 'body')" class="mt-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+              {{ introDraftCopied === 'body' ? 'Copied body' : 'Copy body' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center mt-6 pt-4 border-t">
+          <a :href="introDraftMailto" target="_blank" class="text-sm text-blue-600 hover:underline">Open in default mail app →</a>
+          <div class="flex gap-2">
+            <button @click="copyEntireIntro" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
+              {{ introDraftCopied === 'all' ? 'Copied all' : 'Copy everything' }}
+            </button>
+            <button @click="showIntroDraftModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Merge Investor Modal -->
     <div v-if="showMergeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
@@ -4726,15 +4785,95 @@
             generatingMatches.value = false;
           }
         };
+        // Intro draft modal (pre-formatted email for Superhuman/Gmail)
+        const showIntroDraftModal = ref(false);
+        const introDraft = reactive({ to: '', cc: '', subject: '', body: '' });
+        const introDraftCopied = ref('');
+
+        const buildIntroDraft = (req) => {
+          // Resolve full records from cached lists (req only has lightweight fields)
+          const f = founders.value.find(x => x.id === req.founderId) || req.founder || {};
+          const i = investors.value.find(x => x.id === req.investorId) || req.investor || {};
+          const n = nodes.value.find(x => x.id === req.nodeId) || req.node || {};
+
+          const investorFirst = (i.name || '').split(/\s+/)[0] || 'there';
+          const founderFirst = (f.name || '').split(/\s+/)[0] || '';
+          const companyName = f.companyName || '';
+          const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
+          const stage = f.companyStage ? String(f.companyStage).replace(/_/g, ' ') : '';
+          const founderEmail = f.email || '';
+          const investorEmail = i.email || '';
+          const nodeName = n.name || 'Mat';
+          const nodeFirst = nodeName.split(/\s+/)[0] || 'Mat';
+
+          const subject = companyName
+            ? `Intro: ${f.name || 'Founder'} (${companyName}) <> ${i.name || 'Investor'}`
+            : `Intro: ${f.name || 'Founder'} <> ${i.name || 'Investor'}`;
+
+          const bodyLines = [];
+          bodyLines.push(`Hi ${investorFirst} —`);
+          bodyLines.push('');
+          bodyLines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
+          if (oneLiner) bodyLines.push('');
+          if (oneLiner) bodyLines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
+          bodyLines.push('');
+          if (stage) bodyLines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+          else bodyLines.push(`I think they'd be a strong fit for your thesis.`);
+          bodyLines.push('');
+          bodyLines.push(`${founderFirst || f.name || 'Founder'}, meet ${investorFirst}${i.firm ? ` (${i.role || 'investor'} at ${i.firm})` : ''} — off to you both.`);
+          bodyLines.push('');
+          bodyLines.push(nodeFirst);
+
+          return {
+            to: investorEmail,
+            cc: founderEmail,
+            subject,
+            body: bodyLines.join('\n'),
+          };
+        };
+
+        const openIntroDraft = (req) => {
+          const d = buildIntroDraft(req);
+          Object.assign(introDraft, d);
+          introDraftCopied.value = '';
+          showIntroDraftModal.value = true;
+        };
+
+        const copyToClipboard = async (text, key) => {
+          try {
+            await navigator.clipboard.writeText(text || '');
+            introDraftCopied.value = key;
+            setTimeout(() => { if (introDraftCopied.value === key) introDraftCopied.value = ''; }, 1500);
+          } catch (e) {
+            alert('Copy failed — your browser may not allow clipboard access.');
+          }
+        };
+
+        const copyEntireIntro = async () => {
+          const combined = `To: ${introDraft.to}\nCc: ${introDraft.cc}\nSubject: ${introDraft.subject}\n\n${introDraft.body}`;
+          await copyToClipboard(combined, 'all');
+        };
+
+        const introDraftMailto = computed(() => {
+          const enc = (s) => encodeURIComponent(s || '');
+          const cc = introDraft.cc ? `&cc=${enc(introDraft.cc)}` : '';
+          return `mailto:${enc(introDraft.to)}?subject=${enc(introDraft.subject)}${cc}&body=${enc(introDraft.body)}`;
+        });
+
         const approveSuggestion = async (id) => {
           if (!confirm('Approve this match? It will become an active intro request.')) return;
           try {
             await api(`/matching/approve-intro/${id}`, { method: 'PUT' });
-            loadIntroRequests();
+            // Find the approved request in the (just-loaded) list so we can pre-draft
+            const approved = introRequests.value.find(r => r.id === id);
+            await loadIntroRequests();
             if (activeTab.value === 'marketplace') {
               loadThroughput();
               loadStaleOpen();
             }
+            // Offer the intro draft immediately after approval
+            const refreshed = (introRequests.value || []).find(r => r.id === id) || approved;
+            if (refreshed) openIntroDraft(refreshed);
           } catch (e) {
             alert('Failed to approve: ' + e.message);
           }
@@ -6164,6 +6303,9 @@
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
+          // Intro draft modal
+          showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
+          openIntroDraft, copyToClipboard, copyEntireIntro,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, plannedStaleFitCount, shuffleInvestors, requestIntroFor,

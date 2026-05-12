@@ -810,4 +810,124 @@ app.get('/supply-demand', async (c) => {
   });
 });
 
+/**
+ * Investors who have gone dark: their last 2 "judgeable" intros both stalled
+ * at `introduced` (or earlier) with at least one followup logged, and neither
+ * progressed to a meeting / pass / reply. Flag for review (not auto-deactivate)
+ * since long gaps can mean parental leave, fund cycles, batch reviews, etc.
+ *
+ * "Judgeable" excludes intros newer than 4 weeks — too fresh to call dead.
+ *
+ * GET /api/marketplace-health/disengaged-investors
+ */
+app.get('/disengaged-investors', async (c) => {
+  const [allInvestors, allIntros] = await Promise.all([
+    db.select().from(investors),
+    db.select().from(introRequests),
+  ]);
+
+  const nowMs = Date.now();
+  const FOUR_WEEKS_MS = 28 * 24 * 60 * 60 * 1000;
+
+  const introsByInvestor = new Map<number, IntroRequest[]>();
+  for (const ir of allIntros) {
+    if (!introsByInvestor.has(ir.investorId)) introsByInvestor.set(ir.investorId, []);
+    introsByInvestor.get(ir.investorId)!.push(ir);
+  }
+
+  // Statuses that mean the investor responded (whether they liked it or not).
+  // A response — even "passed" — resets the dead streak.
+  const RESPONDED_STATUSES = new Set([
+    'first_meeting_complete',
+    'second_meeting_complete',
+    'follow_up_questions',
+    'circle_back_round_opens',
+    'invested',
+    'passed',
+  ]);
+
+  // Statuses that mean we sent something but heard nothing back.
+  const STALLED_STATUSES = new Set([
+    'intro_request_sent',
+    'introduced',
+    'waiting_on_investor',
+    'waiting_on_node',
+    'ignored',
+  ]);
+
+  type StalledIntro = {
+    id: number;
+    founderId: number;
+    founderName: string | null;
+    status: string;
+    bumpCount: number;
+    ageWeeks: number;
+  };
+  type Item = {
+    id: number;
+    name: string;
+    firm: string | null;
+    stalledIntros: StalledIntro[];
+  };
+  const items: Item[] = [];
+
+  for (const inv of allInvestors) {
+    if (!inv.active) continue;
+    const intros = (introsByInvestor.get(inv.id) || [])
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Walk through intros newest → oldest. Skip anything < 4 weeks old.
+    // Then look at the next 2: if both stalled with bumps, flag.
+    const judgeable = intros.filter(ir => {
+      const t = new Date(ir.createdAt).getTime();
+      return !isNaN(t) && (nowMs - t) >= FOUR_WEEKS_MS;
+    });
+    if (judgeable.length < 2) continue;
+
+    const recent2 = judgeable.slice(0, 2);
+    const bothStalled = recent2.every(ir =>
+      STALLED_STATUSES.has(ir.status) &&
+      (ir.investorBumpCount ?? 0) >= 1 &&
+      !RESPONDED_STATUSES.has(ir.status)
+    );
+    if (!bothStalled) continue;
+
+    items.push({
+      id: inv.id,
+      name: inv.name,
+      firm: inv.firm,
+      stalledIntros: recent2.map(ir => ({
+        id: ir.id,
+        founderId: ir.founderId,
+        founderName: null as string | null,
+        status: ir.status,
+        bumpCount: ir.investorBumpCount ?? 0,
+        ageWeeks: Math.floor((nowMs - new Date(ir.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 7)),
+      })),
+    });
+  }
+
+  // Resolve all founder names in one query
+  const allFounderIds = Array.from(new Set(items.flatMap(it => it.stalledIntros.map(s => s.founderId))));
+  if (allFounderIds.length > 0) {
+    const founderRows = await db.select({ id: founders.id, name: founders.name }).from(founders);
+    const nameMap = new Map<number, string>();
+    for (const f of founderRows) nameMap.set(f.id, f.name);
+    for (const it of items) {
+      for (const s of it.stalledIntros) s.founderName = nameMap.get(s.founderId) || null;
+    }
+  }
+
+  // Sort: most stalled (oldest 2nd intro) first
+  items.sort((a, b) => {
+    const aMax = Math.max(...a.stalledIntros.map(s => s.ageWeeks));
+    const bMax = Math.max(...b.stalledIntros.map(s => s.ageWeeks));
+    return bMax - aMax;
+  });
+
+  c.header('Cache-Control', 'no-store');
+  return c.json({ count: items.length, items });
+});
+
 export default app;

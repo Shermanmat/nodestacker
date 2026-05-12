@@ -1795,7 +1795,7 @@
       <div v-if="activeTab === 'marketplace'">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Marketplace Health</h2>
-          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen(); loadSupplyDemand();" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen(); loadSupplyDemand(); loadDisengaged();" class="text-blue-600 text-sm hover:underline">Refresh</button>
         </div>
 
         <!-- Network filter (applies to both Throughput and Stale Open cards) -->
@@ -1929,6 +1929,47 @@
               {{ staleOpenShowAll ? 'Show top 10 only' : `Show all ${staleOpen.items.length}` }}
             </button>
           </div>
+        </div>
+
+        <!-- Disengaged Investors -->
+        <div v-if="disengaged.items &amp;&amp; disengaged.items.length > 0" class="bg-white rounded-lg shadow p-6 mb-8 border-2 border-amber-200">
+          <div class="flex items-baseline justify-between mb-4">
+            <div>
+              <h3 class="font-semibold text-lg">Investors to review &mdash; possibly disengaged</h3>
+              <p class="text-sm text-gray-500">Last 2 intros (≥4w old) both stalled with followups sent. May be parental leave / fund cycle / just done with us &mdash; you decide.</p>
+            </div>
+            <div class="text-2xl font-bold text-amber-600">{{ disengaged.count }}</div>
+          </div>
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs text-gray-500 border-b">
+                <th class="pb-2">Investor</th>
+                <th class="pb-2">Firm</th>
+                <th class="pb-2">Last 2 stalled intros</th>
+                <th class="pb-2 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in (disengagedShowAll ? disengaged.items : disengaged.items.slice(0, 10))" :key="item.id" class="border-b last:border-0 align-top">
+                <td class="py-3 font-medium text-blue-700 cursor-pointer" @click="goToInvestor(item.id)" title="Open in Investors tab">{{ item.name }}</td>
+                <td class="py-3 text-gray-600">{{ item.firm || '—' }}</td>
+                <td class="py-3 text-xs text-gray-600">
+                  <div v-for="si in item.stalledIntros" :key="si.id">
+                    {{ si.founderName || `Founder #${si.founderId}` }} &middot;
+                    <span class="text-gray-500">{{ si.status }}</span> &middot;
+                    <span class="text-amber-600">{{ si.bumpCount }} bump{{ si.bumpCount === 1 ? '' : 's' }}</span> &middot;
+                    <span class="text-gray-500">{{ si.ageWeeks }}w ago</span>
+                  </div>
+                </td>
+                <td class="py-3 text-right">
+                  <button @click="deactivateInvestor(item.id)" class="text-xs text-red-600 hover:underline">Remove from rotation</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <button v-if="disengaged.items.length > 10" @click="disengagedShowAll = !disengagedShowAll" class="text-xs text-blue-600 hover:underline mt-2">
+            {{ disengagedShowAll ? 'Show top 10 only' : `Show all ${disengaged.items.length}` }}
+          </button>
         </div>
 
         <!-- Capacity Summary -->
@@ -3360,6 +3401,7 @@
             loadThroughput();
             loadStaleOpen();
             loadSupplyDemand();
+            loadDisengaged();
           }
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
@@ -3419,6 +3461,10 @@
 
         // Supply / Demand by sector (weekly capacity-based)
         const supplyDemand = ref(null);
+
+        // Disengaged investors (2 stalled intros in a row)
+        const disengaged = ref({ count: 0, items: null });
+        const disengagedShowAll = ref(false);
 
         // Throughput (generalist stale-rate + 12-week trend)
         const throughput = ref({ current: null, trend: [], staleItems: null });
@@ -4924,6 +4970,21 @@
           }
         };
 
+        const loadDisengaged = async () => {
+          try {
+            disengaged.value = await api('/marketplace-health/disengaged-investors');
+          } catch (e) {
+            console.error('Failed to load disengaged', e);
+          }
+        };
+
+        const deactivateInvestor = async (id) => {
+          if (!confirm('Mark this investor as inactive? They will be removed from the matching rotation. You can re-activate any time.')) return;
+          await api(`/investors/${id}`, { method: 'PUT', body: { active: false } });
+          loadDisengaged();
+          loadInvestors();
+        };
+
         // Nodes that actually have investor connections — used to populate the
         // network filter dropdown without listing every node that has 0
         // connections (which would just be noise).
@@ -6104,6 +6165,8 @@
           stageCategoryOptions, personaCategoryOptions, sectorCategoryOptions,
           // Supply/demand by sector
           supplyDemand, loadSupplyDemand,
+          // Disengaged investors
+          disengaged, disengagedShowAll, loadDisengaged, deactivateInvestor,
           bulkResearch,
           // Onboarding
           onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,

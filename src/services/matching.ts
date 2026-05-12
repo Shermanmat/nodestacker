@@ -296,6 +296,88 @@ export function computeInverseMatchScore(
   return Math.max(0, Math.min(130, baseScore));
 }
 
+/**
+ * Classify the quality of a founder↔investor match across the three category
+ * axes. The hard category filter (passesCategoryFilter) has already screened
+ * for compatibility — this just rates HOW well they fit, so scoring can reward
+ * tight fits over generalist coverage.
+ */
+export function classifyMatchFit(
+  founderCategories: { id: number; name: string; type: string }[],
+  investorCategories: { id: number; name: string; type: string }[] | undefined,
+): {
+  sector: 'exact' | 'generalist' | 'untagged';
+  stage: 'exact' | 'untagged';
+  persona: 'exact' | 'untagged';
+} {
+  const invCats = investorCategories || [];
+  const founderSectors = new Set(founderCategories.filter(c => c.type === 'sector').map(c => c.id));
+  const investorSectors = invCats.filter(c => c.type === 'sector');
+  const investorSectorIds = new Set(investorSectors.map(c => c.id));
+  const isGeneralist = investorSectors.some(c => c.name.toLowerCase() === 'generalist');
+
+  let sector: 'exact' | 'generalist' | 'untagged' = 'untagged';
+  if (founderSectors.size > 0 && investorSectors.length > 0) {
+    let exactOverlap = false;
+    for (const id of founderSectors) {
+      if (investorSectorIds.has(id)) { exactOverlap = true; break; }
+    }
+    sector = exactOverlap ? 'exact' : (isGeneralist ? 'generalist' : 'untagged');
+  } else if (isGeneralist) {
+    sector = 'generalist';
+  }
+
+  const founderStages = new Set(founderCategories.filter(c => c.type === 'stage').map(c => c.id));
+  const investorStages = new Set(invCats.filter(c => c.type === 'stage').map(c => c.id));
+  let stage: 'exact' | 'untagged' = 'untagged';
+  if (founderStages.size > 0 && investorStages.size > 0) {
+    for (const id of founderStages) {
+      if (investorStages.has(id)) { stage = 'exact'; break; }
+    }
+  }
+
+  const founderPersonas = new Set(founderCategories.filter(c => c.type === 'persona').map(c => c.id));
+  const investorPersonas = new Set(invCats.filter(c => c.type === 'persona').map(c => c.id));
+  let persona: 'exact' | 'untagged' = 'untagged';
+  if (founderPersonas.size > 0 && investorPersonas.size > 0) {
+    for (const id of founderPersonas) {
+      if (investorPersonas.has(id)) { persona = 'exact'; break; }
+    }
+  }
+
+  return { sector, stage, persona };
+}
+
+/**
+ * Fit-based match score, 0–100. Optimizes for "will the node forward this?"
+ * given that the only outcome tracked is whether the intro happens.
+ *
+ *  - Connection strength (your relationship): up to 30
+ *  - Sector fit (exact > generalist): up to 25
+ *  - Stage fit: up to 10
+ *  - Persona fit: up to 5
+ *  - Recency / staleness pressure: up to 30
+ *
+ * Founder heat + investor reliability are intentionally NOT factored in —
+ * the former is behavior, not quality, and the latter measures downstream
+ * conversion which isn't tracked. Both still exist as standalone metrics for
+ * dashboards; they just don't drive ranking anymore.
+ */
+export function computeFitScore(
+  connectionStrength: string,
+  fit: { sector: 'exact' | 'generalist' | 'untagged'; stage: 'exact' | 'untagged'; persona: 'exact' | 'untagged' },
+  recencyBonus: number,
+): number {
+  const strengthPoints = connectionStrength === 'strong' ? 30
+    : connectionStrength === 'medium' ? 15
+    : 5;
+  const sectorPoints = fit.sector === 'exact' ? 25 : fit.sector === 'generalist' ? 10 : 0;
+  const stagePoints = fit.stage === 'exact' ? 10 : 0;
+  const personaPoints = fit.persona === 'exact' ? 5 : 0;
+  const recency = Math.max(0, Math.min(30, recencyBonus));
+  return Math.max(0, Math.min(100, strengthPoints + sectorPoints + stagePoints + personaPoints + recency));
+}
+
 function describeMatchLogic(founderHeat: number, investorReliability: number): string {
   if (founderHeat < 40 && investorReliability >= 70) {
     return 'Cold founder paired with reliable investor to maximize conversion chance';
@@ -790,7 +872,8 @@ export async function generateMatchSuggestions(
         const investorReliability = investorScores.get(investorId)!;
         const weeksSinceContact = investorWeeksSinceContact.get(investorId) ?? 52;
         const recencyBonus = Math.min(30, weeksSinceContact * 5);
-        const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength, recencyBonus);
+        const fit = classifyMatchFit(founderCats, data.investorCatMap.get(investorId));
+        const matchScore = computeFitScore(conn.connectionStrength, fit, recencyBonus);
 
         suggestions.push({
           founderId: founder.id,
@@ -800,10 +883,11 @@ export async function generateMatchSuggestions(
           investorReliabilityScore: investorReliability,
           matchScore,
           matchReasoning: JSON.stringify({
-            founderStaticHeat: staticHeat,
-            founderDynamicHeat: dynamicHeat,
             connectionStrength: conn.connectionStrength,
-            logic: describeMatchLogic(founderHeat, investorReliability),
+            sectorFit: fit.sector,
+            stageFit: fit.stage,
+            personaFit: fit.persona,
+            weeksSinceContact,
           }),
           batchId,
         });

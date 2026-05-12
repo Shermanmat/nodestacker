@@ -117,6 +117,8 @@ app.use('/api/admin/voice-interviews/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 app.use('/api/weekly-digest/preview-admin', adminGuard);
+// Shadow agent — admin-only manual trigger
+app.use('/api/agent/*', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -139,6 +141,13 @@ app.route('/api/brands', brandsRoutes);
 
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+// Shadow agent — manual trigger (admin-only via /api/agent/* guard above)
+app.post('/api/agent/run-now', async (c) => {
+  const { runAgentTick } = await import('./services/agent.js');
+  const result = await runAgentTick();
+  return c.json(result);
+});
 
 // Angel Club application (public, no auth)
 app.post('/api/angel-club-apply', async (c) => {
@@ -525,6 +534,25 @@ cron.schedule('0 23 * * 5', async () => {
 });
 
 console.log('[CRON] Digest preview scheduled for Friday 23:00 UTC (4pm Arizona, 1 hour before digest)');
+
+// Shadow agent — generates match suggestions and emails admin a digest.
+// Phase 1: visibility only. Nothing is sent autonomously; admin still approves
+// each suggestion in the matching tab.
+// Monday + Thursday 16:00 UTC = 9am Arizona — start of week + mid-week
+cron.schedule('0 16 * * 1,4', async () => {
+  console.log('[CRON] Running shadow agent tick...');
+  try {
+    const { runAgentTick } = await import('./services/agent.js');
+    const result = await runAgentTick();
+    console.log('[CRON] Agent tick complete:', result);
+  } catch (err) {
+    console.error('[CRON] Agent tick failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Shadow agent scheduled for Mon + Thu 16:00 UTC (9am Arizona)');
 
 serve({
   fetch: app.fetch,

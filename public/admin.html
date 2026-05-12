@@ -1185,6 +1185,9 @@
             <button @click="sendDigestPreview" class="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800" :disabled="sendingDigestPreview" :title="'Email me a summary of what next Friday\'s digest will look like'">
               {{ sendingDigestPreview ? 'Sending...' : 'Email Digest Preview' }}
             </button>
+            <button @click="runAgentNow" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700" :disabled="runningAgent" :title="'Run the shadow agent now — generates matches + emails me a digest. Runs automatically Mon + Thu 9am AZ.'">
+              {{ runningAgent ? 'Running agent...' : 'Run agent now' }}
+            </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
@@ -4660,6 +4663,22 @@
 
         // Digest preview email (high-level summary, sent to admin email)
         const sendingDigestPreview = ref(false);
+        const runningAgent = ref(false);
+        const runAgentNow = async () => {
+          if (!confirm('Run the shadow agent now? It will generate new matches and email you a digest.')) return;
+          runningAgent.value = true;
+          try {
+            const result = await api('/agent/run-now', { method: 'POST' });
+            alert(`Agent run complete.\n\nGenerated: ${result.generated} suggestions\nTop picks (score ≥ 70): ${result.topRecommendations}\nEmail sent: ${result.emailSent ? 'yes (' + result.recipient + ')' : 'no — check logs'}`);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            console.error('Agent run failed', e);
+          } finally {
+            runningAgent.value = false;
+          }
+        };
+
         const sendDigestPreview = async () => {
           if (sendingDigestPreview.value) return;
           sendingDigestPreview.value = true;
@@ -6144,6 +6163,7 @@
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
+          runningAgent, runAgentNow,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, plannedStaleFitCount, shuffleInvestors, requestIntroFor,

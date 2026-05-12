@@ -588,6 +588,22 @@ export function passesCategoryFilter(
     if (!hasStageOverlap) return false;
   }
 
+  // --- Persona filter (hard gate) ---
+  // Persona is a strict preference — if an investor specifies a persona
+  // (e.g. "College / Recent Grad Hustler"), the founder MUST match it.
+  // Unlike stage, an untagged founder is rejected here: we don't know if
+  // they fit, and the investor was explicit about who they want.
+  const investorPersonas = investorCategories
+    ? investorCategories.filter(c => c.type === 'persona')
+    : [];
+  if (investorPersonas.length > 0) {
+    const founderPersonas = founderCategories.filter(c => c.type === 'persona');
+    if (founderPersonas.length === 0) return false;
+    const investorPersonaIds = new Set(investorPersonas.map(c => c.id));
+    const hasPersonaOverlap = founderPersonas.some(c => investorPersonaIds.has(c.id));
+    if (!hasPersonaOverlap) return false;
+  }
+
   return true;
 }
 

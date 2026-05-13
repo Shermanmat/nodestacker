@@ -2583,6 +2583,25 @@
                 </select>
               </div>
             </div>
+            <div class="border-t pt-4">
+              <p class="text-xs font-medium text-gray-700 mb-2">Intro draft content — used by the agent + approve flow to assemble intro emails for this founder.</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Blurb (intro email body)</label>
+                  <textarea v-model="founderForm.blurb" rows="6" placeholder="Multi-paragraph pitch. Used verbatim as the body of intro emails. Write it like you'd write to an investor — 1-2 sentences on the founder, 1 paragraph on the company, 1 paragraph on traction/why-now." class="w-full border rounded px-3 py-2 text-sm"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Deck URL</label>
+                    <input v-model="founderForm.deckUrl" type="url" placeholder="https://..." class="w-full border rounded px-3 py-2 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Calendly URL</label>
+                    <input v-model="founderForm.calendlyUrl" type="url" placeholder="https://..." class="w-full border rounded px-3 py-2 text-sm">
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
             <button type="button" @click="closeFounderModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -3980,7 +3999,7 @@
         watch(showInvestorModal, (v) => { if (v && !editingInvestor.value) { ssInvestorNode.value = ''; } });
 
         // Forms
-        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
+        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', calendlyUrl: '' });
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
         const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
 
@@ -4799,12 +4818,15 @@
           const investorFirst = (i.name || '').split(/\s+/)[0] || 'there';
           const founderFirst = (f.name || '').split(/\s+/)[0] || '';
           const companyName = f.companyName || '';
-          const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
           const stage = f.companyStage ? String(f.companyStage).replace(/_/g, ' ') : '';
           const founderEmail = f.email || '';
           const investorEmail = i.email || '';
           const nodeName = n.name || 'Mat';
           const nodeFirst = nodeName.split(/\s+/)[0] || 'Mat';
+          const blurb = (f.blurb || '').trim();
+          const deckUrl = (f.deckUrl || '').trim();
+          const calendlyUrl = (f.calendlyUrl || '').trim();
+          const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
 
           const subject = companyName
             ? `Intro: ${f.name || 'Founder'} (${companyName}) <> ${i.name || 'Investor'}`
@@ -4813,12 +4835,30 @@
           const bodyLines = [];
           bodyLines.push(`Hi ${investorFirst} —`);
           bodyLines.push('');
-          bodyLines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
-          if (oneLiner) bodyLines.push('');
-          if (oneLiner) bodyLines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
-          bodyLines.push('');
-          if (stage) bodyLines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
-          else bodyLines.push(`I think they'd be a strong fit for your thesis.`);
+
+          if (blurb) {
+            // Use the founder's own blurb verbatim as the meat of the email.
+            bodyLines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
+            bodyLines.push('');
+            bodyLines.push(blurb);
+          } else {
+            // Fallback when no blurb is set — generic template
+            bodyLines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
+            if (oneLiner) {
+              bodyLines.push('');
+              bodyLines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
+            }
+            bodyLines.push('');
+            if (stage) bodyLines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+            else bodyLines.push(`I think they'd be a strong fit for your thesis.`);
+          }
+
+          if (deckUrl || calendlyUrl) {
+            bodyLines.push('');
+            if (deckUrl) bodyLines.push(`Deck: ${deckUrl}`);
+            if (calendlyUrl) bodyLines.push(`Book time: ${calendlyUrl}`);
+          }
+
           bodyLines.push('');
           bodyLines.push(`${founderFirst || f.name || 'Founder'}, meet ${investorFirst}${i.firm ? ` (${i.role || 'investor'} at ${i.firm})` : ''} — off to you both.`);
           bodyLines.push('');
@@ -5832,7 +5872,7 @@
         const closeFounderModal = () => {
           showFounderModal.value = false;
           editingFounder.value = null;
-          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
+          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', calendlyUrl: '' });
         };
 
         const saveNode = async () => {

@@ -20,6 +20,9 @@ const updateFounderSchema = createFounderSchema.partial().extend({
   cadenceStartDate: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
+  blurb: z.string().nullable().optional(),
+  deckUrl: z.string().nullable().optional(),
+  calendlyUrl: z.string().nullable().optional(),
 });
 
 // List all founders (with categories)

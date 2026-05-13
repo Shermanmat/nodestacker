@@ -66,6 +66,11 @@ export const founders = sqliteTable('founders', {
   introTargetPerWeek: integer('intro_target_per_week').default(2),
   introCadenceActive: integer('intro_cadence_active', { mode: 'boolean' }).default(false),
   cadenceStartDate: text('cadence_start_date'),
+  // Intro draft content — used by the agent + manual approve flow to assemble
+  // a final-shaped intro email instead of a skeleton.
+  blurb: text('blurb'),
+  deckUrl: text('deck_url'),
+  calendlyUrl: text('calendly_url'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

@@ -235,6 +235,18 @@ export async function runAutoDraftTick(): Promise<{
     investorName: string;
     matchScore: number;
   }>;
+  skippedBreakdown?: {
+    total: number;
+    underScore: number;
+    noInvestorEmail: number;
+    existingDraft: number;
+    notPendingSuggestion: number;
+    perFounderDayCap: number;
+    perFounderWeekCap: number;
+    missingFounder: number;
+    missingIntroRequest: number;
+    minScoreThreshold: number;
+  };
 }> {
   // 1. Gmail must be connected
   const gmail = await getGmailStatus();
@@ -265,8 +277,8 @@ export async function runAutoDraftTick(): Promise<{
     }
   }
 
-  // Find eligible pending suggestions: pending status, score above threshold,
-  // ordered by score desc so we draft the best fits first.
+  // Pull all pending suggestions (not pre-filtered by score) so we can count
+  // and report each skip reason. The score gate is applied in the JS loop.
   const candidates = await db.select({
     suggestionId: matchSuggestions.id,
     introRequestId: matchSuggestions.introRequestId,
@@ -276,35 +288,44 @@ export async function runAutoDraftTick(): Promise<{
     nodeId: matchSuggestions.nodeId,
   })
     .from(matchSuggestions)
-    .where(and(
-      eq(matchSuggestions.status, 'pending'),
-      gte(matchSuggestions.matchScore, AUTO_DRAFT_MIN_SCORE),
-    ))
+    .where(eq(matchSuggestions.status, 'pending'))
     .orderBy(desc(matchSuggestions.matchScore))
-    .limit(200);
+    .limit(500);
 
   const results: Array<{ draftId: string; gmailUrl: string; founderName: string; investorName: string; matchScore: number }> = [];
+  const skipped = {
+    total: candidates.length,
+    underScore: 0,
+    noInvestorEmail: 0,
+    existingDraft: 0,
+    notPendingSuggestion: 0,
+    perFounderDayCap: 0,
+    perFounderWeekCap: 0,
+    missingFounder: 0,
+    missingIntroRequest: 0,
+    minScoreThreshold: AUTO_DRAFT_MIN_SCORE,
+  };
 
   for (const c of candidates) {
-    if (!c.introRequestId) continue;
+    if (!c.introRequestId) { skipped.missingIntroRequest++; continue; }
+    if ((c.matchScore ?? 0) < AUTO_DRAFT_MIN_SCORE) { skipped.underScore++; continue; }
 
-    // Per-founder caps: 1/day, 5/week
     const dayCount = draftsLastDay.get(c.founderId) || 0;
     const weekCount = draftsLastWeek.get(c.founderId) || 0;
-    if (dayCount >= AUTO_DRAFT_PER_FOUNDER_PER_DAY) continue;
-    if (weekCount >= AUTO_DRAFT_PER_FOUNDER_PER_WEEK) continue;
+    if (dayCount >= AUTO_DRAFT_PER_FOUNDER_PER_DAY) { skipped.perFounderDayCap++; continue; }
+    if (weekCount >= AUTO_DRAFT_PER_FOUNDER_PER_WEEK) { skipped.perFounderWeekCap++; continue; }
 
     const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, c.introRequestId) });
-    if (!intro) continue;
-    if (intro.status !== 'pending_suggestion') continue;
-    if (intro.gmailDraftId) continue;
+    if (!intro) { skipped.missingIntroRequest++; continue; }
+    if (intro.status !== 'pending_suggestion') { skipped.notPendingSuggestion++; continue; }
+    if (intro.gmailDraftId) { skipped.existingDraft++; continue; }
 
     const investor = await db.query.investors.findFirst({ where: eq(investors.id, c.investorId) });
-    if (!investor || !investor.email) continue;
+    if (!investor || !investor.email) { skipped.noInvestorEmail++; continue; }
 
     const founder = await db.query.founders.findFirst({ where: eq(founders.id, c.founderId) });
     const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.nodeId) });
-    if (!founder) continue;
+    if (!founder) { skipped.missingFounder++; continue; }
 
     // Build email + draft
     const { subject, body } = buildIntroBody({
@@ -393,7 +414,12 @@ export async function runAutoDraftTick(): Promise<{
   }
 
   if (results.length === 0) {
-    return { drafted: 0, results: [], skipped: `No eligible candidates (score >= ${AUTO_DRAFT_MIN_SCORE}, investor.email set, no existing draft, per-founder cap not hit)` };
+    return {
+      drafted: 0,
+      results: [],
+      skipped: `No eligible candidates of ${skipped.total} pending. Breakdown: score<${AUTO_DRAFT_MIN_SCORE}: ${skipped.underScore}, no investor email: ${skipped.noInvestorEmail}, existing draft: ${skipped.existingDraft}, not pending: ${skipped.notPendingSuggestion}, day-cap: ${skipped.perFounderDayCap}, week-cap: ${skipped.perFounderWeekCap}`,
+      skippedBreakdown: skipped,
+    };
   }
-  return { drafted: results.length, results };
+  return { drafted: results.length, results, skippedBreakdown: skipped };
 }

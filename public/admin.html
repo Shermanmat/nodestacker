@@ -4918,7 +4918,29 @@
             const result = await api('/agent/auto-draft-now', { method: 'POST' });
             if (result.drafted > 0) {
               const lines = result.results.map(r => `• ${r.founderName} → ${r.investorName} (score ${r.matchScore})`).join('\n');
-              alert(`${result.drafted} draft${result.drafted === 1 ? '' : 's'} created.\n\n${lines}\n\nOpen Gmail → Drafts to review.`);
+              let msg = `${result.drafted} draft${result.drafted === 1 ? '' : 's'} created.\n\n${lines}\n\nOpen Gmail → Drafts to review.`;
+              if (result.skippedBreakdown) {
+                const s = result.skippedBreakdown;
+                const skipBits = [];
+                if (s.underScore) skipBits.push(`score<${s.minScoreThreshold}: ${s.underScore}`);
+                if (s.noInvestorEmail) skipBits.push(`no email: ${s.noInvestorEmail}`);
+                if (s.existingDraft) skipBits.push(`existing draft: ${s.existingDraft}`);
+                if (s.perFounderDayCap) skipBits.push(`day-cap hit: ${s.perFounderDayCap}`);
+                if (s.perFounderWeekCap) skipBits.push(`week-cap hit: ${s.perFounderWeekCap}`);
+                if (skipBits.length) msg += `\n\nAlso skipped (${s.total - result.drafted}): ${skipBits.join(', ')}`;
+              }
+              alert(msg);
+            } else if (result.skippedBreakdown) {
+              const s = result.skippedBreakdown;
+              let msg = `0 drafts created. Of ${s.total} pending suggestions:\n`;
+              if (s.underScore) msg += `\n• ${s.underScore} below score threshold (need ≥${s.minScoreThreshold})`;
+              if (s.noInvestorEmail) msg += `\n• ${s.noInvestorEmail} investor has no email on file`;
+              if (s.existingDraft) msg += `\n• ${s.existingDraft} already have a Gmail draft`;
+              if (s.notPendingSuggestion) msg += `\n• ${s.notPendingSuggestion} intro_request status not pending_suggestion`;
+              if (s.perFounderDayCap) msg += `\n• ${s.perFounderDayCap} founder hit 1/day cap`;
+              if (s.perFounderWeekCap) msg += `\n• ${s.perFounderWeekCap} founder hit 5/week cap`;
+              if (s.missingFounder || s.missingIntroRequest) msg += `\n• ${s.missingFounder + s.missingIntroRequest} data-link issues`;
+              alert(msg);
             } else {
               alert(`Skipped: ${result.skipped || 'no eligible candidate'}`);
             }

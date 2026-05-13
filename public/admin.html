@@ -3335,6 +3335,21 @@
         </div>
         <p class="text-xs text-gray-500 mb-4">Pre-drafted from the founder + investor data. Tweak as needed, copy, paste into Superhuman.</p>
 
+        <!-- Warning + inline fix when the investor has no email on file -->
+        <div v-if="currentInvestorForDraft &amp;&amp; !currentInvestorForDraft.email" class="bg-amber-50 border border-amber-200 rounded p-3 mb-4 text-sm">
+          <div class="font-medium text-amber-900">⚠ No email on file for {{ currentInvestorForDraft.name }}{{ currentInvestorForDraft.firm ? ' @ ' + currentInvestorForDraft.firm : '' }}</div>
+          <p class="text-amber-800 text-xs mt-1">The draft will have a blank <code>To:</code>. Add their email now and we'll patch this draft + save for future intros.</p>
+          <div class="flex gap-2 mt-2">
+            <input type="email" v-model="missingInvestorEmail" placeholder="investor@firm.com" @keydown.enter.prevent="saveMissingInvestorEmail"
+              class="flex-1 border rounded px-3 py-1 text-sm">
+            <button @click="saveMissingInvestorEmail" :disabled="savingMissingEmail || !missingInvestorEmail"
+              :class="(savingMissingEmail || !missingInvestorEmail) ? 'bg-gray-300 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'"
+              class="px-3 py-1 text-white rounded text-sm">
+              {{ savingMissingEmail ? 'Saving…' : 'Save & patch draft' }}
+            </button>
+          </div>
+        </div>
+
         <div class="space-y-4">
           <div>
             <label class="block text-xs font-medium text-gray-500 mb-1">To</label>
@@ -4987,13 +5002,41 @@
         };
 
         const introDraftIntroRequestId = ref(null);
+        const introDraftInvestorId = ref(null);
+        const missingInvestorEmail = ref('');
+        const savingMissingEmail = ref(false);
+        const currentInvestorForDraft = computed(() => {
+          if (!introDraftInvestorId.value) return null;
+          return investors.value.find(i => i.id === introDraftInvestorId.value) || null;
+        });
         const openIntroDraft = (req) => {
           const d = buildIntroDraft(req);
           Object.assign(introDraft, d);
           introDraftCopied.value = '';
           introDraftIntroRequestId.value = req.id;
+          introDraftInvestorId.value = req.investorId || req.investor?.id || null;
+          missingInvestorEmail.value = '';
           gmailDraftResult.value = null;
           showIntroDraftModal.value = true;
+        };
+        const saveMissingInvestorEmail = async () => {
+          if (!introDraftInvestorId.value || !missingInvestorEmail.value) return;
+          savingMissingEmail.value = true;
+          try {
+            await api(`/investors/${introDraftInvestorId.value}`, {
+              method: 'PUT',
+              body: { email: missingInvestorEmail.value.trim() },
+            });
+            // Reload investors so the cached record has the new email
+            await loadInvestors();
+            // Patch the live draft so the To: field fills in
+            introDraft.to = missingInvestorEmail.value.trim();
+            missingInvestorEmail.value = '';
+          } catch (e) {
+            alert('Failed to save email: ' + (e.message || e));
+          } finally {
+            savingMissingEmail.value = false;
+          }
         };
 
         const copyToClipboard = async (text, key) => {
@@ -6463,6 +6506,7 @@
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,
+          currentInvestorForDraft, missingInvestorEmail, savingMissingEmail, saveMissingInvestorEmail,
           // Gmail integration
           gmailStatus, connectOrDisconnectGmail,
           draftingGmail, gmailDraftResult, createGmailDraftFromCurrent,

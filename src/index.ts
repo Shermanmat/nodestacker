@@ -142,6 +142,26 @@ app.route('/api/brands', brandsRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// Serve uploaded founder decks (unguessable filename = the access token)
+app.get('/decks/:filename', async (c) => {
+  const filename = c.req.param('filename');
+  if (!/^[a-f0-9]{32}\.pdf$/i.test(filename)) {
+    return c.text('Not found', 404);
+  }
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const decksDir = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'decks');
+  try {
+    const buf = await fs.readFile(path.join(decksDir, filename));
+    c.header('Content-Type', 'application/pdf');
+    c.header('Content-Disposition', `inline; filename="${filename}"`);
+    c.header('Cache-Control', 'private, max-age=3600');
+    return c.body(new Uint8Array(buf));
+  } catch (_) {
+    return c.text('Not found', 404);
+  }
+});
+
 // Shadow agent — manual trigger (admin-only via /api/agent/* guard above)
 app.post('/api/agent/run-now', async (c) => {
   const { runAgentTick } = await import('./services/agent.js');

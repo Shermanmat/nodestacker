@@ -480,6 +480,64 @@ app.put('/:id', async (c) => {
   return c.json(result[0]);
 });
 
+// Upload founder deck — stored on Fly volume, served at /decks/<filename>
+app.post('/:id/upload-deck', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const existing = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  if (!existing) return c.json({ error: 'Founder not found' }, 404);
+
+  const body = await c.req.parseBody();
+  const file = body['deck'] as File | undefined;
+  if (!file) return c.json({ error: 'No file provided (form field "deck")' }, 400);
+
+  const MAX_BYTES = 30 * 1024 * 1024; // 30 MB
+  if (file.size > MAX_BYTES) {
+    return c.json({ error: `File too large (max ${MAX_BYTES / 1024 / 1024} MB)` }, 413);
+  }
+
+  // Accept PDF only for now — keeps attachment logic predictable.
+  const mime = (file as any).type || '';
+  if (!mime.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+    return c.json({ error: 'Only PDF files are supported' }, 400);
+  }
+
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const crypto = await import('crypto');
+
+  const decksDir = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'decks');
+  await fs.mkdir(decksDir, { recursive: true });
+
+  // Remove any previous deck file for this founder
+  if (existing.deckFile) {
+    try { await fs.unlink(path.join(decksDir, existing.deckFile)); } catch (_) { /* ok if already gone */ }
+  }
+
+  const token = crypto.randomBytes(16).toString('hex');
+  const filename = `${token}.pdf`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(path.join(decksDir, filename), buffer);
+
+  await db.update(founders).set({ deckFile: filename }).where(eq(founders.id, id));
+
+  return c.json({ success: true, deckFile: filename, deckServePath: `/decks/${filename}`, sizeBytes: file.size });
+});
+
+// Remove uploaded deck
+app.delete('/:id/deck', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const existing = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  if (!existing) return c.json({ error: 'Founder not found' }, 404);
+  if (existing.deckFile) {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const decksDir = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'decks');
+    try { await fs.unlink(path.join(decksDir, existing.deckFile)); } catch (_) { /* ok */ }
+  }
+  await db.update(founders).set({ deckFile: null }).where(eq(founders.id, id));
+  return c.json({ success: true });
+});
+
 // Delete founder
 app.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));

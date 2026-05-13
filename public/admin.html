@@ -2600,6 +2600,18 @@
                     <input v-model="founderForm.calendlyUrl" type="url" placeholder="https://..." class="w-full border rounded px-3 py-2 text-sm">
                   </div>
                 </div>
+                <div v-if="editingFounder">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Deck PDF attachment</label>
+                  <div v-if="founderForm.deckFile" class="flex items-center justify-between gap-2 bg-gray-50 border rounded px-3 py-2 text-sm">
+                    <a :href="'/decks/' + founderForm.deckFile" target="_blank" class="text-blue-600 hover:underline truncate">📎 Deck attached ({{ founderForm.deckFile }})</a>
+                    <button type="button" @click="removeFounderDeck" class="text-red-600 text-xs hover:underline">Remove</button>
+                  </div>
+                  <div v-else class="flex items-center gap-2">
+                    <input type="file" accept="application/pdf,.pdf" @change="uploadFounderDeck($event)" :disabled="uploadingDeck" class="text-sm">
+                    <span v-if="uploadingDeck" class="text-xs text-gray-500">Uploading…</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">PDF only, 30 MB max. Will be attached to Gmail drafts when ready (Step 3).</p>
+                </div>
               </div>
             </div>
           </div>
@@ -3999,7 +4011,41 @@
         watch(showInvestorModal, (v) => { if (v && !editingInvestor.value) { ssInvestorNode.value = ''; } });
 
         // Forms
-        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', calendlyUrl: '' });
+        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '' });
+        const uploadingDeck = ref(false);
+        const uploadFounderDeck = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file || !editingFounder.value) return;
+          uploadingDeck.value = true;
+          try {
+            const fd = new FormData();
+            fd.append('deck', file);
+            const res = await fetch(`/api/founders/${editingFounder.value}/upload-deck`, {
+              method: 'POST',
+              headers: { 'X-Admin-Session': adminSessionId.value },
+              body: fd,
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+              throw new Error(err.error || 'Upload failed');
+            }
+            const result = await res.json();
+            founderForm.deckFile = result.deckFile;
+            loadFounders();
+          } catch (err) {
+            alert('Deck upload failed: ' + (err.message || err));
+          } finally {
+            uploadingDeck.value = false;
+            e.target.value = '';
+          }
+        };
+        const removeFounderDeck = async () => {
+          if (!editingFounder.value) return;
+          if (!confirm('Remove the attached deck?')) return;
+          await api(`/founders/${editingFounder.value}/deck`, { method: 'DELETE' });
+          founderForm.deckFile = '';
+          loadFounders();
+        };
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
         const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
 
@@ -5872,7 +5918,7 @@
         const closeFounderModal = () => {
           showFounderModal.value = false;
           editingFounder.value = null;
-          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', calendlyUrl: '' });
+          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '' });
         };
 
         const saveNode = async () => {
@@ -6348,6 +6394,7 @@
           openIntroDraft, copyToClipboard, copyEntireIntro,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
+          uploadingDeck, uploadFounderDeck, removeFounderDeck,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, plannedStaleFitCount, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,

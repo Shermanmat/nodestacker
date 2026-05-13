@@ -70,6 +70,7 @@ export const founders = sqliteTable('founders', {
   // a final-shaped intro email instead of a skeleton.
   blurb: text('blurb'),
   deckUrl: text('deck_url'),
+  deckFile: text('deck_file'), // server-stored filename, e.g. '<token>.pdf' — used for Gmail attachments
   calendlyUrl: text('calendly_url'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });

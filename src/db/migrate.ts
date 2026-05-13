@@ -144,6 +144,7 @@ safeAddColumn('nodes', 'vip', 'integer NOT NULL DEFAULT 1');
 // deck/calendly links are appended to drafts when present.
 safeAddColumn('founders', 'blurb', 'text');
 safeAddColumn('founders', 'deck_url', 'text');
+safeAddColumn('founders', 'deck_file', 'text');
 safeAddColumn('founders', 'calendly_url', 'text');
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {

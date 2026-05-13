@@ -712,13 +712,23 @@ export async function generateMatchSuggestions(
     existingSuggestions.filter(s => s.status === 'pending').map(s => s.investorId)
   );
 
-  // Count intros in last 7 days per founder (including pending_suggestion — counts toward quota)
+  // Count intros in last 7 days per founder — only those actually sent (or
+  // beyond). Pending_suggestion rows are agent-generated proposals that
+  // haven't been approved/sent yet; counting them against the weekly quota
+  // would let unreviewed drafts block new generation. Drafts age out via
+  // discard/reject/mark-sent, not via "quota use."
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const SENT_OR_PROGRESSED_STATUSES = new Set([
+    'intro_request_sent', 'introduced', 'first_meeting_complete',
+    'second_meeting_complete', 'invested', 'follow_up_questions',
+    'circle_back_round_opens', 'passed',
+  ]);
   const weeklyIntroCount = new Map<number, number>();
   for (const ir of data.allIntroRequests) {
-    if (ir.createdAt && new Date(ir.createdAt).getTime() > sevenDaysAgo) {
-      weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
-    }
+    if (!ir.createdAt) continue;
+    if (new Date(ir.createdAt).getTime() <= sevenDaysAgo) continue;
+    if (!SENT_OR_PROGRESSED_STATUSES.has(ir.status)) continue;
+    weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
   }
 
   // Track ramp-ups and effective targets

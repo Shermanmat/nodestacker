@@ -1240,7 +1240,11 @@
               <tr v-for="req in introRequests" :key="req.id" class="border-t hover:bg-gray-50">
                 <td class="py-3 px-4 font-medium">{{ req.founder?.name }}</td>
                 <td class="px-4">{{ req.node?.name }}</td>
-                <td class="px-4">{{ req.investor?.name }} <span class="text-gray-400">@ {{ req.investor?.firm }}</span></td>
+                <td class="px-4">
+                  <button @click="req.investor &amp;&amp; editInvestor(req.investor)" class="text-blue-600 hover:underline">{{ req.investor?.name }}</button>
+                  <span class="text-gray-400">@ {{ req.investor?.firm }}</span>
+                  <span v-if="req.investor &amp;&amp; !req.investor.email" class="ml-1 text-xs text-red-600" title="No email on file — auto-draft will skip">(no email)</span>
+                </td>
                 <td class="px-4">
                   <span v-if="req.matchScore != null" :class="{
                     'bg-green-100 text-green-800': req.matchScore >= 80,

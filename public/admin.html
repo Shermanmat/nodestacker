@@ -1182,6 +1182,10 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Intro Requests</h2>
           <div class="flex gap-2">
+            <button @click="connectOrDisconnectGmail" :title="gmailStatus.connected ? 'Click to disconnect ' + (gmailStatus.email || 'Gmail') : 'Connect Gmail so the agent can create drafts in your inbox'"
+              :class="['text-white px-4 py-2 rounded-lg text-sm', gmailStatus.connected ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600']">
+              {{ gmailStatus.connected ? '✓ Gmail: ' + (gmailStatus.email || 'connected') : 'Connect Gmail' }}
+            </button>
             <button @click="sendDigestPreview" class="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800" :disabled="sendingDigestPreview" :title="'Email me a summary of what next Friday\'s digest will look like'">
               {{ sendingDigestPreview ? 'Sending...' : 'Email Digest Preview' }}
             </button>
@@ -3362,9 +3366,20 @@
           </div>
         </div>
 
+        <!-- Gmail draft result -->
+        <div v-if="gmailDraftResult" class="mt-4 bg-green-50 border border-green-200 rounded p-3 text-sm">
+          <div class="font-medium text-green-900">✓ Gmail draft created{{ gmailDraftResult.attached ? ' with PDF attached' : '' }}</div>
+          <p class="text-green-800 text-xs mt-1">Open Gmail or Superhuman → Drafts. The To field is blank (investor email not in our DB yet) — Gmail will autocomplete from your contacts.</p>
+          <a :href="gmailDraftResult.gmailUrl" target="_blank" class="text-green-700 underline text-xs">Open draft in Gmail →</a>
+        </div>
+
         <div class="flex justify-between items-center mt-6 pt-4 border-t">
           <a :href="introDraftMailto" target="_blank" class="text-sm text-blue-600 hover:underline">Open in default mail app →</a>
           <div class="flex gap-2">
+            <button v-if="gmailStatus.connected" @click="createGmailDraftFromCurrent" :disabled="draftingGmail"
+              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+              {{ draftingGmail ? 'Creating…' : 'Create as Gmail draft' }}
+            </button>
             <button @click="copyEntireIntro" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
               {{ introDraftCopied === 'all' ? 'Copied all' : 'Copy everything' }}
             </button>
@@ -4744,6 +4759,7 @@
           loadPendingInboundCount();
           loadOnboardingWorkflows();
           loadCategories();
+          loadGmailStatus();
         };
 
         // Load functions
@@ -4787,6 +4803,45 @@
 
         // Digest preview email (high-level summary, sent to admin email)
         const sendingDigestPreview = ref(false);
+        const gmailStatus = ref({ connected: false, email: null });
+        const loadGmailStatus = async () => {
+          try { gmailStatus.value = await api('/agent/gmail/status'); } catch (e) { /* ok */ }
+        };
+        const connectOrDisconnectGmail = async () => {
+          if (gmailStatus.value.connected) {
+            if (!confirm(`Disconnect ${gmailStatus.value.email || 'Gmail'}? The agent will stop creating drafts.`)) return;
+            await api('/agent/gmail/disconnect', { method: 'POST' });
+            await loadGmailStatus();
+          } else {
+            try {
+              const res = await api('/agent/gmail/connect');
+              if (res.authUrl) window.location.href = res.authUrl;
+            } catch (e) {
+              alert('Gmail connect failed: ' + (e.message || e) + '\n\nMake sure GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are set as Fly secrets.');
+            }
+          }
+        };
+
+        // Create the draft directly in Gmail (instead of copy/paste).
+        const draftingGmail = ref(false);
+        const gmailDraftResult = ref(null);
+        const createGmailDraftFromCurrent = async () => {
+          if (!introDraftIntroRequestId.value) return;
+          draftingGmail.value = true;
+          gmailDraftResult.value = null;
+          try {
+            const result = await api('/agent/gmail/draft-intro', {
+              method: 'POST',
+              body: { introRequestId: introDraftIntroRequestId.value },
+            });
+            gmailDraftResult.value = result;
+          } catch (e) {
+            alert('Gmail draft failed: ' + (e.message || e));
+          } finally {
+            draftingGmail.value = false;
+          }
+        };
+
         const runningAgent = ref(false);
         const runAgentNow = async () => {
           if (!confirm('Run the shadow agent now? It will generate new matches and email you a digest.')) return;
@@ -4918,10 +4973,13 @@
           };
         };
 
+        const introDraftIntroRequestId = ref(null);
         const openIntroDraft = (req) => {
           const d = buildIntroDraft(req);
           Object.assign(introDraft, d);
           introDraftCopied.value = '';
+          introDraftIntroRequestId.value = req.id;
+          gmailDraftResult.value = null;
           showIntroDraftModal.value = true;
         };
 
@@ -6392,6 +6450,9 @@
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,
+          // Gmail integration
+          gmailStatus, connectOrDisconnectGmail,
+          draftingGmail, gmailDraftResult, createGmailDraftFromCurrent,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
           uploadingDeck, uploadFounderDeck, removeFounderDeck,

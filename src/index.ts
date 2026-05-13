@@ -138,7 +138,6 @@ app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
 app.route('/api/brands', brandsRoutes);
-
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -167,6 +166,133 @@ app.post('/api/agent/run-now', async (c) => {
   const { runAgentTick } = await import('./services/agent.js');
   const result = await runAgentTick();
   return c.json(result);
+});
+
+// Gmail OAuth — returns the Google consent URL for the admin to redirect to
+app.get('/api/agent/gmail/connect', async (c) => {
+  const { getAuthUrl } = await import('./services/gmail.js');
+  try {
+    return c.json({ authUrl: getAuthUrl() });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Gmail OAuth not configured' }, 500);
+  }
+});
+
+// Gmail OAuth — connection status
+app.get('/api/agent/gmail/status', async (c) => {
+  const { getStatus } = await import('./services/gmail.js');
+  return c.json(await getStatus());
+});
+
+// Gmail OAuth — disconnect (deletes stored refresh token)
+app.post('/api/agent/gmail/disconnect', async (c) => {
+  const { disconnect } = await import('./services/gmail.js');
+  await disconnect();
+  return c.json({ success: true });
+});
+
+// Gmail OAuth — callback (public; Google redirects here after consent).
+// Lives outside /api/agent/* so the admin guard doesn't block Google.
+// The Google-issued `code` is the only credential needed; only Google can
+// produce a valid one, so the public URL is acceptable.
+app.get('/oauth/gmail/callback', async (c) => {
+  const code = c.req.query('code');
+  const errorParam = c.req.query('error');
+  if (errorParam) {
+    return c.html(`<h2>Gmail connect failed</h2><p>${errorParam}</p><p><a href="/admin">Back to admin</a></p>`, 400);
+  }
+  if (!code) {
+    return c.html('<h2>Gmail connect: missing code parameter</h2><p><a href="/admin">Back to admin</a></p>', 400);
+  }
+  const { exchangeCodeForTokens } = await import('./services/gmail.js');
+  try {
+    const { email } = await exchangeCodeForTokens(code);
+    return c.html(`<h2>Gmail connected ✓</h2><p>Linked account: <strong>${email || 'unknown'}</strong>. You can close this tab.</p><script>setTimeout(()=>{window.location.href='/admin';},1200);</script>`);
+  } catch (err: any) {
+    return c.html(`<h2>Gmail connect failed</h2><pre>${err.message || err}</pre><p><a href="/admin">Back to admin</a></p>`, 500);
+  }
+});
+
+// Create a Gmail draft from a match suggestion / intro request.
+// Body: { introRequestId } — pulls everything else from the DB + founder fields.
+app.post('/api/agent/gmail/draft-intro', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const introRequestId = parseInt(body.introRequestId);
+  if (!introRequestId || isNaN(introRequestId)) {
+    return c.json({ error: 'introRequestId is required' }, 400);
+  }
+
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, introRequestId) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) });
+  const investor = await db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) });
+  const node = await db.query.nodes.findFirst({ where: eq(nodes.id, intro.nodeId) });
+
+  if (!founder || !investor) return c.json({ error: 'Missing founder or investor' }, 400);
+  // Note: the investors table has no email column today — the draft is created
+  // with a blank `To`, the user fills it from their Gmail contacts on send.
+  // Adding investor.email is a future migration; not blocking this feature.
+
+  // Build the email exactly the same way the client-side draft modal does,
+  // mirroring the buildIntroDraft logic in admin.html.
+  const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+  const founderFirst = (founder.name || '').split(/\s+/)[0] || '';
+  const companyName = founder.companyName || '';
+  const stage = founder.companyStage ? String(founder.companyStage).replace(/_/g, ' ') : '';
+  const nodeFirst = (node?.name || 'Mat').split(/\s+/)[0];
+  const blurb = (founder.blurb || '').trim();
+  const deckUrl = (founder.deckUrl || '').trim();
+  const calendlyUrl = (founder.calendlyUrl || '').trim();
+
+  const subject = companyName
+    ? `Intro: ${founder.name} (${companyName}) <> ${investor.name}`
+    : `Intro: ${founder.name} <> ${investor.name}`;
+
+  const bodyLines: string[] = [];
+  bodyLines.push(`Hi ${investorFirst} —`);
+  bodyLines.push('');
+  bodyLines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
+  if (blurb) {
+    bodyLines.push('');
+    bodyLines.push(blurb);
+  } else if (stage) {
+    bodyLines.push('');
+    bodyLines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+  }
+  if (deckUrl || calendlyUrl) {
+    bodyLines.push('');
+    if (deckUrl) bodyLines.push(`Deck: ${deckUrl}`);
+    if (calendlyUrl) bodyLines.push(`Book time: ${calendlyUrl}`);
+  }
+  bodyLines.push('');
+  bodyLines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
+  bodyLines.push('');
+  bodyLines.push(nodeFirst);
+
+  // Locate the deck file on disk if uploaded
+  let attachmentPath: string | undefined;
+  let attachmentName: string | undefined;
+  if (founder.deckFile) {
+    const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
+    attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
+    attachmentName = `${companyName || founder.name} Deck.pdf`;
+  }
+
+  const { createDraft } = await import('./services/gmail.js');
+  try {
+    const result = await createDraft({
+      to: '', // investor email not stored on investors table — fill in Gmail
+      cc: founder.email || undefined,
+      subject,
+      body: bodyLines.join('\n'),
+      attachmentPath,
+      attachmentName,
+    });
+    return c.json({ success: true, ...result, attached: !!attachmentPath });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to create Gmail draft' }, 500);
+  }
 });
 
 // Angel Club application (public, no auth)

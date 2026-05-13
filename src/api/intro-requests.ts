@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, lt, isNull, inArray, sql, desc } from 'drizzle-orm';
-import { db, introRequests, founderNodeRelationships, nodeInvestorConnections, followupLogs, investors } from '../db/index.js';
+import { db, introRequests, founderNodeRelationships, nodeInvestorConnections, followupLogs, investors, matchSuggestions } from '../db/index.js';
 import { z } from 'zod';
 import { checkFirmBlocked } from '../services/matching.js';
 
@@ -71,6 +71,32 @@ app.get('/', async (c) => {
   }
   if (investorId) {
     filtered = filtered.filter(r => r.investorId === parseInt(investorId));
+  }
+
+  // Attach the latest matchSuggestion score for each intro request so the
+  // admin table can display agent confidence inline. We pull all suggestions
+  // once and join in JS — small N (under a few thousand suggestions total).
+  const introIds = filtered.map(r => r.id);
+  if (introIds.length > 0) {
+    const suggestions = await db.select({
+      introRequestId: matchSuggestions.introRequestId,
+      matchScore: matchSuggestions.matchScore,
+      matchReasoning: matchSuggestions.matchReasoning,
+    })
+      .from(matchSuggestions)
+      .where(inArray(matchSuggestions.introRequestId, introIds));
+    const scoreByIntroId = new Map<number, { matchScore: number | null; matchReasoning: string | null }>();
+    for (const s of suggestions) {
+      if (s.introRequestId != null) {
+        scoreByIntroId.set(s.introRequestId, { matchScore: s.matchScore, matchReasoning: s.matchReasoning });
+      }
+    }
+    const withScores = filtered.map(r => ({
+      ...r,
+      matchScore: scoreByIntroId.get(r.id)?.matchScore ?? null,
+      matchReasoning: scoreByIntroId.get(r.id)?.matchReasoning ?? null,
+    }));
+    return c.json(withScores);
   }
 
   return c.json(filtered);

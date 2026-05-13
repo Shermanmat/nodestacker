@@ -1226,6 +1226,7 @@
                 <th class="py-3 px-4">Founder</th>
                 <th class="px-4">Node</th>
                 <th class="px-4">Investor</th>
+                <th class="px-4">Score</th>
                 <th class="px-4">Status</th>
                 <th class="px-4">Requested</th>
                 <th class="px-4">Next Follow-up</th>
@@ -1237,6 +1238,14 @@
                 <td class="py-3 px-4 font-medium">{{ req.founder?.name }}</td>
                 <td class="px-4">{{ req.node?.name }}</td>
                 <td class="px-4">{{ req.investor?.name }} <span class="text-gray-400">@ {{ req.investor?.firm }}</span></td>
+                <td class="px-4">
+                  <span v-if="req.matchScore != null" :class="{
+                    'bg-green-100 text-green-800': req.matchScore >= 80,
+                    'bg-yellow-100 text-yellow-800': req.matchScore >= 65 &amp;&amp; req.matchScore < 80,
+                    'bg-gray-100 text-gray-600': req.matchScore < 65
+                  }" class="px-2 py-0.5 rounded text-xs font-medium" :title="req.matchReasoning || ''">{{ req.matchScore }}</span>
+                  <span v-else class="text-gray-300">—</span>
+                </td>
                 <td class="px-4"><span :class="statusClass(req.status)">{{ formatStatus(req.status) }}</span></td>
                 <td class="px-4">{{ req.dateRequested }}</td>
                 <td class="px-4" :class="isOverdue(req.nextFollowupDate) ? 'text-red-600 font-medium' : ''">{{ req.nextFollowupDate || '-' }}</td>

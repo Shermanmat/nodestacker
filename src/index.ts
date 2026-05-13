@@ -37,7 +37,7 @@ import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
-import { eq } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
 import { desc } from 'drizzle-orm';
 
@@ -182,6 +182,75 @@ app.post('/api/agent/rescore-pending', async (c) => {
   const { rescorePendingSuggestions } = await import('./services/matching.js');
   const result = await rescorePendingSuggestions();
   return c.json(result);
+});
+
+// Clear all pending suggestions — destructive reset of the queue. Drops both
+// the match_suggestions rows and the linked intro_requests in 'pending_suggestion'
+// status. Use before re-running the agent under new gating to start clean.
+app.post('/api/agent/clear-pending', async (c) => {
+  const { matchSuggestions } = await import('./db/index.js');
+  const pending = await db.select({
+    id: matchSuggestions.id,
+    introRequestId: matchSuggestions.introRequestId,
+  }).from(matchSuggestions).where(eq(matchSuggestions.status, 'pending'));
+
+  const introIds = pending.map(p => p.introRequestId).filter((x): x is number => x != null);
+  let deletedIntros = 0;
+  let deletedSuggestions = 0;
+
+  if (introIds.length > 0) {
+    const introRows = await db.select().from(introRequests)
+      .where(and(
+        eq(introRequests.status, 'pending_suggestion'),
+        inArray(introRequests.id, introIds),
+      ));
+    for (const ir of introRows) {
+      await db.delete(introRequests).where(eq(introRequests.id, ir.id));
+      deletedIntros++;
+    }
+  }
+
+  for (const s of pending) {
+    await db.delete(matchSuggestions).where(eq(matchSuggestions.id, s.id));
+    deletedSuggestions++;
+  }
+
+  return c.json({ deletedSuggestions, deletedIntros });
+});
+
+// Backfill investor emails from inbound_intro_logs. For each investor lacking
+// an email, find the most recent inbound_intro_logs row where detectedInvestorId
+// matches and copy from_email onto the investor record.
+app.post('/api/agent/backfill-investor-emails', async (c) => {
+  const { inboundIntroLogs } = await import('./db/index.js');
+  const missing = await db.select({ id: investors.id, name: investors.name })
+    .from(investors)
+    .where(or(isNull(investors.email), eq(investors.email, '')));
+
+  let updated = 0;
+  const filled: Array<{ id: number; name: string; email: string }> = [];
+  for (const inv of missing) {
+    const logs = await db.select({ fromEmail: inboundIntroLogs.fromEmail })
+      .from(inboundIntroLogs)
+      .where(and(
+        eq(inboundIntroLogs.detectedInvestorId, inv.id),
+        sql`${inboundIntroLogs.fromEmail} IS NOT NULL AND ${inboundIntroLogs.fromEmail} != ''`,
+      ))
+      .orderBy(desc(inboundIntroLogs.createdAt))
+      .limit(1);
+    if (logs.length === 0) continue;
+    const email = logs[0].fromEmail.trim().toLowerCase();
+    if (!email || !email.includes('@')) continue;
+    await db.update(investors).set({ email }).where(eq(investors.id, inv.id));
+    filled.push({ id: inv.id, name: inv.name, email });
+    updated++;
+  }
+
+  return c.json({
+    candidates: missing.length,
+    updated,
+    sampleFilled: filled.slice(0, 10),
+  });
 });
 
 // Mark a Gmail-drafted intro as actually sent — flips status to intro_request_sent

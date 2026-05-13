@@ -1201,6 +1201,12 @@
             <button @click="rescorePending" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700" :disabled="rescoring" :title="'Recompute scores on every pending suggestion using the current formula. Use after scoring algorithm changes.'">
               {{ rescoring ? 'Rescoring...' : 'Rescore pending' }}
             </button>
+            <button @click="backfillEmails" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700" :disabled="backfilling" :title="'Backfill missing investor emails from inbound_intro_logs.from_email.'">
+              {{ backfilling ? 'Backfilling...' : 'Backfill emails' }}
+            </button>
+            <button @click="clearPending" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700" :disabled="clearing" :title="'Delete ALL pending match_suggestions + their linked pending_suggestion intro_requests. Destructive — used before a clean re-run.'">
+              {{ clearing ? 'Clearing...' : 'Clear pending' }}
+            </button>
             <button @click="showIntroModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               New Intro Request
             </button>
@@ -4987,6 +4993,34 @@
           loadAllIntroRequests();
         };
 
+        const clearing = ref(false);
+        const clearPending = async () => {
+          if (!confirm('Delete ALL pending match suggestions and their pending_suggestion intro_requests? This is destructive — used to reset the queue before a clean agent re-run.')) return;
+          clearing.value = true;
+          try {
+            const result = await api('/agent/clear-pending', { method: 'POST' });
+            alert(`Cleared ${result.deletedSuggestions} suggestions and ${result.deletedIntros} intro_requests.`);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { console.error('Clear failed', e); } finally { clearing.value = false; }
+        };
+
+        const backfilling = ref(false);
+        const backfillEmails = async () => {
+          if (!confirm('Backfill missing investor emails from inbound_intro_logs?')) return;
+          backfilling.value = true;
+          try {
+            const result = await api('/agent/backfill-investor-emails', { method: 'POST' });
+            let msg = `Updated ${result.updated} of ${result.candidates} investors missing email.`;
+            if (result.sampleFilled?.length) {
+              msg += `\n\nSample:\n${result.sampleFilled.map(f => `• ${f.name} → ${f.email}`).join('\n')}`;
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { console.error('Backfill failed', e); } finally { backfilling.value = false; }
+        };
+
         const rescoring = ref(false);
         const rescorePending = async () => {
           if (!confirm('Recompute scores on every pending suggestion using the current formula?')) return;
@@ -6711,6 +6745,8 @@
           runningAgent, runAgentNow,
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested,
           rescoring, rescorePending,
+          clearing, clearPending,
+          backfilling, backfillEmails,
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,

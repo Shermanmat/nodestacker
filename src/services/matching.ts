@@ -694,6 +694,12 @@ interface FounderLiquidity {
 /**
  * Generate match suggestions for eligible founders.
  */
+// Only this node's connections feed the auto-match algorithm today —
+// Mat Sherman's network (id 2). Other nodes still exist and can be used
+// for manually-created intro_requests; the agent just won't auto-pick
+// them. Override via AGENT_PRIMARY_NODE_ID env var if/when that changes.
+const PRIMARY_NODE_ID = parseInt(process.env.AGENT_PRIMARY_NODE_ID || '2', 10);
+
 export async function generateMatchSuggestions(
   targetFounderId?: number,
 ): Promise<{ suggestions: GeneratedSuggestion[]; batchId: string; rampUps: RampUp[]; liquidity: FounderLiquidity[] }> {
@@ -873,7 +879,7 @@ export async function generateMatchSuggestions(
     const manualBaseline = founder.introTargetPerWeek || 0;
 
     // Get founder's nodes and track liquidity
-    const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id);
+    const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id && r.nodeId === PRIMARY_NODE_ID);
     let totalReachable = 0;
     let blockedByExisting = 0;
     let blockedByFirm = 0;

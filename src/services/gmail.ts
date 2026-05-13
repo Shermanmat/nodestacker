@@ -194,9 +194,9 @@ export function buildIntroBody(args: {
   const deckUrl = (founder.deckUrl || '').trim();
   const calendlyUrl = (founder.calendlyUrl || '').trim();
 
-  const subject = companyName
-    ? `Intro: ${founder.name} (${companyName}) <> ${investor.name}`
-    : `Intro: ${founder.name} <> ${investor.name}`;
+  // Subject defaults to the company name (admin can edit in Gmail before sending).
+  // Falls back to founder name only if companyName is unset.
+  const subject = companyName || founder.name;
 
   const fillVars = (s: string) => s
     .replace(/\{\{investorFirst\}\}/g, investorFirst)

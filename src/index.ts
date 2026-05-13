@@ -175,6 +175,15 @@ app.post('/api/agent/auto-draft-now', async (c) => {
   return c.json(result);
 });
 
+// Rescore every pending match_suggestion using the current scoring formula.
+// One-shot tool for the case where suggestions were generated under an older
+// algorithm and now show stale scores in the audit table.
+app.post('/api/agent/rescore-pending', async (c) => {
+  const { rescorePendingSuggestions } = await import('./services/matching.js');
+  const result = await rescorePendingSuggestions();
+  return c.json(result);
+});
+
 // Mark a Gmail-drafted intro as actually sent — flips status to intro_request_sent
 app.post('/api/intro-requests/:id/mark-sent', async (c) => {
   const id = parseInt(c.req.param('id'));

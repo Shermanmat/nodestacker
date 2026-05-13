@@ -1085,3 +1085,69 @@ export async function computeAllInvestorScores() {
     })
     .sort((a, b) => b.reliabilityScore - a.reliabilityScore);
 }
+
+/**
+ * One-shot rescore: walks every pending match_suggestion and recomputes
+ * matchScore + matchReasoning using the current scoring formula. Useful
+ * after we change the algorithm (or hard-tweak weights) so the existing
+ * queue doesn't show stale scores from the old formula. Untouched: the
+ * status itself — pending suggestions stay pending.
+ */
+export async function rescorePendingSuggestions(): Promise<{
+  total: number;
+  updated: number;
+  skipped: number;
+}> {
+  const data = await loadMatchingData();
+
+  const pending = await db.select().from(matchSuggestions)
+    .where(eq(matchSuggestions.status, 'pending'));
+
+  const connByPair = new Map<string, string>(); // `${nodeId}-${investorId}` -> strength
+  for (const conn of data.allNiConns) {
+    connByPair.set(`${conn.nodeId}-${conn.investorId}`, conn.connectionStrength);
+  }
+
+  const nowMs = Date.now();
+  const investorWeeksSinceContact = new Map<number, number>();
+  for (const inv of data.allInvestors) {
+    const intros = data.investorIntroMap.get(inv.id) || [];
+    let mostRecentMs = 0;
+    for (const ir of intros) {
+      const dateStr = ir.dateRequested || ir.createdAt;
+      if (!dateStr) continue;
+      const t = new Date(dateStr).getTime();
+      if (!isNaN(t) && t > mostRecentMs) mostRecentMs = t;
+    }
+    const weeks = mostRecentMs === 0
+      ? 52
+      : Math.floor((nowMs - mostRecentMs) / (1000 * 60 * 60 * 24 * 7));
+    investorWeeksSinceContact.set(inv.id, Math.max(0, weeks));
+  }
+
+  let updated = 0;
+  let skipped = 0;
+  for (const s of pending) {
+    const strength = connByPair.get(`${s.nodeId}-${s.investorId}`);
+    if (!strength) { skipped++; continue; }
+    const founderCats = data.founderCatMap.get(s.founderId) || [];
+    const investorCats = data.investorCatMap.get(s.investorId);
+    const weeksSinceContact = investorWeeksSinceContact.get(s.investorId) ?? 52;
+    const recencyBonus = Math.min(30, weeksSinceContact * 5);
+    const fit = classifyMatchFit(founderCats, investorCats);
+    const matchScore = computeFitScore(strength, fit, recencyBonus);
+    const matchReasoning = JSON.stringify({
+      connectionStrength: strength,
+      sectorFit: fit.sector,
+      stageFit: fit.stage,
+      personaFit: fit.persona,
+      weeksSinceContact,
+    });
+    await db.update(matchSuggestions)
+      .set({ matchScore, matchReasoning })
+      .where(eq(matchSuggestions.id, s.id));
+    updated++;
+  }
+
+  return { total: pending.length, updated, skipped };
+}

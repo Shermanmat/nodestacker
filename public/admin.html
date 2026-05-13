@@ -1198,6 +1198,9 @@
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
+            <button @click="rescorePending" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700" :disabled="rescoring" :title="'Recompute scores on every pending suggestion using the current formula. Use after scoring algorithm changes.'">
+              {{ rescoring ? 'Rescoring...' : 'Rescore pending' }}
+            </button>
             <button @click="showIntroModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               New Intro Request
             </button>
@@ -4980,6 +4983,22 @@
           loadAllIntroRequests();
         };
 
+        const rescoring = ref(false);
+        const rescorePending = async () => {
+          if (!confirm('Recompute scores on every pending suggestion using the current formula?')) return;
+          rescoring.value = true;
+          try {
+            const result = await api('/agent/rescore-pending', { method: 'POST' });
+            alert(`Rescored ${result.updated} of ${result.total} pending suggestions.${result.skipped ? ` (${result.skipped} skipped — connection no longer exists.)` : ''}`);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            console.error('Rescore failed', e);
+          } finally {
+            rescoring.value = false;
+          }
+        };
+
         const markIntroInvested = async (id) => {
           if (!confirm('Mark this intro as resulting in an investment? This is the binary outcome signal we track.')) return;
           await api(`/intro-requests/${id}/mark-invested`, { method: 'POST' });
@@ -6679,6 +6698,7 @@
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested,
+          rescoring, rescorePending,
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,

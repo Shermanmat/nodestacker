@@ -196,6 +196,24 @@ app.post('/api/intro-requests/:id/mark-sent', async (c) => {
   return c.json({ success: true });
 });
 
+// Mark an intro as resulting in an investment — flips status to 'invested'.
+// This is the single binary outcome signal we track. Allowed from any
+// post-pending status so admin can flip after the fact.
+app.post('/api/intro-requests/:id/mark-invested', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, id) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+  if (intro.status === 'pending_suggestion') {
+    return c.json({ error: 'Cannot mark a pending suggestion as invested — send the intro first' }, 400);
+  }
+  const now = new Date().toISOString();
+  await db.update(introRequests).set({
+    status: 'invested',
+    updatedAt: now,
+  }).where(eq(introRequests.id, id));
+  return c.json({ success: true });
+});
+
 // Discard a Gmail draft + the pending suggestion (deletes draft, rejects suggestion)
 app.post('/api/intro-requests/:id/discard-draft', async (c) => {
   const id = parseInt(c.req.param('id'));

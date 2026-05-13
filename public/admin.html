@@ -1255,7 +1255,8 @@
                   <template v-else>
                     <button @click="openIntroDraft(req)" class="text-purple-600 hover:underline mr-2">Draft</button>
                     <button @click="editIntro(req)" class="text-blue-600 hover:underline mr-2">Update</button>
-                    <button @click="showAddFollowup(req)" class="text-green-600 hover:underline">Log</button>
+                    <button @click="showAddFollowup(req)" class="text-green-600 hover:underline mr-2">Log</button>
+                    <button v-if="req.status !== 'invested'" @click="markIntroInvested(req.id)" class="text-emerald-700 hover:underline font-medium" title="Mark this intro as having led to an investment">💰 Invested</button>
                   </template>
                 </td>
               </tr>
@@ -1813,7 +1814,7 @@
       <div v-if="activeTab === 'marketplace'">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Marketplace Health</h2>
-          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen(); loadSupplyDemand(); loadDisengaged();" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen(); loadSupplyDemand(); loadDisengaged(); loadUntaggedInvestors();" class="text-blue-600 text-sm hover:underline">Refresh</button>
         </div>
 
         <!-- Network filter (applies to both Throughput and Stale Open cards) -->
@@ -2017,6 +2018,40 @@
           <span v-if="supplyDemand.totals.untaggedFounders > 0 &amp;&amp; supplyDemand.totals.untaggedInvestors > 0"> · </span>
           <span v-if="supplyDemand.totals.untaggedInvestors > 0">{{ supplyDemand.totals.untaggedInvestors }} eligible investor(s) have no sector tag</span>.
           They're missing from the per-sector rows below — tag them to get accurate signal.
+        </div>
+
+        <!-- Untagged investors punch list -->
+        <div v-if="untaggedInvestors &amp;&amp; untaggedInvestors.count > 0" class="bg-white rounded-lg shadow p-6 mb-8">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold">Untagged investors <span class="text-sm font-normal text-gray-500">({{ untaggedInvestors.count }})</span></h3>
+            <button @click="loadUntaggedInvestors" class="text-blue-600 text-xs hover:underline">Refresh</button>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Connected to a node, active, but missing sector tags — silently excluded from matching. Tag them to bring them into the pool.</p>
+          <div class="max-h-96 overflow-y-auto border rounded">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th class="text-left px-3 py-2">Investor</th>
+                  <th class="text-left px-3 py-2">Firm</th>
+                  <th class="text-left px-3 py-2">Tags</th>
+                  <th class="text-right px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="inv in untaggedInvestors.items" :key="inv.id" class="border-t hover:bg-gray-50">
+                  <td class="px-3 py-2">{{ inv.name }}</td>
+                  <td class="px-3 py-2 text-gray-600">{{ inv.firm || '—' }}</td>
+                  <td class="px-3 py-2 text-gray-500">
+                    <span v-if="!inv.hasAnyTags" class="text-red-600">none</span>
+                    <span v-else>{{ inv.tagCount }} (no sector)</span>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    <button @click="openInvestorEdit(inv.id)" class="text-blue-600 hover:underline text-xs">Tag now →</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Capacity by sector -->
@@ -3541,6 +3576,7 @@
             loadStaleOpen();
             loadSupplyDemand();
             loadDisengaged();
+            loadUntaggedInvestors();
           }
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
@@ -3600,6 +3636,7 @@
 
         // Supply / Demand by sector (weekly capacity-based)
         const supplyDemand = ref(null);
+        const untaggedInvestors = ref(null);
 
         // Disengaged investors (2 stalled intros in a row)
         const disengaged = ref({ count: 0, items: null });
@@ -4912,6 +4949,13 @@
           loadAllIntroRequests();
         };
 
+        const markIntroInvested = async (id) => {
+          if (!confirm('Mark this intro as resulting in an investment? This is the binary outcome signal we track.')) return;
+          await api(`/intro-requests/${id}/mark-invested`, { method: 'POST' });
+          loadIntroRequests();
+          loadAllIntroRequests();
+        };
+
         const runningAgent = ref(false);
         const runAgentNow = async () => {
           if (!confirm('Run the shadow agent now? It will generate new matches and email you a digest.')) return;
@@ -5410,6 +5454,22 @@
           } catch (e) {
             console.error('Failed to load supply-demand', e);
           }
+        };
+
+        const loadUntaggedInvestors = async () => {
+          try {
+            untaggedInvestors.value = await api('/marketplace-health/untagged-investors');
+          } catch (e) {
+            console.error('Failed to load untagged investors', e);
+          }
+        };
+
+        const openInvestorEdit = (id) => {
+          activeTab.value = 'investors';
+          setTimeout(() => {
+            const el = document.querySelector(`[data-investor-id="${id}"]`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 200);
         };
 
         const loadDisengaged = async () => {
@@ -6587,7 +6647,7 @@
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
-          runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft,
+          runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested,
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,
@@ -6617,6 +6677,7 @@
           stageCategoryOptions, personaCategoryOptions, sectorCategoryOptions,
           // Supply/demand by sector
           supplyDemand, loadSupplyDemand,
+          untaggedInvestors, loadUntaggedInvestors, openInvestorEdit,
           // Disengaged investors
           disengaged, disengagedShowAll, loadDisengaged, deactivateInvestor,
           bulkResearch,

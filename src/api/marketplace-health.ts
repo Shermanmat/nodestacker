@@ -930,4 +930,49 @@ app.get('/disengaged-investors', async (c) => {
   return c.json({ count: items.length, items });
 });
 
+/**
+ * Active/eligible investors connected to at least one node but missing
+ * sector tags. These get silently excluded from the matching algorithm's
+ * sector overlap step — surfacing them gives the admin a punch list to
+ * chip away at, 10/day. Each row links to the investor's record so
+ * tagging is a click away.
+ *
+ * GET /api/marketplace-health/untagged-investors
+ */
+app.get('/untagged-investors', async (c) => {
+  const [allInvestors, allCats, invCatRows, nodeConns] = await Promise.all([
+    db.select().from(investors),
+    db.select().from(investorCategories),
+    db.select().from(investorCategoryAssignments),
+    db.select().from(nodeInvestorConnections),
+  ]);
+  const catType = new Map(allCats.map(c => [c.id, c.type]));
+  const sectorTagsByInvestor = new Map<number, number>();
+  const allTagsByInvestor = new Map<number, number>();
+  for (const r of invCatRows) {
+    allTagsByInvestor.set(r.investorId, (allTagsByInvestor.get(r.investorId) || 0) + 1);
+    if (catType.get(r.categoryId) === 'sector') {
+      sectorTagsByInvestor.set(r.investorId, (sectorTagsByInvestor.get(r.investorId) || 0) + 1);
+    }
+  }
+  const connected = new Set(nodeConns.map(c => c.investorId));
+  const items = allInvestors
+    .filter(inv => inv.active)
+    .filter(inv => !inv.pausedUntil || new Date(inv.pausedUntil) <= new Date())
+    .filter(inv => connected.has(inv.id))
+    .filter(inv => (sectorTagsByInvestor.get(inv.id) || 0) === 0)
+    .map(inv => ({
+      id: inv.id,
+      name: inv.name,
+      firm: inv.firm,
+      email: inv.email,
+      hasAnyTags: (allTagsByInvestor.get(inv.id) || 0) > 0,
+      tagCount: allTagsByInvestor.get(inv.id) || 0,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  c.header('Cache-Control', 'no-store');
+  return c.json({ count: items.length, items });
+});
+
 export default app;

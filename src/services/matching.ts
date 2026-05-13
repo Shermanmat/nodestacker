@@ -1097,13 +1097,14 @@ export async function rescorePendingSuggestions(): Promise<{
   total: number;
   updated: number;
   skipped: number;
+  diagnostics?: { sampleMissing: Array<{ nodeId: number; investorId: number }>; connCount: number };
 }> {
   const data = await loadMatchingData();
 
   const pending = await db.select().from(matchSuggestions)
     .where(eq(matchSuggestions.status, 'pending'));
 
-  const connByPair = new Map<string, string>(); // `${nodeId}-${investorId}` -> strength
+  const connByPair = new Map<string, string>();
   for (const conn of data.allNiConns) {
     connByPair.set(`${conn.nodeId}-${conn.investorId}`, conn.connectionStrength);
   }
@@ -1127,9 +1128,18 @@ export async function rescorePendingSuggestions(): Promise<{
 
   let updated = 0;
   let skipped = 0;
+  const sampleMissing: Array<{ nodeId: number; investorId: number }> = [];
   for (const s of pending) {
-    const strength = connByPair.get(`${s.nodeId}-${s.investorId}`);
-    if (!strength) { skipped++; continue; }
+    let strength = connByPair.get(`${s.nodeId}-${s.investorId}`);
+    if (!strength) {
+      // Connection record vanished (deleted after suggestion was made, or
+      // suggestion predates current data model). Don't skip — fall back to
+      // 'medium' so the rescore still produces something usable. The score
+      // will rebuild on next agent run with the right data.
+      if (sampleMissing.length < 5) sampleMissing.push({ nodeId: s.nodeId, investorId: s.investorId });
+      strength = 'medium';
+      skipped++;
+    }
     const founderCats = data.founderCatMap.get(s.founderId) || [];
     const investorCats = data.investorCatMap.get(s.investorId);
     const weeksSinceContact = investorWeeksSinceContact.get(s.investorId) ?? 52;
@@ -1149,5 +1159,10 @@ export async function rescorePendingSuggestions(): Promise<{
     updated++;
   }
 
-  return { total: pending.length, updated, skipped };
+  return {
+    total: pending.length,
+    updated,
+    skipped,
+    diagnostics: { sampleMissing, connCount: data.allNiConns.length },
+  };
 }

@@ -4989,7 +4989,15 @@
           rescoring.value = true;
           try {
             const result = await api('/agent/rescore-pending', { method: 'POST' });
-            alert(`Rescored ${result.updated} of ${result.total} pending suggestions.${result.skipped ? ` (${result.skipped} skipped — connection no longer exists.)` : ''}`);
+            let msg = `Rescored ${result.updated} of ${result.total} pending suggestions.`;
+            if (result.skipped) msg += `\n\n${result.skipped} had a missing node↔investor connection (used 'medium' fallback).`;
+            if (result.diagnostics) {
+              msg += `\n\nDB has ${result.diagnostics.connCount} node↔investor connections total.`;
+              if (result.diagnostics.sampleMissing?.length) {
+                msg += `\nMissing pairs sample: ${result.diagnostics.sampleMissing.map(p => `node${p.nodeId}↔inv${p.investorId}`).join(', ')}`;
+              }
+            }
+            alert(msg);
             loadIntroRequests();
             loadAllIntroRequests();
           } catch (e) {

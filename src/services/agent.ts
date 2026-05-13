@@ -205,50 +205,68 @@ export async function runAgentTick(): Promise<{
 }
 
 /**
- * Auto-draft tick: picks ONE high-score pending suggestion per day and creates
- * a Gmail draft for it. Does NOT change status — draft sits in user's Gmail
- * awaiting their review. User clicks "Mark as sent" in admin (or sends from
- * Gmail) to flip intro_requests.status to intro_request_sent.
+ * Auto-draft tick: walks the pending-suggestion queue and creates Gmail
+ * drafts up to the per-founder caps. Does NOT change status — drafts sit
+ * in user's Gmail awaiting their review.
+ *
+ * Per-founder caps (not per-system):
+ *   - 1 auto-draft per founder per 24h
+ *   - 5 auto-drafts per founder per 7 days
  *
  * Hard preflight checks:
  *   - Gmail must be connected
  *   - Investor must have an email on file
  *   - Suggestion must have matchScore >= AUTO_DRAFT_MIN_SCORE (default 80)
- *   - At most one auto-draft per 24h (cap=1, daily)
  *   - Suggestion must not already have a gmailDraftId
  */
 const AUTO_DRAFT_MIN_SCORE = parseInt(process.env.AUTO_DRAFT_MIN_SCORE || '80', 10);
+const AUTO_DRAFT_PER_FOUNDER_PER_DAY = 1;
+const AUTO_DRAFT_PER_FOUNDER_PER_WEEK = 5;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
 
 export async function runAutoDraftTick(): Promise<{
-  drafted: boolean;
+  drafted: number;
   skipped?: string;
-  draftId?: string;
-  gmailUrl?: string;
-  founderName?: string;
-  investorName?: string;
-  matchScore?: number;
+  results: Array<{
+    draftId: string;
+    gmailUrl: string;
+    founderName: string;
+    investorName: string;
+    matchScore: number;
+  }>;
 }> {
   // 1. Gmail must be connected
   const gmail = await getGmailStatus();
   if (!gmail.connected) {
-    return { drafted: false, skipped: 'Gmail not connected' };
+    return { drafted: 0, skipped: 'Gmail not connected', results: [] };
   }
 
-  // 2. Daily cap — skip if any auto-draft was created in the last 24h
-  const twentyFourHoursAgo = new Date(Date.now() - DAY_MS).toISOString();
-  const recentDrafts = await db.select({ id: introRequests.id })
+  // Per-founder caps: build maps of drafts created in the last 24h and 7d
+  // by reading intro_requests.gmail_draft_created_at. We use these to skip
+  // founders who've already hit their quota for the window.
+  const dayCutoff = new Date(Date.now() - DAY_MS).toISOString();
+  const weekCutoff = new Date(Date.now() - WEEK_MS).toISOString();
+  const recentByFounder = await db.select({
+    founderId: introRequests.founderId,
+    createdAt: introRequests.gmailDraftCreatedAt,
+  })
     .from(introRequests)
     .where(and(
-      gte(introRequests.gmailDraftCreatedAt, twentyFourHoursAgo),
-    ))
-    .limit(1);
-  if (recentDrafts.length > 0) {
-    return { drafted: false, skipped: 'Daily cap hit (one auto-draft per 24h)' };
+      gte(introRequests.gmailDraftCreatedAt, weekCutoff),
+    ));
+  const draftsLastDay = new Map<number, number>();
+  const draftsLastWeek = new Map<number, number>();
+  for (const r of recentByFounder) {
+    if (!r.createdAt) continue;
+    draftsLastWeek.set(r.founderId, (draftsLastWeek.get(r.founderId) || 0) + 1);
+    if (r.createdAt >= dayCutoff) {
+      draftsLastDay.set(r.founderId, (draftsLastDay.get(r.founderId) || 0) + 1);
+    }
   }
 
-  // 3. Find top eligible pending suggestion: highest matchScore, no draft yet,
-  //    intro_request status still pending_suggestion.
+  // Find eligible pending suggestions: pending status, score above threshold,
+  // ordered by score desc so we draft the best fits first.
   const candidates = await db.select({
     suggestionId: matchSuggestions.id,
     introRequestId: matchSuggestions.introRequestId,
@@ -263,10 +281,19 @@ export async function runAutoDraftTick(): Promise<{
       gte(matchSuggestions.matchScore, AUTO_DRAFT_MIN_SCORE),
     ))
     .orderBy(desc(matchSuggestions.matchScore))
-    .limit(20); // load a few; we'll filter in JS for "no existing draft + investor has email"
+    .limit(200);
+
+  const results: Array<{ draftId: string; gmailUrl: string; founderName: string; investorName: string; matchScore: number }> = [];
 
   for (const c of candidates) {
     if (!c.introRequestId) continue;
+
+    // Per-founder caps: 1/day, 5/week
+    const dayCount = draftsLastDay.get(c.founderId) || 0;
+    const weekCount = draftsLastWeek.get(c.founderId) || 0;
+    if (dayCount >= AUTO_DRAFT_PER_FOUNDER_PER_DAY) continue;
+    if (weekCount >= AUTO_DRAFT_PER_FOUNDER_PER_WEEK) continue;
+
     const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, c.introRequestId) });
     if (!intro) continue;
     if (intro.status !== 'pending_suggestion') continue;
@@ -348,20 +375,25 @@ export async function runAutoDraftTick(): Promise<{
         });
       } catch (e) { console.error('[AUTO-DRAFT] Failed to notify admin', e); }
 
-      return {
-        drafted: true,
+      results.push({
         draftId: draftResult.draftId,
         gmailUrl: draftResult.gmailUrl,
         founderName: founder.name,
         investorName: investor.name,
-        matchScore: c.matchScore ?? undefined,
-      };
+        matchScore: c.matchScore ?? 0,
+      });
+      // Bump per-founder counters so subsequent candidates respect the cap in
+      // the same tick (otherwise we'd draft 5 in one run for a hot founder).
+      draftsLastDay.set(c.founderId, dayCount + 1);
+      draftsLastWeek.set(c.founderId, weekCount + 1);
     } catch (err) {
       console.error('[AUTO-DRAFT] createDraft failed', err);
-      // try the next candidate
       continue;
     }
   }
 
-  return { drafted: false, skipped: `No eligible candidates (score >= ${AUTO_DRAFT_MIN_SCORE}, investor.email set, no existing draft)` };
+  if (results.length === 0) {
+    return { drafted: 0, results: [], skipped: `No eligible candidates (score >= ${AUTO_DRAFT_MIN_SCORE}, investor.email set, no existing draft, per-founder cap not hit)` };
+  }
+  return { drafted: results.length, results };
 }

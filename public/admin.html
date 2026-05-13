@@ -1192,7 +1192,7 @@
             <button @click="runAgentNow" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700" :disabled="runningAgent" :title="'Run the shadow agent now — generates matches + emails me a digest. Runs automatically Mon + Thu 9am AZ.'">
               {{ runningAgent ? 'Running agent...' : 'Run agent now' }}
             </button>
-            <button @click="runAutoDraftNow" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700" :disabled="runningAutoDraft || !gmailStatus.connected" :title="'Pick the top high-score suggestion and create a Gmail draft. Daily cap: 1 per 24h. Status stays pending until you mark sent.'">
+            <button @click="runAutoDraftNow" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700" :disabled="runningAutoDraft || !gmailStatus.connected" :title="'Create Gmail drafts for top eligible suggestions. Per-founder cap: 1/day, 5/week. Status stays pending until you mark sent.'">
               {{ runningAutoDraft ? 'Drafting...' : 'Auto-draft one' }}
             </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
@@ -4875,12 +4875,13 @@
 
         const runningAutoDraft = ref(false);
         const runAutoDraftNow = async () => {
-          if (!confirm('Run the auto-draft now? It will pick the top high-score suggestion and create a Gmail draft. Daily cap: 1 per 24h.')) return;
+          if (!confirm('Run the auto-draft now? It will create Gmail drafts for the top eligible suggestions. Per-founder cap: 1/day, 5/week.')) return;
           runningAutoDraft.value = true;
           try {
             const result = await api('/agent/auto-draft-now', { method: 'POST' });
-            if (result.drafted) {
-              alert(`Draft created.\n\nFounder: ${result.founderName}\nInvestor: ${result.investorName}\nScore: ${result.matchScore}\n\nOpen in Gmail: ${result.gmailUrl}`);
+            if (result.drafted > 0) {
+              const lines = result.results.map(r => `• ${r.founderName} → ${r.investorName} (score ${r.matchScore})`).join('\n');
+              alert(`${result.drafted} draft${result.drafted === 1 ? '' : 's'} created.\n\n${lines}\n\nOpen Gmail → Drafts to review.`);
             } else {
               alert(`Skipped: ${result.skipped || 'no eligible candidate'}`);
             }

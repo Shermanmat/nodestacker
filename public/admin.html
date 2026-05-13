@@ -2592,7 +2592,8 @@
               <div class="space-y-3">
                 <div>
                   <label class="block text-sm font-medium text-gray-700 mb-1">Blurb (intro email body)</label>
-                  <textarea v-model="founderForm.blurb" rows="6" placeholder="Multi-paragraph pitch. Used verbatim as the body of intro emails. Write it like you'd write to an investor — 1-2 sentences on the founder, 1 paragraph on the company, 1 paragraph on traction/why-now." class="w-full border rounded px-3 py-2 text-sm"></textarea>
+                  <textarea v-model="founderForm.blurb" rows="8" placeholder="The full intro email body, used verbatim. Include greeting, body, sign-off. Supports template variables: {{investorFirst}}, {{investorName}}, {{investorFirm}}, {{founderFirst}}, {{founderName}}, {{companyName}}." class="w-full border rounded px-3 py-2 text-sm font-mono"></textarea>
+                  <p class="text-xs text-gray-500 mt-1">Used verbatim — no auto-prefix, no auto-signature. Variables like <code>{{investorFirst}}</code> get filled in per intro.</p>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                   <div>
@@ -4933,43 +4934,50 @@
             ? `Intro: ${f.name || 'Founder'} (${companyName}) <> ${i.name || 'Investor'}`
             : `Intro: ${f.name || 'Founder'} <> ${i.name || 'Investor'}`;
 
-          const bodyLines = [];
-          bodyLines.push(`Hi ${investorFirst} —`);
-          bodyLines.push('');
+          // Template variable substitution — used in blurb
+          const fillVars = (s) => s
+            .replace(/\{\{investorFirst\}\}/g, investorFirst)
+            .replace(/\{\{investorName\}\}/g, i.name || '')
+            .replace(/\{\{investorFirm\}\}/g, i.firm || '')
+            .replace(/\{\{founderFirst\}\}/g, founderFirst)
+            .replace(/\{\{founderName\}\}/g, f.name || '')
+            .replace(/\{\{companyName\}\}/g, companyName);
 
+          let body;
           if (blurb) {
-            // Use the founder's own blurb verbatim as the meat of the email.
-            bodyLines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
-            bodyLines.push('');
-            bodyLines.push(blurb);
+            // Use the founder's own blurb verbatim — it's expected to be the
+            // complete email (greeting, body, sign-off). Just substitute vars.
+            body = fillVars(blurb);
           } else {
-            // Fallback when no blurb is set — generic template
-            bodyLines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
+            // Fallback skeleton when no blurb is set
+            const lines = [];
+            lines.push(`Hi ${investorFirst} —`);
+            lines.push('');
+            lines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
             if (oneLiner) {
-              bodyLines.push('');
-              bodyLines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
+              lines.push('');
+              lines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
             }
-            bodyLines.push('');
-            if (stage) bodyLines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
-            else bodyLines.push(`I think they'd be a strong fit for your thesis.`);
+            lines.push('');
+            if (stage) lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+            else lines.push(`I think they'd be a strong fit for your thesis.`);
+            if (deckUrl || calendlyUrl) {
+              lines.push('');
+              if (deckUrl) lines.push(`Deck: ${deckUrl}`);
+              if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
+            }
+            lines.push('');
+            lines.push(`${founderFirst || f.name || 'Founder'}, meet ${investorFirst}${i.firm ? ` (${i.role || 'investor'} at ${i.firm})` : ''} — off to you both.`);
+            lines.push('');
+            lines.push(nodeFirst);
+            body = lines.join('\n');
           }
-
-          if (deckUrl || calendlyUrl) {
-            bodyLines.push('');
-            if (deckUrl) bodyLines.push(`Deck: ${deckUrl}`);
-            if (calendlyUrl) bodyLines.push(`Book time: ${calendlyUrl}`);
-          }
-
-          bodyLines.push('');
-          bodyLines.push(`${founderFirst || f.name || 'Founder'}, meet ${investorFirst}${i.firm ? ` (${i.role || 'investor'} at ${i.firm})` : ''} — off to you both.`);
-          bodyLines.push('');
-          bodyLines.push(nodeFirst);
 
           return {
             to: investorEmail,
             cc: founderEmail,
             subject,
-            body: bodyLines.join('\n'),
+            body,
           };
         };
 

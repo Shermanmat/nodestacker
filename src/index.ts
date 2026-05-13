@@ -234,8 +234,9 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   // with a blank `To`, the user fills it from their Gmail contacts on send.
   // Adding investor.email is a future migration; not blocking this feature.
 
-  // Build the email exactly the same way the client-side draft modal does,
-  // mirroring the buildIntroDraft logic in admin.html.
+  // Build the email — mirrors buildIntroDraft in admin.html.
+  // When blurb is set, the blurb IS the entire email body (with variable
+  // substitution). Fallback template only fires when no blurb is set.
   const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
   const founderFirst = (founder.name || '').split(/\s+/)[0] || '';
   const companyName = founder.companyName || '';
@@ -249,26 +250,37 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     ? `Intro: ${founder.name} (${companyName}) <> ${investor.name}`
     : `Intro: ${founder.name} <> ${investor.name}`;
 
-  const bodyLines: string[] = [];
-  bodyLines.push(`Hi ${investorFirst} —`);
-  bodyLines.push('');
-  bodyLines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
+  const fillVars = (s: string) => s
+    .replace(/\{\{investorFirst\}\}/g, investorFirst)
+    .replace(/\{\{investorName\}\}/g, investor.name || '')
+    .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
+    .replace(/\{\{founderFirst\}\}/g, founderFirst)
+    .replace(/\{\{founderName\}\}/g, founder.name || '')
+    .replace(/\{\{companyName\}\}/g, companyName);
+
+  let bodyText: string;
   if (blurb) {
-    bodyLines.push('');
-    bodyLines.push(blurb);
-  } else if (stage) {
-    bodyLines.push('');
-    bodyLines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+    bodyText = fillVars(blurb);
+  } else {
+    const lines: string[] = [];
+    lines.push(`Hi ${investorFirst} —`);
+    lines.push('');
+    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
+    if (stage) {
+      lines.push('');
+      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+    }
+    if (deckUrl || calendlyUrl) {
+      lines.push('');
+      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
+      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
+    }
+    lines.push('');
+    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
+    lines.push('');
+    lines.push(nodeFirst);
+    bodyText = lines.join('\n');
   }
-  if (deckUrl || calendlyUrl) {
-    bodyLines.push('');
-    if (deckUrl) bodyLines.push(`Deck: ${deckUrl}`);
-    if (calendlyUrl) bodyLines.push(`Book time: ${calendlyUrl}`);
-  }
-  bodyLines.push('');
-  bodyLines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
-  bodyLines.push('');
-  bodyLines.push(nodeFirst);
 
   // Locate the deck file on disk if uploaded
   let attachmentPath: string | undefined;
@@ -285,7 +297,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
       to: '', // investor email not stored on investors table — fill in Gmail
       cc: founder.email || undefined,
       subject,
-      body: bodyLines.join('\n'),
+      body: bodyText,
       attachmentPath,
       attachmentName,
     });

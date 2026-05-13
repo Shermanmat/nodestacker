@@ -92,6 +92,7 @@ export const investors = sqliteTable('investors', {
   name: text('name').notNull(),
   firm: text('firm'),
   role: text('role'),
+  email: text('email'),
   focusAreas: text('focus_areas'), // JSON array stored as text
   checkSize: text('check_size'),
   geography: text('geography'),

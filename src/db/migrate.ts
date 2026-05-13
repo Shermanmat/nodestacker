@@ -93,6 +93,18 @@ safeAddColumn('onboarding_workflows', 'intro_requests_revisit_date', 'text');
 // investor pause columns
 safeAddColumn('investors', 'paused_until', 'text');
 safeAddColumn('investors', 'pause_reason', 'text');
+// investor email — used for Gmail draft To: field
+safeAddColumn('investors', 'email', 'text');
+// One-time backfill: pull emails from instantly_leads where they're linked
+try {
+  sqlite.exec(`UPDATE investors SET email = (
+    SELECT investor_email FROM instantly_leads
+    WHERE instantly_leads.investor_id = investors.id
+      AND instantly_leads.investor_email IS NOT NULL
+      AND instantly_leads.investor_email != ''
+    LIMIT 1
+  ) WHERE email IS NULL OR email = ''`);
+} catch (_) { /* ok if instantly_leads doesn't exist or no rows match */ }
 // intro request date tracking
 safeAddColumn('intro_requests', 'date_passed', 'text');
 // blurb builder columns

@@ -230,9 +230,6 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const node = await db.query.nodes.findFirst({ where: eq(nodes.id, intro.nodeId) });
 
   if (!founder || !investor) return c.json({ error: 'Missing founder or investor' }, 400);
-  // Note: the investors table has no email column today — the draft is created
-  // with a blank `To`, the user fills it from their Gmail contacts on send.
-  // Adding investor.email is a future migration; not blocking this feature.
 
   // Build the email — mirrors buildIntroDraft in admin.html.
   // When blurb is set, the blurb IS the entire email body (with variable
@@ -294,7 +291,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const { createDraft } = await import('./services/gmail.js');
   try {
     const result = await createDraft({
-      to: '', // investor email not stored on investors table — fill in Gmail
+      to: investor.email || '',
       cc: founder.email || undefined,
       subject,
       body: bodyText,

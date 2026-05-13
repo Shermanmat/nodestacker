@@ -21,6 +21,7 @@ const createInvestorSchema = z.object({
   name: z.string().min(1),
   firm: z.string().nullable().optional(),
   role: z.string().nullable().optional(),
+  email: z.string().nullable().optional(),
   focusAreas: z.array(z.string()).nullable().optional(),
   checkSize: z.string().nullable().optional(),
   geography: z.string().nullable().optional(),

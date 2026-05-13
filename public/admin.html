@@ -2678,6 +2678,11 @@
               <input v-model="investorForm.name" type="text" required class="w-full border rounded px-3 py-2">
             </div>
             <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input v-model="investorForm.email" type="email" placeholder="investor@firm.com" class="w-full border rounded px-3 py-2">
+              <p class="text-xs text-gray-500 mt-1">Used as the To: field on Gmail intro drafts.</p>
+            </div>
+            <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Firm</label>
               <input v-model="investorForm.firm" type="text" class="w-full border rounded px-3 py-2">
             </div>
@@ -4063,7 +4068,7 @@
           loadFounders();
         };
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
 
         // Categories grouped by type for the add-investor required dropdowns
         const stageCategoryOptions = computed(() => allCategories.value
@@ -6094,7 +6099,7 @@
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
+          Object.assign(investorForm, { name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
         };
 
         const saveIntro = async () => {

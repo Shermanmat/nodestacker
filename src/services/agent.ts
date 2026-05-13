@@ -29,6 +29,12 @@ export async function runAgentTick(): Promise<{
       blockedByExisting: number;
       blockedByFirm: number;
       blockedByCooldown: number;
+      blockedByClaimed: number;
+      blockedByTripleDup: number;
+      blockedByVipGate: number;
+      blockedByVipNode: number;
+      blockedByGeo: number;
+      blockedByCategory: number;
       generated: number;
     }>;
   };
@@ -178,6 +184,12 @@ export async function runAgentTick(): Promise<{
         blockedByExisting: l.blockedByExisting,
         blockedByFirm: l.blockedByFirm,
         blockedByCooldown: l.blockedByCooldown,
+        blockedByClaimed: l.blockedByClaimed,
+        blockedByTripleDup: l.blockedByTripleDup,
+        blockedByVipGate: l.blockedByVipGate,
+        blockedByVipNode: l.blockedByVipNode,
+        blockedByGeo: l.blockedByGeo,
+        blockedByCategory: l.blockedByCategory,
         generated: l.generated,
       })),
     },

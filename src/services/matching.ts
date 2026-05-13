@@ -650,6 +650,12 @@ interface FounderLiquidity {
   blockedByCooldown: number;
   blockedByFirm: number;
   blockedByExisting: number;
+  blockedByClaimed: number;
+  blockedByTripleDup: number;
+  blockedByVipGate: number;
+  blockedByVipNode: number;
+  blockedByGeo: number;
+  blockedByCategory: number;
   generated: number;
   status: 'healthy' | 'tight' | 'dry';
 }
@@ -830,6 +836,12 @@ export async function generateMatchSuggestions(
     let blockedByExisting = 0;
     let blockedByFirm = 0;
     let blockedByCooldown = 0;
+    let blockedByClaimed = 0;
+    let blockedByTripleDup = 0;
+    let blockedByVipGate = 0;
+    let blockedByVipNode = 0;
+    let blockedByGeo = 0;
+    let blockedByCategory = 0;
     let availableCount = 0;
 
     for (const fnRel of founderNodes) {
@@ -855,33 +867,33 @@ export async function generateMatchSuggestions(
         if (cooldown?.onCooldown) { blockedByCooldown++; continue; }
 
         // Skip investors already claimed by another pending suggestion
-        if (claimedInvestorIds.has(investorId)) continue;
+        if (claimedInvestorIds.has(investorId)) { blockedByClaimed++; continue; }
 
         // Skip existing pending suggestions for same triple
         const tripleKey = `${founder.id}-${fnRel.nodeId}-${investorId}`;
-        if (existingTriples.has(tripleKey)) continue;
+        if (existingTriples.has(tripleKey)) { blockedByTripleDup++; continue; }
 
         // VIP gate: only match VIP investors with founders who have strong acceptance rates
-        if (investorVip.has(investorId) && !qualifiesForVip) continue;
+        if (investorVip.has(investorId) && !qualifiesForVip) { blockedByVipGate++; continue; }
 
         // VIP node gate: only match investors from VIP nodes with founders doing well in non-VIP networks
-        if (vipNodeIds.has(fnRel.nodeId) && !qualifiesForVipNode) continue;
+        if (vipNodeIds.has(fnRel.nodeId) && !qualifiesForVipNode) { blockedByVipNode++; continue; }
 
         // Geography gate: if investor has a specific geography, founder must be located there
         const invGeo = investorGeoMap.get(investorId);
         if (invGeo) {
           const founderCity = (founder.city || '').toLowerCase();
           const founderCountry = (founder.country || '').toLowerCase();
-          if (!founderCity && !founderCountry) continue;
+          if (!founderCity && !founderCountry) { blockedByGeo++; continue; }
           const geoMatch = founderCity.includes(invGeo) || invGeo.includes(founderCity) ||
                            founderCountry.includes(invGeo) || invGeo.includes(founderCountry);
-          if (!geoMatch) continue;
+          if (!geoMatch) { blockedByGeo++; continue; }
         }
 
         // Category filter (hard gate)
         const investorCats = data.investorCatMap.get(investorId);
         const investorExclusions = data.investorExclusionMap.get(investorId);
-        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) continue;
+        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) { blockedByCategory++; continue; }
 
         availableCount++;
 
@@ -927,6 +939,12 @@ export async function generateMatchSuggestions(
       blockedByCooldown,
       blockedByFirm,
       blockedByExisting,
+      blockedByClaimed,
+      blockedByTripleDup,
+      blockedByVipGate,
+      blockedByVipNode,
+      blockedByGeo,
+      blockedByCategory,
       generated: 0, // filled after filtering
       status: weeksOfRunway >= 4 ? 'healthy' : weeksOfRunway >= 2 ? 'tight' : 'dry',
     });

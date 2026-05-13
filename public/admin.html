@@ -4928,7 +4928,19 @@
                 msg += d.perFounder.slice(0, 12).map(p => {
                   const reasons = [];
                   if (p.remaining === 0) reasons.push(`quota filled (${p.usedThisWeek}/${p.target} this week)`);
-                  if (p.available === 0 && p.totalReachable > 0) reasons.push(`all ${p.totalReachable} reachable investors blocked (existing:${p.blockedByExisting}, firm-dedup:${p.blockedByFirm}, cooldown:${p.blockedByCooldown})`);
+                  if (p.available === 0 && p.totalReachable > 0) {
+                    const bits = [];
+                    if (p.blockedByExisting) bits.push(`already-intro'd:${p.blockedByExisting}`);
+                    if (p.blockedByFirm) bits.push(`firm-dedup:${p.blockedByFirm}`);
+                    if (p.blockedByCooldown) bits.push(`cooldown:${p.blockedByCooldown}`);
+                    if (p.blockedByClaimed) bits.push(`claimed-by-other-founder:${p.blockedByClaimed}`);
+                    if (p.blockedByTripleDup) bits.push(`prior-suggestion-dedup:${p.blockedByTripleDup}`);
+                    if (p.blockedByVipGate) bits.push(`VIP-investor-gate:${p.blockedByVipGate}`);
+                    if (p.blockedByVipNode) bits.push(`VIP-node-gate:${p.blockedByVipNode}`);
+                    if (p.blockedByGeo) bits.push(`geo-mismatch:${p.blockedByGeo}`);
+                    if (p.blockedByCategory) bits.push(`category-mismatch:${p.blockedByCategory}`);
+                    reasons.push(`all ${p.totalReachable} blocked (${bits.join(', ')})`);
+                  }
                   if (p.totalReachable === 0) reasons.push(`no reachable investors via any node`);
                   return `• ${p.founder}: ${p.generated} gen, ${p.available} avail of ${p.totalReachable} reachable${reasons.length ? ' — ' + reasons.join('; ') : ''}`;
                 }).join('\n');

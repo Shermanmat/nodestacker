@@ -107,6 +107,10 @@ try {
 } catch (_) { /* ok if instantly_leads doesn't exist or no rows match */ }
 // intro request date tracking
 safeAddColumn('intro_requests', 'date_passed', 'text');
+// Auto-draft agent: track Gmail draft id created for a pending suggestion.
+// Status stays pending_suggestion until user marks it sent.
+safeAddColumn('intro_requests', 'gmail_draft_id', 'text');
+safeAddColumn('intro_requests', 'gmail_draft_created_at', 'text');
 // blurb builder columns
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');

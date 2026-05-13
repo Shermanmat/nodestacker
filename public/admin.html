@@ -1192,6 +1192,9 @@
             <button @click="runAgentNow" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700" :disabled="runningAgent" :title="'Run the shadow agent now — generates matches + emails me a digest. Runs automatically Mon + Thu 9am AZ.'">
               {{ runningAgent ? 'Running agent...' : 'Run agent now' }}
             </button>
+            <button @click="runAutoDraftNow" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700" :disabled="runningAutoDraft || !gmailStatus.connected" :title="'Pick the top high-score suggestion and create a Gmail draft. Daily cap: 1 per 24h. Status stays pending until you mark sent.'">
+              {{ runningAutoDraft ? 'Drafting...' : 'Auto-draft one' }}
+            </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
@@ -1239,8 +1242,15 @@
                 <td class="px-4" :class="isOverdue(req.nextFollowupDate) ? 'text-red-600 font-medium' : ''">{{ req.nextFollowupDate || '-' }}</td>
                 <td class="px-4">
                   <template v-if="req.status === 'pending_suggestion'">
-                    <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Approve</button>
-                    <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
+                    <template v-if="req.gmailDraftId">
+                      <a :href="'https://mail.google.com/mail/u/0/#drafts/' + req.gmailDraftId" target="_blank" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 mr-1 inline-block">📧 Open draft</a>
+                      <button @click="markIntroSent(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Mark sent</button>
+                      <button @click="discardIntroDraft(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Discard</button>
+                    </template>
+                    <template v-else>
+                      <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Approve</button>
+                      <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
+                    </template>
                   </template>
                   <template v-else>
                     <button @click="openIntroDraft(req)" class="text-purple-600 hover:underline mr-2">Draft</button>
@@ -4863,6 +4873,44 @@
           }
         };
 
+        const runningAutoDraft = ref(false);
+        const runAutoDraftNow = async () => {
+          if (!confirm('Run the auto-draft now? It will pick the top high-score suggestion and create a Gmail draft. Daily cap: 1 per 24h.')) return;
+          runningAutoDraft.value = true;
+          try {
+            const result = await api('/agent/auto-draft-now', { method: 'POST' });
+            if (result.drafted) {
+              alert(`Draft created.\n\nFounder: ${result.founderName}\nInvestor: ${result.investorName}\nScore: ${result.matchScore}\n\nOpen in Gmail: ${result.gmailUrl}`);
+            } else {
+              alert(`Skipped: ${result.skipped || 'no eligible candidate'}`);
+            }
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            console.error('Auto-draft failed', e);
+          } finally {
+            runningAutoDraft.value = false;
+          }
+        };
+
+        const markIntroSent = async (id) => {
+          if (!confirm('Mark this intro as sent? Flips status to intro_request_sent. Only do this AFTER you actually sent the Gmail draft.')) return;
+          await api(`/intro-requests/${id}/mark-sent`, { method: 'POST' });
+          loadIntroRequests();
+          loadAllIntroRequests();
+          if (activeTab.value === 'marketplace') {
+            loadThroughput();
+            loadStaleOpen();
+          }
+        };
+
+        const discardIntroDraft = async (id) => {
+          if (!confirm('Discard this draft? Deletes the Gmail draft and removes the pending suggestion.')) return;
+          await api(`/intro-requests/${id}/discard-draft`, { method: 'POST' });
+          loadIntroRequests();
+          loadAllIntroRequests();
+        };
+
         const runningAgent = ref(false);
         const runAgentNow = async () => {
           if (!confirm('Run the shadow agent now? It will generate new matches and email you a digest.')) return;
@@ -6503,6 +6551,7 @@
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
+          runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft,
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,

@@ -172,6 +172,67 @@ export interface DraftResult {
   gmailUrl: string; // direct link to the draft in Gmail web
 }
 
+/**
+ * Build the intro email body + subject for a (founder, investor, node) triple.
+ * Mirrors the client-side buildIntroDraft in admin.html.
+ *
+ * Exported here so both the manual draft endpoint and the auto-draft cron
+ * produce the same email.
+ */
+export function buildIntroBody(args: {
+  founder: { name: string; companyName: string; email: string | null; blurb: string | null; companyStage: string; deckUrl: string | null; calendlyUrl: string | null };
+  investor: { name: string; firm: string | null; role: string | null };
+  node: { name: string } | null;
+}): { subject: string; body: string } {
+  const { founder, investor, node } = args;
+  const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+  const founderFirst = (founder.name || '').split(/\s+/)[0] || '';
+  const companyName = founder.companyName || '';
+  const stage = founder.companyStage ? String(founder.companyStage).replace(/_/g, ' ') : '';
+  const nodeFirst = (node?.name || 'Mat').split(/\s+/)[0];
+  const blurb = (founder.blurb || '').trim();
+  const deckUrl = (founder.deckUrl || '').trim();
+  const calendlyUrl = (founder.calendlyUrl || '').trim();
+
+  const subject = companyName
+    ? `Intro: ${founder.name} (${companyName}) <> ${investor.name}`
+    : `Intro: ${founder.name} <> ${investor.name}`;
+
+  const fillVars = (s: string) => s
+    .replace(/\{\{investorFirst\}\}/g, investorFirst)
+    .replace(/\{\{investorName\}\}/g, investor.name || '')
+    .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
+    .replace(/\{\{founderFirst\}\}/g, founderFirst)
+    .replace(/\{\{founderName\}\}/g, founder.name || '')
+    .replace(/\{\{companyName\}\}/g, companyName);
+
+  let body: string;
+  if (blurb) {
+    body = fillVars(blurb);
+  } else {
+    const lines: string[] = [];
+    lines.push(`Hi ${investorFirst} —`);
+    lines.push('');
+    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
+    if (stage) {
+      lines.push('');
+      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+    }
+    if (deckUrl || calendlyUrl) {
+      lines.push('');
+      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
+      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
+    }
+    lines.push('');
+    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
+    lines.push('');
+    lines.push(nodeFirst);
+    body = lines.join('\n');
+  }
+
+  return { subject, body };
+}
+
 export async function createDraft(input: DraftInput): Promise<DraftResult> {
   const client = await getAuthedClient();
   const stored = await loadStoredCredentials();

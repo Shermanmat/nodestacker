@@ -168,6 +168,80 @@ app.post('/api/agent/run-now', async (c) => {
   return c.json(result);
 });
 
+// Auto-draft tick — picks one high-score pending suggestion + creates Gmail draft
+app.post('/api/agent/auto-draft-now', async (c) => {
+  const { runAutoDraftTick } = await import('./services/agent.js');
+  const result = await runAutoDraftTick();
+  return c.json(result);
+});
+
+// Mark a Gmail-drafted intro as actually sent — flips status to intro_request_sent
+app.post('/api/intro-requests/:id/mark-sent', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, id) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+  if (intro.status !== 'pending_suggestion') {
+    return c.json({ error: `Not a pending suggestion (status: ${intro.status})` }, 400);
+  }
+  const now = new Date().toISOString();
+  await db.update(introRequests).set({
+    status: 'intro_request_sent',
+    dateRequested: now.split('T')[0],
+    updatedAt: now,
+  }).where(eq(introRequests.id, id));
+  // Mirror the match suggestion to approved
+  const { matchSuggestions } = await import('./db/index.js');
+  await db.update(matchSuggestions).set({ status: 'approved', reviewedAt: now })
+    .where(eq(matchSuggestions.introRequestId, id));
+  return c.json({ success: true });
+});
+
+// Discard a Gmail draft + the pending suggestion (deletes draft, rejects suggestion)
+app.post('/api/intro-requests/:id/discard-draft', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, id) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+  if (intro.status !== 'pending_suggestion') {
+    return c.json({ error: `Not a pending suggestion (status: ${intro.status})` }, 400);
+  }
+  // Best-effort: delete the Gmail draft if one exists
+  if (intro.gmailDraftId) {
+    try {
+      const { google } = await import('googleapis');
+      const { getStatus } = await import('./services/gmail.js');
+      // We don't have a public delete helper yet; do it inline.
+      const stored = await getStatus();
+      if (stored.connected) {
+        const { OAuth2Client } = await import('google-auth-library');
+        const client = new google.auth.OAuth2(process.env.GOOGLE_OAUTH_CLIENT_ID, process.env.GOOGLE_OAUTH_CLIENT_SECRET);
+        // Reload refresh token via the same file used in gmail.ts
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const credsFile = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'gmail-credentials.json');
+        const raw = await fs.readFile(credsFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        client.setCredentials({ refresh_token: parsed.refreshToken });
+        const gmail = google.gmail({ version: 'v1', auth: client });
+        await gmail.users.drafts.delete({ userId: 'me', id: intro.gmailDraftId });
+      }
+    } catch (e) {
+      console.error('[DISCARD-DRAFT] Failed to delete Gmail draft', e);
+      // Not fatal — still proceed with DB cleanup
+    }
+  }
+  const now = new Date().toISOString();
+  // Reject the linked match suggestion + free up the FK so we can delete
+  const { matchSuggestions } = await import('./db/index.js');
+  await db.update(matchSuggestions).set({
+    status: 'rejected',
+    reviewedAt: now,
+    rejectionReason: 'Discarded after auto-draft',
+    introRequestId: null,
+  }).where(eq(matchSuggestions.introRequestId, id));
+  await db.delete(introRequests).where(eq(introRequests.id, id));
+  return c.json({ success: true });
+});
+
 // Gmail OAuth — returns the Google consent URL for the admin to redirect to
 app.get('/api/agent/gmail/connect', async (c) => {
   const { getAuthUrl } = await import('./services/gmail.js');
@@ -708,6 +782,26 @@ cron.schedule('0 16 * * 1,4', async () => {
 });
 
 console.log('[CRON] Shadow agent scheduled for Mon + Thu 16:00 UTC (9am Arizona)');
+
+// Auto-draft tick — picks ONE high-score pending suggestion per day and creates
+// a Gmail draft. Status stays pending_suggestion. Admin reviews + sends from
+// Gmail, then clicks "Mark as sent" in admin.
+// 10am Arizona = 17:00 UTC. After the shadow-agent's 9am suggestion run so the
+// queue is fresh.
+cron.schedule('0 17 * * *', async () => {
+  console.log('[CRON] Running auto-draft tick...');
+  try {
+    const { runAutoDraftTick } = await import('./services/agent.js');
+    const result = await runAutoDraftTick();
+    console.log('[CRON] Auto-draft tick result:', result);
+  } catch (err) {
+    console.error('[CRON] Auto-draft tick failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Auto-draft scheduled for daily 17:00 UTC (10am Arizona)');
 
 serve({
   fetch: app.fetch,

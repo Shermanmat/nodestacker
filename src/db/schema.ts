@@ -147,6 +147,11 @@ export const introRequests = sqliteTable('intro_requests', {
   passReason: text('pass_reason'),
   investorBumpCount: integer('investor_bump_count').notNull().default(0),
   lastInvestorBumpAt: text('last_investor_bump_at'),
+  // Gmail draft id created by the auto-draft agent. Presence = draft exists
+  // in user's Gmail, awaiting their review/send. Status stays pending_suggestion
+  // until the user marks it sent.
+  gmailDraftId: text('gmail_draft_id'),
+  gmailDraftCreatedAt: text('gmail_draft_created_at'),
   notes: text('notes'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),

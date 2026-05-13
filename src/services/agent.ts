@@ -1,7 +1,8 @@
-import { eq, inArray } from 'drizzle-orm';
-import { db, founders, investors, nodes, matchSuggestions, type MatchSuggestion } from '../db/index.js';
+import { eq, inArray, and, isNull, desc, gte } from 'drizzle-orm';
+import { db, founders, investors, nodes, matchSuggestions, introRequests, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
 import { sendEmail } from './email.js';
+import { buildIntroBody, createDraft, getStatus as getGmailStatus } from './gmail.js';
 
 /**
  * Phase 1 shadow agent — runs match generation on a schedule and emails an
@@ -142,4 +143,166 @@ export async function runAgentTick(): Promise<{
     emailSent,
     recipient: adminEmail,
   };
+}
+
+/**
+ * Auto-draft tick: picks ONE high-score pending suggestion per day and creates
+ * a Gmail draft for it. Does NOT change status — draft sits in user's Gmail
+ * awaiting their review. User clicks "Mark as sent" in admin (or sends from
+ * Gmail) to flip intro_requests.status to intro_request_sent.
+ *
+ * Hard preflight checks:
+ *   - Gmail must be connected
+ *   - Investor must have an email on file
+ *   - Suggestion must have matchScore >= AUTO_DRAFT_MIN_SCORE (default 80)
+ *   - At most one auto-draft per 24h (cap=1, daily)
+ *   - Suggestion must not already have a gmailDraftId
+ */
+const AUTO_DRAFT_MIN_SCORE = parseInt(process.env.AUTO_DRAFT_MIN_SCORE || '80', 10);
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export async function runAutoDraftTick(): Promise<{
+  drafted: boolean;
+  skipped?: string;
+  draftId?: string;
+  gmailUrl?: string;
+  founderName?: string;
+  investorName?: string;
+  matchScore?: number;
+}> {
+  // 1. Gmail must be connected
+  const gmail = await getGmailStatus();
+  if (!gmail.connected) {
+    return { drafted: false, skipped: 'Gmail not connected' };
+  }
+
+  // 2. Daily cap — skip if any auto-draft was created in the last 24h
+  const twentyFourHoursAgo = new Date(Date.now() - DAY_MS).toISOString();
+  const recentDrafts = await db.select({ id: introRequests.id })
+    .from(introRequests)
+    .where(and(
+      gte(introRequests.gmailDraftCreatedAt, twentyFourHoursAgo),
+    ))
+    .limit(1);
+  if (recentDrafts.length > 0) {
+    return { drafted: false, skipped: 'Daily cap hit (one auto-draft per 24h)' };
+  }
+
+  // 3. Find top eligible pending suggestion: highest matchScore, no draft yet,
+  //    intro_request status still pending_suggestion.
+  const candidates = await db.select({
+    suggestionId: matchSuggestions.id,
+    introRequestId: matchSuggestions.introRequestId,
+    matchScore: matchSuggestions.matchScore,
+    founderId: matchSuggestions.founderId,
+    investorId: matchSuggestions.investorId,
+    nodeId: matchSuggestions.nodeId,
+  })
+    .from(matchSuggestions)
+    .where(and(
+      eq(matchSuggestions.status, 'pending'),
+      gte(matchSuggestions.matchScore, AUTO_DRAFT_MIN_SCORE),
+    ))
+    .orderBy(desc(matchSuggestions.matchScore))
+    .limit(20); // load a few; we'll filter in JS for "no existing draft + investor has email"
+
+  for (const c of candidates) {
+    if (!c.introRequestId) continue;
+    const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, c.introRequestId) });
+    if (!intro) continue;
+    if (intro.status !== 'pending_suggestion') continue;
+    if (intro.gmailDraftId) continue;
+
+    const investor = await db.query.investors.findFirst({ where: eq(investors.id, c.investorId) });
+    if (!investor || !investor.email) continue;
+
+    const founder = await db.query.founders.findFirst({ where: eq(founders.id, c.founderId) });
+    const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.nodeId) });
+    if (!founder) continue;
+
+    // Build email + draft
+    const { subject, body } = buildIntroBody({
+      founder: {
+        name: founder.name,
+        companyName: founder.companyName,
+        email: founder.email,
+        blurb: founder.blurb,
+        companyStage: founder.companyStage,
+        deckUrl: founder.deckUrl,
+        calendlyUrl: founder.calendlyUrl,
+      },
+      investor: { name: investor.name, firm: investor.firm, role: investor.role },
+      node: node ? { name: node.name } : null,
+    });
+
+    let attachmentPath: string | undefined;
+    let attachmentName: string | undefined;
+    if (founder.deckFile) {
+      const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
+      attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
+      attachmentName = `${founder.companyName || founder.name} Deck.pdf`;
+    }
+
+    try {
+      const draftResult = await createDraft({
+        to: investor.email,
+        cc: founder.email || undefined,
+        subject,
+        body,
+        attachmentPath,
+        attachmentName,
+      });
+
+      const now = new Date().toISOString();
+      await db.update(introRequests)
+        .set({
+          gmailDraftId: draftResult.draftId,
+          gmailDraftCreatedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(introRequests.id, intro.id));
+
+      // Notify admin
+      const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+      const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+      const subjectLine = `Agent: draft ready — ${founder.name} → ${investor.name}${investor.firm ? ` (${investor.firm})` : ''}`;
+      const reviewUrl = `${baseUrl}/admin#intros`;
+      try {
+        await sendEmail({
+          to: adminEmail,
+          subject: subjectLine,
+          html: `<div style="font-family:Inter,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#222">
+            <h2 style="margin:0 0 8px 0">Agent drafted a Gmail intro</h2>
+            <p style="color:#555;margin:0 0 16px 0">Score <strong>${c.matchScore}</strong>. Draft is in your Gmail Drafts (and Superhuman). Review and send, or discard.</p>
+            <table style="border-collapse:collapse;font-size:14px">
+              <tr><td style="padding:4px 12px;color:#888">Founder</td><td style="padding:4px 12px;font-weight:600">${founder.name} (${founder.companyName})</td></tr>
+              <tr><td style="padding:4px 12px;color:#888">Investor</td><td style="padding:4px 12px">${investor.name}${investor.firm ? ' @ ' + investor.firm : ''}</td></tr>
+              <tr><td style="padding:4px 12px;color:#888">To</td><td style="padding:4px 12px">${investor.email}</td></tr>
+              <tr><td style="padding:4px 12px;color:#888">Attachment</td><td style="padding:4px 12px">${attachmentPath ? '📎 ' + (attachmentName || 'deck.pdf') : 'none'}</td></tr>
+            </table>
+            <p style="margin-top:20px">
+              <a href="${draftResult.gmailUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;margin-right:8px">Open draft in Gmail →</a>
+              <a href="${reviewUrl}" style="display:inline-block;color:#2563eb;text-decoration:underline">Admin: intro requests</a>
+            </p>
+          </div>`,
+          text: `Agent drafted a Gmail intro\n\nFounder: ${founder.name} (${founder.companyName})\nInvestor: ${investor.name}${investor.firm ? ' @ ' + investor.firm : ''}\nTo: ${investor.email}\nScore: ${c.matchScore}\n\nOpen draft: ${draftResult.gmailUrl}\nAdmin: ${reviewUrl}`,
+        });
+      } catch (e) { console.error('[AUTO-DRAFT] Failed to notify admin', e); }
+
+      return {
+        drafted: true,
+        draftId: draftResult.draftId,
+        gmailUrl: draftResult.gmailUrl,
+        founderName: founder.name,
+        investorName: investor.name,
+        matchScore: c.matchScore ?? undefined,
+      };
+    } catch (err) {
+      console.error('[AUTO-DRAFT] createDraft failed', err);
+      // try the next candidate
+      continue;
+    }
+  }
+
+  return { drafted: false, skipped: `No eligible candidates (score >= ${AUTO_DRAFT_MIN_SCORE}, investor.email set, no existing draft)` };
 }

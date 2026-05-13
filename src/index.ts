@@ -223,6 +223,22 @@ app.post('/api/agent/clear-pending', async (c) => {
 // matches and copy from_email onto the investor record.
 app.post('/api/agent/backfill-investor-emails', async (c) => {
   const { inboundIntroLogs } = await import('./db/index.js');
+  // First: revert any prior bad backfills where the email is a known admin/node
+  // address. inbound_intro_logs stores from_email for BOTH inbound and outbound
+  // threads, so an earlier sweep stamped Mat's own address onto investors who
+  // had only ever been mailed BY him, never replied.
+  const adminAddresses = [
+    'mat@matsherman.com', 'mat@matcap.vc',
+    process.env.ADMIN_EMAIL || '',
+  ].filter(Boolean).map(s => s.toLowerCase());
+  await db.update(investors).set({ email: null })
+    .where(inArray(investors.email, adminAddresses));
+
+  // Also load node emails to skip — any address belonging to a node is "us"
+  const nodeRows = await db.select({ email: nodes.email }).from(nodes);
+  const nodeEmails = new Set(nodeRows.map(n => (n.email || '').toLowerCase()).filter(Boolean));
+  const skipAddresses = new Set([...adminAddresses, ...nodeEmails]);
+
   const missing = await db.select({ id: investors.id, name: investors.name })
     .from(investors)
     .where(or(isNull(investors.email), eq(investors.email, '')));
@@ -230,19 +246,27 @@ app.post('/api/agent/backfill-investor-emails', async (c) => {
   let updated = 0;
   const filled: Array<{ id: number; name: string; email: string }> = [];
   for (const inv of missing) {
+    // Pull ALL inbound from_email values for this investor and pick the first
+    // one that ISN'T an admin/node address. The investor's real reply address
+    // appears once they've actually responded.
     const logs = await db.select({ fromEmail: inboundIntroLogs.fromEmail })
       .from(inboundIntroLogs)
       .where(and(
         eq(inboundIntroLogs.detectedInvestorId, inv.id),
         sql`${inboundIntroLogs.fromEmail} IS NOT NULL AND ${inboundIntroLogs.fromEmail} != ''`,
       ))
-      .orderBy(desc(inboundIntroLogs.createdAt))
-      .limit(1);
-    if (logs.length === 0) continue;
-    const email = logs[0].fromEmail.trim().toLowerCase();
-    if (!email || !email.includes('@')) continue;
-    await db.update(investors).set({ email }).where(eq(investors.id, inv.id));
-    filled.push({ id: inv.id, name: inv.name, email });
+      .orderBy(desc(inboundIntroLogs.createdAt));
+    let chosen: string | null = null;
+    for (const log of logs) {
+      const candidate = (log.fromEmail || '').trim().toLowerCase();
+      if (!candidate || !candidate.includes('@')) continue;
+      if (skipAddresses.has(candidate)) continue;
+      chosen = candidate;
+      break;
+    }
+    if (!chosen) continue;
+    await db.update(investors).set({ email: chosen }).where(eq(investors.id, inv.id));
+    filled.push({ id: inv.id, name: inv.name, email: chosen });
     updated++;
   }
 

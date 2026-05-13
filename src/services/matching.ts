@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, lt, sql } from 'drizzle-orm';
 import {
   db,
   founders,
@@ -700,9 +700,32 @@ export async function generateMatchSuggestions(
   const data = await loadMatchingData();
   const batchId = crypto.randomUUID();
 
-  // Get existing pending/rejected suggestions to avoid duplicates and re-suggestions
+  // Auto-expire pending suggestions older than 14 days. They were generated but
+  // never reviewed by the admin — leaving them pending claims investors forever
+  // (claimedInvestorIds), starving other founders. We flip them to 'rejected'
+  // so they release the investor lock; the triple stays blocked for 90 days
+  // via the existingTriples window below, then re-opens for new suggestions.
+  const STALE_PENDING_DAYS = 14;
+  const fourteenDaysAgo = new Date(Date.now() - STALE_PENDING_DAYS * 86400 * 1000).toISOString();
+  await db.update(matchSuggestions)
+    .set({ status: 'rejected' })
+    .where(and(
+      eq(matchSuggestions.status, 'pending'),
+      lt(matchSuggestions.createdAt, fourteenDaysAgo),
+    ));
+
+  // existingTriples blocks re-suggesting the same (founder, node, investor):
+  //   - pending: actively in queue
+  //   - rejected within last 90 days: admin (or auto-expiry) rejected recently
+  // Older rejections age out so circumstances can change (founder pivots,
+  // investor pivots) without permanently blocking the triple.
+  const REJECTED_LOOKBACK_DAYS = 90;
+  const rejectedCutoff = new Date(Date.now() - REJECTED_LOOKBACK_DAYS * 86400 * 1000).toISOString();
   const existingSuggestions = await db.select().from(matchSuggestions)
-    .where(inArray(matchSuggestions.status, ['pending', 'rejected']));
+    .where(and(
+      inArray(matchSuggestions.status, ['pending', 'rejected']),
+      sql`(${matchSuggestions.status} = 'pending' OR ${matchSuggestions.createdAt} >= ${rejectedCutoff})`,
+    ));
   const existingTriples = new Set(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
@@ -819,39 +842,26 @@ export async function generateMatchSuggestions(
       if (firm) blockedFirms.add(firm);
     }
 
-    // Compute founder intro acceptance rate for VIP gating.
-    // Acceptance = intros that progressed to meeting or beyond, out of all introduced.
-    // Requires minimum 3 intros to qualify (otherwise not enough data).
-    const introduced = founderIntros.filter(ir =>
-      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)
-    );
-    const accepted = founderIntros.filter(ir =>
-      ['first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions'].includes(ir.status)
-    );
-    const founderAcceptRate = introduced.length >= 3
-      ? accepted.length / introduced.length
-      : 0;
-    // VIP threshold: founder needs ≥50% acceptance rate with at least 3 intros
-    const qualifiesForVip = founderAcceptRate >= 0.5 && introduced.length >= 3;
+    // VIP gating: gate on intro volume only, not acceptance rate. We don't
+    // track meeting/decline outcomes reliably — we assume every sent intro
+    // means a meeting happened. So "earning VIP access" = "has put 3 intros
+    // through the network" (proves the founder is real + the system is
+    // working for them). Drop the 50%-acceptance filter that previously
+    // gated on follow_up_questions / first_meeting_complete progression.
+    const VIP_INTROS_REQUIRED = 3;
+    const SENT_OR_PROGRESSED = new Set([
+      'intro_request_sent', 'introduced', 'first_meeting_complete',
+      'second_meeting_complete', 'invested', 'follow_up_questions',
+      'circle_back_round_opens', 'passed',
+    ]);
+    const introsSent = founderIntros.filter(ir => SENT_OR_PROGRESSED.has(ir.status));
+    const qualifiesForVip = introsSent.length >= VIP_INTROS_REQUIRED;
 
-    // VIP node qualification: check acceptance rate specifically from non-VIP node intros.
-    // Founders must prove they're "doing well" through the primary network before
-    // being matched with VIP node investors.
-    const nonVipIntros = founderIntros.filter(ir => !vipNodeIds.has(ir.nodeId));
-    const nonVipIntroduced = nonVipIntros.filter(ir =>
-      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)
-    );
-    const nonVipAccepted = nonVipIntros.filter(ir =>
-      ['first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions'].includes(ir.status)
-    );
-    const nonVipAcceptRate = nonVipIntroduced.length >= 3
-      ? nonVipAccepted.length / nonVipIntroduced.length
-      : 0;
-    const qualifiesForVipNode = nonVipAcceptRate >= 0.5 && nonVipIntroduced.length >= 3;
+    // VIP node gate: same threshold, but counted across non-VIP node intros
+    // only — founder must have proven they can absorb intros through the
+    // primary network before VIP nodes open up.
+    const nonVipIntrosSent = introsSent.filter(ir => !vipNodeIds.has(ir.nodeId));
+    const qualifiesForVipNode = nonVipIntrosSent.length >= VIP_INTROS_REQUIRED;
 
     // Compute founder heat
     const staticHeat = computeFounderStaticHeat(founderCats, data.personaTierMap);

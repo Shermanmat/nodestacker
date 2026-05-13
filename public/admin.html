@@ -4917,7 +4917,25 @@
           runningAgent.value = true;
           try {
             const result = await api('/agent/run-now', { method: 'POST' });
-            alert(`Agent run complete.\n\nGenerated: ${result.generated} suggestions\nTop picks (score ≥ 70): ${result.topRecommendations}\nEmail sent: ${result.emailSent ? 'yes (' + result.recipient + ')' : 'no — check logs'}`);
+            let msg = `Agent run complete.\n\nGenerated: ${result.generated} suggestions\nTop picks (score ≥ 70): ${result.topRecommendations}\nEmail sent: ${result.emailSent ? 'yes (' + result.recipient + ')' : 'no — check logs'}`;
+            if (result.generated === 0 && result.diagnostics) {
+              const d = result.diagnostics;
+              msg += `\n\n— Why 0? —\nEligible founders: ${d.eligibleFounders}`;
+              if (d.eligibleFounders === 0) {
+                msg += `\n(none have introCadenceActive=true + round not closed + not hidden)`;
+              } else {
+                msg += `\n\nPer-founder breakdown:\n`;
+                msg += d.perFounder.slice(0, 12).map(p => {
+                  const reasons = [];
+                  if (p.remaining === 0) reasons.push(`quota filled (${p.usedThisWeek}/${p.target} this week)`);
+                  if (p.available === 0 && p.totalReachable > 0) reasons.push(`all ${p.totalReachable} reachable investors blocked (existing:${p.blockedByExisting}, firm-dedup:${p.blockedByFirm}, cooldown:${p.blockedByCooldown})`);
+                  if (p.totalReachable === 0) reasons.push(`no reachable investors via any node`);
+                  return `• ${p.founder}: ${p.generated} gen, ${p.available} avail of ${p.totalReachable} reachable${reasons.length ? ' — ' + reasons.join('; ') : ''}`;
+                }).join('\n');
+                if (d.perFounder.length > 12) msg += `\n(+${d.perFounder.length - 12} more)`;
+              }
+            }
+            alert(msg);
             loadIntroRequests();
             loadAllIntroRequests();
           } catch (e) {

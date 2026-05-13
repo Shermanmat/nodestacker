@@ -17,6 +17,21 @@ export async function runAgentTick(): Promise<{
   topRecommendations: number;
   emailSent: boolean;
   recipient: string;
+  diagnostics?: {
+    eligibleFounders: number;
+    perFounder: Array<{
+      founder: string;
+      target: number;
+      usedThisWeek: number;
+      remaining: number;
+      totalReachable: number;
+      available: number;
+      blockedByExisting: number;
+      blockedByFirm: number;
+      blockedByCooldown: number;
+      generated: number;
+    }>;
+  };
 }> {
   const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
   const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
@@ -24,7 +39,7 @@ export async function runAgentTick(): Promise<{
   // 1. Generate fresh suggestions across all eligible founders.
   // generateMatchSuggestions persists rows in match_suggestions with
   // status='pending' for each new candidate.
-  const { suggestions, batchId } = await generateMatchSuggestions();
+  const { suggestions, batchId, liquidity } = await generateMatchSuggestions();
 
   // 2. Pull the just-created pending suggestions back (with the new batchId)
   //    so we have ids to link to from the email.
@@ -137,11 +152,35 @@ export async function runAgentTick(): Promise<{
     console.error('Agent: failed to send digest email', e);
   }
 
+  const founderNameMap = new Map(founderRows.map(f => [f.id, f.name]));
+  // Re-fetch names for founders that appeared in liquidity but didn't make top picks
+  const missingFounderIds = liquidity.map(l => l.founderId).filter(id => !founderNameMap.has(id));
+  if (missingFounderIds.length) {
+    const extra = await db.select({ id: founders.id, name: founders.name })
+      .from(founders).where(inArray(founders.id, missingFounderIds));
+    for (const f of extra) founderNameMap.set(f.id, f.name);
+  }
+
   return {
     generated: suggestions.length,
     topRecommendations: top.length,
     emailSent,
     recipient: adminEmail,
+    diagnostics: {
+      eligibleFounders: liquidity.length,
+      perFounder: liquidity.map(l => ({
+        founder: founderNameMap.get(l.founderId) || `#${l.founderId}`,
+        target: l.weeklyTarget,
+        usedThisWeek: l.usedThisWeek,
+        remaining: l.remaining,
+        totalReachable: l.totalReachableInvestors,
+        available: l.availableInvestors,
+        blockedByExisting: l.blockedByExisting,
+        blockedByFirm: l.blockedByFirm,
+        blockedByCooldown: l.blockedByCooldown,
+        generated: l.generated,
+      })),
+    },
   };
 }
 

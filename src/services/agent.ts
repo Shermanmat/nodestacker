@@ -47,11 +47,38 @@ export async function runAgentTick(): Promise<{
   const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
 
   // 1. Generate fresh suggestions across all eligible founders.
-  // generateMatchSuggestions persists rows in match_suggestions with
-  // status='pending' for each new candidate.
   const { suggestions, batchId, liquidity } = await generateMatchSuggestions();
 
-  // 2. Pull the just-created pending suggestions back (with the new batchId)
+  // 2. Persist each suggestion as a pending intro_request + linked match_suggestion.
+  // generateMatchSuggestions only returns in-memory candidates — the /api/matching/generate
+  // endpoint does this same write, but the shadow agent path needs it too.
+  const now = new Date().toISOString();
+  for (const s of suggestions) {
+    const [introRequest] = await db.insert(introRequests).values({
+      founderId: s.founderId,
+      nodeId: s.nodeId,
+      investorId: s.investorId,
+      status: 'pending_suggestion',
+      notes: `Match Score: ${s.matchScore}`,
+      createdAt: now,
+      updatedAt: now,
+    }).returning();
+    await db.insert(matchSuggestions).values({
+      founderId: s.founderId,
+      nodeId: s.nodeId,
+      investorId: s.investorId,
+      founderHeatScore: s.founderHeatScore,
+      investorReliabilityScore: s.investorReliabilityScore,
+      matchScore: s.matchScore,
+      matchReasoning: s.matchReasoning,
+      batchId: s.batchId,
+      status: 'pending',
+      introRequestId: introRequest.id,
+      createdAt: now,
+    });
+  }
+
+  // 3. Pull the just-created pending suggestions back (with the new batchId)
   //    so we have ids to link to from the email.
   const fresh = await db.select().from(matchSuggestions)
     .where(eq(matchSuggestions.batchId, batchId));

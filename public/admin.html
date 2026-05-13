@@ -4927,7 +4927,12 @@
                 msg += `\n\nPer-founder breakdown:\n`;
                 msg += d.perFounder.slice(0, 12).map(p => {
                   const reasons = [];
-                  if (p.remaining === 0) reasons.push(`quota filled (${p.usedThisWeek}/${p.target} this week)`);
+                  const targetBits = [];
+                  if (p.targetSupplyBased) targetBits.push(`supply:${p.targetSupplyBased}`);
+                  if (p.targetHeatBased) targetBits.push(`heat:${p.targetHeatBased}`);
+                  if (p.targetManualBaseline) targetBits.push(`manual:${p.targetManualBaseline}`);
+                  const targetExpl = targetBits.length ? ` [target=${p.target} via ${targetBits.join(',')}]` : '';
+                  if (p.remaining === 0) reasons.push(`quota filled (${p.usedThisWeek}/${p.target} this week)${targetExpl}`);
                   if (p.available === 0 && p.totalReachable > 0) {
                     const bits = [];
                     if (p.blockedByExisting) bits.push(`already-intro'd:${p.blockedByExisting}`);

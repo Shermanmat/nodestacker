@@ -622,8 +622,35 @@ export function computeRecommendedIntroTarget(heatScore: number, currentTarget: 
   else if (heatScore >= 60) recommended = 3;
   else if (heatScore >= 40) recommended = 2;
   else recommended = 1;
-  // Only ramp up, never decrease automatically
   return Math.max(recommended, currentTarget);
+}
+
+// Runway-based target: spread the available-investor pool across ~8 weeks.
+// Combines with heat (faster cadence for hot founders) and respects an
+// explicit manual baseline from founder.introTargetPerWeek when set > 0.
+// Clamped to [1, 5] so we always offer at least 1/week and never blow out
+// momentum with more than 5 fresh intros in a week.
+export const DYNAMIC_RUNWAY_WEEKS = 8;
+export const DYNAMIC_MIN = 1;
+export const DYNAMIC_MAX = 5;
+
+export function computeDynamicIntroTarget(opts: {
+  availableInvestors: number;
+  heatScore: number;
+  manualBaseline?: number | null;
+}): { target: number; supplyBased: number; heatBased: number; manualBaseline: number } {
+  const supplyBased = opts.availableInvestors > 0
+    ? Math.ceil(opts.availableInvestors / DYNAMIC_RUNWAY_WEEKS)
+    : DYNAMIC_MIN;
+  let heatBased: number;
+  if (opts.heatScore >= 80) heatBased = 4;
+  else if (opts.heatScore >= 60) heatBased = 3;
+  else if (opts.heatScore >= 40) heatBased = 2;
+  else heatBased = 1;
+  const manualBaseline = opts.manualBaseline ?? 0;
+  const combined = Math.max(supplyBased, heatBased, manualBaseline);
+  const target = Math.max(DYNAMIC_MIN, Math.min(DYNAMIC_MAX, combined));
+  return { target, supplyBased, heatBased, manualBaseline };
 }
 
 // --- Match Generation ---
@@ -658,6 +685,10 @@ interface FounderLiquidity {
   blockedByCategory: number;
   generated: number;
   status: 'healthy' | 'tight' | 'dry';
+  targetSource: 'dynamic' | 'manual';
+  targetSupplyBased: number;
+  targetHeatBased: number;
+  targetManualBaseline: number;
 }
 
 /**
@@ -817,18 +848,9 @@ export async function generateMatchSuggestions(
     const dynamicHeat = computeFounderDynamicHeat(founderIntros);
     const founderHeat = computeFounderHeatScore(staticHeat, dynamicHeat);
 
-    // Auto-ramp intro target based on heat
-    const currentTarget = founder.introTargetPerWeek || 2;
-    const recommendedTarget = computeRecommendedIntroTarget(founderHeat, currentTarget);
-    effectiveTargets.set(founder.id, recommendedTarget);
-    if (recommendedTarget > currentTarget) {
-      rampUps.push({
-        founderId: founder.id,
-        previousTarget: currentTarget,
-        newTarget: recommendedTarget,
-        heatScore: founderHeat,
-      });
-    }
+    // Manual baseline: an admin-set introTargetPerWeek > 0 acts as a floor.
+    // We default to 0 if unset so the dynamic calc (supply + heat) drives.
+    const manualBaseline = founder.introTargetPerWeek || 0;
 
     // Get founder's nodes and track liquidity
     const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id);
@@ -926,7 +948,22 @@ export async function generateMatchSuggestions(
     }
 
     const usedThisWeek = weeklyIntroCount.get(founder.id) || 0;
-    const target = effectiveTargets.get(founder.id) || currentTarget;
+    const dyn = computeDynamicIntroTarget({
+      availableInvestors: availableCount,
+      heatScore: founderHeat,
+      manualBaseline,
+    });
+    const target = dyn.target;
+    effectiveTargets.set(founder.id, target);
+    const targetSource: 'dynamic' | 'manual' = manualBaseline > 0 && manualBaseline >= dyn.supplyBased && manualBaseline >= dyn.heatBased ? 'manual' : 'dynamic';
+    if (manualBaseline > 0 && target > manualBaseline) {
+      rampUps.push({
+        founderId: founder.id,
+        previousTarget: manualBaseline,
+        newTarget: target,
+        heatScore: founderHeat,
+      });
+    }
     const weeksOfRunway = target > 0 ? Math.floor(availableCount / target) : 999;
     liquidityStats.push({
       founderId: founder.id,
@@ -947,6 +984,10 @@ export async function generateMatchSuggestions(
       blockedByCategory,
       generated: 0, // filled after filtering
       status: weeksOfRunway >= 4 ? 'healthy' : weeksOfRunway >= 2 ? 'tight' : 'dry',
+      targetSource,
+      targetSupplyBased: dyn.supplyBased,
+      targetHeatBased: dyn.heatBased,
+      targetManualBaseline: dyn.manualBaseline,
     });
   }
 

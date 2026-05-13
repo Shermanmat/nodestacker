@@ -36,6 +36,10 @@ export async function runAgentTick(): Promise<{
       blockedByGeo: number;
       blockedByCategory: number;
       generated: number;
+      targetSource: 'dynamic' | 'manual';
+      targetSupplyBased: number;
+      targetHeatBased: number;
+      targetManualBaseline: number;
     }>;
   };
 }> {
@@ -191,6 +195,10 @@ export async function runAgentTick(): Promise<{
         blockedByGeo: l.blockedByGeo,
         blockedByCategory: l.blockedByCategory,
         generated: l.generated,
+        targetSource: l.targetSource,
+        targetSupplyBased: l.targetSupplyBased,
+        targetHeatBased: l.targetHeatBased,
+        targetManualBaseline: l.targetManualBaseline,
       })),
     },
   };

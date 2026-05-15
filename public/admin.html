@@ -6424,8 +6424,17 @@
 
         const editInvestor = (investor) => {
           editingInvestor.value = investor.id;
+          // focusAreas can arrive as either a JSON string (when the investor
+          // object comes from a Drizzle join — e.g. the intro_requests table)
+          // or an already-parsed array (from /api/investors). Normalize to an
+          // array so the PUT validator is happy.
+          let focusAreas = investor.focusAreas;
+          if (typeof focusAreas === 'string') {
+            try { focusAreas = focusAreas ? JSON.parse(focusAreas) : []; } catch { focusAreas = []; }
+          }
           Object.assign(investorForm, {
             ...investor,
+            focusAreas: Array.isArray(focusAreas) ? focusAreas : [],
             active: investor.active !== false,
           });
           showInvestorModal.value = true;

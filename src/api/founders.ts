@@ -456,6 +456,25 @@ app.post('/', async (c) => {
 
   await ensureDefaultNodeRelationship(result[0].id);
 
+  // Default stage tags: Pre-seed + Seed. Most founders we onboard fit one
+  // of these; admin can flip them off in the founder edit modal if not.
+  // Without stage tags the matching algorithm can't gate by stage, so a
+  // sensible default beats untagged.
+  try {
+    const stageCats = await db.select({ id: investorCategories.id, name: investorCategories.name })
+      .from(investorCategories)
+      .where(eq(investorCategories.type, 'stage'));
+    const defaultStageNames = new Set(['pre-seed', 'preseed', 'seed']);
+    const defaultStages = stageCats.filter(c => defaultStageNames.has(c.name.toLowerCase()));
+    for (const stage of defaultStages) {
+      await db.insert(founderCategoryAssignments)
+        .values({ founderId: result[0].id, categoryId: stage.id })
+        .onConflictDoNothing();
+    }
+  } catch (e) {
+    console.error('Failed to assign default stage tags', e);
+  }
+
   return c.json(result[0], 201);
 });
 

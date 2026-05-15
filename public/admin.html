@@ -1278,8 +1278,9 @@
                     <button @click="openIntroDraft(req)" class="text-purple-600 hover:underline mr-2">Draft</button>
                     <button @click="editIntro(req)" class="text-blue-600 hover:underline mr-2">Update</button>
                     <button @click="showAddFollowup(req)" class="text-green-600 hover:underline mr-2">Log</button>
-                    <button v-if="req.status !== 'invested'" @click="markIntroInvested(req.id)" class="text-emerald-700 hover:underline font-medium" title="Mark this intro as having led to an investment">💰 Invested</button>
+                    <button v-if="req.status !== 'invested'" @click="markIntroInvested(req.id)" class="text-emerald-700 hover:underline font-medium mr-2" title="Mark this intro as having led to an investment">💰 Invested</button>
                   </template>
+                  <button @click="deleteIntroRequest(req)" class="text-gray-400 hover:text-red-600 ml-1" title="Delete this intro request (test entries, mistakes)">🗑️</button>
                 </td>
               </tr>
             </tbody>
@@ -5057,6 +5058,16 @@
           }
         };
 
+        const deleteIntroRequest = async (req) => {
+          const label = `${req.founder?.name || 'Founder'} → ${req.investor?.name || 'Investor'}`;
+          if (!confirm(`Delete intro request "${label}"? This permanently removes it (and any linked match suggestion). Use for test entries / mistakes.`)) return;
+          try {
+            await api(`/intro-requests/${req.id}`, { method: 'DELETE' });
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { console.error('Delete failed', e); alert('Delete failed — see console.'); }
+        };
+
         const markIntroInvested = async (id) => {
           if (!confirm('Mark this intro as resulting in an investment? This is the binary outcome signal we track.')) return;
           await api(`/intro-requests/${id}/mark-invested`, { method: 'POST' });
@@ -6763,7 +6774,7 @@
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
-          runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested,
+          runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,

@@ -416,11 +416,14 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     return c.json({ error: 'introRequestId is required' }, 400);
   }
   // Optional overrides: when the admin edits subject/body/to in the draft
-  // modal before clicking "Create Gmail draft", these come through verbatim.
-  // Without these, the server falls back to building from founder.blurb.
+  // modal before clicking "Create Gmail draft" or "Send now", these come
+  // through verbatim. Without them the server builds from founder.blurb.
   const subjectOverride: string | undefined = body.subjectOverride;
   const bodyOverride: string | undefined = body.bodyOverride;
   const toOverride: string | undefined = body.toOverride;
+  // sendNow=true: skip draft, send the message directly + flip status to
+  // intro_request_sent + mark match_suggestion approved in one step.
+  const sendNow: boolean = !!body.sendNow;
 
   const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, introRequestId) });
   if (!intro) return c.json({ error: 'Intro request not found' }, 404);
@@ -494,6 +497,32 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const finalBody = (bodyOverride != null && bodyOverride.trim()) ? bodyOverride : bodyText;
   const finalTo = (toOverride != null && toOverride.trim()) ? toOverride : (investor.email || '');
 
+  if (sendNow) {
+    const { sendGmail } = await import('./services/gmail.js');
+    try {
+      const sent = await sendGmail({
+        to: finalTo,
+        subject: finalSubject,
+        body: finalBody,
+        attachmentPath,
+        attachmentName,
+      });
+      const now = new Date().toISOString();
+      await db.update(introRequests).set({
+        status: 'intro_request_sent',
+        dateRequested: now.split('T')[0],
+        updatedAt: now,
+      }).where(eq(introRequests.id, intro.id));
+      const { matchSuggestions } = await import('./db/index.js');
+      await db.update(matchSuggestions)
+        .set({ status: 'approved', reviewedAt: now })
+        .where(eq(matchSuggestions.introRequestId, intro.id));
+      return c.json({ success: true, sent: true, ...sent, attached: !!attachmentPath });
+    } catch (err: any) {
+      return c.json({ error: err.message || 'Failed to send via Gmail' }, 500);
+    }
+  }
+
   const { createDraft } = await import('./services/gmail.js');
   try {
     const result = await createDraft({
@@ -503,7 +532,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
       attachmentPath,
       attachmentName,
     });
-    return c.json({ success: true, ...result, attached: !!attachmentPath });
+    return c.json({ success: true, sent: false, ...result, attached: !!attachmentPath });
   } catch (err: any) {
     return c.json({ error: err.message || 'Failed to create Gmail draft' }, 500);
   }

@@ -277,3 +277,42 @@ export async function createDraft(input: DraftInput): Promise<DraftResult> {
     gmailUrl: `https://mail.google.com/mail/u/0/#drafts/${messageId || draftId}`,
   };
 }
+
+// Send the email directly (skipping drafts). gmail.compose scope is sufficient
+// for messages.send per Google's OAuth docs. Returns the sent message's id +
+// thread id for future reference (e.g. follow-up agent linking).
+export async function sendGmail(input: DraftInput): Promise<{ messageId: string; threadId: string }> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const from = stored?.email || 'me';
+
+  let attachment: { filename: string; mimeType: string; data: Buffer } | undefined;
+  if (input.attachmentPath) {
+    const data = await fs.readFile(input.attachmentPath);
+    attachment = {
+      filename: input.attachmentName || path.basename(input.attachmentPath),
+      mimeType: 'application/pdf',
+      data,
+    };
+  }
+
+  const raw = buildMimeMessage({
+    from,
+    to: input.to,
+    cc: input.cc,
+    subject: input.subject,
+    body: input.body,
+    attachment,
+  });
+
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+
+  return {
+    messageId: res.data.id || '',
+    threadId: res.data.threadId || '',
+  };
+}

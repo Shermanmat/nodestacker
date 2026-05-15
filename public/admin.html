@@ -1270,7 +1270,7 @@
                       <button @click="discardIntroDraft(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Discard</button>
                     </template>
                     <template v-else>
-                      <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Approve</button>
+                      <button @click="openIntroDraft(req)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Review the email and choose: create Gmail draft or send now">Approve</button>
                       <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
                     </template>
                   </template>
@@ -3465,9 +3465,13 @@
         <div class="flex justify-between items-center mt-6 pt-4 border-t">
           <a :href="introDraftMailto" target="_blank" class="text-sm text-blue-600 hover:underline">Open in default mail app →</a>
           <div class="flex gap-2">
-            <button v-if="gmailStatus.connected" @click="createGmailDraftFromCurrent" :disabled="draftingGmail"
+            <button v-if="gmailStatus.connected" @click="createGmailDraftFromCurrent" :disabled="draftingGmail || sendingGmail"
               class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
               {{ draftingGmail ? 'Creating…' : 'Create as Gmail draft' }}
+            </button>
+            <button v-if="gmailStatus.connected" @click="sendGmailFromCurrent" :disabled="draftingGmail || sendingGmail"
+              class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm">
+              {{ sendingGmail ? 'Sending…' : 'Send now' }}
             </button>
             <button @click="copyEntireIntro" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
               {{ introDraftCopied === 'all' ? 'Copied all' : 'Copy everything' }}
@@ -4928,6 +4932,40 @@
         // Create the draft directly in Gmail (instead of copy/paste).
         const draftingGmail = ref(false);
         const gmailDraftResult = ref(null);
+        const sendingGmail = ref(false);
+        const sendGmailFromCurrent = async () => {
+          if (!introDraftIntroRequestId.value) return;
+          if (!introDraft.to || !introDraft.to.trim()) {
+            alert('No recipient email — add one before sending.');
+            return;
+          }
+          if (!confirm(`Send this intro now?\n\nTo: ${introDraft.to}\nSubject: ${introDraft.subject}\n\nThis cannot be undone.`)) return;
+          sendingGmail.value = true;
+          try {
+            const result = await api('/agent/gmail/draft-intro', {
+              method: 'POST',
+              body: {
+                introRequestId: introDraftIntroRequestId.value,
+                subjectOverride: introDraft.subject,
+                bodyOverride: introDraft.body,
+                toOverride: introDraft.to,
+                sendNow: true,
+              },
+            });
+            if (result?.sent) {
+              showIntroDraftModal.value = false;
+              loadIntroRequests();
+              loadAllIntroRequests();
+            } else {
+              alert('Send returned without confirmation. Check the row status.');
+            }
+          } catch (e) {
+            alert('Send failed: ' + (e.message || e));
+          } finally {
+            sendingGmail.value = false;
+          }
+        };
+
         const createGmailDraftFromCurrent = async () => {
           if (!introDraftIntroRequestId.value) return;
           draftingGmail.value = true;
@@ -6794,6 +6832,7 @@
           // Gmail integration
           gmailStatus, connectOrDisconnectGmail,
           draftingGmail, gmailDraftResult, createGmailDraftFromCurrent,
+          sendingGmail, sendGmailFromCurrent,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
           showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
           uploadingDeck, uploadFounderDeck, removeFounderDeck,

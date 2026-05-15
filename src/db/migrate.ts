@@ -113,6 +113,11 @@ safeAddColumn('intro_requests', 'date_passed', 'text');
 // Status stays pending_suggestion until user marks it sent.
 safeAddColumn('intro_requests', 'gmail_draft_id', 'text');
 safeAddColumn('intro_requests', 'gmail_draft_created_at', 'text');
+// Follow-up agent (Phase 1) — track thread id + reply detection + bump count
+safeAddColumn('intro_requests', 'gmail_thread_id', 'text');
+safeAddColumn('intro_requests', 'reply_detected_at', 'text');
+safeAddColumn('intro_requests', 'followup_count', 'integer NOT NULL DEFAULT 0');
+safeAddColumn('intro_requests', 'last_followup_at', 'text');
 // blurb builder columns
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');

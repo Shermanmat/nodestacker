@@ -9,8 +9,9 @@ import * as path from 'path';
  * Stores the refresh token on the Fly volume so it survives restarts.
  * On every call, refreshes the access token as needed via the OAuth2Client.
  *
- * Scope is gmail.compose only — drafts + send permission, no read access
- * to the inbox.
+ * Scope is gmail.modify — drafts, send, and read access (needed for the
+ * follow-up agent to check threads for investor replies). Re-auth required
+ * after the scope upgrade.
  */
 
 const CREDENTIALS_FILE = path.join(
@@ -18,7 +19,7 @@ const CREDENTIALS_FILE = path.join(
   'gmail-credentials.json'
 );
 
-const SCOPES = ['https://www.googleapis.com/auth/gmail.compose'];
+const SCOPES = ['https://www.googleapis.com/auth/gmail.modify'];
 
 interface StoredCredentials {
   refreshToken: string;
@@ -314,5 +315,97 @@ export async function sendGmail(input: DraftInput): Promise<{ messageId: string;
   return {
     messageId: res.data.id || '',
     threadId: res.data.threadId || '',
+  };
+}
+
+// Inspect a Gmail thread for inbound messages — any message NOT sent by us.
+// Used by the follow-up agent to stop bumping investors who've replied.
+// Returns the most recent non-self message timestamp (ms) if one exists.
+export async function checkThreadReplies(threadId: string): Promise<{
+  hasReply: boolean;
+  lastReplyAt?: string;
+  messageCount: number;
+}> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const myEmail = (stored?.email || '').toLowerCase();
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.threads.get({
+    userId: 'me',
+    id: threadId,
+    format: 'metadata',
+    metadataHeaders: ['From', 'Date'],
+  });
+  const messages = res.data.messages || [];
+  let lastReplyMs = 0;
+  let hasReply = false;
+  for (const msg of messages) {
+    const headers = msg.payload?.headers || [];
+    const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from')?.value || '';
+    // Extract bare email from "Name <foo@bar.com>" style headers
+    const emailMatch = fromHeader.match(/<([^>]+)>/);
+    const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
+    if (!from || from === myEmail) continue;
+    hasReply = true;
+    const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date')?.value;
+    const t = dateHeader ? new Date(dateHeader).getTime() : (msg.internalDate ? parseInt(msg.internalDate) : 0);
+    if (!isNaN(t) && t > lastReplyMs) lastReplyMs = t;
+  }
+  return {
+    hasReply,
+    lastReplyAt: lastReplyMs > 0 ? new Date(lastReplyMs).toISOString() : undefined,
+    messageCount: messages.length,
+  };
+}
+
+// Reply to an existing thread. Uses the same MIME build as sendGmail but adds
+// In-Reply-To + References + threadId so Gmail threads it correctly. No
+// attachment — follow-ups are short bumps.
+export async function sendThreadReply(input: {
+  threadId: string;
+  to: string;
+  subject: string;
+  body: string;
+  inReplyTo?: string; // Message-ID of the message we're replying to
+  references?: string;
+  asDraft?: boolean;
+}): Promise<{ messageId: string; threadId: string; draftId?: string }> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const from = stored?.email || 'me';
+
+  // Build MIME with In-Reply-To headers
+  const rawLines: string[] = [];
+  rawLines.push(`From: ${from}`);
+  rawLines.push(`To: ${input.to}`);
+  rawLines.push(`Subject: ${input.subject}`);
+  if (input.inReplyTo) rawLines.push(`In-Reply-To: ${input.inReplyTo}`);
+  if (input.references) rawLines.push(`References: ${input.references}`);
+  rawLines.push('MIME-Version: 1.0');
+  rawLines.push('Content-Type: text/plain; charset="UTF-8"');
+  rawLines.push('Content-Transfer-Encoding: 7bit');
+  rawLines.push('');
+  rawLines.push(input.body);
+  const raw = Buffer.from(rawLines.join('\r\n')).toString('base64url');
+
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  if (input.asDraft) {
+    const res = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody: { message: { raw, threadId: input.threadId } },
+    });
+    return {
+      draftId: res.data.id || '',
+      messageId: res.data.message?.id || '',
+      threadId: res.data.message?.threadId || input.threadId,
+    };
+  }
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw, threadId: input.threadId },
+  });
+  return {
+    messageId: res.data.id || '',
+    threadId: res.data.threadId || input.threadId,
   };
 }

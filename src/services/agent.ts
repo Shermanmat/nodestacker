@@ -1,8 +1,8 @@
-import { eq, inArray, and, isNull, desc, gte } from 'drizzle-orm';
+import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
 import { sendEmail } from './email.js';
-import { buildIntroBody, createDraft, getStatus as getGmailStatus } from './gmail.js';
+import { buildIntroBody, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 
 /**
  * Phase 1 shadow agent — runs match generation on a schedule and emails an
@@ -448,4 +448,139 @@ export async function runAutoDraftTick(): Promise<{
     };
   }
   return { drafted: results.length, results, skippedBreakdown: skipped };
+}
+
+// --- Follow-up Agent (Phase 1) ---
+//
+// For every sent intro that hasn't gotten a reply in 7+ days and hasn't already
+// been followed up on this cycle, draft a short bump in the same Gmail thread.
+// Drafts (not sends) — admin reviews + sends manually for now.
+//
+// Stops automatically when:
+//   - investor has replied (replyDetectedAt set)
+//   - followupCount >= MAX_FOLLOWUPS (2)
+//   - last follow-up was < 7 days ago
+
+const MAX_FOLLOWUPS = 2;
+const FOLLOWUP_GAP_DAYS = 7;
+const FOLLOWUP_TEMPLATES = [
+  'Hi {{first}} — just bumping this back to the top. No worries if not a fit, didn\'t want it to get lost.',
+  'Hi {{first}} — checking in on this, no pressure either way. Let me know!',
+  'Hey {{first}} — circling back on this. Happy to drop it if not interesting.',
+  '{{first}} — quick bump in case this got buried. No worries if you\'re slammed.',
+];
+
+export async function runFollowupTick(): Promise<{
+  checked: number;
+  drafted: number;
+  repliesDetected: number;
+  results: Array<{
+    introId: number;
+    founderName: string;
+    investorName: string;
+    action: 'drafted' | 'reply-detected' | 'skipped';
+    detail?: string;
+  }>;
+}> {
+  const gmail = await getGmailStatus();
+  if (!gmail.connected) {
+    return { checked: 0, drafted: 0, repliesDetected: 0, results: [] };
+  }
+
+  const cutoff = new Date(Date.now() - FOLLOWUP_GAP_DAYS * 86400 * 1000).toISOString();
+  const candidates = await db.select().from(introRequests)
+    .where(and(
+      eq(introRequests.status, 'intro_request_sent'),
+      sql`${introRequests.gmailThreadId} IS NOT NULL AND ${introRequests.gmailThreadId} != ''`,
+      isNull(introRequests.replyDetectedAt),
+      lt(introRequests.followupCount, MAX_FOLLOWUPS),
+      lt(introRequests.dateRequested, cutoff.split('T')[0]),
+      or(
+        isNull(introRequests.lastFollowupAt),
+        lt(introRequests.lastFollowupAt, cutoff),
+      ),
+    ));
+
+  const results: Array<{ introId: number; founderName: string; investorName: string; action: 'drafted' | 'reply-detected' | 'skipped'; detail?: string }> = [];
+  let drafted = 0;
+  let repliesDetected = 0;
+
+  for (const intro of candidates) {
+    const investor = await db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) });
+    const founder = await db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) });
+    if (!investor || !investor.email || !founder || !intro.gmailThreadId) continue;
+
+    // 1. Check if investor has replied — if so, stop the follow-up cycle for them
+    let threadInfo: { hasReply: boolean; lastReplyAt?: string };
+    try {
+      threadInfo = await checkThreadReplies(intro.gmailThreadId);
+    } catch (e: any) {
+      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: `thread check failed: ${e.message || e}` });
+      continue;
+    }
+    if (threadInfo.hasReply) {
+      await db.update(introRequests)
+        .set({ replyDetectedAt: threadInfo.lastReplyAt || new Date().toISOString(), updatedAt: new Date().toISOString() })
+        .where(eq(introRequests.id, intro.id));
+      repliesDetected++;
+      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'reply-detected' });
+      continue;
+    }
+
+    // 2. Pick a random follow-up template + fill {{first}}
+    const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+    const template = FOLLOWUP_TEMPLATES[Math.floor(Math.random() * FOLLOWUP_TEMPLATES.length)];
+    const body = template.replace(/\{\{first\}\}/g, investorFirst);
+
+    // 3. Build subject (Re: <original>) and reply in thread
+    const originalSubject = founder.companyName || founder.name;
+    const subject = originalSubject.startsWith('Re:') ? originalSubject : `Re: ${originalSubject}`;
+
+    try {
+      await sendThreadReply({
+        threadId: intro.gmailThreadId,
+        to: investor.email,
+        subject,
+        body,
+        asDraft: true,
+      });
+      const now = new Date().toISOString();
+      await db.update(introRequests)
+        .set({
+          followupCount: (intro.followupCount || 0) + 1,
+          lastFollowupAt: now,
+          updatedAt: now,
+        })
+        .where(eq(introRequests.id, intro.id));
+      drafted++;
+      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'drafted' });
+    } catch (e: any) {
+      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: `draft failed: ${e.message || e}` });
+    }
+  }
+
+  // Notify admin if anything happened
+  if (drafted > 0 || repliesDetected > 0) {
+    const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+    const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+    const draftedRows = results.filter(r => r.action === 'drafted')
+      .map(r => `  • ${r.founderName} → ${r.investorName}`).join('\n');
+    const repliedRows = results.filter(r => r.action === 'reply-detected')
+      .map(r => `  • ${r.founderName} → ${r.investorName}`).join('\n');
+    try {
+      await sendEmail({
+        to: adminEmail,
+        subject: `Follow-up agent: ${drafted} drafts, ${repliesDetected} replies`,
+        html: `<div style="font-family:Inter,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#222">
+          <h2 style="margin:0 0 8px 0">Follow-up agent run</h2>
+          ${drafted > 0 ? `<p><strong>${drafted} bump draft${drafted === 1 ? '' : 's'}</strong> in Gmail Drafts, ready to send:</p><pre style="background:#f6f7f8;padding:12px;border-radius:6px;font-size:13px">${draftedRows}</pre>` : ''}
+          ${repliesDetected > 0 ? `<p><strong>${repliesDetected} repl${repliesDetected === 1 ? 'y' : 'ies'} detected</strong> — these are off the follow-up rotation now:</p><pre style="background:#eafbe6;padding:12px;border-radius:6px;font-size:13px">${repliedRows}</pre>` : ''}
+          <p style="margin-top:16px"><a href="${baseUrl}/admin#intros">Open admin → intros</a></p>
+        </div>`,
+        text: `Follow-up agent run\nDrafts: ${drafted}\nReplies detected: ${repliesDetected}\n\n${baseUrl}/admin#intros`,
+      });
+    } catch (e) { console.error('Follow-up notify failed', e); }
+  }
+
+  return { checked: candidates.length, drafted, repliesDetected, results };
 }

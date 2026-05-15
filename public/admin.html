@@ -1195,6 +1195,9 @@
             <button @click="runAutoDraftNow" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700" :disabled="runningAutoDraft || !gmailStatus.connected" :title="'Create Gmail drafts for top eligible suggestions. Per-founder cap: 1/day, 5/week. Status stays pending until you mark sent.'">
               {{ runningAutoDraft ? 'Drafting...' : 'Auto-draft one' }}
             </button>
+            <button @click="runFollowupNow" class="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700" :disabled="runningFollowup || !gmailStatus.connected" :title="'For every sent intro with no reply in 7+ days, draft a short bump in the same thread. Max 2 bumps per intro.'">
+              {{ runningFollowup ? 'Following up...' : 'Run follow-ups' }}
+            </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
@@ -4954,6 +4957,26 @@
         // Create the draft directly in Gmail (instead of copy/paste).
         const draftingGmail = ref(false);
         const gmailDraftResult = ref(null);
+        const runningFollowup = ref(false);
+        const runFollowupNow = async () => {
+          if (!confirm('Run the follow-up agent? Checks every sent intro 7+ days old for replies, drafts a bump if none. Max 2 bumps per intro.')) return;
+          runningFollowup.value = true;
+          try {
+            const result = await api('/agent/followup-now', { method: 'POST' });
+            let msg = `Checked ${result.checked} sent intros.\nDrafts created: ${result.drafted}\nReplies detected: ${result.repliesDetected}`;
+            if (result.results?.length) {
+              const drafted = result.results.filter(r => r.action === 'drafted').map(r => `• ${r.founderName} → ${r.investorName}`).join('\n');
+              const replied = result.results.filter(r => r.action === 'reply-detected').map(r => `• ${r.founderName} → ${r.investorName}`).join('\n');
+              if (drafted) msg += `\n\nBump drafts:\n${drafted}`;
+              if (replied) msg += `\n\nReplies (now off rotation):\n${replied}`;
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { alert('Follow-up failed: ' + (e.message || e)); }
+          finally { runningFollowup.value = false; }
+        };
+
         const sendingGmail = ref(false);
         const sendGmailFromCurrent = async () => {
           if (!introDraftIntroRequestId.value) return;
@@ -6889,6 +6912,7 @@
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,
+          runningFollowup, runFollowupNow,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,

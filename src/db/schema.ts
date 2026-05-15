@@ -153,6 +153,17 @@ export const introRequests = sqliteTable('intro_requests', {
   // until the user marks it sent.
   gmailDraftId: text('gmail_draft_id'),
   gmailDraftCreatedAt: text('gmail_draft_created_at'),
+  // Captured when the intro is actually sent via sendGmail. Lets the
+  // follow-up agent fetch the thread state to check for replies and
+  // create follow-up drafts in the same thread.
+  gmailThreadId: text('gmail_thread_id'),
+  // Reply detection: set when checkThreadReplies finds a message from
+  // someone other than us in the thread. Stops the follow-up agent
+  // from bumping investors who've already responded.
+  replyDetectedAt: text('reply_detected_at'),
+  // Follow-up tracking
+  followupCount: integer('followup_count').notNull().default(0),
+  lastFollowupAt: text('last_followup_at'),
   notes: text('notes'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),

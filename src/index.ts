@@ -175,6 +175,14 @@ app.post('/api/agent/auto-draft-now', async (c) => {
   return c.json(result);
 });
 
+// Follow-up agent — for every sent intro with no reply in 7+ days, create a
+// short bump draft in the same Gmail thread (up to 2 bumps per intro).
+app.post('/api/agent/followup-now', async (c) => {
+  const { runFollowupTick } = await import('./services/agent.js');
+  const result = await runFollowupTick();
+  return c.json(result);
+});
+
 // Rescore every pending match_suggestion using the current scoring formula.
 // One-shot tool for the case where suggestions were generated under an older
 // algorithm and now show stale scores in the audit table.
@@ -562,6 +570,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
       await db.update(introRequests).set({
         status: 'intro_request_sent',
         dateRequested: now.split('T')[0],
+        gmailThreadId: sent.threadId || null,
         updatedAt: now,
       }).where(eq(introRequests.id, intro.id));
       const { matchSuggestions } = await import('./db/index.js');
@@ -1013,6 +1022,22 @@ cron.schedule('0 17 * * *', async () => {
 });
 
 console.log('[CRON] Auto-draft scheduled for daily 17:00 UTC (10am Arizona)');
+
+// Follow-up agent — runs daily at 18:00 UTC (11am AZ), an hour after auto-draft.
+cron.schedule('0 18 * * *', async () => {
+  console.log('[CRON] Running follow-up tick...');
+  try {
+    const { runFollowupTick } = await import('./services/agent.js');
+    const result = await runFollowupTick();
+    console.log('[CRON] Follow-up tick result:', result);
+  } catch (err) {
+    console.error('[CRON] Follow-up tick failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Follow-up agent scheduled for daily 18:00 UTC (11am Arizona)');
 
 serve({
   fetch: app.fetch,

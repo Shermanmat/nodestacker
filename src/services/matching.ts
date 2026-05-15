@@ -625,14 +625,13 @@ export function computeRecommendedIntroTarget(heatScore: number, currentTarget: 
   return Math.max(recommended, currentTarget);
 }
 
-// Runway-based target: spread the available-investor pool across ~8 weeks.
-// Combines with heat (faster cadence for hot founders) and respects an
-// explicit manual baseline from founder.introTargetPerWeek when set > 0.
-// Clamped to [1, 5] so we always offer at least 1/week and never blow out
-// momentum with more than 5 fresh intros in a week.
+// Intro target: by default a runway-based calc, but a non-zero manual value
+// on founder.introTargetPerWeek wins — admin explicitly set it, respect it
+// (capped at MANUAL_MAX for sanity, no inbox should send >20/week).
 export const DYNAMIC_RUNWAY_WEEKS = 8;
 export const DYNAMIC_MIN = 1;
 export const DYNAMIC_MAX = 5;
+export const MANUAL_MAX = 20;
 
 export function computeDynamicIntroTarget(opts: {
   availableInvestors: number;
@@ -648,7 +647,14 @@ export function computeDynamicIntroTarget(opts: {
   else if (opts.heatScore >= 40) heatBased = 2;
   else heatBased = 1;
   const manualBaseline = opts.manualBaseline ?? 0;
-  const combined = Math.max(supplyBased, heatBased, manualBaseline);
+  // Manual override: when admin explicitly set a value, that's the target.
+  // We don't override it with the dynamic calc — explicit intent wins.
+  if (manualBaseline > 0) {
+    const target = Math.max(DYNAMIC_MIN, Math.min(MANUAL_MAX, manualBaseline));
+    return { target, supplyBased, heatBased, manualBaseline };
+  }
+  // Otherwise, dynamic calc: max of supply + heat, clamped to [1, DYNAMIC_MAX].
+  const combined = Math.max(supplyBased, heatBased);
   const target = Math.max(DYNAMIC_MIN, Math.min(DYNAMIC_MAX, combined));
   return { target, supplyBased, heatBased, manualBaseline };
 }
@@ -720,25 +726,19 @@ export async function generateMatchSuggestions(
       lt(matchSuggestions.createdAt, fourteenDaysAgo),
     ));
 
-  // existingTriples blocks re-suggesting the same (founder, node, investor):
-  //   - pending: actively in queue
-  //   - rejected within last 90 days: admin (or auto-expiry) rejected recently
-  // Older rejections age out so circumstances can change (founder pivots,
-  // investor pivots) without permanently blocking the triple.
-  const REJECTED_LOOKBACK_DAYS = 90;
-  const rejectedCutoff = new Date(Date.now() - REJECTED_LOOKBACK_DAYS * 86400 * 1000).toISOString();
+  // existingTriples blocks re-suggesting an active (founder, node, investor):
+  // ONLY actively pending. Rejected suggestions are intentionally re-suggestable
+  // so the admin can iterate — circumstances change (pitch sharpens, sector
+  // re-tag, founder pivots) and a rejected pair often becomes a fit later.
   const existingSuggestions = await db.select().from(matchSuggestions)
-    .where(and(
-      inArray(matchSuggestions.status, ['pending', 'rejected']),
-      sql`(${matchSuggestions.status} = 'pending' OR ${matchSuggestions.createdAt} >= ${rejectedCutoff})`,
-    ));
+    .where(eq(matchSuggestions.status, 'pending'));
   const existingTriples = new Set(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
 
   // Track investors already claimed by a pending suggestion (1 suggestion at a time per investor)
   const claimedInvestorIds = new Set(
-    existingSuggestions.filter(s => s.status === 'pending').map(s => s.investorId)
+    existingSuggestions.map(s => s.investorId)
   );
 
   // Count intros in last 7 days per founder — only those actually sent (or

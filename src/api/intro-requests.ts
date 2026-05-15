@@ -261,6 +261,12 @@ app.put('/:id', async (c) => {
 // Delete intro request
 app.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
+  // followup_logs.intro_request_id is NOT NULL — must delete linked logs first
+  // or the FK constraint blocks the delete. match_suggestions.intro_request_id
+  // is nullable, but we delete those too so the suggestion can be regenerated
+  // cleanly later if needed.
+  await db.delete(followupLogs).where(eq(followupLogs.introRequestId, id));
+  await db.delete(matchSuggestions).where(eq(matchSuggestions.introRequestId, id));
   const result = await db.delete(introRequests).where(eq(introRequests.id, id)).returning();
 
   if (result.length === 0) {

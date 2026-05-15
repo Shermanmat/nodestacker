@@ -2866,6 +2866,27 @@
       </div>
     </div>
 
+    <!-- Reject Reason Modal -->
+    <div v-if="showRejectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-1">Why reject this intro?</h3>
+        <p class="text-xs text-gray-500 mb-4">Captured for pattern-spotting later. Required.</p>
+        <div class="space-y-2 mb-4">
+          <label v-for="opt in rejectReasonOptions" :key="opt" class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+            <input type="radio" v-model="rejectReasonChoice" :value="opt" class="rounded">
+            <span class="text-sm">{{ opt }}</span>
+          </label>
+        </div>
+        <div v-if="rejectReasonChoice === 'Other'" class="mb-4">
+          <input type="text" v-model="rejectReasonOther" placeholder="Brief reason..." class="w-full border rounded px-3 py-2 text-sm" autofocus>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button @click="showRejectModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+          <button @click="submitRejectSuggestion" :disabled="!rejectReasonChoice" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">Reject</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Intro Request Modal -->
     <div v-if="showIntroModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
@@ -5432,13 +5453,45 @@
             alert('Failed to approve: ' + e.message);
           }
         };
-        const rejectSuggestion = async (id) => {
-          if (!confirm('Reject this match suggestion? It will be removed.')) return;
+        // Reject flow: open a small modal asking for a quick-pick reason +
+        // optional free-text. Captures rejectionReason so we can spot patterns
+        // later (e.g. always rejecting fintech investors for Bryce → adjust tags).
+        const showRejectModal = ref(false);
+        const rejectingIntroId = ref(null);
+        const rejectReasonChoice = ref('');
+        const rejectReasonOther = ref('');
+        const rejectReasonOptions = [
+          'Wrong sector',
+          'Wrong stage',
+          'Not a fit (gut)',
+          'Already met',
+          'Pre-revenue',
+          'Other',
+        ];
+
+        const rejectSuggestion = (id) => {
+          rejectingIntroId.value = id;
+          rejectReasonChoice.value = '';
+          rejectReasonOther.value = '';
+          showRejectModal.value = true;
+        };
+
+        const submitRejectSuggestion = async () => {
+          if (!rejectingIntroId.value) return;
+          const reason = rejectReasonChoice.value === 'Other'
+            ? (rejectReasonOther.value || '').trim() || 'Other'
+            : rejectReasonChoice.value || null;
           try {
-            await api(`/matching/reject-intro/${id}`, { method: 'PUT' });
+            await api(`/matching/reject-intro/${rejectingIntroId.value}`, {
+              method: 'PUT',
+              body: { reason },
+            });
+            showRejectModal.value = false;
+            rejectingIntroId.value = null;
             loadIntroRequests();
+            loadAllIntroRequests();
           } catch (e) {
-            alert('Failed to reject: ' + e.message);
+            alert('Failed to reject: ' + (e.message || e));
           }
         };
         const loadRelationships = async () => {
@@ -6909,6 +6962,7 @@
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
+          showRejectModal, rejectReasonChoice, rejectReasonOther, rejectReasonOptions, submitRejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
           runningAgent, runAgentNow,
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,

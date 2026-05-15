@@ -198,12 +198,17 @@ export function buildIntroBody(args: {
   // Falls back to founder name only if companyName is unset.
   const subject = companyName || founder.name;
 
+  // {{investorName}} and {{founderName}} default to first name only — that's
+  // what reads naturally in an intro email ("Hi Sarah"). Use {{investorFull}}
+  // / {{founderFull}} when you actually want the full name.
   const fillVars = (s: string) => s
     .replace(/\{\{investorFirst\}\}/g, investorFirst)
-    .replace(/\{\{investorName\}\}/g, investor.name || '')
+    .replace(/\{\{investorFull\}\}/g, investor.name || '')
+    .replace(/\{\{investorName\}\}/g, investorFirst)
     .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
     .replace(/\{\{founderFirst\}\}/g, founderFirst)
-    .replace(/\{\{founderName\}\}/g, founder.name || '')
+    .replace(/\{\{founderFull\}\}/g, founder.name || '')
+    .replace(/\{\{founderName\}\}/g, founderFirst)
     .replace(/\{\{companyName\}\}/g, companyName);
 
   let body: string;

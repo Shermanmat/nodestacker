@@ -5174,17 +5174,18 @@
           const calendlyUrl = (f.calendlyUrl || '').trim();
           const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
 
-          const subject = companyName
-            ? `Intro: ${f.name || 'Founder'} (${companyName}) <> ${i.name || 'Investor'}`
-            : `Intro: ${f.name || 'Founder'} <> ${i.name || 'Investor'}`;
+          const subject = companyName || f.name || 'Intro';
 
-          // Template variable substitution — used in blurb
+          // Template variable substitution — used in blurb.
+          // {{investorName}} / {{founderName}} default to first name (matches server side).
           const fillVars = (s) => s
             .replace(/\{\{investorFirst\}\}/g, investorFirst)
-            .replace(/\{\{investorName\}\}/g, i.name || '')
+            .replace(/\{\{investorFull\}\}/g, i.name || '')
+            .replace(/\{\{investorName\}\}/g, investorFirst)
             .replace(/\{\{investorFirm\}\}/g, i.firm || '')
             .replace(/\{\{founderFirst\}\}/g, founderFirst)
-            .replace(/\{\{founderName\}\}/g, f.name || '')
+            .replace(/\{\{founderFull\}\}/g, f.name || '')
+            .replace(/\{\{founderName\}\}/g, founderFirst)
             .replace(/\{\{companyName\}\}/g, companyName);
 
           let body;

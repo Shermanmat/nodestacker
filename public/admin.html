@@ -1204,6 +1204,9 @@
             <button @click="backfillEmails" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700" :disabled="backfilling" :title="'Backfill missing investor emails from inbound_intro_logs.from_email.'">
               {{ backfilling ? 'Backfilling...' : 'Backfill emails' }}
             </button>
+            <button @click="backfillFounderStages" class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700" :disabled="backfillingStages" :title="'Tag every founder with no stage category as Pre-seed + Seed. Idempotent — already-tagged are skipped.'">
+              {{ backfillingStages ? 'Tagging...' : 'Tag founders' }}
+            </button>
             <button @click="clearPending" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700" :disabled="clearing" :title="'Delete ALL pending match_suggestions + their linked pending_suggestion intro_requests. Destructive — used before a clean re-run.'">
               {{ clearing ? 'Clearing...' : 'Clear pending' }}
             </button>
@@ -5065,6 +5068,21 @@
         };
 
         const backfilling = ref(false);
+        const backfillingStages = ref(false);
+        const backfillFounderStages = async () => {
+          if (!confirm('Tag every founder with zero stage tags as Pre-seed + Seed?')) return;
+          backfillingStages.value = true;
+          try {
+            const result = await api('/agent/backfill-founder-stages', { method: 'POST' });
+            let msg = `Tagged ${result.updated} of ${result.candidates} founders (assigned: ${(result.stagesAssigned || []).join(', ')}).`;
+            if (result.sampleFilled?.length) {
+              msg += `\n\nSample:\n${result.sampleFilled.map(f => `• ${f.name}`).join('\n')}`;
+            }
+            alert(msg);
+          } catch (e) { console.error('Backfill stages failed', e); alert('Backfill failed — see console.'); }
+          finally { backfillingStages.value = false; }
+        };
+
         const backfillEmails = async () => {
           if (!confirm('Backfill missing investor emails from inbound_intro_logs?')) return;
           backfilling.value = true;
@@ -6833,6 +6851,7 @@
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,
+          backfillingStages, backfillFounderStages,
           openNewIntroModal,
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,

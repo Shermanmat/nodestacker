@@ -226,6 +226,49 @@ app.post('/api/agent/clear-pending', async (c) => {
   return c.json({ deletedSuggestions, deletedIntros, deletedFollowups });
 });
 
+// Backfill default Pre-seed + Seed stage tags onto any founder that currently
+// has zero stage assignments. Matches the auto-assignment in POST /api/founders,
+// applied retroactively. Idempotent — re-running has no effect on already-tagged.
+app.post('/api/agent/backfill-founder-stages', async (c) => {
+  const { founderCategoryAssignments, investorCategories } = await import('./db/index.js');
+  const stageCats = await db.select({ id: investorCategories.id, name: investorCategories.name })
+    .from(investorCategories)
+    .where(eq(investorCategories.type, 'stage'));
+  const defaultStageNames = new Set(['pre-seed', 'preseed', 'seed']);
+  const defaultStages = stageCats.filter(s => defaultStageNames.has(s.name.toLowerCase()));
+  if (defaultStages.length === 0) {
+    return c.json({ error: 'No Pre-seed or Seed categories found in DB' }, 400);
+  }
+  const allStageIds = new Set(stageCats.map(s => s.id));
+
+  const allFounders = await db.select({ id: founders.id, name: founders.name }).from(founders);
+  const assignments = await db.select().from(founderCategoryAssignments);
+  const stageByFounder = new Map<number, Set<number>>();
+  for (const a of assignments) {
+    if (!allStageIds.has(a.categoryId)) continue;
+    if (!stageByFounder.has(a.founderId)) stageByFounder.set(a.founderId, new Set());
+    stageByFounder.get(a.founderId)!.add(a.categoryId);
+  }
+
+  const filled: Array<{ id: number; name: string }> = [];
+  for (const f of allFounders) {
+    if ((stageByFounder.get(f.id)?.size || 0) > 0) continue;
+    for (const stage of defaultStages) {
+      await db.insert(founderCategoryAssignments)
+        .values({ founderId: f.id, categoryId: stage.id })
+        .onConflictDoNothing();
+    }
+    filled.push({ id: f.id, name: f.name });
+  }
+
+  return c.json({
+    candidates: allFounders.length,
+    updated: filled.length,
+    sampleFilled: filled.slice(0, 20),
+    stagesAssigned: defaultStages.map(s => s.name),
+  });
+});
+
 // Backfill investor emails from inbound_intro_logs. For each investor lacking
 // an email, find the most recent inbound_intro_logs row where detectedInvestorId
 // matches and copy from_email onto the investor record.

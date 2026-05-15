@@ -542,10 +542,13 @@ export function passesCategoryFilter(
     founderCategories.filter(c => c.type === 'sector').map(c => c.id)
   );
 
-  // Check exclusions: if investor excludes any of the founder's sectors, reject
-  if (investorExclusions && founderSectorIds.size > 0) {
-    for (const sectorId of founderSectorIds) {
-      if (investorExclusions.has(sectorId)) return false;
+  // Check exclusions against ANY founder tag (sector / stage / persona / etc).
+  // Lets admin model rules like "Francis won't take pre-revenue companies" by
+  // creating a 'Pre-revenue' category, tagging pre-revenue founders, then
+  // adding it to Francis's exclusions.
+  if (investorExclusions && investorExclusions.size > 0) {
+    for (const cat of founderCategories) {
+      if (investorExclusions.has(cat.id)) return false;
     }
   }
 

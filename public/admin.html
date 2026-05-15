@@ -1207,7 +1207,7 @@
             <button @click="clearPending" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700" :disabled="clearing" :title="'Delete ALL pending match_suggestions + their linked pending_suggestion intro_requests. Destructive — used before a clean re-run.'">
               {{ clearing ? 'Clearing...' : 'Clear pending' }}
             </button>
-            <button @click="showIntroModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+            <button @click="openNewIntroModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               New Intro Request
             </button>
           </div>
@@ -4186,6 +4186,18 @@
         const introFounderDropdownOpen = ref(false);
         const introNodeDropdownOpen = ref(false);
         const introInvestorDropdownOpen = ref(false);
+        // Open the New Intro modal with node defaulted to Mat Sherman.
+        // Save a click — the vast majority of logged intros go through Mat.
+        const openNewIntroModal = () => {
+          editingIntro.value = null;
+          const mat = (nodes.value || []).find(n => (n.name || '').toLowerCase().includes('mat sherman'));
+          if (mat && !introForm.nodeId) {
+            introForm.nodeId = mat.id;
+            introNodeSearch.value = mat.name;
+          }
+          showIntroModal.value = true;
+        };
+
         const followupForm = reactive({ followupType: 'node_check', completedBy: 'admin', notes: '', nextAction: '' });
         const fnRelForm = reactive({ founderId: '', nodeId: '', relationshipStrength: 'medium', howConnected: '' });
         const niConnForm = reactive({ nodeId: '', investorId: '', connectionStrength: 'medium', validated: false });
@@ -6748,6 +6760,7 @@
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,
+          openNewIntroModal,
           // Intro draft modal
           showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
           openIntroDraft, copyToClipboard, copyEntireIntro,

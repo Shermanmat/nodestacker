@@ -5219,7 +5219,6 @@
 
           return {
             to: investorEmail,
-            cc: founderEmail,
             subject,
             body,
           };
@@ -5235,6 +5234,7 @@
         });
         const openIntroDraft = (req) => {
           const d = buildIntroDraft(req);
+          introDraft.cc = '';
           Object.assign(introDraft, d);
           introDraftCopied.value = '';
           introDraftIntroRequestId.value = req.id;

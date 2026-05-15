@@ -486,7 +486,6 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   try {
     const result = await createDraft({
       to: investor.email || '',
-      cc: founder.email || undefined,
       subject,
       body: bodyText,
       attachmentPath,

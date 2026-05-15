@@ -380,7 +380,6 @@ export async function runAutoDraftTick(): Promise<{
     try {
       const draftResult = await createDraft({
         to: investor.email,
-        cc: founder.email || undefined,
         subject,
         body,
         attachmentPath,

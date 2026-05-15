@@ -6035,7 +6035,6 @@
           inboundConfirmLog.value = log;
           inboundConfirmForm.founderId = log.detectedFounderId || '';
           inboundConfirmForm.investorId = log.detectedInvestorId || '';
-          inboundConfirmForm.nodeId = '';
           inboundConfirmForm.notes = '';
           // Pre-populate search text for detected entities
           if (log.detectedFounderId) {
@@ -6050,7 +6049,15 @@
           } else {
             ssInboundInvestor.value = '';
           }
-          ssInboundNode.value = '';
+          // Default node to Mat Sherman — same UX as the New Intro modal
+          const mat = (nodes.value || []).find(n => (n.name || '').toLowerCase().includes('mat sherman'));
+          if (mat) {
+            inboundConfirmForm.nodeId = mat.id;
+            ssInboundNode.value = mat.name;
+          } else {
+            inboundConfirmForm.nodeId = '';
+            ssInboundNode.value = '';
+          }
           showInboundConfirmModal.value = true;
         };
 

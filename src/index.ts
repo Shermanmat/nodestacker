@@ -188,34 +188,42 @@ app.post('/api/agent/rescore-pending', async (c) => {
 // the match_suggestions rows and the linked intro_requests in 'pending_suggestion'
 // status. Use before re-running the agent under new gating to start clean.
 app.post('/api/agent/clear-pending', async (c) => {
-  const { matchSuggestions } = await import('./db/index.js');
+  const { matchSuggestions, followupLogs } = await import('./db/index.js');
   const pending = await db.select({
     id: matchSuggestions.id,
     introRequestId: matchSuggestions.introRequestId,
   }).from(matchSuggestions).where(eq(matchSuggestions.status, 'pending'));
 
   const introIds = pending.map(p => p.introRequestId).filter((x): x is number => x != null);
-  let deletedIntros = 0;
+
+  // Order matters because of FK constraints:
+  // 1. followup_logs.intro_request_id is NOT NULL → must clear before deleting intros
+  // 2. match_suggestions.intro_request_id references intros → clear before deleting intros
+  // 3. then delete the intro_requests themselves
+  let deletedFollowups = 0;
   let deletedSuggestions = 0;
+  let deletedIntros = 0;
 
   if (introIds.length > 0) {
-    const introRows = await db.select().from(introRequests)
+    const followupResult = await db.delete(followupLogs)
+      .where(inArray(followupLogs.introRequestId, introIds)).returning();
+    deletedFollowups = followupResult.length;
+  }
+
+  const suggResult = await db.delete(matchSuggestions)
+    .where(eq(matchSuggestions.status, 'pending')).returning();
+  deletedSuggestions = suggResult.length;
+
+  if (introIds.length > 0) {
+    const introResult = await db.delete(introRequests)
       .where(and(
         eq(introRequests.status, 'pending_suggestion'),
         inArray(introRequests.id, introIds),
-      ));
-    for (const ir of introRows) {
-      await db.delete(introRequests).where(eq(introRequests.id, ir.id));
-      deletedIntros++;
-    }
+      )).returning();
+    deletedIntros = introResult.length;
   }
 
-  for (const s of pending) {
-    await db.delete(matchSuggestions).where(eq(matchSuggestions.id, s.id));
-    deletedSuggestions++;
-  }
-
-  return c.json({ deletedSuggestions, deletedIntros });
+  return c.json({ deletedSuggestions, deletedIntros, deletedFollowups });
 });
 
 // Backfill investor emails from inbound_intro_logs. For each investor lacking

@@ -95,6 +95,8 @@ safeAddColumn('investors', 'paused_until', 'text');
 safeAddColumn('investors', 'pause_reason', 'text');
 // investor email — used for Gmail draft To: field
 safeAddColumn('investors', 'email', 'text');
+// Free-form admin notes (non-categorical quirks)
+safeAddColumn('investors', 'notes', 'text');
 // One-time backfill: pull emails from instantly_leads where they're linked
 try {
   sqlite.exec(`UPDATE investors SET email = (

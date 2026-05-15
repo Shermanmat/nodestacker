@@ -102,6 +102,7 @@ export const investors = sqliteTable('investors', {
   pauseReason: text('pause_reason'),
   city: text('city'),
   country: text('country'),
+  notes: text('notes'), // Free-form admin notes — non-categorical quirks ("doesn't take cold intros", "asks for revenue first")
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

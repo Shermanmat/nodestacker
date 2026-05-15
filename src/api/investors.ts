@@ -34,6 +34,7 @@ const updateInvestorSchema = createInvestorSchema.partial().extend({
   pauseReason: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
 });
 
 // List all investors with their latest research
@@ -252,10 +253,36 @@ app.get('/:id', async (c) => {
     return c.json({ error: 'Investor not found' }, 404);
   }
 
+  // Pull this investor's category exclusions so the edit modal can pre-populate
+  // the "Won't take" multi-select.
+  const excludedRows = await db.select({ categoryId: investorCategoryExclusions.categoryId })
+    .from(investorCategoryExclusions)
+    .where(eq(investorCategoryExclusions.investorId, investor.id));
+
   return c.json({
     ...investor,
     focusAreas: investor.focusAreas ? JSON.parse(investor.focusAreas) : [],
+    excludedCategoryIds: excludedRows.map(r => r.categoryId),
   });
+});
+
+// Replace this investor's category exclusions with the supplied list.
+// "Lori @ Bloomberg Beta doesn't take fintech" → POST { categoryIds: [<fintech_id>] }.
+// Matching algorithm honors these automatically via passesCategoryFilter.
+app.put('/:id/exclusions', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const body = await c.req.json().catch(() => ({}));
+  const schema = z.object({ categoryIds: z.array(z.number()) });
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
+
+  await db.delete(investorCategoryExclusions).where(eq(investorCategoryExclusions.investorId, id));
+  for (const categoryId of parsed.data.categoryIds) {
+    await db.insert(investorCategoryExclusions)
+      .values({ investorId: id, categoryId })
+      .onConflictDoNothing();
+  }
+  return c.json({ success: true, count: parsed.data.categoryIds.length });
 });
 
 // Create investor

@@ -2837,6 +2837,23 @@
               <label for="investor-active" class="text-sm font-medium text-gray-700">Active</label>
               <span class="text-xs text-gray-500">(Inactive investors are hidden from planning)</span>
             </div>
+
+            <div v-if="editingInvestor" class="border-t pt-4 space-y-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea v-model="investorForm.notes" rows="2" placeholder="Free-form notes — e.g. 'Doesn't take cold intros', 'Asks for revenue first', 'Only Tuesdays'" class="w-full border rounded px-3 py-2 text-sm"></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Won't take (category exclusions)</label>
+                <p class="text-xs text-gray-500 mb-2">Founders with any selected tag will be silently blocked from matching with this investor.</p>
+                <div class="max-h-48 overflow-y-auto border rounded p-2 grid grid-cols-2 gap-1">
+                  <label v-for="cat in allExclusionCategories" :key="cat.id" class="flex items-center gap-2 text-sm hover:bg-gray-50 px-1 py-0.5 rounded cursor-pointer">
+                    <input type="checkbox" :value="cat.id" v-model="investorForm.excludedCategoryIds" class="rounded">
+                    <span>{{ cat.name }} <span class="text-xs text-gray-400">· {{ cat.type }}</span></span>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
             <button type="button" @click="closeInvestorModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -4160,7 +4177,9 @@
           loadFounders();
         };
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', notes: '', excludedCategoryIds: [], newStageId: '', newPersonaId: '', newSectorId: '' });
+        // Full list of categories (any type) — used to populate the "Won't take" picker.
+        const allExclusionCategories = ref([]);
 
         // Categories grouped by type for the add-investor required dropdowns
         const stageCategoryOptions = computed(() => allCategories.value
@@ -6402,8 +6421,15 @@
         const saveInvestor = async () => {
           try {
             if (editingInvestor.value) {
-              const { nodeId, newStageId, newPersonaId, newSectorId, ...investorData } = investorForm;
+              // Strip non-investor fields: nodeId/newStageId/etc are form-only.
+              // excludedCategoryIds goes to a separate endpoint below.
+              const { nodeId, newStageId, newPersonaId, newSectorId, excludedCategoryIds, ...investorData } = investorForm;
               await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorData });
+              // Replace exclusions in one shot
+              await api(`/investors/${editingInvestor.value}/exclusions`, {
+                method: 'PUT',
+                body: { categoryIds: Array.isArray(excludedCategoryIds) ? excludedCategoryIds : [] },
+              });
             } else {
               // Require node for new investors
               if (!investorForm.nodeId) {
@@ -6440,7 +6466,7 @@
           }
         };
 
-        const editInvestor = (investor) => {
+        const editInvestor = async (investor) => {
           editingInvestor.value = investor.id;
           // focusAreas can arrive as either a JSON string (when the investor
           // object comes from a Drizzle join — e.g. the intro_requests table)
@@ -6454,8 +6480,23 @@
             ...investor,
             focusAreas: Array.isArray(focusAreas) ? focusAreas : [],
             active: investor.active !== false,
+            notes: investor.notes || '',
+            excludedCategoryIds: Array.isArray(investor.excludedCategoryIds) ? [...investor.excludedCategoryIds] : [],
           });
           showInvestorModal.value = true;
+          // Fetch the canonical record (includes excludedCategoryIds) + ensure
+          // the exclusion picker has the full categories list loaded.
+          try {
+            const [full, cats] = await Promise.all([
+              api(`/investors/${investor.id}`),
+              allExclusionCategories.value.length === 0 ? api('/categories') : Promise.resolve(null),
+            ]);
+            if (full?.excludedCategoryIds) {
+              investorForm.excludedCategoryIds = [...full.excludedCategoryIds];
+            }
+            if (full?.notes != null) investorForm.notes = full.notes;
+            if (cats) allExclusionCategories.value = cats;
+          } catch (e) { console.error('Failed to load investor details / categories', e); }
         };
 
         const deleteInvestor = async (id) => {
@@ -6868,6 +6909,7 @@
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, toggleInvestorVip, closeInvestorModal,
+          allExclusionCategories,
           saveIntro, editIntro, closeIntroModal,
           showAddFollowup, saveFollowup,
           saveFNRelationship, deleteFNRelationship,

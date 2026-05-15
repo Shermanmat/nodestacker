@@ -415,6 +415,12 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   if (!introRequestId || isNaN(introRequestId)) {
     return c.json({ error: 'introRequestId is required' }, 400);
   }
+  // Optional overrides: when the admin edits subject/body/to in the draft
+  // modal before clicking "Create Gmail draft", these come through verbatim.
+  // Without these, the server falls back to building from founder.blurb.
+  const subjectOverride: string | undefined = body.subjectOverride;
+  const bodyOverride: string | undefined = body.bodyOverride;
+  const toOverride: string | undefined = body.toOverride;
 
   const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, introRequestId) });
   if (!intro) return c.json({ error: 'Intro request not found' }, 404);
@@ -437,16 +443,17 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const deckUrl = (founder.deckUrl || '').trim();
   const calendlyUrl = (founder.calendlyUrl || '').trim();
 
-  const subject = companyName
-    ? `Intro: ${founder.name} (${companyName}) <> ${investor.name}`
-    : `Intro: ${founder.name} <> ${investor.name}`;
+  const subject = companyName || founder.name;
 
+  // {{investorName}} / {{founderName}} default to first name (matches gmail.ts).
   const fillVars = (s: string) => s
     .replace(/\{\{investorFirst\}\}/g, investorFirst)
-    .replace(/\{\{investorName\}\}/g, investor.name || '')
+    .replace(/\{\{investorFull\}\}/g, investor.name || '')
+    .replace(/\{\{investorName\}\}/g, investorFirst)
     .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
     .replace(/\{\{founderFirst\}\}/g, founderFirst)
-    .replace(/\{\{founderName\}\}/g, founder.name || '')
+    .replace(/\{\{founderFull\}\}/g, founder.name || '')
+    .replace(/\{\{founderName\}\}/g, founderFirst)
     .replace(/\{\{companyName\}\}/g, companyName);
 
   let bodyText: string;
@@ -482,12 +489,17 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     attachmentName = `${companyName || founder.name} Deck.pdf`;
   }
 
+  // Admin overrides win — edits made in the draft modal land in the Gmail draft.
+  const finalSubject = (subjectOverride != null && subjectOverride.trim()) ? subjectOverride : subject;
+  const finalBody = (bodyOverride != null && bodyOverride.trim()) ? bodyOverride : bodyText;
+  const finalTo = (toOverride != null && toOverride.trim()) ? toOverride : (investor.email || '');
+
   const { createDraft } = await import('./services/gmail.js');
   try {
     const result = await createDraft({
-      to: investor.email || '',
-      subject,
-      body: bodyText,
+      to: finalTo,
+      subject: finalSubject,
+      body: finalBody,
       attachmentPath,
       attachmentName,
     });

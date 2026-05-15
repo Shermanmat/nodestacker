@@ -4933,9 +4933,17 @@
           draftingGmail.value = true;
           gmailDraftResult.value = null;
           try {
+            // Send the EDITED subject / body / to from the textarea so the
+            // server doesn't rebuild from stale DB blurb. Server uses these
+            // overrides verbatim when present.
             const result = await api('/agent/gmail/draft-intro', {
               method: 'POST',
-              body: { introRequestId: introDraftIntroRequestId.value },
+              body: {
+                introRequestId: introDraftIntroRequestId.value,
+                subjectOverride: introDraft.subject,
+                bodyOverride: introDraft.body,
+                toOverride: introDraft.to,
+              },
             });
             gmailDraftResult.value = result;
           } catch (e) {

@@ -598,8 +598,8 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   }
 });
 
-// Angel Club application (public, no auth)
-app.post('/api/angel-club-apply', async (c) => {
+// Investor Network application (public, no auth)
+app.post('/api/investors-apply', async (c) => {
   const body = await c.req.json();
   const { name, email, linkedin, firm, note } = body;
 
@@ -611,16 +611,16 @@ app.post('/api/angel-club-apply', async (c) => {
   const { sendEmail } = await import('./services/email.js');
   await sendEmail({
     to: 'mat@matsherman.com',
-    subject: `Angel Club Application: ${name}`,
+    subject: `Investor Network Application: ${name}`,
     html: `
-      <h2>New Angel Club Application</h2>
+      <h2>New Investor Network Application</h2>
       <p><strong>Name:</strong> ${name}</p>
       <p><strong>Email:</strong> ${email}</p>
       <p><strong>LinkedIn:</strong> <a href="${linkedin}">${linkedin}</a></p>
       ${firm ? `<p><strong>Firm/Website:</strong> <a href="${firm}">${firm}</a></p>` : ''}
       ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
     `,
-    text: `New Angel Club Application\n\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}${firm ? `\nFirm: ${firm}` : ''}${note ? `\nNote: ${note}` : ''}`,
+    text: `New Investor Network Application\n\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}${firm ? `\nFirm: ${firm}` : ''}${note ? `\nNote: ${note}` : ''}`,
   });
 
   return c.json({ success: true });
@@ -908,9 +908,9 @@ app.get('/trial', serveStatic({ path: './public/trial.html' }));
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
 app.get('/founders', (c) => c.redirect('/signup', 302));
-app.get('/investors', (c) => c.redirect('/angel-club', 302));
+app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
-app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
+app.get('/angel-club', (c) => c.redirect('/investors', 302));
 app.get('/yc', serveStatic({ path: './public/yc.html' }));
 app.get('/scout', (c) => c.redirect('/yc', 302));
 app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));

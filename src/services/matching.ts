@@ -750,15 +750,16 @@ export async function generateMatchSuggestions(
   // would let unreviewed drafts block new generation. Drafts age out via
   // discard/reject/mark-sent, not via "quota use."
   //
-  // Week boundary is Sunday 00:00 (matches founders.ts pipeline-health view
-  // at line ~174 — so the marketplace health "This Week" column and the
-  // matching quota agree on what "this week" means). Was a rolling 7-day
-  // window, which on Monday mornings counted the entire previous week and
-  // looked like every founder was already at cap.
+  // Week boundary is Monday 00:00 UTC — matches marketplace-health.ts and
+  // weekly-digest.ts (the rest of the codebase already uses Monday-UTC).
+  // Was a rolling 7-day window, which on Monday mornings counted the entire
+  // previous week and made every founder look at-cap.
   const weekStart = (() => {
     const d = new Date();
-    d.setDate(d.getDate() - d.getDay()); // Sunday
-    d.setHours(0, 0, 0, 0);
+    const day = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const daysFromMonday = day === 0 ? 6 : day - 1;
+    d.setUTCDate(d.getUTCDate() - daysFromMonday);
+    d.setUTCHours(0, 0, 0, 0);
     return d.getTime();
   })();
   const SENT_OR_PROGRESSED_STATUSES = new Set([

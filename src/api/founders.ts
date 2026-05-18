@@ -171,12 +171,15 @@ app.get('/pipeline-health', async (c) => {
   }
 
   const now = new Date();
+  // Monday 00:00 UTC — matches matching.ts + marketplace-health.ts + weekly-digest.ts.
   const weekStart = new Date(now);
-  weekStart.setDate(now.getDate() - now.getDay()); // Sunday
-  weekStart.setHours(0, 0, 0, 0);
+  const day = now.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysFromMonday = day === 0 ? 6 : day - 1;
+  weekStart.setUTCDate(now.getUTCDate() - daysFromMonday);
+  weekStart.setUTCHours(0, 0, 0, 0);
 
   const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  lastWeekStart.setUTCDate(lastWeekStart.getUTCDate() - 7);
 
   const founderResults = activeFounders.map(founder => {
     const founderCategories = founderCatMap.get(founder.id) || [];

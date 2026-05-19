@@ -2598,6 +2598,7 @@
                 <td class="px-4 py-3">
                   <span :class="{
                     'bg-amber-100 text-amber-700': app.applicationStatus === 'applied',
+                    'bg-cyan-100 text-cyan-700': app.applicationStatus === 'meeting_requested',
                     'bg-purple-100 text-purple-700': app.applicationStatus === 'trial_sent',
                     'bg-blue-100 text-blue-700': app.applicationStatus === 'interview_sent',
                     'bg-green-100 text-green-700': app.applicationStatus === 'approved',
@@ -2612,13 +2613,16 @@
                 <td class="px-4 py-3">
                   <div class="flex gap-2 flex-wrap">
                     <template v-if="app.applicationStatus === 'applied'">
-                      <button @click="sendTrial(app.id)" class="text-xs text-purple-600 hover:underline font-medium">Send Trial</button>
+                      <button @click="requestMeeting(app.id)" class="text-xs text-cyan-600 hover:underline font-medium">Request meeting</button>
+                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
+                    </template>
+                    <template v-else-if="app.applicationStatus === 'meeting_requested'">
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
-                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
+                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
                     <template v-else-if="app.applicationStatus === 'trial_sent'">
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
-                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Decline</button>
+                      <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
                     <template v-else>
                       <span class="text-xs text-gray-400">--</span>
@@ -4195,9 +4199,34 @@
         }
 
         async function declineApplication(companyId) {
-          if (!confirm('Decline this application?')) return;
+          const reason = prompt(
+            "Reject this application — optional reason to include in the email (leave blank to send the standard 'one-person bandwidth' rejection):",
+            ""
+          );
+          // prompt returns null if cancelled
+          if (reason === null) return;
           try {
-            await api(`/signups/applications/${companyId}/decline`, { method: 'POST' });
+            await api(`/signups/applications/${companyId}/decline`, {
+              method: 'POST',
+              body: JSON.stringify({ reason: reason.trim() || undefined }),
+              headers: { 'Content-Type': 'application/json' },
+            });
+            await loadSignups();
+          } catch (e) { /* handled by api() */ }
+        }
+
+        async function requestMeeting(companyId) {
+          const note = prompt(
+            "Request a meeting — optional note to include in the email (e.g. context about why you want to talk, or specific times you're free):",
+            ""
+          );
+          if (note === null) return;
+          try {
+            await api(`/signups/applications/${companyId}/request-meeting`, {
+              method: 'POST',
+              body: JSON.stringify({ note: note.trim() || undefined }),
+              headers: { 'Content-Type': 'application/json' },
+            });
             await loadSignups();
           } catch (e) { /* handled by api() */ }
         }
@@ -7362,7 +7391,7 @@
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,
           portfolioApplications, filteredPortfolioApplications, hideDeclinedApps, showSignupsList,
-          approveApplication, declineApplication, sendTrial,
+          approveApplication, declineApplication, sendTrial, requestMeeting,
           sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer, audioProxyUrl,
         };
       }

@@ -143,6 +143,8 @@ app.post('/applications/:id/approve', async (c) => {
 // Decline portfolio application
 app.post('/applications/:id/decline', async (c) => {
   const companyId = parseInt(c.req.param('id'));
+  const body = await c.req.json().catch(() => ({}));
+  const reason: string | undefined = (body?.reason || '').trim() || undefined;
 
   // Get company and user info for the email
   const company = await db.select().from(publicCompanies).where(eq(publicCompanies.id, companyId)).get();
@@ -157,6 +159,10 @@ app.post('/applications/:id/decline', async (c) => {
   // Send rejection email to the founder
   if (postmarkClient && user) {
     try {
+      const reasonHtml = reason
+        ? `<p>${reason.replace(/\n/g, '<br>')}</p>`
+        : '';
+      const reasonText = reason ? `\n${reason}\n` : '';
       await postmarkClient.sendEmail({
         From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
         To: user.email,
@@ -164,18 +170,67 @@ app.post('/applications/:id/decline', async (c) => {
         HtmlBody: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
             <p>Hi ${user.firstName},</p>
-            <p>Thank you for sharing your work with us — we genuinely appreciate you taking the time.</p>
-            <p>After reviewing your application, we've decided not to move forward at this stage. This is less about your company's potential and more about where we are as investors — we don't yet know your market well enough to be a confident, value-adding partner for you right now.</p>
-            <p>We wish you the best as you build, and hope our paths cross again down the road.</p>
-            <p>Best,<br>The MatCap Team</p>
+            <p>Thanks for applying to MatCap and sharing what you're building.</p>
+            <p>I have to be honest with you — I'm one person, and I can only work closely with a handful of founders at any given time. That keeps the bar high on who I take on, and it means I have to pass on a lot of good companies.</p>
+            <p>Right now, ${company.companyName} isn't a fit for our portfolio.</p>
+            ${reasonHtml}
+            <p>Wishing you the best as you build.</p>
+            <p>Mat Sherman<br>Founder, MatCap</p>
           </div>
         `,
-        TextBody: `Hi ${user.firstName},\n\nThank you for sharing your work with us — we genuinely appreciate you taking the time.\n\nAfter reviewing your application, we've decided not to move forward at this stage. This is less about your company's potential and more about where we are as investors — we don't yet know your market well enough to be a confident, value-adding partner for you right now.\n\nWe wish you the best as you build, and hope our paths cross again down the road.\n\nBest,\nThe MatCap Team`,
+        TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap and sharing what you're building.\n\nI have to be honest with you — I'm one person, and I can only work closely with a handful of founders at any given time. That keeps the bar high on who I take on, and it means I have to pass on a lot of good companies.\n\nRight now, ${company.companyName} isn't a fit for our portfolio.${reasonText}\n\nWishing you the best as you build.\n\nMat Sherman\nFounder, MatCap`,
       });
     } catch (err) {
       console.error('Failed to send decline email:', err);
     }
   }
+
+  return c.json({ success: true });
+});
+
+// Request a meeting with the founder (the new positive-path action)
+app.post('/applications/:id/request-meeting', async (c) => {
+  const companyId = parseInt(c.req.param('id'));
+  const body = await c.req.json().catch(() => ({}));
+  const note: string | undefined = (body?.note || '').trim() || undefined;
+
+  const company = await db.select().from(publicCompanies).where(eq(publicCompanies.id, companyId)).get();
+  if (!company) return c.json({ error: 'Company not found' }, 404);
+
+  const user = await db.select().from(publicUsers).where(eq(publicUsers.id, company.userId)).get();
+  if (!user) return c.json({ error: 'User not found' }, 404);
+
+  await db.update(publicCompanies)
+    .set({ applicationStatus: 'meeting_requested' })
+    .where(eq(publicCompanies.id, companyId));
+
+  if (postmarkClient) {
+    try {
+      const noteHtml = note ? `<p>${note.replace(/\n/g, '<br>')}</p>` : '';
+      const noteText = note ? `\n${note}\n` : '';
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: user.email,
+        Subject: `Re: your MatCap application — let's talk`,
+        HtmlBody: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <p>Hi ${user.firstName},</p>
+            <p>Thanks for applying to MatCap. I'd love to learn more about ${company.companyName} and explore whether we'd be a good fit to work together.</p>
+            <p>Reply with a few times that work this week or next — happy to do a call, or grab coffee if you're in Phoenix.</p>
+            ${noteHtml}
+            <p>Looking forward to it.</p>
+            <p>Mat Sherman<br>Founder, MatCap</p>
+          </div>
+        `,
+        TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap. I'd love to learn more about ${company.companyName} and explore whether we'd be a good fit to work together.\n\nReply with a few times that work this week or next — happy to do a call, or grab coffee if you're in Phoenix.${noteText}\n\nLooking forward to it.\n\nMat Sherman\nFounder, MatCap`,
+      });
+    } catch (err) {
+      console.error('Failed to send meeting-request email:', err);
+      return c.json({ error: 'Failed to send email' }, 500);
+    }
+  }
+
+  console.log(`[MEETING REQUEST] Sent to ${user.firstName} ${user.lastName} (${user.email}) for ${company.companyName}`);
 
   return c.json({ success: true });
 });

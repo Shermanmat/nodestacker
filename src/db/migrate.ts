@@ -218,6 +218,26 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// People captures — universal lead-magnet capture table. Public POST endpoint
+// at /api/people-captures writes here. De-duped on (email, source).
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`people_captures\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`email\` text NOT NULL,
+    \`name\` text,
+    \`city\` text,
+    \`source\` text NOT NULL,
+    \`metadata\` text,
+    \`captured_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    \`auto_emailed_at\` text
+  )`);
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`people_captures_email_source_unique\` ON \`people_captures\` (\`email\`, \`source\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_people_captures_email\` ON \`people_captures\` (\`email\`)`);
+  console.log('  Ensured people_captures table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

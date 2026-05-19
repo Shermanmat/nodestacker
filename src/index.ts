@@ -14,6 +14,7 @@ import relationshipsRoutes from './api/relationships.js';
 import digestRoutes from './api/digest.js';
 import authRoutes from './api/auth.js';
 import founderPortalRoutes from './api/founder-portal.js';
+import portalCrmRoutes from './api/portal-crm.js';
 import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
 import adminAuthRoutes from './api/admin-auth.js';
@@ -51,6 +52,9 @@ app.use('/api/*', cors());
 app.route('/api/admin-auth', adminAuthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/portal', founderPortalRoutes);
+// Founder-private CRM: investor pipeline + self-added records + interaction logs.
+// All routes scoped to the logged-in founder; no admin endpoint reads any of these.
+app.route('/api/portal/crm', portalCrmRoutes);
 // Public network signup/login (separate from founder auth)
 app.route('/api/public', publicAuthRoutes);
 app.route('/api/public', publicProfileRoutes);

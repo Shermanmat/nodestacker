@@ -458,10 +458,10 @@ export async function runAutoDraftTick(): Promise<{
 //
 // Stops automatically when:
 //   - investor has replied (replyDetectedAt set)
-//   - followupCount >= MAX_FOLLOWUPS (2)
+//   - followupCount >= MAX_FOLLOWUPS (1)
 //   - last follow-up was < 7 days ago
 
-const MAX_FOLLOWUPS = 2;
+const MAX_FOLLOWUPS = 1;
 const FOLLOWUP_GAP_DAYS = 7;
 const FOLLOWUP_TEMPLATES = [
   'Hi {{first}} — just bumping this back to the top. No worries if not a fit, didn\'t want it to get lost.',

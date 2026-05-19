@@ -169,9 +169,60 @@ export const introRequests = sqliteTable('intro_requests', {
   followupCount: integer('followup_count').notNull().default(0),
   lastFollowupAt: text('last_followup_at'),
   notes: text('notes'),
+  // Founder-side CRM fields. Separate from admin-side `notes` so a founder
+  // can keep their own diligence notes / next-action without polluting the
+  // admin view (and vice versa).
+  founderNextActionText: text('founder_next_action_text'),
+  founderNextActionDate: text('founder_next_action_date'),
+  founderCheckSize: text('founder_check_size'),
+  founderOwnedNotes: text('founder_owned_notes'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
 });
+
+// Founder-private investor records — investors a founder is tracking that
+// are NOT in MatCap's network. Admin does NOT see these. The founder CRM
+// page unions these with the founder's intro_requests for a single view.
+export const founderInvestorRecords = sqliteTable('founder_investor_records', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  name: text('name').notNull(),
+  firm: text('firm'),
+  role: text('role'),
+  email: text('email'),
+  geography: text('geography'),
+  // 'self_added' = founder proactively added; 'cold_inbound' = investor reached out
+  source: text('source').notNull().default('self_added'),
+  status: text('status').notNull().default('self_outreach'),
+  nextActionText: text('next_action_text'),
+  nextActionDate: text('next_action_date'),
+  checkSize: text('check_size'),
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Interaction log entries — works for both MatCap-sourced intros (via
+// investorId) and founder-private records (via founderInvestorRecordId).
+// Exactly one of the two fk columns is non-null on a given row.
+export const investorInteractions = sqliteTable('investor_interactions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  investorId: integer('investor_id').references(() => investors.id),
+  founderInvestorRecordId: integer('founder_investor_record_id').references(() => founderInvestorRecords.id),
+  // 'meeting' | 'email' | 'call' | 'note' | 'intro_sent'
+  interactionType: text('interaction_type').notNull(),
+  occurredAt: text('occurred_at').notNull(),
+  content: text('content'),
+  // 'founder' | 'matcap_admin' — who logged this entry
+  createdBy: text('created_by').notNull().default('founder'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type FounderInvestorRecord = typeof founderInvestorRecords.$inferSelect;
+export type NewFounderInvestorRecord = typeof founderInvestorRecords.$inferInsert;
+export type InvestorInteraction = typeof investorInteractions.$inferSelect;
+export type NewInvestorInteraction = typeof investorInteractions.$inferInsert;
 
 export const followupLogs = sqliteTable('followup_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),

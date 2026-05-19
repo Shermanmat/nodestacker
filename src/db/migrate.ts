@@ -171,6 +171,53 @@ safeAddColumn('founders', 'deck_file', 'text');
 safeAddColumn('founders', 'calendly_url', 'text');
 // Soft preference flag: matching algo gives angels a score bonus when true.
 safeAddColumn('founders', 'prefer_angels_only', 'integer DEFAULT 0');
+
+// Founder-side CRM fields on intro_requests — kept separate from admin
+// `notes` so the two surfaces don't fight over the same column.
+safeAddColumn('intro_requests', 'founder_next_action_text', 'text');
+safeAddColumn('intro_requests', 'founder_next_action_date', 'text');
+safeAddColumn('intro_requests', 'founder_check_size', 'text');
+safeAddColumn('intro_requests', 'founder_owned_notes', 'text');
+
+// Founder CRM tables — private to each founder, no admin endpoint reads them.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_investor_records\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`founder_id\` integer NOT NULL REFERENCES \`founders\`(\`id\`),
+    \`name\` text NOT NULL,
+    \`firm\` text,
+    \`role\` text,
+    \`email\` text,
+    \`geography\` text,
+    \`source\` text NOT NULL DEFAULT 'self_added',
+    \`status\` text NOT NULL DEFAULT 'self_outreach',
+    \`next_action_text\` text,
+    \`next_action_date\` text,
+    \`check_size\` text,
+    \`notes\` text,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_fir_founder\` ON \`founder_investor_records\` (\`founder_id\`)`);
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`investor_interactions\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`founder_id\` integer NOT NULL REFERENCES \`founders\`(\`id\`),
+    \`investor_id\` integer REFERENCES \`investors\`(\`id\`),
+    \`founder_investor_record_id\` integer REFERENCES \`founder_investor_records\`(\`id\`),
+    \`interaction_type\` text NOT NULL,
+    \`occurred_at\` text NOT NULL,
+    \`content\` text,
+    \`created_by\` text NOT NULL DEFAULT 'founder',
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_ii_founder\` ON \`investor_interactions\` (\`founder_id\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_ii_investor\` ON \`investor_interactions\` (\`investor_id\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_ii_record\` ON \`investor_interactions\` (\`founder_investor_record_id\`)`);
+  console.log('  Ensured founder_investor_records + investor_interactions tables exist');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

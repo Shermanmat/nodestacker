@@ -23,6 +23,7 @@ const updateFounderSchema = createFounderSchema.partial().extend({
   blurb: z.string().nullable().optional(),
   deckUrl: z.string().nullable().optional(),
   calendlyUrl: z.string().nullable().optional(),
+  preferAnglesOnly: z.boolean().optional(),
 });
 
 // List all founders (with categories)

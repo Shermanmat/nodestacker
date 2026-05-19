@@ -2661,6 +2661,15 @@
                 </select>
               </div>
             </div>
+            <div class="bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              <label class="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" v-model="founderForm.preferAnglesOnly" class="mt-0.5">
+                <span class="text-sm">
+                  <span class="font-medium text-gray-800">Prefer angels over VCs</span>
+                  <span class="block text-xs text-gray-600 mt-0.5">Soft preference — angels get a +20 score bonus in matching so they rank above VCs of equivalent fit. VCs still surface if they're a strong fit.</span>
+                </span>
+              </label>
+            </div>
             <div class="border-t pt-4">
               <p class="text-xs font-medium text-gray-700 mb-2">Intro draft content — used by the agent + approve flow to assemble intro emails for this founder.</p>
               <div class="space-y-3">
@@ -4165,7 +4174,7 @@
         watch(showInvestorModal, (v) => { if (v && !editingInvestor.value) { ssInvestorNode.value = ''; } });
 
         // Forms
-        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '' });
+        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '', preferAnglesOnly: false });
         const uploadingDeck = ref(false);
         const uploadFounderDeck = async (e) => {
           const file = e.target.files && e.target.files[0];
@@ -6462,7 +6471,7 @@
         const closeFounderModal = () => {
           showFounderModal.value = false;
           editingFounder.value = null;
-          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '' });
+          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '', preferAnglesOnly: false });
         };
 
         const saveNode = async () => {

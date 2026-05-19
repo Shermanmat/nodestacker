@@ -169,6 +169,8 @@ safeAddColumn('founders', 'blurb', 'text');
 safeAddColumn('founders', 'deck_url', 'text');
 safeAddColumn('founders', 'deck_file', 'text');
 safeAddColumn('founders', 'calendly_url', 'text');
+// Soft preference flag: matching algo gives angels a score bonus when true.
+safeAddColumn('founders', 'prefer_angels_only', 'integer DEFAULT 0');
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

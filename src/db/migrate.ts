@@ -238,6 +238,22 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// People tags — admin segmentation tags by email.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`people_tags\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`email\` text NOT NULL,
+    \`tag\` text NOT NULL,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`people_tags_email_tag_unique\` ON \`people_tags\` (\`email\`, \`tag\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_people_tags_email\` ON \`people_tags\` (\`email\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_people_tags_tag\` ON \`people_tags\` (\`tag\`)`);
+  console.log('  Ensured people_tags table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

@@ -1187,3 +1187,16 @@ export const peopleCaptures = sqliteTable('people_captures', {
 
 export type PeopleCapture = typeof peopleCaptures.$inferSelect;
 export type NewPeopleCapture = typeof peopleCaptures.$inferInsert;
+
+// People tags — free-form tags attached to a person by email. Used to segment
+// the unified People view ("AI-Austin", "vibe-coding-dinner-prospect",
+// "fundraising-workshop"). Unique on (email, tag) so re-tagging is idempotent.
+export const peopleTags = sqliteTable('people_tags', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  email: text('email').notNull(),
+  tag: text('tag').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type PeopleTag = typeof peopleTags.$inferSelect;
+export type NewPeopleTag = typeof peopleTags.$inferInsert;

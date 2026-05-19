@@ -1276,7 +1276,7 @@
                       <button @click="discardIntroDraft(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Discard</button>
                     </template>
                     <template v-else>
-                      <button @click="openIntroDraft(req)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Review the email and choose: create Gmail draft or send now">Approve</button>
+                      <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Approve this intro request. The draft modal opens after — close it and the approval still stands.">Approve</button>
                       <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
                     </template>
                   </template>

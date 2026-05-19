@@ -1,0 +1,411 @@
+import { google, gmail_v1 } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+
+/**
+ * Gmail OAuth + drafts service.
+ *
+ * Stores the refresh token on the Fly volume so it survives restarts.
+ * On every call, refreshes the access token as needed via the OAuth2Client.
+ *
+ * Scope is gmail.modify — drafts, send, and read access (needed for the
+ * follow-up agent to check threads for investor replies). Re-auth required
+ * after the scope upgrade.
+ */
+
+const CREDENTIALS_FILE = path.join(
+  process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'),
+  'gmail-credentials.json'
+);
+
+const SCOPES = ['https://www.googleapis.com/auth/gmail.modify'];
+
+interface StoredCredentials {
+  refreshToken: string;
+  email?: string;
+  connectedAt: string;
+}
+
+function getRedirectUri(): string {
+  const base = process.env.BASE_URL || 'http://localhost:3000';
+  return `${base.replace(/\/$/, '')}/oauth/gmail/callback`;
+}
+
+function makeOAuth2Client(): OAuth2Client {
+  const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('Missing GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET env vars');
+  }
+  return new google.auth.OAuth2(clientId, clientSecret, getRedirectUri());
+}
+
+export function getAuthUrl(): string {
+  const client = makeOAuth2Client();
+  return client.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent', // force refresh token even if user already granted before
+    scope: SCOPES,
+  });
+}
+
+export async function exchangeCodeForTokens(code: string): Promise<{ email?: string }> {
+  const client = makeOAuth2Client();
+  const { tokens } = await client.getToken(code);
+  if (!tokens.refresh_token) {
+    throw new Error('No refresh token returned. Disconnect first or revoke access at https://myaccount.google.com/permissions, then retry.');
+  }
+
+  // Best-effort: pull the connected user's email for display
+  let email: string | undefined;
+  try {
+    client.setCredentials(tokens);
+    const oauth2 = google.oauth2({ version: 'v2', auth: client });
+    const info = await oauth2.userinfo.get();
+    email = info.data.email || undefined;
+  } catch (_) { /* not fatal */ }
+
+  await fs.mkdir(path.dirname(CREDENTIALS_FILE), { recursive: true });
+  const stored: StoredCredentials = {
+    refreshToken: tokens.refresh_token,
+    email,
+    connectedAt: new Date().toISOString(),
+  };
+  await fs.writeFile(CREDENTIALS_FILE, JSON.stringify(stored, null, 2), 'utf8');
+  return { email };
+}
+
+async function loadStoredCredentials(): Promise<StoredCredentials | null> {
+  try {
+    const raw = await fs.readFile(CREDENTIALS_FILE, 'utf8');
+    return JSON.parse(raw) as StoredCredentials;
+  } catch (_) {
+    return null;
+  }
+}
+
+export async function getStatus(): Promise<{ connected: boolean; email?: string; connectedAt?: string }> {
+  const stored = await loadStoredCredentials();
+  if (!stored) return { connected: false };
+  return { connected: true, email: stored.email, connectedAt: stored.connectedAt };
+}
+
+export async function disconnect(): Promise<void> {
+  try {
+    await fs.unlink(CREDENTIALS_FILE);
+  } catch (_) { /* already gone is fine */ }
+}
+
+async function getAuthedClient(): Promise<OAuth2Client> {
+  const stored = await loadStoredCredentials();
+  if (!stored) throw new Error('Gmail not connected — visit /api/agent/gmail/connect first');
+  const client = makeOAuth2Client();
+  client.setCredentials({ refresh_token: stored.refreshToken });
+  return client;
+}
+
+/**
+ * Build a RFC-2822 MIME message, optionally with one PDF attachment.
+ * Returns base64url-encoded for the Gmail API.
+ */
+function buildMimeMessage(opts: {
+  from: string;
+  to: string;
+  cc?: string;
+  subject: string;
+  body: string;
+  attachment?: { filename: string; mimeType: string; data: Buffer };
+}): string {
+  const boundary = `boundary_${Math.random().toString(36).slice(2)}`;
+  const headers: string[] = [
+    `From: ${opts.from}`,
+    `To: ${opts.to}`,
+  ];
+  if (opts.cc) headers.push(`Cc: ${opts.cc}`);
+  headers.push(`Subject: ${opts.subject}`);
+  headers.push('MIME-Version: 1.0');
+
+  let body: string;
+  if (opts.attachment) {
+    headers.push(`Content-Type: multipart/mixed; boundary="${boundary}"`);
+    const parts: string[] = [
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: 7bit',
+      '',
+      opts.body,
+      '',
+      `--${boundary}`,
+      `Content-Type: ${opts.attachment.mimeType}; name="${opts.attachment.filename}"`,
+      `Content-Disposition: attachment; filename="${opts.attachment.filename}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      opts.attachment.data.toString('base64').replace(/(.{76})/g, '$1\n'),
+      '',
+      `--${boundary}--`,
+    ];
+    body = headers.join('\r\n') + '\r\n\r\n' + parts.join('\r\n');
+  } else {
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    body = headers.join('\r\n') + '\r\n\r\n' + opts.body;
+  }
+
+  return Buffer.from(body)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+export interface DraftInput {
+  to: string;
+  cc?: string;
+  subject: string;
+  body: string;
+  attachmentPath?: string; // absolute or relative path to PDF on disk
+  attachmentName?: string; // filename to show in email (e.g. "Acme Deck.pdf")
+}
+
+export interface DraftResult {
+  draftId: string;
+  messageId?: string;
+  gmailUrl: string; // direct link to the draft in Gmail web
+}
+
+/**
+ * Build the intro email body + subject for a (founder, investor, node) triple.
+ * Mirrors the client-side buildIntroDraft in admin.html.
+ *
+ * Exported here so both the manual draft endpoint and the auto-draft cron
+ * produce the same email.
+ */
+export function buildIntroBody(args: {
+  founder: { name: string; companyName: string; email: string | null; blurb: string | null; companyStage: string; deckUrl: string | null; calendlyUrl: string | null };
+  investor: { name: string; firm: string | null; role: string | null };
+  node: { name: string } | null;
+}): { subject: string; body: string } {
+  const { founder, investor, node } = args;
+  const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+  const founderFirst = (founder.name || '').split(/\s+/)[0] || '';
+  const companyName = founder.companyName || '';
+  const stage = founder.companyStage ? String(founder.companyStage).replace(/_/g, ' ') : '';
+  const nodeFirst = (node?.name || 'Mat').split(/\s+/)[0];
+  const blurb = (founder.blurb || '').trim();
+  const deckUrl = (founder.deckUrl || '').trim();
+  const calendlyUrl = (founder.calendlyUrl || '').trim();
+
+  // Subject defaults to the company name (admin can edit in Gmail before sending).
+  // Falls back to founder name only if companyName is unset.
+  const subject = companyName || founder.name;
+
+  // {{investorName}} and {{founderName}} default to first name only — that's
+  // what reads naturally in an intro email ("Hi Sarah"). Use {{investorFull}}
+  // / {{founderFull}} when you actually want the full name.
+  const fillVars = (s: string) => s
+    .replace(/\{\{investorFirst\}\}/g, investorFirst)
+    .replace(/\{\{investorFull\}\}/g, investor.name || '')
+    .replace(/\{\{investorName\}\}/g, investorFirst)
+    .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
+    .replace(/\{\{founderFirst\}\}/g, founderFirst)
+    .replace(/\{\{founderFull\}\}/g, founder.name || '')
+    .replace(/\{\{founderName\}\}/g, founderFirst)
+    .replace(/\{\{companyName\}\}/g, companyName);
+
+  let body: string;
+  if (blurb) {
+    body = fillVars(blurb);
+  } else {
+    const lines: string[] = [];
+    lines.push(`Hi ${investorFirst} —`);
+    lines.push('');
+    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
+    if (stage) {
+      lines.push('');
+      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+    }
+    if (deckUrl || calendlyUrl) {
+      lines.push('');
+      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
+      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
+    }
+    lines.push('');
+    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
+    lines.push('');
+    lines.push(nodeFirst);
+    body = lines.join('\n');
+  }
+
+  return { subject, body };
+}
+
+export async function createDraft(input: DraftInput): Promise<DraftResult> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const from = stored?.email || 'me';
+
+  let attachment: { filename: string; mimeType: string; data: Buffer } | undefined;
+  if (input.attachmentPath) {
+    const data = await fs.readFile(input.attachmentPath);
+    attachment = {
+      filename: input.attachmentName || path.basename(input.attachmentPath),
+      mimeType: 'application/pdf',
+      data,
+    };
+  }
+
+  const raw = buildMimeMessage({
+    from,
+    to: input.to,
+    cc: input.cc,
+    subject: input.subject,
+    body: input.body,
+    attachment,
+  });
+
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.drafts.create({
+    userId: 'me',
+    requestBody: { message: { raw } },
+  });
+
+  const draftId = res.data.id!;
+  const messageId = res.data.message?.id || undefined;
+  return {
+    draftId,
+    messageId,
+    // Open the draft inside Gmail web — Superhuman will pick it up too.
+    gmailUrl: `https://mail.google.com/mail/u/0/#drafts/${messageId || draftId}`,
+  };
+}
+
+// Send the email directly (skipping drafts). gmail.compose scope is sufficient
+// for messages.send per Google's OAuth docs. Returns the sent message's id +
+// thread id for future reference (e.g. follow-up agent linking).
+export async function sendGmail(input: DraftInput): Promise<{ messageId: string; threadId: string }> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const from = stored?.email || 'me';
+
+  let attachment: { filename: string; mimeType: string; data: Buffer } | undefined;
+  if (input.attachmentPath) {
+    const data = await fs.readFile(input.attachmentPath);
+    attachment = {
+      filename: input.attachmentName || path.basename(input.attachmentPath),
+      mimeType: 'application/pdf',
+      data,
+    };
+  }
+
+  const raw = buildMimeMessage({
+    from,
+    to: input.to,
+    cc: input.cc,
+    subject: input.subject,
+    body: input.body,
+    attachment,
+  });
+
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw },
+  });
+
+  return {
+    messageId: res.data.id || '',
+    threadId: res.data.threadId || '',
+  };
+}
+
+// Inspect a Gmail thread for inbound messages — any message NOT sent by us.
+// Used by the follow-up agent to stop bumping investors who've replied.
+// Returns the most recent non-self message timestamp (ms) if one exists.
+export async function checkThreadReplies(threadId: string): Promise<{
+  hasReply: boolean;
+  lastReplyAt?: string;
+  messageCount: number;
+}> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const myEmail = (stored?.email || '').toLowerCase();
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.threads.get({
+    userId: 'me',
+    id: threadId,
+    format: 'metadata',
+    metadataHeaders: ['From', 'Date'],
+  });
+  const messages = res.data.messages || [];
+  let lastReplyMs = 0;
+  let hasReply = false;
+  for (const msg of messages) {
+    const headers = msg.payload?.headers || [];
+    const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from')?.value || '';
+    // Extract bare email from "Name <foo@bar.com>" style headers
+    const emailMatch = fromHeader.match(/<([^>]+)>/);
+    const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
+    if (!from || from === myEmail) continue;
+    hasReply = true;
+    const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date')?.value;
+    const t = dateHeader ? new Date(dateHeader).getTime() : (msg.internalDate ? parseInt(msg.internalDate) : 0);
+    if (!isNaN(t) && t > lastReplyMs) lastReplyMs = t;
+  }
+  return {
+    hasReply,
+    lastReplyAt: lastReplyMs > 0 ? new Date(lastReplyMs).toISOString() : undefined,
+    messageCount: messages.length,
+  };
+}
+
+// Reply to an existing thread. Uses the same MIME build as sendGmail but adds
+// In-Reply-To + References + threadId so Gmail threads it correctly. No
+// attachment — follow-ups are short bumps.
+export async function sendThreadReply(input: {
+  threadId: string;
+  to: string;
+  subject: string;
+  body: string;
+  inReplyTo?: string; // Message-ID of the message we're replying to
+  references?: string;
+  asDraft?: boolean;
+}): Promise<{ messageId: string; threadId: string; draftId?: string }> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  const from = stored?.email || 'me';
+
+  // Build MIME with In-Reply-To headers
+  const rawLines: string[] = [];
+  rawLines.push(`From: ${from}`);
+  rawLines.push(`To: ${input.to}`);
+  rawLines.push(`Subject: ${input.subject}`);
+  if (input.inReplyTo) rawLines.push(`In-Reply-To: ${input.inReplyTo}`);
+  if (input.references) rawLines.push(`References: ${input.references}`);
+  rawLines.push('MIME-Version: 1.0');
+  rawLines.push('Content-Type: text/plain; charset="UTF-8"');
+  rawLines.push('Content-Transfer-Encoding: 7bit');
+  rawLines.push('');
+  rawLines.push(input.body);
+  const raw = Buffer.from(rawLines.join('\r\n')).toString('base64url');
+
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  if (input.asDraft) {
+    const res = await gmail.users.drafts.create({
+      userId: 'me',
+      requestBody: { message: { raw, threadId: input.threadId } },
+    });
+    return {
+      draftId: res.data.id || '',
+      messageId: res.data.message?.id || '',
+      threadId: res.data.message?.threadId || input.threadId,
+    };
+  }
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: { raw, threadId: input.threadId },
+  });
+  return {
+    messageId: res.data.id || '',
+    threadId: res.data.threadId || input.threadId,
+  };
+}

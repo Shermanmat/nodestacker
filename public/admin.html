@@ -857,8 +857,15 @@
       <!-- Founders Tab -->
       <div v-if="activeTab === 'founders'">
         <div class="flex justify-between items-center mb-4">
-          <div class="flex items-center gap-4">
+          <div class="flex items-center gap-4 flex-wrap">
             <h2 class="text-xl font-semibold">Founders</h2>
+            <select v-model="founderListFilter" class="text-sm border rounded px-2 py-1">
+              <option value="active">Active (cadence on or in portfolio)</option>
+              <option value="cadence">Cadence on only</option>
+              <option value="portfolio">Portfolio only</option>
+              <option value="all">All founders</option>
+            </select>
+            <span class="text-xs text-gray-400">{{ filteredFounders.length }} shown</span>
             <label class="flex items-center text-sm text-gray-500 cursor-pointer">
               <input type="checkbox" v-model="showHiddenFounders" class="mr-2">
               Show hidden ({{ hiddenFounderCount }})
@@ -1108,6 +1115,7 @@
                   class="hover:underline text-sm">
                   {{ (item.investor || item).active === false ? 'Activate' : 'Deactivate' }}
                 </button>
+                <button @click="openMergeInvestor(item.investor || item)" class="text-orange-600 hover:underline text-sm">Merge</button>
                 <button @click="deleteInvestor((item.investor || item).id)" class="text-red-600 hover:underline text-sm">Delete</button>
               </div>
             </div>
@@ -1174,13 +1182,38 @@
         <div class="flex justify-between items-center mb-4">
           <h2 class="text-xl font-semibold">Intro Requests</h2>
           <div class="flex gap-2">
+            <button @click="connectOrDisconnectGmail" :title="gmailStatus.connected ? 'Click to disconnect ' + (gmailStatus.email || 'Gmail') : 'Connect Gmail so the agent can create drafts in your inbox'"
+              :class="['text-white px-4 py-2 rounded-lg text-sm', gmailStatus.connected ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-500 hover:bg-gray-600']">
+              {{ gmailStatus.connected ? '✓ Gmail: ' + (gmailStatus.email || 'connected') : 'Connect Gmail' }}
+            </button>
             <button @click="sendDigestPreview" class="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800" :disabled="sendingDigestPreview" :title="'Email me a summary of what next Friday\'s digest will look like'">
               {{ sendingDigestPreview ? 'Sending...' : 'Email Digest Preview' }}
+            </button>
+            <button @click="runAgentNow" class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700" :disabled="runningAgent" :title="'Run the shadow agent now — generates matches + emails me a digest. Runs automatically Mon + Thu 9am AZ.'">
+              {{ runningAgent ? 'Running agent...' : 'Run agent now' }}
+            </button>
+            <button @click="runAutoDraftNow" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700" :disabled="runningAutoDraft || !gmailStatus.connected" :title="'Create Gmail drafts for top eligible suggestions. Per-founder cap: 1/day, 5/week. Status stays pending until you mark sent.'">
+              {{ runningAutoDraft ? 'Drafting...' : 'Auto-draft one' }}
+            </button>
+            <button @click="runFollowupNow" class="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700" :disabled="runningFollowup || !gmailStatus.connected" :title="'For every sent intro with no reply in 7+ days, draft a short bump in the same thread. Max 2 bumps per intro.'">
+              {{ runningFollowup ? 'Following up...' : 'Run follow-ups' }}
             </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
-            <button @click="showIntroModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+            <button @click="rescorePending" class="bg-gray-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-700" :disabled="rescoring" :title="'Recompute scores on every pending suggestion using the current formula. Use after scoring algorithm changes.'">
+              {{ rescoring ? 'Rescoring...' : 'Rescore pending' }}
+            </button>
+            <button @click="backfillEmails" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-emerald-700" :disabled="backfilling" :title="'Backfill missing investor emails from inbound_intro_logs.from_email.'">
+              {{ backfilling ? 'Backfilling...' : 'Backfill emails' }}
+            </button>
+            <button @click="backfillFounderStages" class="bg-teal-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-teal-700" :disabled="backfillingStages" :title="'Tag every founder with no stage category as Pre-seed + Seed. Idempotent — already-tagged are skipped.'">
+              {{ backfillingStages ? 'Tagging...' : 'Tag founders' }}
+            </button>
+            <button @click="clearPending" class="bg-red-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-700" :disabled="clearing" :title="'Delete ALL pending match_suggestions + their linked pending_suggestion intro_requests. Destructive — used before a clean re-run.'">
+              {{ clearing ? 'Clearing...' : 'Clear pending' }}
+            </button>
+            <button @click="openNewIntroModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               New Intro Request
             </button>
           </div>
@@ -1208,6 +1241,7 @@
                 <th class="py-3 px-4">Founder</th>
                 <th class="px-4">Node</th>
                 <th class="px-4">Investor</th>
+                <th class="px-4">Score</th>
                 <th class="px-4">Status</th>
                 <th class="px-4">Requested</th>
                 <th class="px-4">Next Follow-up</th>
@@ -1218,19 +1252,41 @@
               <tr v-for="req in introRequests" :key="req.id" class="border-t hover:bg-gray-50">
                 <td class="py-3 px-4 font-medium">{{ req.founder?.name }}</td>
                 <td class="px-4">{{ req.node?.name }}</td>
-                <td class="px-4">{{ req.investor?.name }} <span class="text-gray-400">@ {{ req.investor?.firm }}</span></td>
+                <td class="px-4">
+                  <button @click="req.investor &amp;&amp; editInvestor(req.investor)" class="text-blue-600 hover:underline">{{ req.investor?.name }}</button>
+                  <span class="text-gray-400">@ {{ req.investor?.firm }}</span>
+                  <span v-if="req.investor &amp;&amp; !req.investor.email" class="ml-1 text-xs text-red-600" title="No email on file — auto-draft will skip">(no email)</span>
+                </td>
+                <td class="px-4">
+                  <span v-if="req.matchScore != null" :class="{
+                    'bg-green-100 text-green-800': req.matchScore >= 80,
+                    'bg-yellow-100 text-yellow-800': req.matchScore >= 65 &amp;&amp; req.matchScore < 80,
+                    'bg-gray-100 text-gray-600': req.matchScore < 65
+                  }" class="px-2 py-0.5 rounded text-xs font-medium" :title="req.matchReasoning || ''">{{ req.matchScore }}</span>
+                  <span v-else class="text-gray-300">—</span>
+                </td>
                 <td class="px-4"><span :class="statusClass(req.status)">{{ formatStatus(req.status) }}</span></td>
                 <td class="px-4">{{ req.dateRequested }}</td>
                 <td class="px-4" :class="isOverdue(req.nextFollowupDate) ? 'text-red-600 font-medium' : ''">{{ req.nextFollowupDate || '-' }}</td>
                 <td class="px-4">
                   <template v-if="req.status === 'pending_suggestion'">
-                    <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Approve</button>
-                    <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
+                    <template v-if="req.gmailDraftId">
+                      <a :href="'https://mail.google.com/mail/u/0/#drafts/' + req.gmailDraftId" target="_blank" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 mr-1 inline-block">📧 Open draft</a>
+                      <button @click="markIntroSent(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Mark sent</button>
+                      <button @click="discardIntroDraft(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Discard</button>
+                    </template>
+                    <template v-else>
+                      <button @click="openIntroDraft(req)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Review the email and choose: create Gmail draft or send now">Approve</button>
+                      <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
+                    </template>
                   </template>
                   <template v-else>
+                    <button @click="openIntroDraft(req)" class="text-purple-600 hover:underline mr-2">Draft</button>
                     <button @click="editIntro(req)" class="text-blue-600 hover:underline mr-2">Update</button>
-                    <button @click="showAddFollowup(req)" class="text-green-600 hover:underline">Log</button>
+                    <button @click="showAddFollowup(req)" class="text-green-600 hover:underline mr-2">Log</button>
+                    <button v-if="req.status !== 'invested'" @click="markIntroInvested(req.id)" class="text-emerald-700 hover:underline font-medium mr-2" title="Mark this intro as having led to an investment">💰 Invested</button>
                   </template>
+                  <button @click="deleteIntroRequest(req)" class="text-gray-400 hover:text-red-600 ml-1" title="Delete this intro request (test entries, mistakes)">🗑️</button>
                 </td>
               </tr>
             </tbody>
@@ -1787,7 +1843,7 @@
       <div v-if="activeTab === 'marketplace'">
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Marketplace Health</h2>
-          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen();" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          <button @click="loadMarketplaceHealth(); loadThroughput(); loadStaleOpen(); loadSupplyDemand(); loadDisengaged(); loadUntaggedInvestors();" class="text-blue-600 text-sm hover:underline">Refresh</button>
         </div>
 
         <!-- Network filter (applies to both Throughput and Stale Open cards) -->
@@ -1923,72 +1979,155 @@
           </div>
         </div>
 
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-4 gap-4 mb-8">
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-gray-900">{{ marketplaceHealth.sectorBalance.summary.totalSectors }}</div>
-            <div class="text-sm text-gray-500">Total Sectors</div>
+        <!-- Disengaged Investors -->
+        <div v-if="disengaged.items &amp;&amp; disengaged.items.length > 0" class="bg-white rounded-lg shadow p-6 mb-8 border-2 border-amber-200">
+          <div class="flex items-baseline justify-between mb-4">
+            <div>
+              <h3 class="font-semibold text-lg">Investors to review &mdash; possibly disengaged</h3>
+              <p class="text-sm text-gray-500">Last 2 intros (≥4w old) both stalled with followups sent. May be parental leave / fund cycle / just done with us &mdash; you decide.</p>
+            </div>
+            <div class="text-2xl font-bold text-amber-600">{{ disengaged.count }}</div>
           </div>
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-green-600">{{ marketplaceHealth.sectorBalance.summary.balanced }}</div>
-            <div class="text-sm text-gray-500">Balanced</div>
-          </div>
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-amber-600">{{ marketplaceHealth.sectorBalance.summary.tight }}</div>
-            <div class="text-sm text-gray-500">Tight</div>
-          </div>
-          <div class="bg-white rounded-lg shadow p-4">
-            <div class="text-3xl font-bold text-red-600">{{ marketplaceHealth.sectorBalance.summary.severe }}</div>
-            <div class="text-sm text-gray-500">Severe</div>
-          </div>
-        </div>
-
-        <!-- Sector Balance Table -->
-        <div class="bg-white rounded-lg shadow p-6 mb-8">
-          <h3 class="font-semibold mb-4">Supply / Demand by Sector</h3>
           <table class="w-full text-sm">
             <thead>
-              <tr class="text-left border-b">
-                <th class="pb-2">Sector</th>
-                <th class="pb-2">Founders</th>
-                <th class="pb-2">Investors (Available / Total)</th>
-                <th class="pb-2">Ratio</th>
-                <th class="pb-2">Status</th>
+              <tr class="text-left text-xs text-gray-500 border-b">
+                <th class="pb-2">Investor</th>
+                <th class="pb-2">Firm</th>
+                <th class="pb-2">Last 2 stalled intros</th>
+                <th class="pb-2 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="sector in marketplaceHealth.sectorBalance.sectors" :key="sector.categoryId" class="border-b last:border-0">
-                <td class="py-3 font-medium">{{ sector.categoryName }}</td>
-                <td class="py-3">{{ sector.founderCount }}</td>
-                <td class="py-3">
-                  <span class="font-medium">{{ sector.investorsAvailable }}</span>
-                  <span class="text-gray-400"> / {{ sector.investorCountTotal }}</span>
-                  <span v-if="sector.investorsOnCooldown > 0" class="text-xs text-amber-500 ml-1">({{ sector.investorsOnCooldown }} on cooldown)</span>
-                </td>
-                <td class="py-3">
-                  <div class="flex items-center gap-2">
-                    <div class="w-24 bg-gray-200 rounded-full h-2">
-                      <div class="h-2 rounded-full" :class="{
-                        'bg-green-500': sector.status === 'balanced',
-                        'bg-amber-500': sector.status === 'tight',
-                        'bg-red-500': sector.status === 'severe',
-                        'bg-gray-300': sector.status === 'no_demand',
-                      }" :style="{ width: Math.min(100, (sector.ratio !== null ? Math.min(sector.ratio / 20 * 100, 100) : 100)) + '%' }"></div>
-                    </div>
-                    <span class="text-xs text-gray-500">{{ sector.ratio !== null ? sector.ratio + ':1' : 'No investors' }}</span>
+              <tr v-for="item in (disengagedShowAll ? disengaged.items : disengaged.items.slice(0, 10))" :key="item.id" class="border-b last:border-0 align-top">
+                <td class="py-3 font-medium text-blue-700 cursor-pointer" @click="goToInvestor(item.id)" title="Open in Investors tab">{{ item.name }}</td>
+                <td class="py-3 text-gray-600">{{ item.firm || '—' }}</td>
+                <td class="py-3 text-xs text-gray-600">
+                  <div v-for="si in item.stalledIntros" :key="si.id">
+                    {{ si.founderName || `Founder #${si.founderId}` }} &middot;
+                    <span class="text-gray-500">{{ si.status }}</span> &middot;
+                    <span class="text-amber-600">{{ si.bumpCount }} bump{{ si.bumpCount === 1 ? '' : 's' }}</span> &middot;
+                    <span class="text-gray-500">{{ si.ageWeeks }}w ago</span>
                   </div>
                 </td>
-                <td class="py-3">
-                  <span class="px-2 py-1 rounded-full text-xs font-medium" :class="{
-                    'bg-green-100 text-green-700': sector.status === 'balanced',
-                    'bg-amber-100 text-amber-700': sector.status === 'tight',
-                    'bg-red-100 text-red-700': sector.status === 'severe',
-                    'bg-gray-100 text-gray-500': sector.status === 'no_demand',
-                  }">{{ sector.status === 'no_demand' ? 'No Demand' : sector.status.charAt(0).toUpperCase() + sector.status.slice(1) }}</span>
+                <td class="py-3 text-right">
+                  <button @click="deactivateInvestor(item.id)" class="text-xs text-red-600 hover:underline">Remove from rotation</button>
                 </td>
               </tr>
-              <tr v-if="marketplaceHealth.sectorBalance.sectors.length === 0">
-                <td colspan="5" class="py-4 text-center text-gray-400">No sector data available</td>
+            </tbody>
+          </table>
+          <button v-if="disengaged.items.length > 10" @click="disengagedShowAll = !disengagedShowAll" class="text-xs text-blue-600 hover:underline mt-2">
+            {{ disengagedShowAll ? 'Show top 10 only' : `Show all ${disengaged.items.length}` }}
+          </button>
+        </div>
+
+        <!-- Capacity Summary -->
+        <div v-if="supplyDemand" class="grid grid-cols-4 gap-4 mb-4">
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-gray-900">{{ supplyDemand.totals.activeFounders }}</div>
+            <div class="text-sm text-gray-500">Active founders (cadence on)</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-gray-900">{{ supplyDemand.totals.eligibleInvestors }}</div>
+            <div class="text-sm text-gray-500">Eligible investors</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-blue-600">{{ supplyDemand.totals.weeklyDemand }}<span class="text-base text-gray-400 font-normal">/wk</span></div>
+            <div class="text-sm text-gray-500">Total demand (intros wanted)</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-4">
+            <div class="text-3xl font-bold text-purple-600">{{ supplyDemand.totals.weeklySupply }}<span class="text-base text-gray-400 font-normal">/wk</span></div>
+            <div class="text-sm text-gray-500">Total supply (1 intro / 3wks each)</div>
+          </div>
+        </div>
+
+        <!-- Data quality nudge -->
+        <div v-if="supplyDemand &amp;&amp; (supplyDemand.totals.untaggedFounders > 0 || supplyDemand.totals.untaggedInvestors > 0)" class="mb-4 bg-amber-50 border border-amber-200 text-amber-900 rounded p-3 text-sm">
+          <strong>Data gap:</strong>
+          <span v-if="supplyDemand.totals.untaggedFounders > 0">{{ supplyDemand.totals.untaggedFounders }} active founder(s) have no sector tag</span>
+          <span v-if="supplyDemand.totals.untaggedFounders > 0 &amp;&amp; supplyDemand.totals.untaggedInvestors > 0"> · </span>
+          <span v-if="supplyDemand.totals.untaggedInvestors > 0">{{ supplyDemand.totals.untaggedInvestors }} eligible investor(s) have no sector tag</span>.
+          They're missing from the per-sector rows below — tag them to get accurate signal.
+        </div>
+
+        <!-- Untagged investors punch list -->
+        <div v-if="untaggedInvestors &amp;&amp; untaggedInvestors.count > 0" class="bg-white rounded-lg shadow p-6 mb-8">
+          <div class="flex items-center justify-between mb-2">
+            <h3 class="font-semibold">Untagged investors <span class="text-sm font-normal text-gray-500">({{ untaggedInvestors.count }})</span></h3>
+            <button @click="loadUntaggedInvestors" class="text-blue-600 text-xs hover:underline">Refresh</button>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Connected to a node, active, but missing sector tags — silently excluded from matching. Tag them to bring them into the pool.</p>
+          <div class="max-h-96 overflow-y-auto border rounded">
+            <table class="w-full text-sm">
+              <thead class="bg-gray-50 sticky top-0">
+                <tr>
+                  <th class="text-left px-3 py-2">Investor</th>
+                  <th class="text-left px-3 py-2">Firm</th>
+                  <th class="text-left px-3 py-2">Tags</th>
+                  <th class="text-right px-3 py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="inv in untaggedInvestors.items" :key="inv.id" class="border-t hover:bg-gray-50">
+                  <td class="px-3 py-2">{{ inv.name }}</td>
+                  <td class="px-3 py-2 text-gray-600">{{ inv.firm || '—' }}</td>
+                  <td class="px-3 py-2 text-gray-500">
+                    <span v-if="!inv.hasAnyTags" class="text-red-600">none</span>
+                    <span v-else>{{ inv.tagCount }} (no sector)</span>
+                  </td>
+                  <td class="px-3 py-2 text-right">
+                    <button @click="openInvestorEdit(inv.id)" class="text-blue-600 hover:underline text-xs">Tag now →</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Capacity by sector -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+          <h3 class="font-semibold mb-1">Supply / Demand by Sector</h3>
+          <p class="text-xs text-gray-500 mb-4">
+            Weekly capacity model. <strong>Demand</strong> = founders × their per-week target. <strong>Supply</strong> = investors × (1 intro / 3 weeks).
+            Ratio &gt;1.3 = under-supplied (recruit investors), &lt;0.7 = over-supplied (recruit founders).
+            Generalists are sized against all founders; specialists against their own sector.
+          </p>
+          <div v-if="!supplyDemand" class="text-sm text-gray-400 py-4 text-center">Loading…</div>
+          <table v-else class="w-full text-sm">
+            <thead>
+              <tr class="text-left border-b">
+                <th class="pb-2">Sector</th>
+                <th class="pb-2 text-right">Founders</th>
+                <th class="pb-2 text-right">Investors</th>
+                <th class="pb-2 text-right">Demand /wk</th>
+                <th class="pb-2 text-right">Supply /wk</th>
+                <th class="pb-2 text-right">Ratio</th>
+                <th class="pb-2">Status</th>
+                <th class="pb-2">What to do</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in supplyDemand.rows" :key="row.sectorId" class="border-b last:border-0 align-top">
+                <td class="py-3 font-medium">
+                  {{ row.sectorName }}
+                  <span v-if="row.isGeneralist" class="ml-1 text-xs text-gray-400">(all founders)</span>
+                </td>
+                <td class="py-3 text-right">{{ row.founders }}</td>
+                <td class="py-3 text-right">{{ row.investors }}</td>
+                <td class="py-3 text-right text-blue-600">{{ row.weeklyDemand }}</td>
+                <td class="py-3 text-right text-purple-600">{{ row.weeklySupply }}</td>
+                <td class="py-3 text-right font-mono text-xs">{{ row.ratio !== null ? row.ratio : '—' }}</td>
+                <td class="py-3">
+                  <span class="px-2 py-1 rounded-full text-xs font-medium" :class="{
+                    'bg-red-100 text-red-700': row.status === 'undersupplied',
+                    'bg-green-100 text-green-700': row.status === 'balanced',
+                    'bg-amber-100 text-amber-700': row.status === 'oversupplied',
+                    'bg-gray-100 text-gray-500': row.status === 'dormant',
+                  }">{{ {undersupplied:'Under-supplied', balanced:'Balanced', oversupplied:'Over-supplied', dormant:'Dormant'}[row.status] }}</span>
+                </td>
+                <td class="py-3 text-xs text-gray-600 max-w-xs">{{ row.actionHint }}</td>
+              </tr>
+              <tr v-if="supplyDemand.rows.length === 0">
+                <td colspan="8" class="py-4 text-center text-gray-400">No sector data — add categories first.</td>
               </tr>
             </tbody>
           </table>
@@ -2522,6 +2661,38 @@
                 </select>
               </div>
             </div>
+            <div class="border-t pt-4">
+              <p class="text-xs font-medium text-gray-700 mb-2">Intro draft content — used by the agent + approve flow to assemble intro emails for this founder.</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Blurb (intro email body)</label>
+                  <textarea v-model="founderForm.blurb" rows="8" placeholder="The full intro email body, used verbatim. Include greeting, body, sign-off. Supports template variables: {{investorFirst}}, {{investorName}}, {{investorFirm}}, {{founderFirst}}, {{founderName}}, {{companyName}}." class="w-full border rounded px-3 py-2 text-sm font-mono"></textarea>
+                  <p class="text-xs text-gray-500 mt-1">Used verbatim — no auto-prefix, no auto-signature. Variables like <code>{{investorFirst}}</code> get filled in per intro.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Deck URL</label>
+                    <input v-model="founderForm.deckUrl" type="url" placeholder="https://..." class="w-full border rounded px-3 py-2 text-sm">
+                  </div>
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Calendly URL</label>
+                    <input v-model="founderForm.calendlyUrl" type="url" placeholder="https://..." class="w-full border rounded px-3 py-2 text-sm">
+                  </div>
+                </div>
+                <div v-if="editingFounder">
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Deck PDF attachment</label>
+                  <div v-if="founderForm.deckFile" class="flex items-center justify-between gap-2 bg-gray-50 border rounded px-3 py-2 text-sm">
+                    <a :href="'/decks/' + founderForm.deckFile" target="_blank" class="text-blue-600 hover:underline truncate">📎 Deck attached ({{ founderForm.deckFile }})</a>
+                    <button type="button" @click="removeFounderDeck" class="text-red-600 text-xs hover:underline">Remove</button>
+                  </div>
+                  <div v-else class="flex items-center gap-2">
+                    <input type="file" accept="application/pdf,.pdf" @change="uploadFounderDeck($event)" :disabled="uploadingDeck" class="text-sm">
+                    <span v-if="uploadingDeck" class="text-xs text-gray-500">Uploading…</span>
+                  </div>
+                  <p class="text-xs text-gray-500 mt-1">PDF only, 30 MB max. Will be attached to Gmail drafts when ready (Step 3).</p>
+                </div>
+              </div>
+            </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
             <button type="button" @click="closeFounderModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -2581,6 +2752,11 @@
               <input v-model="investorForm.name" type="text" required class="w-full border rounded px-3 py-2">
             </div>
             <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input v-model="investorForm.email" type="email" placeholder="investor@firm.com" class="w-full border rounded px-3 py-2">
+              <p class="text-xs text-gray-500 mt-1">Used as the To: field on Gmail intro drafts.</p>
+            </div>
+            <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Firm</label>
               <input v-model="investorForm.firm" type="text" class="w-full border rounded px-3 py-2">
             </div>
@@ -2626,10 +2802,60 @@
               </div>
               <p class="text-xs text-gray-500 mt-1">Every investor must be connected to a node</p>
             </div>
+            <div v-if="!editingInvestor" class="border-t pt-4">
+              <p class="text-xs font-medium text-gray-700 mb-2">Required categories — used for matching & marketplace balance</p>
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Stage *</label>
+                  <select v-model="investorForm.newStageId" required class="w-full border rounded px-3 py-2"
+                    :class="{ 'border-red-300': !investorForm.newStageId }">
+                    <option value="">— Select stage —</option>
+                    <option v-for="c in stageCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Founder persona *</label>
+                  <select v-model="investorForm.newPersonaId" required class="w-full border rounded px-3 py-2"
+                    :class="{ 'border-red-300': !investorForm.newPersonaId }">
+                    <option value="">— Select persona —</option>
+                    <option v-for="c in personaCategoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Sector *</label>
+                  <select v-model="investorForm.newSectorId" required class="w-full border rounded px-3 py-2"
+                    :class="{ 'border-red-300': !investorForm.newSectorId }">
+                    <option value="">— Select sector —</option>
+                    <template v-for="group in sectorCategoryOptions" :key="group.parent.id">
+                      <option :value="group.parent.id">{{ group.parent.name }}</option>
+                      <option v-for="child in group.children" :key="child.id" :value="child.id">&nbsp;&nbsp;↳ {{ child.name }}</option>
+                    </template>
+                  </select>
+                  <p class="text-xs text-gray-500 mt-1">Pick "Generalist" if this investor has no sector specialty</p>
+                </div>
+              </div>
+            </div>
             <div v-if="editingInvestor" class="flex items-center gap-2">
               <input type="checkbox" v-model="investorForm.active" id="investor-active" class="rounded">
               <label for="investor-active" class="text-sm font-medium text-gray-700">Active</label>
               <span class="text-xs text-gray-500">(Inactive investors are hidden from planning)</span>
+            </div>
+
+            <div v-if="editingInvestor" class="border-t pt-4 space-y-3">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea v-model="investorForm.notes" rows="2" placeholder="Free-form notes — e.g. 'Doesn't take cold intros', 'Asks for revenue first', 'Only Tuesdays'" class="w-full border rounded px-3 py-2 text-sm"></textarea>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Won't take (category exclusions)</label>
+                <p class="text-xs text-gray-500 mb-2">Founders with any selected tag will be silently blocked from matching with this investor.</p>
+                <div class="max-h-48 overflow-y-auto border rounded p-2 grid grid-cols-2 gap-1">
+                  <label v-for="cat in allExclusionCategories" :key="cat.id" class="flex items-center gap-2 text-sm hover:bg-gray-50 px-1 py-0.5 rounded cursor-pointer">
+                    <input type="checkbox" :value="cat.id" v-model="investorForm.excludedCategoryIds" class="rounded">
+                    <span>{{ cat.name }} <span class="text-xs text-gray-400">· {{ cat.type }}</span></span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
           <div class="flex justify-end space-x-3 mt-6">
@@ -2637,6 +2863,27 @@
             <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Reject Reason Modal -->
+    <div v-if="showRejectModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-1">Why reject this intro?</h3>
+        <p class="text-xs text-gray-500 mb-4">Captured for pattern-spotting later. Required.</p>
+        <div class="space-y-2 mb-4">
+          <label v-for="opt in rejectReasonOptions" :key="opt" class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+            <input type="radio" v-model="rejectReasonChoice" :value="opt" class="rounded">
+            <span class="text-sm">{{ opt }}</span>
+          </label>
+        </div>
+        <div v-if="rejectReasonChoice === 'Other'" class="mb-4">
+          <input type="text" v-model="rejectReasonOther" placeholder="Brief reason..." class="w-full border rounded px-3 py-2 text-sm" autofocus>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button @click="showRejectModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+          <button @click="submitRejectSuggestion" :disabled="!rejectReasonChoice" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">Reject</button>
+        </div>
       </div>
     </div>
 
@@ -3191,6 +3438,151 @@
       </div>
     </div>
 
+    <!-- Intro Draft Modal — pre-drafted email to copy into Superhuman/Gmail -->
+    <div v-if="showIntroDraftModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Intro email draft</h3>
+          <button @click="showIntroDraftModal = false" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <p class="text-xs text-gray-500 mb-4">Pre-drafted from the founder + investor data. Tweak as needed, copy, paste into Superhuman.</p>
+
+        <!-- Warning + inline fix when the investor has no email on file -->
+        <div v-if="currentInvestorForDraft &amp;&amp; !currentInvestorForDraft.email" class="bg-amber-50 border border-amber-200 rounded p-3 mb-4 text-sm">
+          <div class="font-medium text-amber-900">⚠ No email on file for {{ currentInvestorForDraft.name }}{{ currentInvestorForDraft.firm ? ' @ ' + currentInvestorForDraft.firm : '' }}</div>
+          <p class="text-amber-800 text-xs mt-1">The draft will have a blank <code>To:</code>. Add their email now and we'll patch this draft + save for future intros.</p>
+          <div class="flex gap-2 mt-2">
+            <input type="email" v-model="missingInvestorEmail" placeholder="investor@firm.com" @keydown.enter.prevent="saveMissingInvestorEmail"
+              class="flex-1 border rounded px-3 py-1 text-sm">
+            <button @click="saveMissingInvestorEmail" :disabled="savingMissingEmail || !missingInvestorEmail"
+              :class="(savingMissingEmail || !missingInvestorEmail) ? 'bg-gray-300 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'"
+              class="px-3 py-1 text-white rounded text-sm">
+              {{ savingMissingEmail ? 'Saving…' : 'Save & patch draft' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">To</label>
+            <div class="flex gap-2">
+              <input type="text" v-model="introDraft.to" class="flex-1 border rounded px-3 py-2 text-sm font-mono">
+              <button @click="copyToClipboard(introDraft.to, 'to')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                {{ introDraftCopied === 'to' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Cc</label>
+            <div class="flex gap-2">
+              <input type="text" v-model="introDraft.cc" class="flex-1 border rounded px-3 py-2 text-sm font-mono">
+              <button @click="copyToClipboard(introDraft.cc, 'cc')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                {{ introDraftCopied === 'cc' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Subject</label>
+            <div class="flex gap-2">
+              <input type="text" v-model="introDraft.subject" class="flex-1 border rounded px-3 py-2 text-sm">
+              <button @click="copyToClipboard(introDraft.subject, 'subject')" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+                {{ introDraftCopied === 'subject' ? 'Copied' : 'Copy' }}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-500 mb-1">Body</label>
+            <textarea v-model="introDraft.body" rows="14" class="w-full border rounded px-3 py-2 text-sm font-mono"></textarea>
+            <button @click="copyToClipboard(introDraft.body, 'body')" class="mt-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm">
+              {{ introDraftCopied === 'body' ? 'Copied body' : 'Copy body' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Gmail draft result -->
+        <div v-if="gmailDraftResult" class="mt-4 bg-green-50 border border-green-200 rounded p-3 text-sm">
+          <div class="font-medium text-green-900">✓ Gmail draft created{{ gmailDraftResult.attached ? ' with PDF attached' : '' }}</div>
+          <p class="text-green-800 text-xs mt-1">Open Gmail or Superhuman → Drafts. The To field is blank (investor email not in our DB yet) — Gmail will autocomplete from your contacts.</p>
+          <a :href="gmailDraftResult.gmailUrl" target="_blank" class="text-green-700 underline text-xs">Open draft in Gmail →</a>
+        </div>
+
+        <div class="flex justify-between items-center mt-6 pt-4 border-t">
+          <a :href="introDraftMailto" target="_blank" class="text-sm text-blue-600 hover:underline">Open in default mail app →</a>
+          <div class="flex gap-2">
+            <button v-if="gmailStatus.connected" @click="createGmailDraftFromCurrent" :disabled="draftingGmail || sendingGmail"
+              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+              {{ draftingGmail ? 'Creating…' : 'Create as Gmail draft' }}
+            </button>
+            <button v-if="gmailStatus.connected" @click="sendGmailFromCurrent" :disabled="draftingGmail || sendingGmail"
+              class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 text-sm">
+              {{ sendingGmail ? 'Sending…' : 'Send now' }}
+            </button>
+            <button @click="copyEntireIntro" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm">
+              {{ introDraftCopied === 'all' ? 'Copied all' : 'Copy everything' }}
+            </button>
+            <button @click="showIntroDraftModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Merge Investor Modal -->
+    <div v-if="showMergeModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg">
+        <div class="flex justify-between items-center mb-4">
+          <h3 class="text-lg font-semibold">Merge Investor</h3>
+          <button @click="closeMergeModal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <div v-if="mergeSource" class="bg-orange-50 border border-orange-200 rounded p-3 mb-4 text-sm">
+          <div class="font-medium text-orange-900">This investor (duplicate, will be deleted):</div>
+          <div class="text-orange-800 mt-1">{{ mergeSource.name }}<span v-if="mergeSource.firm"> @ {{ mergeSource.firm }}</span> <span class="text-orange-600 text-xs">(id: {{ mergeSource.id }})</span></div>
+        </div>
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Merge into (keep this one):</label>
+          <input
+            type="text"
+            v-model="mergeSearch"
+            @focus="mergeSearchOpen = true"
+            @input="mergeSearchOpen = true; mergeTarget = null"
+            placeholder="Type to search investor to keep..."
+            class="w-full border rounded px-3 py-2"
+            :class="{ 'border-green-500 bg-green-50': mergeTarget }"
+          />
+          <div v-if="mergeSearchOpen && mergeSearchResults.length" class="border rounded mt-1 max-h-60 overflow-y-auto bg-white shadow">
+            <div
+              v-for="i in mergeSearchResults"
+              :key="i.id"
+              @mousedown="selectMergeTarget(i)"
+              class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+            >
+              <span class="font-medium">{{ i.name }}</span>
+              <span v-if="i.firm" class="text-gray-500"> @ {{ i.firm }}</span>
+              <span class="text-gray-400 text-xs ml-2">id: {{ i.id }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="mergeTarget" class="bg-green-50 border border-green-200 rounded p-3 mb-4 text-sm">
+          <div class="font-medium text-green-900">Will keep (all data merged into):</div>
+          <div class="text-green-800 mt-1">{{ mergeTarget.name }}<span v-if="mergeTarget.firm"> @ {{ mergeTarget.firm }}</span> <span class="text-green-600 text-xs">(id: {{ mergeTarget.id }})</span></div>
+        </div>
+        <div v-if="mergeError" class="text-red-600 text-sm mb-3">{{ mergeError }}</div>
+        <div v-if="mergeResult" class="bg-blue-50 border border-blue-200 rounded p-3 mb-3 text-sm text-blue-900">
+          <div class="font-medium">Merged.</div>
+          <pre class="text-xs mt-1 overflow-x-auto">{{ JSON.stringify(mergeResult, null, 2) }}</pre>
+        </div>
+        <div class="flex justify-end gap-2">
+          <button @click="closeMergeModal" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
+          <button
+            @click="confirmMerge"
+            :disabled="!mergeTarget || mergeSubmitting"
+            :class="(!mergeTarget || mergeSubmitting) ? 'bg-gray-300 cursor-not-allowed' : 'bg-orange-600 hover:bg-orange-700'"
+            class="px-4 py-2 text-white rounded">
+            {{ mergeSubmitting ? 'Merging...' : 'Merge & Delete Duplicate' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     </div><!-- /flex -->
     </template>
   </div>
@@ -3253,6 +3645,9 @@
             loadMarketplaceHealth();
             loadThroughput();
             loadStaleOpen();
+            loadSupplyDemand();
+            loadDisengaged();
+            loadUntaggedInvestors();
           }
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
@@ -3309,6 +3704,14 @@
         const marketplaceUtilFilter = ref('all');
         const marketplaceExpandedGap = ref(null);
         const networkAvailability = ref(null);
+
+        // Supply / Demand by sector (weekly capacity-based)
+        const supplyDemand = ref(null);
+        const untaggedInvestors = ref(null);
+
+        // Disengaged investors (2 stalled intros in a row)
+        const disengaged = ref({ count: 0, items: null });
+        const disengagedShowAll = ref(false);
 
         // Throughput (generalist stale-rate + 12-week trend)
         const throughput = ref({ current: null, trend: [], staleItems: null });
@@ -3577,6 +3980,69 @@
         const currentResearchInvestorId = ref(null);
         let researchPollingInterval = null;
 
+        // Merge investor modal state
+        const showMergeModal = ref(false);
+        const mergeSource = ref(null);
+        const mergeTarget = ref(null);
+        const mergeSearch = ref('');
+        const mergeSearchOpen = ref(false);
+        const mergeError = ref('');
+        const mergeResult = ref(null);
+        const mergeSubmitting = ref(false);
+        const mergeSearchResults = computed(() => {
+          const q = mergeSearch.value.toLowerCase().trim();
+          const src = mergeSource.value;
+          let list = investors.value;
+          if (src) list = list.filter(i => i.id !== src.id);
+          if (!q) return list.slice(0, 20);
+          return list.filter(i => (i.name || '').toLowerCase().includes(q) || (i.firm || '').toLowerCase().includes(q)).slice(0, 20);
+        });
+        const openMergeInvestor = (investor) => {
+          mergeSource.value = investor;
+          mergeTarget.value = null;
+          mergeSearch.value = '';
+          mergeSearchOpen.value = false;
+          mergeError.value = '';
+          mergeResult.value = null;
+          mergeSubmitting.value = false;
+          showMergeModal.value = true;
+        };
+        const closeMergeModal = () => {
+          showMergeModal.value = false;
+          mergeSource.value = null;
+          mergeTarget.value = null;
+          mergeSearch.value = '';
+          mergeError.value = '';
+          mergeResult.value = null;
+        };
+        const selectMergeTarget = (i) => {
+          mergeTarget.value = i;
+          mergeSearch.value = `${i.name}${i.firm ? ' @ ' + i.firm : ''}`;
+          mergeSearchOpen.value = false;
+        };
+        const confirmMerge = async () => {
+          if (!mergeSource.value || !mergeTarget.value) return;
+          const srcLabel = `${mergeSource.value.name}${mergeSource.value.firm ? ' @ ' + mergeSource.value.firm : ''}`;
+          const tgtLabel = `${mergeTarget.value.name}${mergeTarget.value.firm ? ' @ ' + mergeTarget.value.firm : ''}`;
+          if (!confirm(`Merge "${srcLabel}" INTO "${tgtLabel}"?\n\nAll intro requests, connections, categories, research, and history from the duplicate will be reassigned to the keeper. The duplicate will be deleted.\n\nThis cannot be undone.`)) return;
+          mergeSubmitting.value = true;
+          mergeError.value = '';
+          mergeResult.value = null;
+          try {
+            const result = await api(`/investors/${mergeSource.value.id}/merge-into/${mergeTarget.value.id}`, { method: 'POST' });
+            mergeResult.value = result.stats;
+            await loadInvestors();
+            if (activeTab.value === 'marketplace') {
+              loadThroughput();
+              loadStaleOpen();
+            }
+          } catch (e) {
+            mergeError.value = e?.message || 'Merge failed';
+          } finally {
+            mergeSubmitting.value = false;
+          }
+        };
+
         // Inbound confirm modal
         const showInboundConfirmModal = ref(false);
         const inboundConfirmLog = ref(null);
@@ -3699,9 +4165,64 @@
         watch(showInvestorModal, (v) => { if (v && !editingInvestor.value) { ssInvestorNode.value = ''; } });
 
         // Forms
-        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
+        const founderForm = reactive({ name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '' });
+        const uploadingDeck = ref(false);
+        const uploadFounderDeck = async (e) => {
+          const file = e.target.files && e.target.files[0];
+          if (!file || !editingFounder.value) return;
+          uploadingDeck.value = true;
+          try {
+            const fd = new FormData();
+            fd.append('deck', file);
+            const res = await fetch(`/api/founders/${editingFounder.value}/upload-deck`, {
+              method: 'POST',
+              headers: { 'X-Admin-Session': adminSessionId.value },
+              body: fd,
+            });
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+              throw new Error(err.error || 'Upload failed');
+            }
+            const result = await res.json();
+            founderForm.deckFile = result.deckFile;
+            loadFounders();
+          } catch (err) {
+            alert('Deck upload failed: ' + (err.message || err));
+          } finally {
+            uploadingDeck.value = false;
+            e.target.value = '';
+          }
+        };
+        const removeFounderDeck = async () => {
+          if (!editingFounder.value) return;
+          if (!confirm('Remove the attached deck?')) return;
+          await api(`/founders/${editingFounder.value}/deck`, { method: 'DELETE' });
+          founderForm.deckFile = '';
+          loadFounders();
+        };
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', notes: '', excludedCategoryIds: [], newStageId: '', newPersonaId: '', newSectorId: '' });
+        // Full list of categories (any type) — used to populate the "Won't take" picker.
+        const allExclusionCategories = ref([]);
+
+        // Categories grouped by type for the add-investor required dropdowns
+        const stageCategoryOptions = computed(() => allCategories.value
+          .filter(c => c.type === 'stage')
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+        const personaCategoryOptions = computed(() => allCategories.value
+          .filter(c => c.type === 'persona')
+          .sort((a, b) => (a.name || '').localeCompare(b.name || '')));
+        const sectorCategoryOptions = computed(() => {
+          // Group sectors: top-level parents first (or flat if no children)
+          const sectors = allCategories.value.filter(c => c.type === 'sector');
+          const parents = sectors.filter(c => !c.parentId);
+          const groups = [];
+          for (const parent of parents.sort((a, b) => (a.name || '').localeCompare(b.name || ''))) {
+            const children = sectors.filter(c => c.parentId === parent.id);
+            groups.push({ parent, children });
+          }
+          return groups;
+        });
         const introForm = reactive({
           founderId: '', nodeId: '', investorId: '', status: 'intro_request_sent',
           dateRequested: '', dateNodeAsked: '', dateIntroduced: '', firstMeetingDate: '',
@@ -3716,6 +4237,18 @@
         const introFounderDropdownOpen = ref(false);
         const introNodeDropdownOpen = ref(false);
         const introInvestorDropdownOpen = ref(false);
+        // Open the New Intro modal with node defaulted to Mat Sherman.
+        // Save a click — the vast majority of logged intros go through Mat.
+        const openNewIntroModal = () => {
+          editingIntro.value = null;
+          const mat = (nodes.value || []).find(n => (n.name || '').toLowerCase().includes('mat sherman'));
+          if (mat && !introForm.nodeId) {
+            introForm.nodeId = mat.id;
+            introNodeSearch.value = mat.name;
+          }
+          showIntroModal.value = true;
+        };
+
         const followupForm = reactive({ followupType: 'node_check', completedBy: 'admin', notes: '', nextAction: '' });
         const fnRelForm = reactive({ founderId: '', nodeId: '', relationshipStrength: 'medium', howConnected: '' });
         const niConnForm = reactive({ nodeId: '', investorId: '', connectionStrength: 'medium', validated: false });
@@ -3735,6 +4268,8 @@
         const introFilter = reactive({ status: '', founderId: '' });
         const investorSearchQuery = ref('');
         const showHiddenFounders = ref(false);
+        // Founders list view filter: 'active' (cadence on or in portfolio), 'cadence', 'portfolio', 'all'
+        const founderListFilter = ref('active');
 
         // Intro Planning
         const planningFounderId = ref('');
@@ -3775,12 +4310,24 @@
           return c ? c.name : code;
         };
 
-        // Computed: filtered founders (hide hidden unless toggled)
+        // Set of founder ids who have at least one portfolio company
+        const portfolioFounderIds = computed(() => {
+          return new Set((portfolio.value?.companies || []).map(c => c.founderId).filter(Boolean));
+        });
+
+        // Computed: filtered founders (hide hidden unless toggled, plus active/portfolio filter)
         const filteredFounders = computed(() => {
-          if (showHiddenFounders.value) {
-            return founders.value;
+          let list = showHiddenFounders.value ? founders.value : founders.value.filter(f => !f.hidden);
+          const portfolioIds = portfolioFounderIds.value;
+          if (founderListFilter.value === 'cadence') {
+            list = list.filter(f => f.introCadenceActive);
+          } else if (founderListFilter.value === 'portfolio') {
+            list = list.filter(f => portfolioIds.has(f.id));
+          } else if (founderListFilter.value === 'active') {
+            list = list.filter(f => f.introCadenceActive || portfolioIds.has(f.id));
           }
-          return founders.value.filter(f => !f.hidden);
+          // 'all' = no further filter
+          return list;
         });
 
         const hiddenFounderCount = computed(() => {
@@ -4365,6 +4912,7 @@
           loadPendingInboundCount();
           loadOnboardingWorkflows();
           loadCategories();
+          loadGmailStatus();
         };
 
         // Load functions
@@ -4408,6 +4956,303 @@
 
         // Digest preview email (high-level summary, sent to admin email)
         const sendingDigestPreview = ref(false);
+        const gmailStatus = ref({ connected: false, email: null });
+        const loadGmailStatus = async () => {
+          try { gmailStatus.value = await api('/agent/gmail/status'); } catch (e) { /* ok */ }
+        };
+        const connectOrDisconnectGmail = async () => {
+          if (gmailStatus.value.connected) {
+            if (!confirm(`Disconnect ${gmailStatus.value.email || 'Gmail'}? The agent will stop creating drafts.`)) return;
+            await api('/agent/gmail/disconnect', { method: 'POST' });
+            await loadGmailStatus();
+          } else {
+            try {
+              const res = await api('/agent/gmail/connect');
+              if (res.authUrl) window.location.href = res.authUrl;
+            } catch (e) {
+              alert('Gmail connect failed: ' + (e.message || e) + '\n\nMake sure GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET are set as Fly secrets.');
+            }
+          }
+        };
+
+        // Create the draft directly in Gmail (instead of copy/paste).
+        const draftingGmail = ref(false);
+        const gmailDraftResult = ref(null);
+        const runningFollowup = ref(false);
+        const runFollowupNow = async () => {
+          if (!confirm('Run the follow-up agent? Checks every sent intro 7+ days old for replies, drafts a bump if none. Max 2 bumps per intro.')) return;
+          runningFollowup.value = true;
+          try {
+            const result = await api('/agent/followup-now', { method: 'POST' });
+            let msg = `Checked ${result.checked} sent intros.\nDrafts created: ${result.drafted}\nReplies detected: ${result.repliesDetected}`;
+            if (result.results?.length) {
+              const drafted = result.results.filter(r => r.action === 'drafted').map(r => `• ${r.founderName} → ${r.investorName}`).join('\n');
+              const replied = result.results.filter(r => r.action === 'reply-detected').map(r => `• ${r.founderName} → ${r.investorName}`).join('\n');
+              if (drafted) msg += `\n\nBump drafts:\n${drafted}`;
+              if (replied) msg += `\n\nReplies (now off rotation):\n${replied}`;
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { alert('Follow-up failed: ' + (e.message || e)); }
+          finally { runningFollowup.value = false; }
+        };
+
+        const sendingGmail = ref(false);
+        const sendGmailFromCurrent = async () => {
+          if (!introDraftIntroRequestId.value) return;
+          if (!introDraft.to || !introDraft.to.trim()) {
+            alert('No recipient email — add one before sending.');
+            return;
+          }
+          if (!confirm(`Send this intro now?\n\nTo: ${introDraft.to}\nSubject: ${introDraft.subject}\n\nThis cannot be undone.`)) return;
+          sendingGmail.value = true;
+          try {
+            const result = await api('/agent/gmail/draft-intro', {
+              method: 'POST',
+              body: {
+                introRequestId: introDraftIntroRequestId.value,
+                subjectOverride: introDraft.subject,
+                bodyOverride: introDraft.body,
+                toOverride: introDraft.to,
+                sendNow: true,
+              },
+            });
+            if (result?.sent) {
+              showIntroDraftModal.value = false;
+              loadIntroRequests();
+              loadAllIntroRequests();
+            } else {
+              alert('Send returned without confirmation. Check the row status.');
+            }
+          } catch (e) {
+            alert('Send failed: ' + (e.message || e));
+          } finally {
+            sendingGmail.value = false;
+          }
+        };
+
+        const createGmailDraftFromCurrent = async () => {
+          if (!introDraftIntroRequestId.value) return;
+          draftingGmail.value = true;
+          gmailDraftResult.value = null;
+          try {
+            // Send the EDITED subject / body / to from the textarea so the
+            // server doesn't rebuild from stale DB blurb. Server uses these
+            // overrides verbatim when present.
+            const result = await api('/agent/gmail/draft-intro', {
+              method: 'POST',
+              body: {
+                introRequestId: introDraftIntroRequestId.value,
+                subjectOverride: introDraft.subject,
+                bodyOverride: introDraft.body,
+                toOverride: introDraft.to,
+              },
+            });
+            gmailDraftResult.value = result;
+          } catch (e) {
+            alert('Gmail draft failed: ' + (e.message || e));
+          } finally {
+            draftingGmail.value = false;
+          }
+        };
+
+        const runningAutoDraft = ref(false);
+        const runAutoDraftNow = async () => {
+          if (!confirm('Run the auto-draft now? It will create Gmail drafts for the top eligible suggestions. Per-founder cap: 1/day, 5/week.')) return;
+          runningAutoDraft.value = true;
+          try {
+            const result = await api('/agent/auto-draft-now', { method: 'POST' });
+            if (result.drafted > 0) {
+              const lines = result.results.map(r => `• ${r.founderName} → ${r.investorName} (score ${r.matchScore})`).join('\n');
+              let msg = `${result.drafted} draft${result.drafted === 1 ? '' : 's'} created.\n\n${lines}\n\nOpen Gmail → Drafts to review.`;
+              if (result.skippedBreakdown) {
+                const s = result.skippedBreakdown;
+                const skipBits = [];
+                if (s.underScore) skipBits.push(`score<${s.minScoreThreshold}: ${s.underScore}`);
+                if (s.noInvestorEmail) skipBits.push(`no email: ${s.noInvestorEmail}`);
+                if (s.existingDraft) skipBits.push(`existing draft: ${s.existingDraft}`);
+                if (s.perFounderDayCap) skipBits.push(`day-cap hit: ${s.perFounderDayCap}`);
+                if (s.perFounderWeekCap) skipBits.push(`week-cap hit: ${s.perFounderWeekCap}`);
+                if (skipBits.length) msg += `\n\nAlso skipped (${s.total - result.drafted}): ${skipBits.join(', ')}`;
+              }
+              alert(msg);
+            } else if (result.skippedBreakdown) {
+              const s = result.skippedBreakdown;
+              let msg = `0 drafts created. Of ${s.total} pending suggestions:\n`;
+              if (s.underScore) msg += `\n• ${s.underScore} below score threshold (need ≥${s.minScoreThreshold})`;
+              if (s.noInvestorEmail) msg += `\n• ${s.noInvestorEmail} investor has no email on file`;
+              if (s.existingDraft) msg += `\n• ${s.existingDraft} already have a Gmail draft`;
+              if (s.notPendingSuggestion) msg += `\n• ${s.notPendingSuggestion} intro_request status not pending_suggestion`;
+              if (s.perFounderDayCap) msg += `\n• ${s.perFounderDayCap} founder hit 1/day cap`;
+              if (s.perFounderWeekCap) msg += `\n• ${s.perFounderWeekCap} founder hit 5/week cap`;
+              if (s.missingFounder || s.missingIntroRequest) msg += `\n• ${s.missingFounder + s.missingIntroRequest} data-link issues`;
+              alert(msg);
+            } else {
+              alert(`Skipped: ${result.skipped || 'no eligible candidate'}`);
+            }
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            console.error('Auto-draft failed', e);
+          } finally {
+            runningAutoDraft.value = false;
+          }
+        };
+
+        const markIntroSent = async (id) => {
+          if (!confirm('Mark this intro as sent? Flips status to intro_request_sent. Only do this AFTER you actually sent the Gmail draft.')) return;
+          await api(`/intro-requests/${id}/mark-sent`, { method: 'POST' });
+          loadIntroRequests();
+          loadAllIntroRequests();
+          if (activeTab.value === 'marketplace') {
+            loadThroughput();
+            loadStaleOpen();
+          }
+        };
+
+        const discardIntroDraft = async (id) => {
+          if (!confirm('Discard this draft? Deletes the Gmail draft and removes the pending suggestion.')) return;
+          await api(`/intro-requests/${id}/discard-draft`, { method: 'POST' });
+          loadIntroRequests();
+          loadAllIntroRequests();
+        };
+
+        const clearing = ref(false);
+        const clearPending = async () => {
+          if (!confirm('Delete ALL pending match suggestions and their pending_suggestion intro_requests? This is destructive — used to reset the queue before a clean agent re-run.')) return;
+          clearing.value = true;
+          try {
+            const result = await api('/agent/clear-pending', { method: 'POST' });
+            alert(`Cleared ${result.deletedSuggestions} suggestions and ${result.deletedIntros} intro_requests.`);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { console.error('Clear failed', e); } finally { clearing.value = false; }
+        };
+
+        const backfilling = ref(false);
+        const backfillingStages = ref(false);
+        const backfillFounderStages = async () => {
+          if (!confirm('Tag every founder with zero stage tags as Pre-seed + Seed?')) return;
+          backfillingStages.value = true;
+          try {
+            const result = await api('/agent/backfill-founder-stages', { method: 'POST' });
+            let msg = `Tagged ${result.updated} of ${result.candidates} founders (assigned: ${(result.stagesAssigned || []).join(', ')}).`;
+            if (result.sampleFilled?.length) {
+              msg += `\n\nSample:\n${result.sampleFilled.map(f => `• ${f.name}`).join('\n')}`;
+            }
+            alert(msg);
+          } catch (e) { console.error('Backfill stages failed', e); alert('Backfill failed — see console.'); }
+          finally { backfillingStages.value = false; }
+        };
+
+        const backfillEmails = async () => {
+          if (!confirm('Backfill missing investor emails from inbound_intro_logs?')) return;
+          backfilling.value = true;
+          try {
+            const result = await api('/agent/backfill-investor-emails', { method: 'POST' });
+            let msg = `Updated ${result.updated} of ${result.candidates} investors missing email.`;
+            if (result.sampleFilled?.length) {
+              msg += `\n\nSample:\n${result.sampleFilled.map(f => `• ${f.name} → ${f.email}`).join('\n')}`;
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { console.error('Backfill failed', e); } finally { backfilling.value = false; }
+        };
+
+        const rescoring = ref(false);
+        const rescorePending = async () => {
+          if (!confirm('Recompute scores on every pending suggestion using the current formula?')) return;
+          rescoring.value = true;
+          try {
+            const result = await api('/agent/rescore-pending', { method: 'POST' });
+            let msg = `Rescored ${result.updated} of ${result.total} pending suggestions.`;
+            if (result.skipped) msg += `\n\n${result.skipped} had a missing node↔investor connection (used 'medium' fallback).`;
+            if (result.diagnostics) {
+              msg += `\n\nDB has ${result.diagnostics.connCount} node↔investor connections total.`;
+              if (result.diagnostics.sampleMissing?.length) {
+                msg += `\nMissing pairs sample: ${result.diagnostics.sampleMissing.map(p => `node${p.nodeId}↔inv${p.investorId}`).join(', ')}`;
+              }
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            console.error('Rescore failed', e);
+          } finally {
+            rescoring.value = false;
+          }
+        };
+
+        const deleteIntroRequest = async (req) => {
+          const label = `${req.founder?.name || 'Founder'} → ${req.investor?.name || 'Investor'}`;
+          if (!confirm(`Delete intro request "${label}"? This permanently removes it (and any linked match suggestion). Use for test entries / mistakes.`)) return;
+          try {
+            await api(`/intro-requests/${req.id}`, { method: 'DELETE' });
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { console.error('Delete failed', e); alert('Delete failed — see console.'); }
+        };
+
+        const markIntroInvested = async (id) => {
+          if (!confirm('Mark this intro as resulting in an investment? This is the binary outcome signal we track.')) return;
+          await api(`/intro-requests/${id}/mark-invested`, { method: 'POST' });
+          loadIntroRequests();
+          loadAllIntroRequests();
+        };
+
+        const runningAgent = ref(false);
+        const runAgentNow = async () => {
+          if (!confirm('Run the shadow agent now? It will generate new matches and email you a digest.')) return;
+          runningAgent.value = true;
+          try {
+            const result = await api('/agent/run-now', { method: 'POST' });
+            let msg = `Agent run complete.\n\nGenerated: ${result.generated} suggestions\nTop picks (score ≥ 70): ${result.topRecommendations}\nEmail sent: ${result.emailSent ? 'yes (' + result.recipient + ')' : 'no — check logs'}`;
+            if (result.generated === 0 && result.diagnostics) {
+              const d = result.diagnostics;
+              msg += `\n\n— Why 0? —\nEligible founders: ${d.eligibleFounders}`;
+              if (d.eligibleFounders === 0) {
+                msg += `\n(none have introCadenceActive=true + round not closed + not hidden)`;
+              } else {
+                msg += `\n\nPer-founder breakdown:\n`;
+                msg += d.perFounder.slice(0, 12).map(p => {
+                  const reasons = [];
+                  const targetBits = [];
+                  if (p.targetSupplyBased) targetBits.push(`supply:${p.targetSupplyBased}`);
+                  if (p.targetHeatBased) targetBits.push(`heat:${p.targetHeatBased}`);
+                  if (p.targetManualBaseline) targetBits.push(`manual:${p.targetManualBaseline}`);
+                  const targetExpl = targetBits.length ? ` [target=${p.target} via ${targetBits.join(',')}]` : '';
+                  if (p.remaining === 0) reasons.push(`quota filled (${p.usedThisWeek}/${p.target} this week)${targetExpl}`);
+                  if (p.available === 0 && p.totalReachable > 0) {
+                    const bits = [];
+                    if (p.blockedByExisting) bits.push(`already-intro'd:${p.blockedByExisting}`);
+                    if (p.blockedByFirm) bits.push(`firm-dedup:${p.blockedByFirm}`);
+                    if (p.blockedByCooldown) bits.push(`cooldown:${p.blockedByCooldown}`);
+                    if (p.blockedByClaimed) bits.push(`claimed-by-other-founder:${p.blockedByClaimed}`);
+                    if (p.blockedByTripleDup) bits.push(`prior-suggestion-dedup:${p.blockedByTripleDup}`);
+                    if (p.blockedByVipGate) bits.push(`VIP-investor-gate:${p.blockedByVipGate}`);
+                    if (p.blockedByVipNode) bits.push(`VIP-node-gate:${p.blockedByVipNode}`);
+                    if (p.blockedByGeo) bits.push(`geo-mismatch:${p.blockedByGeo}`);
+                    if (p.blockedByCategory) bits.push(`category-mismatch:${p.blockedByCategory}`);
+                    reasons.push(`all ${p.totalReachable} blocked (${bits.join(', ')})`);
+                  }
+                  if (p.totalReachable === 0) reasons.push(`no reachable investors via any node`);
+                  return `• ${p.founder}: ${p.generated} gen, ${p.available} avail of ${p.totalReachable} reachable${reasons.length ? ' — ' + reasons.join('; ') : ''}`;
+                }).join('\n');
+                if (d.perFounder.length > 12) msg += `\n(+${d.perFounder.length - 12} more)`;
+              }
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            console.error('Agent run failed', e);
+          } finally {
+            runningAgent.value = false;
+          }
+        };
+
         const sendDigestPreview = async () => {
           if (sendingDigestPreview.value) return;
           sendingDigestPreview.value = true;
@@ -4455,26 +5300,198 @@
             generatingMatches.value = false;
           }
         };
+        // Intro draft modal (pre-formatted email for Superhuman/Gmail)
+        const showIntroDraftModal = ref(false);
+        const introDraft = reactive({ to: '', cc: '', subject: '', body: '' });
+        const introDraftCopied = ref('');
+
+        const buildIntroDraft = (req) => {
+          // Resolve full records from cached lists (req only has lightweight fields)
+          const f = founders.value.find(x => x.id === req.founderId) || req.founder || {};
+          const i = investors.value.find(x => x.id === req.investorId) || req.investor || {};
+          const n = nodes.value.find(x => x.id === req.nodeId) || req.node || {};
+
+          const investorFirst = (i.name || '').split(/\s+/)[0] || 'there';
+          const founderFirst = (f.name || '').split(/\s+/)[0] || '';
+          const companyName = f.companyName || '';
+          const stage = f.companyStage ? String(f.companyStage).replace(/_/g, ' ') : '';
+          const founderEmail = f.email || '';
+          const investorEmail = i.email || '';
+          const nodeName = n.name || 'Mat';
+          const nodeFirst = nodeName.split(/\s+/)[0] || 'Mat';
+          const blurb = (f.blurb || '').trim();
+          const deckUrl = (f.deckUrl || '').trim();
+          const calendlyUrl = (f.calendlyUrl || '').trim();
+          const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
+
+          const subject = companyName || f.name || 'Intro';
+
+          // Template variable substitution — used in blurb.
+          // {{investorName}} / {{founderName}} default to first name (matches server side).
+          const fillVars = (s) => s
+            .replace(/\{\{investorFirst\}\}/g, investorFirst)
+            .replace(/\{\{investorFull\}\}/g, i.name || '')
+            .replace(/\{\{investorName\}\}/g, investorFirst)
+            .replace(/\{\{investorFirm\}\}/g, i.firm || '')
+            .replace(/\{\{founderFirst\}\}/g, founderFirst)
+            .replace(/\{\{founderFull\}\}/g, f.name || '')
+            .replace(/\{\{founderName\}\}/g, founderFirst)
+            .replace(/\{\{companyName\}\}/g, companyName);
+
+          let body;
+          if (blurb) {
+            // Use the founder's own blurb verbatim — it's expected to be the
+            // complete email (greeting, body, sign-off). Just substitute vars.
+            body = fillVars(blurb);
+          } else {
+            // Fallback skeleton when no blurb is set
+            const lines = [];
+            lines.push(`Hi ${investorFirst} —`);
+            lines.push('');
+            lines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
+            if (oneLiner) {
+              lines.push('');
+              lines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
+            }
+            lines.push('');
+            if (stage) lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+            else lines.push(`I think they'd be a strong fit for your thesis.`);
+            if (deckUrl || calendlyUrl) {
+              lines.push('');
+              if (deckUrl) lines.push(`Deck: ${deckUrl}`);
+              if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
+            }
+            lines.push('');
+            lines.push(`${founderFirst || f.name || 'Founder'}, meet ${investorFirst}${i.firm ? ` (${i.role || 'investor'} at ${i.firm})` : ''} — off to you both.`);
+            lines.push('');
+            lines.push(nodeFirst);
+            body = lines.join('\n');
+          }
+
+          return {
+            to: investorEmail,
+            subject,
+            body,
+          };
+        };
+
+        const introDraftIntroRequestId = ref(null);
+        const introDraftInvestorId = ref(null);
+        const missingInvestorEmail = ref('');
+        const savingMissingEmail = ref(false);
+        const currentInvestorForDraft = computed(() => {
+          if (!introDraftInvestorId.value) return null;
+          return investors.value.find(i => i.id === introDraftInvestorId.value) || null;
+        });
+        const openIntroDraft = (req) => {
+          const d = buildIntroDraft(req);
+          introDraft.cc = '';
+          Object.assign(introDraft, d);
+          introDraftCopied.value = '';
+          introDraftIntroRequestId.value = req.id;
+          introDraftInvestorId.value = req.investorId || req.investor?.id || null;
+          missingInvestorEmail.value = '';
+          gmailDraftResult.value = null;
+          showIntroDraftModal.value = true;
+        };
+        const saveMissingInvestorEmail = async () => {
+          if (!introDraftInvestorId.value || !missingInvestorEmail.value) return;
+          savingMissingEmail.value = true;
+          try {
+            await api(`/investors/${introDraftInvestorId.value}`, {
+              method: 'PUT',
+              body: { email: missingInvestorEmail.value.trim() },
+            });
+            // Reload investors so the cached record has the new email
+            await loadInvestors();
+            // Patch the live draft so the To: field fills in
+            introDraft.to = missingInvestorEmail.value.trim();
+            missingInvestorEmail.value = '';
+          } catch (e) {
+            alert('Failed to save email: ' + (e.message || e));
+          } finally {
+            savingMissingEmail.value = false;
+          }
+        };
+
+        const copyToClipboard = async (text, key) => {
+          try {
+            await navigator.clipboard.writeText(text || '');
+            introDraftCopied.value = key;
+            setTimeout(() => { if (introDraftCopied.value === key) introDraftCopied.value = ''; }, 1500);
+          } catch (e) {
+            alert('Copy failed — your browser may not allow clipboard access.');
+          }
+        };
+
+        const copyEntireIntro = async () => {
+          const combined = `To: ${introDraft.to}\nCc: ${introDraft.cc}\nSubject: ${introDraft.subject}\n\n${introDraft.body}`;
+          await copyToClipboard(combined, 'all');
+        };
+
+        const introDraftMailto = computed(() => {
+          const enc = (s) => encodeURIComponent(s || '');
+          const cc = introDraft.cc ? `&cc=${enc(introDraft.cc)}` : '';
+          return `mailto:${enc(introDraft.to)}?subject=${enc(introDraft.subject)}${cc}&body=${enc(introDraft.body)}`;
+        });
+
         const approveSuggestion = async (id) => {
           if (!confirm('Approve this match? It will become an active intro request.')) return;
           try {
             await api(`/matching/approve-intro/${id}`, { method: 'PUT' });
-            loadIntroRequests();
+            // Find the approved request in the (just-loaded) list so we can pre-draft
+            const approved = introRequests.value.find(r => r.id === id);
+            await loadIntroRequests();
             if (activeTab.value === 'marketplace') {
               loadThroughput();
               loadStaleOpen();
             }
+            // Offer the intro draft immediately after approval
+            const refreshed = (introRequests.value || []).find(r => r.id === id) || approved;
+            if (refreshed) openIntroDraft(refreshed);
           } catch (e) {
             alert('Failed to approve: ' + e.message);
           }
         };
-        const rejectSuggestion = async (id) => {
-          if (!confirm('Reject this match suggestion? It will be removed.')) return;
+        // Reject flow: open a small modal asking for a quick-pick reason +
+        // optional free-text. Captures rejectionReason so we can spot patterns
+        // later (e.g. always rejecting fintech investors for Bryce → adjust tags).
+        const showRejectModal = ref(false);
+        const rejectingIntroId = ref(null);
+        const rejectReasonChoice = ref('');
+        const rejectReasonOther = ref('');
+        const rejectReasonOptions = [
+          'Wrong sector',
+          'Wrong stage',
+          'Not a fit (gut)',
+          'Already met',
+          'Pre-revenue',
+          'Other',
+        ];
+
+        const rejectSuggestion = (id) => {
+          rejectingIntroId.value = id;
+          rejectReasonChoice.value = '';
+          rejectReasonOther.value = '';
+          showRejectModal.value = true;
+        };
+
+        const submitRejectSuggestion = async () => {
+          if (!rejectingIntroId.value) return;
+          const reason = rejectReasonChoice.value === 'Other'
+            ? (rejectReasonOther.value || '').trim() || 'Other'
+            : rejectReasonChoice.value || null;
           try {
-            await api(`/matching/reject-intro/${id}`, { method: 'PUT' });
+            await api(`/matching/reject-intro/${rejectingIntroId.value}`, {
+              method: 'PUT',
+              body: { reason },
+            });
+            showRejectModal.value = false;
+            rejectingIntroId.value = null;
             loadIntroRequests();
+            loadAllIntroRequests();
           } catch (e) {
-            alert('Failed to reject: ' + e.message);
+            alert('Failed to reject: ' + (e.message || e));
           }
         };
         const loadRelationships = async () => {
@@ -4708,6 +5725,45 @@
           } catch (e) {
             console.error('Failed to load stale-open', e);
           }
+        };
+
+        const loadSupplyDemand = async () => {
+          try {
+            supplyDemand.value = await api('/marketplace-health/supply-demand');
+          } catch (e) {
+            console.error('Failed to load supply-demand', e);
+          }
+        };
+
+        const loadUntaggedInvestors = async () => {
+          try {
+            untaggedInvestors.value = await api('/marketplace-health/untagged-investors');
+          } catch (e) {
+            console.error('Failed to load untagged investors', e);
+          }
+        };
+
+        const openInvestorEdit = (id) => {
+          activeTab.value = 'investors';
+          setTimeout(() => {
+            const el = document.querySelector(`[data-investor-id="${id}"]`);
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 200);
+        };
+
+        const loadDisengaged = async () => {
+          try {
+            disengaged.value = await api('/marketplace-health/disengaged-investors');
+          } catch (e) {
+            console.error('Failed to load disengaged', e);
+          }
+        };
+
+        const deactivateInvestor = async (id) => {
+          if (!confirm('Mark this investor as inactive? They will be removed from the matching rotation. You can re-activate any time.')) return;
+          await api(`/investors/${id}`, { method: 'PUT', body: { active: false } });
+          loadDisengaged();
+          loadInvestors();
         };
 
         // Nodes that actually have investor connections — used to populate the
@@ -5149,7 +6205,6 @@
           inboundConfirmLog.value = log;
           inboundConfirmForm.founderId = log.detectedFounderId || '';
           inboundConfirmForm.investorId = log.detectedInvestorId || '';
-          inboundConfirmForm.nodeId = '';
           inboundConfirmForm.notes = '';
           // Pre-populate search text for detected entities
           if (log.detectedFounderId) {
@@ -5164,7 +6219,15 @@
           } else {
             ssInboundInvestor.value = '';
           }
-          ssInboundNode.value = '';
+          // Default node to Mat Sherman — same UX as the New Intro modal
+          const mat = (nodes.value || []).find(n => (n.name || '').toLowerCase().includes('mat sherman'));
+          if (mat) {
+            inboundConfirmForm.nodeId = mat.id;
+            ssInboundNode.value = mat.name;
+          } else {
+            inboundConfirmForm.nodeId = '';
+            ssInboundNode.value = '';
+          }
           showInboundConfirmModal.value = true;
         };
 
@@ -5399,7 +6462,7 @@
         const closeFounderModal = () => {
           showFounderModal.value = false;
           editingFounder.value = null;
-          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '' });
+          Object.assign(founderForm, { name: '', email: '', companyName: '', companyStage: 'pre_seed', roundStatus: 'pre_round', city: '', country: '', blurb: '', deckUrl: '', deckFile: '', calendlyUrl: '' });
         };
 
         const saveNode = async () => {
@@ -5434,15 +6497,27 @@
         const saveInvestor = async () => {
           try {
             if (editingInvestor.value) {
-              const { nodeId, ...investorData } = investorForm;
+              // Strip non-investor fields: nodeId/newStageId/etc are form-only.
+              // excludedCategoryIds goes to a separate endpoint below.
+              const { nodeId, newStageId, newPersonaId, newSectorId, excludedCategoryIds, ...investorData } = investorForm;
               await api(`/investors/${editingInvestor.value}`, { method: 'PUT', body: investorData });
+              // Replace exclusions in one shot
+              await api(`/investors/${editingInvestor.value}/exclusions`, {
+                method: 'PUT',
+                body: { categoryIds: Array.isArray(excludedCategoryIds) ? excludedCategoryIds : [] },
+              });
             } else {
               // Require node for new investors
               if (!investorForm.nodeId) {
                 alert('Please select a node to assign this investor to');
                 return;
               }
-              const { nodeId, ...investorData } = investorForm;
+              // Require all three categories
+              if (!investorForm.newStageId || !investorForm.newPersonaId || !investorForm.newSectorId) {
+                alert('Stage, founder persona, and sector are all required. Pick "Generalist" if no specialty.');
+                return;
+              }
+              const { nodeId, newStageId, newPersonaId, newSectorId, ...investorData } = investorForm;
               const newInvestor = await api('/investors', { method: 'POST', body: investorData });
               // Create the node-investor connection
               await api(`/nodes/${investorForm.nodeId}/investors`, {
@@ -5453,6 +6528,11 @@
                   validated: true,
                 }
               });
+              // Assign the three required categories
+              await api(`/investors/${newInvestor.id}/categories`, {
+                method: 'POST',
+                body: { categoryIds: [parseInt(newStageId), parseInt(newPersonaId), parseInt(newSectorId)] },
+              });
             }
             closeInvestorModal();
             loadInvestors();
@@ -5462,13 +6542,37 @@
           }
         };
 
-        const editInvestor = (investor) => {
+        const editInvestor = async (investor) => {
           editingInvestor.value = investor.id;
+          // focusAreas can arrive as either a JSON string (when the investor
+          // object comes from a Drizzle join — e.g. the intro_requests table)
+          // or an already-parsed array (from /api/investors). Normalize to an
+          // array so the PUT validator is happy.
+          let focusAreas = investor.focusAreas;
+          if (typeof focusAreas === 'string') {
+            try { focusAreas = focusAreas ? JSON.parse(focusAreas) : []; } catch { focusAreas = []; }
+          }
           Object.assign(investorForm, {
             ...investor,
+            focusAreas: Array.isArray(focusAreas) ? focusAreas : [],
             active: investor.active !== false,
+            notes: investor.notes || '',
+            excludedCategoryIds: Array.isArray(investor.excludedCategoryIds) ? [...investor.excludedCategoryIds] : [],
           });
           showInvestorModal.value = true;
+          // Fetch the canonical record (includes excludedCategoryIds) + ensure
+          // the exclusion picker has the full categories list loaded.
+          try {
+            const [full, cats] = await Promise.all([
+              api(`/investors/${investor.id}`),
+              allExclusionCategories.value.length === 0 ? api('/categories') : Promise.resolve(null),
+            ]);
+            if (full?.excludedCategoryIds) {
+              investorForm.excludedCategoryIds = [...full.excludedCategoryIds];
+            }
+            if (full?.notes != null) investorForm.notes = full.notes;
+            if (cats) allExclusionCategories.value = cats;
+          } catch (e) { console.error('Failed to load investor details / categories', e); }
         };
 
         const deleteInvestor = async (id) => {
@@ -5499,7 +6603,7 @@
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '' });
+          Object.assign(investorForm, { name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
         };
 
         const saveIntro = async () => {
@@ -5858,13 +6962,32 @@
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
+          showRejectModal, rejectReasonChoice, rejectReasonOther, rejectReasonOptions, submitRejectSuggestion,
           sendingDigestPreview, sendDigestPreview,
+          runningAgent, runAgentNow,
+          runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,
+          runningFollowup, runFollowupNow,
+          rescoring, rescorePending,
+          clearing, clearPending,
+          backfilling, backfillEmails,
+          backfillingStages, backfillFounderStages,
+          openNewIntroModal,
+          // Intro draft modal
+          showIntroDraftModal, introDraft, introDraftCopied, introDraftMailto,
+          openIntroDraft, copyToClipboard, copyEntireIntro,
+          currentInvestorForDraft, missingInvestorEmail, savingMissingEmail, saveMissingInvestorEmail,
+          // Gmail integration
+          gmailStatus, connectOrDisconnectGmail,
+          draftingGmail, gmailDraftResult, createGmailDraftFromCurrent,
+          sendingGmail, sendGmailFromCurrent,
           markNodeTaskDone, bumpInvestor, goToIntro, toggleFounderTasks, formatTaskType,
-          showHiddenFounders, filteredFounders, hiddenFounderCount,
+          showHiddenFounders, filteredFounders, hiddenFounderCount, founderListFilter,
+          uploadingDeck, uploadFounderDeck, removeFounderDeck,
           planningFounderId, planningFilterStale, planningFilterExactSector, plannedInvestors, plannedStaleFitCount, shuffleInvestors, requestIntroFor,
           saveFounder, editFounder, deleteFounder, closeFounderModal, toggleFounderHidden, toggleFounderCadenceFromList,
           saveNode, editNode, deleteNode, closeNodeModal,
           saveInvestor, editInvestor, deleteInvestor, toggleInvestorActive, toggleInvestorVip, closeInvestorModal,
+          allExclusionCategories,
           saveIntro, editIntro, closeIntroModal,
           showAddFollowup, saveFollowup,
           saveFNRelationship, deleteFNRelationship,
@@ -5872,6 +6995,17 @@
           generateLoginLink, copyLoginLink, impersonateFounder, sendInviteEmail, emailSending, emailSent,
           showResearchModal, researchState, researchError, researchData, researchModalTitle, canRefreshResearch,
           openResearchModal, closeResearchModal, triggerResearch, getUrlDomain, formatDate,
+          // Merge investor modal
+          showMergeModal, mergeSource, mergeTarget, mergeSearch, mergeSearchOpen, mergeSearchResults,
+          mergeError, mergeResult, mergeSubmitting,
+          openMergeInvestor, closeMergeModal, selectMergeTarget, confirmMerge,
+          // Required categories for add-investor
+          stageCategoryOptions, personaCategoryOptions, sectorCategoryOptions,
+          // Supply/demand by sector
+          supplyDemand, loadSupplyDemand,
+          untaggedInvestors, loadUntaggedInvestors, openInvestorEdit,
+          // Disengaged investors
+          disengaged, disengagedShowAll, loadDisengaged, deactivateInvestor,
           bulkResearch,
           // Onboarding
           onboardingWorkflows, onboardingSummary, showStartOnboardingModal, startOnboardingForm,

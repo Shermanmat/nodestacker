@@ -93,8 +93,31 @@ safeAddColumn('onboarding_workflows', 'intro_requests_revisit_date', 'text');
 // investor pause columns
 safeAddColumn('investors', 'paused_until', 'text');
 safeAddColumn('investors', 'pause_reason', 'text');
+// investor email — used for Gmail draft To: field
+safeAddColumn('investors', 'email', 'text');
+// Free-form admin notes (non-categorical quirks)
+safeAddColumn('investors', 'notes', 'text');
+// One-time backfill: pull emails from instantly_leads where they're linked
+try {
+  sqlite.exec(`UPDATE investors SET email = (
+    SELECT investor_email FROM instantly_leads
+    WHERE instantly_leads.investor_id = investors.id
+      AND instantly_leads.investor_email IS NOT NULL
+      AND instantly_leads.investor_email != ''
+    LIMIT 1
+  ) WHERE email IS NULL OR email = ''`);
+} catch (_) { /* ok if instantly_leads doesn't exist or no rows match */ }
 // intro request date tracking
 safeAddColumn('intro_requests', 'date_passed', 'text');
+// Auto-draft agent: track Gmail draft id created for a pending suggestion.
+// Status stays pending_suggestion until user marks it sent.
+safeAddColumn('intro_requests', 'gmail_draft_id', 'text');
+safeAddColumn('intro_requests', 'gmail_draft_created_at', 'text');
+// Follow-up agent (Phase 1) — track thread id + reply detection + bump count
+safeAddColumn('intro_requests', 'gmail_thread_id', 'text');
+safeAddColumn('intro_requests', 'reply_detected_at', 'text');
+safeAddColumn('intro_requests', 'followup_count', 'integer NOT NULL DEFAULT 0');
+safeAddColumn('intro_requests', 'last_followup_at', 'text');
 // blurb builder columns
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');
@@ -139,6 +162,13 @@ try {
 // node VIP flag (migration 0035) — VIP nodes only get intro suggestions
 // for founders who are doing well with the primary (Mat Sherman) network
 safeAddColumn('nodes', 'vip', 'integer NOT NULL DEFAULT 1');
+
+// Founder intro draft fields — blurb is the body of the intro email,
+// deck/calendly links are appended to drafts when present.
+safeAddColumn('founders', 'blurb', 'text');
+safeAddColumn('founders', 'deck_url', 'text');
+safeAddColumn('founders', 'deck_file', 'text');
+safeAddColumn('founders', 'calendly_url', 'text');
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

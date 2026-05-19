@@ -1,4 +1,4 @@
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, lt, sql } from 'drizzle-orm';
 import {
   db,
   founders,
@@ -296,6 +296,88 @@ export function computeInverseMatchScore(
   return Math.max(0, Math.min(130, baseScore));
 }
 
+/**
+ * Classify the quality of a founder↔investor match across the three category
+ * axes. The hard category filter (passesCategoryFilter) has already screened
+ * for compatibility — this just rates HOW well they fit, so scoring can reward
+ * tight fits over generalist coverage.
+ */
+export function classifyMatchFit(
+  founderCategories: { id: number; name: string; type: string }[],
+  investorCategories: { id: number; name: string; type: string }[] | undefined,
+): {
+  sector: 'exact' | 'generalist' | 'untagged';
+  stage: 'exact' | 'untagged';
+  persona: 'exact' | 'untagged';
+} {
+  const invCats = investorCategories || [];
+  const founderSectors = new Set(founderCategories.filter(c => c.type === 'sector').map(c => c.id));
+  const investorSectors = invCats.filter(c => c.type === 'sector');
+  const investorSectorIds = new Set(investorSectors.map(c => c.id));
+  const isGeneralist = investorSectors.some(c => c.name.toLowerCase() === 'generalist');
+
+  let sector: 'exact' | 'generalist' | 'untagged' = 'untagged';
+  if (founderSectors.size > 0 && investorSectors.length > 0) {
+    let exactOverlap = false;
+    for (const id of founderSectors) {
+      if (investorSectorIds.has(id)) { exactOverlap = true; break; }
+    }
+    sector = exactOverlap ? 'exact' : (isGeneralist ? 'generalist' : 'untagged');
+  } else if (isGeneralist) {
+    sector = 'generalist';
+  }
+
+  const founderStages = new Set(founderCategories.filter(c => c.type === 'stage').map(c => c.id));
+  const investorStages = new Set(invCats.filter(c => c.type === 'stage').map(c => c.id));
+  let stage: 'exact' | 'untagged' = 'untagged';
+  if (founderStages.size > 0 && investorStages.size > 0) {
+    for (const id of founderStages) {
+      if (investorStages.has(id)) { stage = 'exact'; break; }
+    }
+  }
+
+  const founderPersonas = new Set(founderCategories.filter(c => c.type === 'persona').map(c => c.id));
+  const investorPersonas = new Set(invCats.filter(c => c.type === 'persona').map(c => c.id));
+  let persona: 'exact' | 'untagged' = 'untagged';
+  if (founderPersonas.size > 0 && investorPersonas.size > 0) {
+    for (const id of founderPersonas) {
+      if (investorPersonas.has(id)) { persona = 'exact'; break; }
+    }
+  }
+
+  return { sector, stage, persona };
+}
+
+/**
+ * Fit-based match score, 0–100. Optimizes for "will the node forward this?"
+ * given that the only outcome tracked is whether the intro happens.
+ *
+ *  - Connection strength (your relationship): up to 30
+ *  - Sector fit (exact > generalist): up to 25
+ *  - Stage fit: up to 10
+ *  - Persona fit: up to 5
+ *  - Recency / staleness pressure: up to 30
+ *
+ * Founder heat + investor reliability are intentionally NOT factored in —
+ * the former is behavior, not quality, and the latter measures downstream
+ * conversion which isn't tracked. Both still exist as standalone metrics for
+ * dashboards; they just don't drive ranking anymore.
+ */
+export function computeFitScore(
+  connectionStrength: string,
+  fit: { sector: 'exact' | 'generalist' | 'untagged'; stage: 'exact' | 'untagged'; persona: 'exact' | 'untagged' },
+  recencyBonus: number,
+): number {
+  const strengthPoints = connectionStrength === 'strong' ? 30
+    : connectionStrength === 'medium' ? 15
+    : 5;
+  const sectorPoints = fit.sector === 'exact' ? 25 : fit.sector === 'generalist' ? 10 : 0;
+  const stagePoints = fit.stage === 'exact' ? 10 : 0;
+  const personaPoints = fit.persona === 'exact' ? 5 : 0;
+  const recency = Math.max(0, Math.min(30, recencyBonus));
+  return Math.max(0, Math.min(100, strengthPoints + sectorPoints + stagePoints + personaPoints + recency));
+}
+
 function describeMatchLogic(founderHeat: number, investorReliability: number): string {
   if (founderHeat < 40 && investorReliability >= 70) {
     return 'Cold founder paired with reliable investor to maximize conversion chance';
@@ -460,10 +542,13 @@ export function passesCategoryFilter(
     founderCategories.filter(c => c.type === 'sector').map(c => c.id)
   );
 
-  // Check exclusions: if investor excludes any of the founder's sectors, reject
-  if (investorExclusions && founderSectorIds.size > 0) {
-    for (const sectorId of founderSectorIds) {
-      if (investorExclusions.has(sectorId)) return false;
+  // Check exclusions against ANY founder tag (sector / stage / persona / etc).
+  // Lets admin model rules like "Francis won't take pre-revenue companies" by
+  // creating a 'Pre-revenue' category, tagging pre-revenue founders, then
+  // adding it to Francis's exclusions.
+  if (investorExclusions && investorExclusions.size > 0) {
+    for (const cat of founderCategories) {
+      if (investorExclusions.has(cat.id)) return false;
     }
   }
 
@@ -506,6 +591,22 @@ export function passesCategoryFilter(
     if (!hasStageOverlap) return false;
   }
 
+  // --- Persona filter (hard gate) ---
+  // Persona is a strict preference — if an investor specifies a persona
+  // (e.g. "College / Recent Grad Hustler"), the founder MUST match it.
+  // Unlike stage, an untagged founder is rejected here: we don't know if
+  // they fit, and the investor was explicit about who they want.
+  const investorPersonas = investorCategories
+    ? investorCategories.filter(c => c.type === 'persona')
+    : [];
+  if (investorPersonas.length > 0) {
+    const founderPersonas = founderCategories.filter(c => c.type === 'persona');
+    if (founderPersonas.length === 0) return false;
+    const investorPersonaIds = new Set(investorPersonas.map(c => c.id));
+    const hasPersonaOverlap = founderPersonas.some(c => investorPersonaIds.has(c.id));
+    if (!hasPersonaOverlap) return false;
+  }
+
   return true;
 }
 
@@ -524,8 +625,41 @@ export function computeRecommendedIntroTarget(heatScore: number, currentTarget: 
   else if (heatScore >= 60) recommended = 3;
   else if (heatScore >= 40) recommended = 2;
   else recommended = 1;
-  // Only ramp up, never decrease automatically
   return Math.max(recommended, currentTarget);
+}
+
+// Intro target: by default a runway-based calc, but a non-zero manual value
+// on founder.introTargetPerWeek wins — admin explicitly set it, respect it
+// (capped at MANUAL_MAX for sanity, no inbox should send >20/week).
+export const DYNAMIC_RUNWAY_WEEKS = 8;
+export const DYNAMIC_MIN = 1;
+export const DYNAMIC_MAX = 5;
+export const MANUAL_MAX = 20;
+
+export function computeDynamicIntroTarget(opts: {
+  availableInvestors: number;
+  heatScore: number;
+  manualBaseline?: number | null;
+}): { target: number; supplyBased: number; heatBased: number; manualBaseline: number } {
+  const supplyBased = opts.availableInvestors > 0
+    ? Math.ceil(opts.availableInvestors / DYNAMIC_RUNWAY_WEEKS)
+    : DYNAMIC_MIN;
+  let heatBased: number;
+  if (opts.heatScore >= 80) heatBased = 4;
+  else if (opts.heatScore >= 60) heatBased = 3;
+  else if (opts.heatScore >= 40) heatBased = 2;
+  else heatBased = 1;
+  const manualBaseline = opts.manualBaseline ?? 0;
+  // Manual override: when admin explicitly set a value, that's the target.
+  // We don't override it with the dynamic calc — explicit intent wins.
+  if (manualBaseline > 0) {
+    const target = Math.max(DYNAMIC_MIN, Math.min(MANUAL_MAX, manualBaseline));
+    return { target, supplyBased, heatBased, manualBaseline };
+  }
+  // Otherwise, dynamic calc: max of supply + heat, clamped to [1, DYNAMIC_MAX].
+  const combined = Math.max(supplyBased, heatBased);
+  const target = Math.max(DYNAMIC_MIN, Math.min(DYNAMIC_MAX, combined));
+  return { target, supplyBased, heatBased, manualBaseline };
 }
 
 // --- Match Generation ---
@@ -552,38 +686,81 @@ interface FounderLiquidity {
   blockedByCooldown: number;
   blockedByFirm: number;
   blockedByExisting: number;
+  blockedByClaimed: number;
+  blockedByTripleDup: number;
+  blockedByVipGate: number;
+  blockedByVipNode: number;
+  blockedByGeo: number;
+  blockedByCategory: number;
   generated: number;
   status: 'healthy' | 'tight' | 'dry';
+  targetSource: 'dynamic' | 'manual';
+  targetSupplyBased: number;
+  targetHeatBased: number;
+  targetManualBaseline: number;
 }
 
 /**
  * Generate match suggestions for eligible founders.
  */
+// Only this node's connections feed the auto-match algorithm today —
+// Mat Sherman's network (id 2). Other nodes still exist and can be used
+// for manually-created intro_requests; the agent just won't auto-pick
+// them. Override via AGENT_PRIMARY_NODE_ID env var if/when that changes.
+const PRIMARY_NODE_ID = parseInt(process.env.AGENT_PRIMARY_NODE_ID || '2', 10);
+
 export async function generateMatchSuggestions(
   targetFounderId?: number,
 ): Promise<{ suggestions: GeneratedSuggestion[]; batchId: string; rampUps: RampUp[]; liquidity: FounderLiquidity[] }> {
   const data = await loadMatchingData();
   const batchId = crypto.randomUUID();
 
-  // Get existing pending/rejected suggestions to avoid duplicates and re-suggestions
+  // Auto-expire pending suggestions older than 14 days. They were generated but
+  // never reviewed by the admin — leaving them pending claims investors forever
+  // (claimedInvestorIds), starving other founders. We flip them to 'rejected'
+  // so they release the investor lock; the triple stays blocked for 90 days
+  // via the existingTriples window below, then re-opens for new suggestions.
+  const STALE_PENDING_DAYS = 14;
+  const fourteenDaysAgo = new Date(Date.now() - STALE_PENDING_DAYS * 86400 * 1000).toISOString();
+  await db.update(matchSuggestions)
+    .set({ status: 'rejected' })
+    .where(and(
+      eq(matchSuggestions.status, 'pending'),
+      lt(matchSuggestions.createdAt, fourteenDaysAgo),
+    ));
+
+  // existingTriples blocks re-suggesting an active (founder, node, investor):
+  // ONLY actively pending. Rejected suggestions are intentionally re-suggestable
+  // so the admin can iterate — circumstances change (pitch sharpens, sector
+  // re-tag, founder pivots) and a rejected pair often becomes a fit later.
   const existingSuggestions = await db.select().from(matchSuggestions)
-    .where(inArray(matchSuggestions.status, ['pending', 'rejected']));
+    .where(eq(matchSuggestions.status, 'pending'));
   const existingTriples = new Set(
     existingSuggestions.map(s => `${s.founderId}-${s.nodeId}-${s.investorId}`)
   );
 
   // Track investors already claimed by a pending suggestion (1 suggestion at a time per investor)
   const claimedInvestorIds = new Set(
-    existingSuggestions.filter(s => s.status === 'pending').map(s => s.investorId)
+    existingSuggestions.map(s => s.investorId)
   );
 
-  // Count intros in last 7 days per founder (including pending_suggestion — counts toward quota)
+  // Count intros in last 7 days per founder — only those actually sent (or
+  // beyond). Pending_suggestion rows are agent-generated proposals that
+  // haven't been approved/sent yet; counting them against the weekly quota
+  // would let unreviewed drafts block new generation. Drafts age out via
+  // discard/reject/mark-sent, not via "quota use."
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const SENT_OR_PROGRESSED_STATUSES = new Set([
+    'intro_request_sent', 'introduced', 'first_meeting_complete',
+    'second_meeting_complete', 'invested', 'follow_up_questions',
+    'circle_back_round_opens', 'passed',
+  ]);
   const weeklyIntroCount = new Map<number, number>();
   for (const ir of data.allIntroRequests) {
-    if (ir.createdAt && new Date(ir.createdAt).getTime() > sevenDaysAgo) {
-      weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
-    }
+    if (!ir.createdAt) continue;
+    if (new Date(ir.createdAt).getTime() <= sevenDaysAgo) continue;
+    if (!SENT_OR_PROGRESSED_STATUSES.has(ir.status)) continue;
+    weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
   }
 
   // Track ramp-ups and effective targets
@@ -674,64 +851,48 @@ export async function generateMatchSuggestions(
       if (firm) blockedFirms.add(firm);
     }
 
-    // Compute founder intro acceptance rate for VIP gating.
-    // Acceptance = intros that progressed to meeting or beyond, out of all introduced.
-    // Requires minimum 3 intros to qualify (otherwise not enough data).
-    const introduced = founderIntros.filter(ir =>
-      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)
-    );
-    const accepted = founderIntros.filter(ir =>
-      ['first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions'].includes(ir.status)
-    );
-    const founderAcceptRate = introduced.length >= 3
-      ? accepted.length / introduced.length
-      : 0;
-    // VIP threshold: founder needs ≥50% acceptance rate with at least 3 intros
-    const qualifiesForVip = founderAcceptRate >= 0.5 && introduced.length >= 3;
+    // VIP gating: gate on intro volume only, not acceptance rate. We don't
+    // track meeting/decline outcomes reliably — we assume every sent intro
+    // means a meeting happened. So "earning VIP access" = "has put 3 intros
+    // through the network" (proves the founder is real + the system is
+    // working for them). Drop the 50%-acceptance filter that previously
+    // gated on follow_up_questions / first_meeting_complete progression.
+    const VIP_INTROS_REQUIRED = 3;
+    const SENT_OR_PROGRESSED = new Set([
+      'intro_request_sent', 'introduced', 'first_meeting_complete',
+      'second_meeting_complete', 'invested', 'follow_up_questions',
+      'circle_back_round_opens', 'passed',
+    ]);
+    const introsSent = founderIntros.filter(ir => SENT_OR_PROGRESSED.has(ir.status));
+    const qualifiesForVip = introsSent.length >= VIP_INTROS_REQUIRED;
 
-    // VIP node qualification: check acceptance rate specifically from non-VIP node intros.
-    // Founders must prove they're "doing well" through the primary network before
-    // being matched with VIP node investors.
-    const nonVipIntros = founderIntros.filter(ir => !vipNodeIds.has(ir.nodeId));
-    const nonVipIntroduced = nonVipIntros.filter(ir =>
-      ['introduced', 'first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions', 'circle_back_round_opens'].includes(ir.status)
-    );
-    const nonVipAccepted = nonVipIntros.filter(ir =>
-      ['first_meeting_complete', 'second_meeting_complete',
-        'invested', 'follow_up_questions'].includes(ir.status)
-    );
-    const nonVipAcceptRate = nonVipIntroduced.length >= 3
-      ? nonVipAccepted.length / nonVipIntroduced.length
-      : 0;
-    const qualifiesForVipNode = nonVipAcceptRate >= 0.5 && nonVipIntroduced.length >= 3;
+    // VIP node gate: same threshold, but counted across non-VIP node intros
+    // only — founder must have proven they can absorb intros through the
+    // primary network before VIP nodes open up.
+    const nonVipIntrosSent = introsSent.filter(ir => !vipNodeIds.has(ir.nodeId));
+    const qualifiesForVipNode = nonVipIntrosSent.length >= VIP_INTROS_REQUIRED;
 
     // Compute founder heat
     const staticHeat = computeFounderStaticHeat(founderCats, data.personaTierMap);
     const dynamicHeat = computeFounderDynamicHeat(founderIntros);
     const founderHeat = computeFounderHeatScore(staticHeat, dynamicHeat);
 
-    // Auto-ramp intro target based on heat
-    const currentTarget = founder.introTargetPerWeek || 2;
-    const recommendedTarget = computeRecommendedIntroTarget(founderHeat, currentTarget);
-    effectiveTargets.set(founder.id, recommendedTarget);
-    if (recommendedTarget > currentTarget) {
-      rampUps.push({
-        founderId: founder.id,
-        previousTarget: currentTarget,
-        newTarget: recommendedTarget,
-        heatScore: founderHeat,
-      });
-    }
+    // Manual baseline: an admin-set introTargetPerWeek > 0 acts as a floor.
+    // We default to 0 if unset so the dynamic calc (supply + heat) drives.
+    const manualBaseline = founder.introTargetPerWeek || 0;
 
     // Get founder's nodes and track liquidity
-    const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id);
+    const founderNodes = data.allFnRels.filter(r => r.founderId === founder.id && r.nodeId === PRIMARY_NODE_ID);
     let totalReachable = 0;
     let blockedByExisting = 0;
     let blockedByFirm = 0;
     let blockedByCooldown = 0;
+    let blockedByClaimed = 0;
+    let blockedByTripleDup = 0;
+    let blockedByVipGate = 0;
+    let blockedByVipNode = 0;
+    let blockedByGeo = 0;
+    let blockedByCategory = 0;
     let availableCount = 0;
 
     for (const fnRel of founderNodes) {
@@ -757,40 +918,41 @@ export async function generateMatchSuggestions(
         if (cooldown?.onCooldown) { blockedByCooldown++; continue; }
 
         // Skip investors already claimed by another pending suggestion
-        if (claimedInvestorIds.has(investorId)) continue;
+        if (claimedInvestorIds.has(investorId)) { blockedByClaimed++; continue; }
 
         // Skip existing pending suggestions for same triple
         const tripleKey = `${founder.id}-${fnRel.nodeId}-${investorId}`;
-        if (existingTriples.has(tripleKey)) continue;
+        if (existingTriples.has(tripleKey)) { blockedByTripleDup++; continue; }
 
         // VIP gate: only match VIP investors with founders who have strong acceptance rates
-        if (investorVip.has(investorId) && !qualifiesForVip) continue;
+        if (investorVip.has(investorId) && !qualifiesForVip) { blockedByVipGate++; continue; }
 
         // VIP node gate: only match investors from VIP nodes with founders doing well in non-VIP networks
-        if (vipNodeIds.has(fnRel.nodeId) && !qualifiesForVipNode) continue;
+        if (vipNodeIds.has(fnRel.nodeId) && !qualifiesForVipNode) { blockedByVipNode++; continue; }
 
         // Geography gate: if investor has a specific geography, founder must be located there
         const invGeo = investorGeoMap.get(investorId);
         if (invGeo) {
           const founderCity = (founder.city || '').toLowerCase();
           const founderCountry = (founder.country || '').toLowerCase();
-          if (!founderCity && !founderCountry) continue;
+          if (!founderCity && !founderCountry) { blockedByGeo++; continue; }
           const geoMatch = founderCity.includes(invGeo) || invGeo.includes(founderCity) ||
                            founderCountry.includes(invGeo) || invGeo.includes(founderCountry);
-          if (!geoMatch) continue;
+          if (!geoMatch) { blockedByGeo++; continue; }
         }
 
         // Category filter (hard gate)
         const investorCats = data.investorCatMap.get(investorId);
         const investorExclusions = data.investorExclusionMap.get(investorId);
-        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) continue;
+        if (!passesCategoryFilter(founderCats, investorCats, investorExclusions)) { blockedByCategory++; continue; }
 
         availableCount++;
 
         const investorReliability = investorScores.get(investorId)!;
         const weeksSinceContact = investorWeeksSinceContact.get(investorId) ?? 52;
         const recencyBonus = Math.min(30, weeksSinceContact * 5);
-        const matchScore = computeInverseMatchScore(founderHeat, investorReliability, conn.connectionStrength, recencyBonus);
+        const fit = classifyMatchFit(founderCats, data.investorCatMap.get(investorId));
+        const matchScore = computeFitScore(conn.connectionStrength, fit, recencyBonus);
 
         suggestions.push({
           founderId: founder.id,
@@ -800,10 +962,11 @@ export async function generateMatchSuggestions(
           investorReliabilityScore: investorReliability,
           matchScore,
           matchReasoning: JSON.stringify({
-            founderStaticHeat: staticHeat,
-            founderDynamicHeat: dynamicHeat,
             connectionStrength: conn.connectionStrength,
-            logic: describeMatchLogic(founderHeat, investorReliability),
+            sectorFit: fit.sector,
+            stageFit: fit.stage,
+            personaFit: fit.persona,
+            weeksSinceContact,
           }),
           batchId,
         });
@@ -814,7 +977,22 @@ export async function generateMatchSuggestions(
     }
 
     const usedThisWeek = weeklyIntroCount.get(founder.id) || 0;
-    const target = effectiveTargets.get(founder.id) || currentTarget;
+    const dyn = computeDynamicIntroTarget({
+      availableInvestors: availableCount,
+      heatScore: founderHeat,
+      manualBaseline,
+    });
+    const target = dyn.target;
+    effectiveTargets.set(founder.id, target);
+    const targetSource: 'dynamic' | 'manual' = manualBaseline > 0 && manualBaseline >= dyn.supplyBased && manualBaseline >= dyn.heatBased ? 'manual' : 'dynamic';
+    if (manualBaseline > 0 && target > manualBaseline) {
+      rampUps.push({
+        founderId: founder.id,
+        previousTarget: manualBaseline,
+        newTarget: target,
+        heatScore: founderHeat,
+      });
+    }
     const weeksOfRunway = target > 0 ? Math.floor(availableCount / target) : 999;
     liquidityStats.push({
       founderId: founder.id,
@@ -827,8 +1005,18 @@ export async function generateMatchSuggestions(
       blockedByCooldown,
       blockedByFirm,
       blockedByExisting,
+      blockedByClaimed,
+      blockedByTripleDup,
+      blockedByVipGate,
+      blockedByVipNode,
+      blockedByGeo,
+      blockedByCategory,
       generated: 0, // filled after filtering
       status: weeksOfRunway >= 4 ? 'healthy' : weeksOfRunway >= 2 ? 'tight' : 'dry',
+      targetSource,
+      targetSupplyBased: dyn.supplyBased,
+      targetHeatBased: dyn.heatBased,
+      targetManualBaseline: dyn.manualBaseline,
     });
   }
 
@@ -905,4 +1093,85 @@ export async function computeAllInvestorScores() {
       };
     })
     .sort((a, b) => b.reliabilityScore - a.reliabilityScore);
+}
+
+/**
+ * One-shot rescore: walks every pending match_suggestion and recomputes
+ * matchScore + matchReasoning using the current scoring formula. Useful
+ * after we change the algorithm (or hard-tweak weights) so the existing
+ * queue doesn't show stale scores from the old formula. Untouched: the
+ * status itself — pending suggestions stay pending.
+ */
+export async function rescorePendingSuggestions(): Promise<{
+  total: number;
+  updated: number;
+  skipped: number;
+  diagnostics?: { sampleMissing: Array<{ nodeId: number; investorId: number }>; connCount: number };
+}> {
+  const data = await loadMatchingData();
+
+  const pending = await db.select().from(matchSuggestions)
+    .where(eq(matchSuggestions.status, 'pending'));
+
+  const connByPair = new Map<string, string>();
+  for (const conn of data.allNiConns) {
+    connByPair.set(`${conn.nodeId}-${conn.investorId}`, conn.connectionStrength);
+  }
+
+  const nowMs = Date.now();
+  const investorWeeksSinceContact = new Map<number, number>();
+  for (const inv of data.allInvestors) {
+    const intros = data.investorIntroMap.get(inv.id) || [];
+    let mostRecentMs = 0;
+    for (const ir of intros) {
+      const dateStr = ir.dateRequested || ir.createdAt;
+      if (!dateStr) continue;
+      const t = new Date(dateStr).getTime();
+      if (!isNaN(t) && t > mostRecentMs) mostRecentMs = t;
+    }
+    const weeks = mostRecentMs === 0
+      ? 52
+      : Math.floor((nowMs - mostRecentMs) / (1000 * 60 * 60 * 24 * 7));
+    investorWeeksSinceContact.set(inv.id, Math.max(0, weeks));
+  }
+
+  let updated = 0;
+  let skipped = 0;
+  const sampleMissing: Array<{ nodeId: number; investorId: number }> = [];
+  for (const s of pending) {
+    let strength = connByPair.get(`${s.nodeId}-${s.investorId}`);
+    if (!strength) {
+      // Connection record vanished (deleted after suggestion was made, or
+      // suggestion predates current data model). Don't skip — fall back to
+      // 'medium' so the rescore still produces something usable. The score
+      // will rebuild on next agent run with the right data.
+      if (sampleMissing.length < 5) sampleMissing.push({ nodeId: s.nodeId, investorId: s.investorId });
+      strength = 'medium';
+      skipped++;
+    }
+    const founderCats = data.founderCatMap.get(s.founderId) || [];
+    const investorCats = data.investorCatMap.get(s.investorId);
+    const weeksSinceContact = investorWeeksSinceContact.get(s.investorId) ?? 52;
+    const recencyBonus = Math.min(30, weeksSinceContact * 5);
+    const fit = classifyMatchFit(founderCats, investorCats);
+    const matchScore = computeFitScore(strength, fit, recencyBonus);
+    const matchReasoning = JSON.stringify({
+      connectionStrength: strength,
+      sectorFit: fit.sector,
+      stageFit: fit.stage,
+      personaFit: fit.persona,
+      weeksSinceContact,
+    });
+    await db.update(matchSuggestions)
+      .set({ matchScore, matchReasoning })
+      .where(eq(matchSuggestions.id, s.id));
+    updated++;
+  }
+
+  return {
+    total: pending.length,
+    updated,
+    skipped,
+    diagnostics: { sampleMissing, connCount: data.allNiConns.length },
+  };
 }

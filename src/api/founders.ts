@@ -20,6 +20,9 @@ const updateFounderSchema = createFounderSchema.partial().extend({
   cadenceStartDate: z.string().nullable().optional(),
   city: z.string().nullable().optional(),
   country: z.string().nullable().optional(),
+  blurb: z.string().nullable().optional(),
+  deckUrl: z.string().nullable().optional(),
+  calendlyUrl: z.string().nullable().optional(),
 });
 
 // List all founders (with categories)
@@ -453,6 +456,25 @@ app.post('/', async (c) => {
 
   await ensureDefaultNodeRelationship(result[0].id);
 
+  // Default stage tags: Pre-seed + Seed. Most founders we onboard fit one
+  // of these; admin can flip them off in the founder edit modal if not.
+  // Without stage tags the matching algorithm can't gate by stage, so a
+  // sensible default beats untagged.
+  try {
+    const stageCats = await db.select({ id: investorCategories.id, name: investorCategories.name })
+      .from(investorCategories)
+      .where(eq(investorCategories.type, 'stage'));
+    const defaultStageNames = new Set(['pre-seed', 'preseed', 'seed']);
+    const defaultStages = stageCats.filter(c => defaultStageNames.has(c.name.toLowerCase()));
+    for (const stage of defaultStages) {
+      await db.insert(founderCategoryAssignments)
+        .values({ founderId: result[0].id, categoryId: stage.id })
+        .onConflictDoNothing();
+    }
+  } catch (e) {
+    console.error('Failed to assign default stage tags', e);
+  }
+
   return c.json(result[0], 201);
 });
 
@@ -475,6 +497,64 @@ app.put('/:id', async (c) => {
     return c.json({ error: 'Founder not found' }, 404);
   }
   return c.json(result[0]);
+});
+
+// Upload founder deck — stored on Fly volume, served at /decks/<filename>
+app.post('/:id/upload-deck', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const existing = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  if (!existing) return c.json({ error: 'Founder not found' }, 404);
+
+  const body = await c.req.parseBody();
+  const file = body['deck'] as File | undefined;
+  if (!file) return c.json({ error: 'No file provided (form field "deck")' }, 400);
+
+  const MAX_BYTES = 30 * 1024 * 1024; // 30 MB
+  if (file.size > MAX_BYTES) {
+    return c.json({ error: `File too large (max ${MAX_BYTES / 1024 / 1024} MB)` }, 413);
+  }
+
+  // Accept PDF only for now — keeps attachment logic predictable.
+  const mime = (file as any).type || '';
+  if (!mime.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) {
+    return c.json({ error: 'Only PDF files are supported' }, 400);
+  }
+
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const crypto = await import('crypto');
+
+  const decksDir = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'decks');
+  await fs.mkdir(decksDir, { recursive: true });
+
+  // Remove any previous deck file for this founder
+  if (existing.deckFile) {
+    try { await fs.unlink(path.join(decksDir, existing.deckFile)); } catch (_) { /* ok if already gone */ }
+  }
+
+  const token = crypto.randomBytes(16).toString('hex');
+  const filename = `${token}.pdf`;
+  const buffer = Buffer.from(await file.arrayBuffer());
+  await fs.writeFile(path.join(decksDir, filename), buffer);
+
+  await db.update(founders).set({ deckFile: filename }).where(eq(founders.id, id));
+
+  return c.json({ success: true, deckFile: filename, deckServePath: `/decks/${filename}`, sizeBytes: file.size });
+});
+
+// Remove uploaded deck
+app.delete('/:id/deck', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const existing = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  if (!existing) return c.json({ error: 'Founder not found' }, 404);
+  if (existing.deckFile) {
+    const fs = await import('fs/promises');
+    const path = await import('path');
+    const decksDir = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'decks');
+    try { await fs.unlink(path.join(decksDir, existing.deckFile)); } catch (_) { /* ok */ }
+  }
+  await db.update(founders).set({ deckFile: null }).where(eq(founders.id, id));
+  return c.json({ success: true });
 });
 
 // Delete founder

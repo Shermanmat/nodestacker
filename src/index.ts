@@ -37,7 +37,7 @@ import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
-import { eq } from 'drizzle-orm';
+import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
 import { desc } from 'drizzle-orm';
 
@@ -117,6 +117,8 @@ app.use('/api/admin/voice-interviews/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 app.use('/api/weekly-digest/preview-admin', adminGuard);
+// Shadow agent — admin-only manual trigger
+app.use('/api/agent/*', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -136,12 +138,468 @@ app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
 app.route('/api/brands', brandsRoutes);
-
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
-// Angel Club application (public, no auth)
-app.post('/api/angel-club-apply', async (c) => {
+// Serve uploaded founder decks (unguessable filename = the access token)
+app.get('/decks/:filename', async (c) => {
+  const filename = c.req.param('filename');
+  if (!/^[a-f0-9]{32}\.pdf$/i.test(filename)) {
+    return c.text('Not found', 404);
+  }
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const decksDir = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'decks');
+  try {
+    const buf = await fs.readFile(path.join(decksDir, filename));
+    c.header('Content-Type', 'application/pdf');
+    c.header('Content-Disposition', `inline; filename="${filename}"`);
+    c.header('Cache-Control', 'private, max-age=3600');
+    return c.body(new Uint8Array(buf));
+  } catch (_) {
+    return c.text('Not found', 404);
+  }
+});
+
+// Shadow agent — manual trigger (admin-only via /api/agent/* guard above)
+app.post('/api/agent/run-now', async (c) => {
+  const { runAgentTick } = await import('./services/agent.js');
+  const result = await runAgentTick();
+  return c.json(result);
+});
+
+// Auto-draft tick — picks one high-score pending suggestion + creates Gmail draft
+app.post('/api/agent/auto-draft-now', async (c) => {
+  const { runAutoDraftTick } = await import('./services/agent.js');
+  const result = await runAutoDraftTick();
+  return c.json(result);
+});
+
+// Follow-up agent — for every sent intro with no reply in 7+ days, create a
+// short bump draft in the same Gmail thread (up to 2 bumps per intro).
+app.post('/api/agent/followup-now', async (c) => {
+  const { runFollowupTick } = await import('./services/agent.js');
+  const result = await runFollowupTick();
+  return c.json(result);
+});
+
+// Rescore every pending match_suggestion using the current scoring formula.
+// One-shot tool for the case where suggestions were generated under an older
+// algorithm and now show stale scores in the audit table.
+app.post('/api/agent/rescore-pending', async (c) => {
+  const { rescorePendingSuggestions } = await import('./services/matching.js');
+  const result = await rescorePendingSuggestions();
+  return c.json(result);
+});
+
+// Clear all pending suggestions — destructive reset of the queue. Drops both
+// the match_suggestions rows and the linked intro_requests in 'pending_suggestion'
+// status. Use before re-running the agent under new gating to start clean.
+app.post('/api/agent/clear-pending', async (c) => {
+  const { matchSuggestions, followupLogs } = await import('./db/index.js');
+  const pending = await db.select({
+    id: matchSuggestions.id,
+    introRequestId: matchSuggestions.introRequestId,
+  }).from(matchSuggestions).where(eq(matchSuggestions.status, 'pending'));
+
+  const introIds = pending.map(p => p.introRequestId).filter((x): x is number => x != null);
+
+  // Order matters because of FK constraints:
+  // 1. followup_logs.intro_request_id is NOT NULL → must clear before deleting intros
+  // 2. match_suggestions.intro_request_id references intros → clear before deleting intros
+  // 3. then delete the intro_requests themselves
+  let deletedFollowups = 0;
+  let deletedSuggestions = 0;
+  let deletedIntros = 0;
+
+  if (introIds.length > 0) {
+    const followupResult = await db.delete(followupLogs)
+      .where(inArray(followupLogs.introRequestId, introIds)).returning();
+    deletedFollowups = followupResult.length;
+  }
+
+  const suggResult = await db.delete(matchSuggestions)
+    .where(eq(matchSuggestions.status, 'pending')).returning();
+  deletedSuggestions = suggResult.length;
+
+  if (introIds.length > 0) {
+    const introResult = await db.delete(introRequests)
+      .where(and(
+        eq(introRequests.status, 'pending_suggestion'),
+        inArray(introRequests.id, introIds),
+      )).returning();
+    deletedIntros = introResult.length;
+  }
+
+  return c.json({ deletedSuggestions, deletedIntros, deletedFollowups });
+});
+
+// Backfill default Pre-seed + Seed stage tags onto any founder that currently
+// has zero stage assignments. Matches the auto-assignment in POST /api/founders,
+// applied retroactively. Idempotent — re-running has no effect on already-tagged.
+app.post('/api/agent/backfill-founder-stages', async (c) => {
+  const { founderCategoryAssignments, investorCategories } = await import('./db/index.js');
+  const stageCats = await db.select({ id: investorCategories.id, name: investorCategories.name })
+    .from(investorCategories)
+    .where(eq(investorCategories.type, 'stage'));
+  const defaultStageNames = new Set(['pre-seed', 'preseed', 'seed']);
+  const defaultStages = stageCats.filter(s => defaultStageNames.has(s.name.toLowerCase()));
+  if (defaultStages.length === 0) {
+    return c.json({ error: 'No Pre-seed or Seed categories found in DB' }, 400);
+  }
+  const allStageIds = new Set(stageCats.map(s => s.id));
+
+  const allFounders = await db.select({ id: founders.id, name: founders.name }).from(founders);
+  const assignments = await db.select().from(founderCategoryAssignments);
+  const stageByFounder = new Map<number, Set<number>>();
+  for (const a of assignments) {
+    if (!allStageIds.has(a.categoryId)) continue;
+    if (!stageByFounder.has(a.founderId)) stageByFounder.set(a.founderId, new Set());
+    stageByFounder.get(a.founderId)!.add(a.categoryId);
+  }
+
+  const filled: Array<{ id: number; name: string }> = [];
+  for (const f of allFounders) {
+    if ((stageByFounder.get(f.id)?.size || 0) > 0) continue;
+    for (const stage of defaultStages) {
+      await db.insert(founderCategoryAssignments)
+        .values({ founderId: f.id, categoryId: stage.id })
+        .onConflictDoNothing();
+    }
+    filled.push({ id: f.id, name: f.name });
+  }
+
+  return c.json({
+    candidates: allFounders.length,
+    updated: filled.length,
+    sampleFilled: filled.slice(0, 20),
+    stagesAssigned: defaultStages.map(s => s.name),
+  });
+});
+
+// Backfill investor emails from inbound_intro_logs. For each investor lacking
+// an email, find the most recent inbound_intro_logs row where detectedInvestorId
+// matches and copy from_email onto the investor record.
+app.post('/api/agent/backfill-investor-emails', async (c) => {
+  const { inboundIntroLogs } = await import('./db/index.js');
+  // First: revert any prior bad backfills where the email is a known admin/node
+  // address. inbound_intro_logs stores from_email for BOTH inbound and outbound
+  // threads, so an earlier sweep stamped Mat's own address onto investors who
+  // had only ever been mailed BY him, never replied.
+  const adminAddresses = [
+    'mat@matsherman.com', 'mat@matcap.vc',
+    process.env.ADMIN_EMAIL || '',
+  ].filter(Boolean).map(s => s.toLowerCase());
+  await db.update(investors).set({ email: null })
+    .where(inArray(investors.email, adminAddresses));
+
+  // Also load node emails to skip — any address belonging to a node is "us"
+  const nodeRows = await db.select({ email: nodes.email }).from(nodes);
+  const nodeEmails = new Set(nodeRows.map(n => (n.email || '').toLowerCase()).filter(Boolean));
+  const skipAddresses = new Set([...adminAddresses, ...nodeEmails]);
+
+  const missing = await db.select({ id: investors.id, name: investors.name })
+    .from(investors)
+    .where(or(isNull(investors.email), eq(investors.email, '')));
+
+  let updated = 0;
+  const filled: Array<{ id: number; name: string; email: string }> = [];
+  for (const inv of missing) {
+    // Pull ALL inbound from_email values for this investor and pick the first
+    // one that ISN'T an admin/node address. The investor's real reply address
+    // appears once they've actually responded.
+    const logs = await db.select({ fromEmail: inboundIntroLogs.fromEmail })
+      .from(inboundIntroLogs)
+      .where(and(
+        eq(inboundIntroLogs.detectedInvestorId, inv.id),
+        sql`${inboundIntroLogs.fromEmail} IS NOT NULL AND ${inboundIntroLogs.fromEmail} != ''`,
+      ))
+      .orderBy(desc(inboundIntroLogs.createdAt));
+    let chosen: string | null = null;
+    for (const log of logs) {
+      const candidate = (log.fromEmail || '').trim().toLowerCase();
+      if (!candidate || !candidate.includes('@')) continue;
+      if (skipAddresses.has(candidate)) continue;
+      chosen = candidate;
+      break;
+    }
+    if (!chosen) continue;
+    await db.update(investors).set({ email: chosen }).where(eq(investors.id, inv.id));
+    filled.push({ id: inv.id, name: inv.name, email: chosen });
+    updated++;
+  }
+
+  return c.json({
+    candidates: missing.length,
+    updated,
+    sampleFilled: filled.slice(0, 10),
+  });
+});
+
+// Mark a Gmail-drafted intro as actually sent — flips status to intro_request_sent
+app.post('/api/intro-requests/:id/mark-sent', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, id) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+  if (intro.status !== 'pending_suggestion') {
+    return c.json({ error: `Not a pending suggestion (status: ${intro.status})` }, 400);
+  }
+  const now = new Date().toISOString();
+  await db.update(introRequests).set({
+    status: 'intro_request_sent',
+    dateRequested: now.split('T')[0],
+    updatedAt: now,
+  }).where(eq(introRequests.id, id));
+  // Mirror the match suggestion to approved
+  const { matchSuggestions } = await import('./db/index.js');
+  await db.update(matchSuggestions).set({ status: 'approved', reviewedAt: now })
+    .where(eq(matchSuggestions.introRequestId, id));
+  return c.json({ success: true });
+});
+
+// Mark an intro as resulting in an investment — flips status to 'invested'.
+// This is the single binary outcome signal we track. Allowed from any
+// post-pending status so admin can flip after the fact.
+app.post('/api/intro-requests/:id/mark-invested', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, id) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+  if (intro.status === 'pending_suggestion') {
+    return c.json({ error: 'Cannot mark a pending suggestion as invested — send the intro first' }, 400);
+  }
+  const now = new Date().toISOString();
+  await db.update(introRequests).set({
+    status: 'invested',
+    updatedAt: now,
+  }).where(eq(introRequests.id, id));
+  return c.json({ success: true });
+});
+
+// Discard a Gmail draft + the pending suggestion (deletes draft, rejects suggestion)
+app.post('/api/intro-requests/:id/discard-draft', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, id) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+  if (intro.status !== 'pending_suggestion') {
+    return c.json({ error: `Not a pending suggestion (status: ${intro.status})` }, 400);
+  }
+  // Best-effort: delete the Gmail draft if one exists
+  if (intro.gmailDraftId) {
+    try {
+      const { google } = await import('googleapis');
+      const { getStatus } = await import('./services/gmail.js');
+      // We don't have a public delete helper yet; do it inline.
+      const stored = await getStatus();
+      if (stored.connected) {
+        const { OAuth2Client } = await import('google-auth-library');
+        const client = new google.auth.OAuth2(process.env.GOOGLE_OAUTH_CLIENT_ID, process.env.GOOGLE_OAUTH_CLIENT_SECRET);
+        // Reload refresh token via the same file used in gmail.ts
+        const fs = await import('fs/promises');
+        const path = await import('path');
+        const credsFile = path.join(process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.'), 'gmail-credentials.json');
+        const raw = await fs.readFile(credsFile, 'utf8');
+        const parsed = JSON.parse(raw);
+        client.setCredentials({ refresh_token: parsed.refreshToken });
+        const gmail = google.gmail({ version: 'v1', auth: client });
+        await gmail.users.drafts.delete({ userId: 'me', id: intro.gmailDraftId });
+      }
+    } catch (e) {
+      console.error('[DISCARD-DRAFT] Failed to delete Gmail draft', e);
+      // Not fatal — still proceed with DB cleanup
+    }
+  }
+  const now = new Date().toISOString();
+  // Reject the linked match suggestion + free up the FK so we can delete
+  const { matchSuggestions } = await import('./db/index.js');
+  await db.update(matchSuggestions).set({
+    status: 'rejected',
+    reviewedAt: now,
+    rejectionReason: 'Discarded after auto-draft',
+    introRequestId: null,
+  }).where(eq(matchSuggestions.introRequestId, id));
+  await db.delete(introRequests).where(eq(introRequests.id, id));
+  return c.json({ success: true });
+});
+
+// Gmail OAuth — returns the Google consent URL for the admin to redirect to
+app.get('/api/agent/gmail/connect', async (c) => {
+  const { getAuthUrl } = await import('./services/gmail.js');
+  try {
+    return c.json({ authUrl: getAuthUrl() });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Gmail OAuth not configured' }, 500);
+  }
+});
+
+// Gmail OAuth — connection status
+app.get('/api/agent/gmail/status', async (c) => {
+  const { getStatus } = await import('./services/gmail.js');
+  return c.json(await getStatus());
+});
+
+// Gmail OAuth — disconnect (deletes stored refresh token)
+app.post('/api/agent/gmail/disconnect', async (c) => {
+  const { disconnect } = await import('./services/gmail.js');
+  await disconnect();
+  return c.json({ success: true });
+});
+
+// Gmail OAuth — callback (public; Google redirects here after consent).
+// Lives outside /api/agent/* so the admin guard doesn't block Google.
+// The Google-issued `code` is the only credential needed; only Google can
+// produce a valid one, so the public URL is acceptable.
+app.get('/oauth/gmail/callback', async (c) => {
+  const code = c.req.query('code');
+  const errorParam = c.req.query('error');
+  if (errorParam) {
+    return c.html(`<h2>Gmail connect failed</h2><p>${errorParam}</p><p><a href="/admin">Back to admin</a></p>`, 400);
+  }
+  if (!code) {
+    return c.html('<h2>Gmail connect: missing code parameter</h2><p><a href="/admin">Back to admin</a></p>', 400);
+  }
+  const { exchangeCodeForTokens } = await import('./services/gmail.js');
+  try {
+    const { email } = await exchangeCodeForTokens(code);
+    return c.html(`<h2>Gmail connected ✓</h2><p>Linked account: <strong>${email || 'unknown'}</strong>. You can close this tab.</p><script>setTimeout(()=>{window.location.href='/admin';},1200);</script>`);
+  } catch (err: any) {
+    return c.html(`<h2>Gmail connect failed</h2><pre>${err.message || err}</pre><p><a href="/admin">Back to admin</a></p>`, 500);
+  }
+});
+
+// Create a Gmail draft from a match suggestion / intro request.
+// Body: { introRequestId } — pulls everything else from the DB + founder fields.
+app.post('/api/agent/gmail/draft-intro', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const introRequestId = parseInt(body.introRequestId);
+  if (!introRequestId || isNaN(introRequestId)) {
+    return c.json({ error: 'introRequestId is required' }, 400);
+  }
+  // Optional overrides: when the admin edits subject/body/to in the draft
+  // modal before clicking "Create Gmail draft" or "Send now", these come
+  // through verbatim. Without them the server builds from founder.blurb.
+  const subjectOverride: string | undefined = body.subjectOverride;
+  const bodyOverride: string | undefined = body.bodyOverride;
+  const toOverride: string | undefined = body.toOverride;
+  // sendNow=true: skip draft, send the message directly + flip status to
+  // intro_request_sent + mark match_suggestion approved in one step.
+  const sendNow: boolean = !!body.sendNow;
+
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, introRequestId) });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) });
+  const investor = await db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) });
+  const node = await db.query.nodes.findFirst({ where: eq(nodes.id, intro.nodeId) });
+
+  if (!founder || !investor) return c.json({ error: 'Missing founder or investor' }, 400);
+
+  // Build the email — mirrors buildIntroDraft in admin.html.
+  // When blurb is set, the blurb IS the entire email body (with variable
+  // substitution). Fallback template only fires when no blurb is set.
+  const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+  const founderFirst = (founder.name || '').split(/\s+/)[0] || '';
+  const companyName = founder.companyName || '';
+  const stage = founder.companyStage ? String(founder.companyStage).replace(/_/g, ' ') : '';
+  const nodeFirst = (node?.name || 'Mat').split(/\s+/)[0];
+  const blurb = (founder.blurb || '').trim();
+  const deckUrl = (founder.deckUrl || '').trim();
+  const calendlyUrl = (founder.calendlyUrl || '').trim();
+
+  const subject = companyName || founder.name;
+
+  // {{investorName}} / {{founderName}} default to first name (matches gmail.ts).
+  const fillVars = (s: string) => s
+    .replace(/\{\{investorFirst\}\}/g, investorFirst)
+    .replace(/\{\{investorFull\}\}/g, investor.name || '')
+    .replace(/\{\{investorName\}\}/g, investorFirst)
+    .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
+    .replace(/\{\{founderFirst\}\}/g, founderFirst)
+    .replace(/\{\{founderFull\}\}/g, founder.name || '')
+    .replace(/\{\{founderName\}\}/g, founderFirst)
+    .replace(/\{\{companyName\}\}/g, companyName);
+
+  let bodyText: string;
+  if (blurb) {
+    bodyText = fillVars(blurb);
+  } else {
+    const lines: string[] = [];
+    lines.push(`Hi ${investorFirst} —`);
+    lines.push('');
+    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
+    if (stage) {
+      lines.push('');
+      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
+    }
+    if (deckUrl || calendlyUrl) {
+      lines.push('');
+      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
+      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
+    }
+    lines.push('');
+    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
+    lines.push('');
+    lines.push(nodeFirst);
+    bodyText = lines.join('\n');
+  }
+
+  // Locate the deck file on disk if uploaded
+  let attachmentPath: string | undefined;
+  let attachmentName: string | undefined;
+  if (founder.deckFile) {
+    const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
+    attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
+    attachmentName = `${companyName || founder.name} Deck.pdf`;
+  }
+
+  // Admin overrides win — edits made in the draft modal land in the Gmail draft.
+  const finalSubject = (subjectOverride != null && subjectOverride.trim()) ? subjectOverride : subject;
+  const finalBody = (bodyOverride != null && bodyOverride.trim()) ? bodyOverride : bodyText;
+  const finalTo = (toOverride != null && toOverride.trim()) ? toOverride : (investor.email || '');
+
+  if (sendNow) {
+    const { sendGmail } = await import('./services/gmail.js');
+    try {
+      const sent = await sendGmail({
+        to: finalTo,
+        subject: finalSubject,
+        body: finalBody,
+        attachmentPath,
+        attachmentName,
+      });
+      const now = new Date().toISOString();
+      await db.update(introRequests).set({
+        status: 'intro_request_sent',
+        dateRequested: now.split('T')[0],
+        gmailThreadId: sent.threadId || null,
+        updatedAt: now,
+      }).where(eq(introRequests.id, intro.id));
+      const { matchSuggestions } = await import('./db/index.js');
+      await db.update(matchSuggestions)
+        .set({ status: 'approved', reviewedAt: now })
+        .where(eq(matchSuggestions.introRequestId, intro.id));
+      return c.json({ success: true, sent: true, ...sent, attached: !!attachmentPath });
+    } catch (err: any) {
+      return c.json({ error: err.message || 'Failed to send via Gmail' }, 500);
+    }
+  }
+
+  const { createDraft } = await import('./services/gmail.js');
+  try {
+    const result = await createDraft({
+      to: finalTo,
+      subject: finalSubject,
+      body: finalBody,
+      attachmentPath,
+      attachmentName,
+    });
+    return c.json({ success: true, sent: false, ...result, attached: !!attachmentPath });
+  } catch (err: any) {
+    return c.json({ error: err.message || 'Failed to create Gmail draft' }, 500);
+  }
+});
+
+// Investor Network application (public, no auth)
+app.post('/api/investors-apply', async (c) => {
   const body = await c.req.json();
   const { name, email, linkedin, firm, note } = body;
 
@@ -153,16 +611,48 @@ app.post('/api/angel-club-apply', async (c) => {
   const { sendEmail } = await import('./services/email.js');
   await sendEmail({
     to: 'mat@matsherman.com',
-    subject: `Angel Club Application: ${name}`,
+    subject: `Investor Network Application: ${name}`,
     html: `
-      <h2>New Angel Club Application</h2>
+      <h2>New Investor Network Application</h2>
       <p><strong>Name:</strong> ${name}</p>
       <p><strong>Email:</strong> ${email}</p>
       <p><strong>LinkedIn:</strong> <a href="${linkedin}">${linkedin}</a></p>
       ${firm ? `<p><strong>Firm/Website:</strong> <a href="${firm}">${firm}</a></p>` : ''}
       ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
     `,
-    text: `New Angel Club Application\n\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}${firm ? `\nFirm: ${firm}` : ''}${note ? `\nNote: ${note}` : ''}`,
+    text: `New Investor Network Application\n\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}${firm ? `\nFirm: ${firm}` : ''}${note ? `\nNote: ${note}` : ''}`,
+  });
+
+  return c.json({ success: true });
+});
+
+// Scout / YC application (public, no auth) — founders with an accelerator offer
+// who want a market read before committing
+app.post('/api/scout-apply', async (c) => {
+  const body = await c.req.json();
+  const { name, email, linkedin, company, oneLiner, accelerator, batch, stage, sector, note, source } = body;
+
+  if (!name || !email || !linkedin || !company || !oneLiner || !accelerator || !stage || !sector) {
+    return c.json({ error: 'Name, email, LinkedIn, company, one-liner, accelerator, stage, and sector are required' }, 400);
+  }
+
+  const { sendEmail } = await import('./services/email.js');
+  await sendEmail({
+    to: 'mat@matsherman.com',
+    subject: `Scout application: ${name} — ${company} (${accelerator})`,
+    html: `
+      <h2>New Scout Application (${source || 'yc'})</h2>
+      <p><strong>Accelerator:</strong> ${accelerator}${batch ? ` &mdash; ${batch}` : ''}</p>
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> ${email}</p>
+      <p><strong>LinkedIn:</strong> <a href="${linkedin}">${linkedin}</a></p>
+      <p><strong>Company:</strong> ${company}</p>
+      <p><strong>One-liner:</strong> ${oneLiner}</p>
+      <p><strong>Stage:</strong> ${stage}</p>
+      <p><strong>Sector:</strong> ${sector}</p>
+      ${note ? `<p><strong>Note:</strong> ${note}</p>` : ''}
+    `,
+    text: `New Scout Application (${source || 'yc'})\n\nAccelerator: ${accelerator}${batch ? ` — ${batch}` : ''}\nName: ${name}\nEmail: ${email}\nLinkedIn: ${linkedin}\nCompany: ${company}\nOne-liner: ${oneLiner}\nStage: ${stage}\nSector: ${sector}${note ? `\nNote: ${note}` : ''}`,
   });
 
   return c.json({ success: true });
@@ -418,9 +908,11 @@ app.get('/trial', serveStatic({ path: './public/trial.html' }));
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
 app.get('/founders', (c) => c.redirect('/signup', 302));
-app.get('/investors', (c) => c.redirect('/angel-club', 302));
+app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
-app.get('/angel-club', serveStatic({ path: './public/angel-club.html' }));
+app.get('/angel-club', (c) => c.redirect('/investors', 302));
+app.get('/yc', serveStatic({ path: './public/yc.html' }));
+app.get('/scout', (c) => c.redirect('/yc', 302));
 app.get('/retreats/7', serveStatic({ path: './public/retreats/7/index.html' }));
 app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.html' }));
 app.get('/project2045', serveStatic({ path: './public/project2045.html' }));
@@ -491,6 +983,61 @@ cron.schedule('0 23 * * 5', async () => {
 });
 
 console.log('[CRON] Digest preview scheduled for Friday 23:00 UTC (4pm Arizona, 1 hour before digest)');
+
+// Shadow agent — generates match suggestions and emails admin a digest.
+// Phase 1: visibility only. Nothing is sent autonomously; admin still approves
+// each suggestion in the matching tab.
+// Monday + Thursday 16:00 UTC = 9am Arizona — start of week + mid-week
+cron.schedule('0 16 * * 1,4', async () => {
+  console.log('[CRON] Running shadow agent tick...');
+  try {
+    const { runAgentTick } = await import('./services/agent.js');
+    const result = await runAgentTick();
+    console.log('[CRON] Agent tick complete:', result);
+  } catch (err) {
+    console.error('[CRON] Agent tick failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Shadow agent scheduled for Mon + Thu 16:00 UTC (9am Arizona)');
+
+// Auto-draft tick — picks ONE high-score pending suggestion per day and creates
+// a Gmail draft. Status stays pending_suggestion. Admin reviews + sends from
+// Gmail, then clicks "Mark as sent" in admin.
+// 10am Arizona = 17:00 UTC. After the shadow-agent's 9am suggestion run so the
+// queue is fresh.
+cron.schedule('0 17 * * *', async () => {
+  console.log('[CRON] Running auto-draft tick...');
+  try {
+    const { runAutoDraftTick } = await import('./services/agent.js');
+    const result = await runAutoDraftTick();
+    console.log('[CRON] Auto-draft tick result:', result);
+  } catch (err) {
+    console.error('[CRON] Auto-draft tick failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Auto-draft scheduled for daily 17:00 UTC (10am Arizona)');
+
+// Follow-up agent — runs daily at 18:00 UTC (11am AZ), an hour after auto-draft.
+cron.schedule('0 18 * * *', async () => {
+  console.log('[CRON] Running follow-up tick...');
+  try {
+    const { runFollowupTick } = await import('./services/agent.js');
+    const result = await runFollowupTick();
+    console.log('[CRON] Follow-up tick result:', result);
+  } catch (err) {
+    console.error('[CRON] Follow-up tick failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Follow-up agent scheduled for daily 18:00 UTC (11am Arizona)');
 
 serve({
   fetch: app.fetch,

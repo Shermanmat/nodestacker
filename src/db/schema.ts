@@ -66,6 +66,12 @@ export const founders = sqliteTable('founders', {
   introTargetPerWeek: integer('intro_target_per_week').default(2),
   introCadenceActive: integer('intro_cadence_active', { mode: 'boolean' }).default(false),
   cadenceStartDate: text('cadence_start_date'),
+  // Intro draft content — used by the agent + manual approve flow to assemble
+  // a final-shaped intro email instead of a skeleton.
+  blurb: text('blurb'),
+  deckUrl: text('deck_url'),
+  deckFile: text('deck_file'), // server-stored filename, e.g. '<token>.pdf' — used for Gmail attachments
+  calendlyUrl: text('calendly_url'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
@@ -86,6 +92,7 @@ export const investors = sqliteTable('investors', {
   name: text('name').notNull(),
   firm: text('firm'),
   role: text('role'),
+  email: text('email'),
   focusAreas: text('focus_areas'), // JSON array stored as text
   checkSize: text('check_size'),
   geography: text('geography'),
@@ -95,6 +102,7 @@ export const investors = sqliteTable('investors', {
   pauseReason: text('pause_reason'),
   city: text('city'),
   country: text('country'),
+  notes: text('notes'), // Free-form admin notes — non-categorical quirks ("doesn't take cold intros", "asks for revenue first")
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
@@ -140,6 +148,22 @@ export const introRequests = sqliteTable('intro_requests', {
   passReason: text('pass_reason'),
   investorBumpCount: integer('investor_bump_count').notNull().default(0),
   lastInvestorBumpAt: text('last_investor_bump_at'),
+  // Gmail draft id created by the auto-draft agent. Presence = draft exists
+  // in user's Gmail, awaiting their review/send. Status stays pending_suggestion
+  // until the user marks it sent.
+  gmailDraftId: text('gmail_draft_id'),
+  gmailDraftCreatedAt: text('gmail_draft_created_at'),
+  // Captured when the intro is actually sent via sendGmail. Lets the
+  // follow-up agent fetch the thread state to check for replies and
+  // create follow-up drafts in the same thread.
+  gmailThreadId: text('gmail_thread_id'),
+  // Reply detection: set when checkThreadReplies finds a message from
+  // someone other than us in the thread. Stops the follow-up agent
+  // from bumping investors who've already responded.
+  replyDetectedAt: text('reply_detected_at'),
+  // Follow-up tracking
+  followupCount: integer('followup_count').notNull().default(0),
+  lastFollowupAt: text('last_followup_at'),
   notes: text('notes'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),

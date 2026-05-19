@@ -4208,8 +4208,7 @@
           try {
             await api(`/signups/applications/${companyId}/decline`, {
               method: 'POST',
-              body: JSON.stringify({ reason: reason.trim() || undefined }),
-              headers: { 'Content-Type': 'application/json' },
+              body: { reason: reason.trim() || undefined },
             });
             await loadSignups();
           } catch (e) { /* handled by api() */ }
@@ -4224,8 +4223,7 @@
           try {
             await api(`/signups/applications/${companyId}/request-meeting`, {
               method: 'POST',
-              body: JSON.stringify({ note: note.trim() || undefined }),
-              headers: { 'Content-Type': 'application/json' },
+              body: { note: note.trim() || undefined },
             });
             await loadSignups();
           } catch (e) { /* handled by api() */ }

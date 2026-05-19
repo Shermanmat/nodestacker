@@ -16,6 +16,7 @@ import authRoutes from './api/auth.js';
 import founderPortalRoutes from './api/founder-portal.js';
 import portalCrmRoutes from './api/portal-crm.js';
 import peopleCapturesRoutes from './api/people-captures.js';
+import adminPeopleRoutes from './api/admin-people.js';
 import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
 import adminAuthRoutes from './api/admin-auth.js';
@@ -59,6 +60,8 @@ app.route('/api/portal/crm', portalCrmRoutes);
 // Public lead-magnet capture — any standalone tool/page posts here to land
 // an email in the unified people directory. No auth.
 app.route('/api/people-captures', peopleCapturesRoutes);
+// Admin unified People view (PR 2) — union of founders + signups + leads + captures
+app.route('/api/admin/people', adminPeopleRoutes);
 // Public network signup/login (separate from founder auth)
 app.route('/api/public', publicAuthRoutes);
 app.route('/api/public', publicProfileRoutes);
@@ -122,6 +125,9 @@ app.use('/api/brands/*', adminGuard);
 // Voice interview admin endpoints
 app.use('/api/admin/voice-interviews', adminGuard);
 app.use('/api/admin/voice-interviews/*', adminGuard);
+// Admin unified People view (CRM directory) — admin-only.
+app.use('/api/admin/people', adminGuard);
+app.use('/api/admin/people/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 app.use('/api/weekly-digest/preview-admin', adminGuard);

@@ -97,6 +97,7 @@
         <div class="sidebar-link" :class="{ active: activeTab === 'signups' }" @click="switchTab('signups')">
           Signups
         </div>
+        <div class="sidebar-link" :class="{ active: activeTab === 'directory' }" @click="switchTab('directory')">Directory</div>
 
         <div class="sidebar-section">Operations</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'intros' }" @click="switchTab('intros')">Intro Requests</div>
@@ -2401,6 +2402,152 @@
         </div>
       </div>
 
+    <!-- Directory Tab — Unified People view -->
+      <div v-if="activeTab === 'directory'">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-semibold">Directory</h2>
+            <p class="text-sm text-gray-500">Every person we've touched — founders, signups, leads, and anyone who's used a lead-magnet tool.</p>
+          </div>
+          <button @click="loadDirectory" class="text-blue-600 text-sm hover:underline">Refresh</button>
+        </div>
+
+        <!-- Stat cards -->
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <div class="bg-white rounded-lg shadow p-3">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Total</div>
+            <div class="text-2xl font-bold">{{ directoryRows.length }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-3">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Founders</div>
+            <div class="text-2xl font-bold">{{ directoryStatsBySource.founder || 0 }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-3">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Signups</div>
+            <div class="text-2xl font-bold">{{ directoryStatsBySource.public_user || 0 }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-3">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Leads</div>
+            <div class="text-2xl font-bold">{{ directoryStatsBySource.founder_lead || 0 }}</div>
+          </div>
+          <div class="bg-white rounded-lg shadow p-3">
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Captures</div>
+            <div class="text-2xl font-bold">{{ directoryCaptureCount }}</div>
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4 flex flex-wrap items-center gap-3">
+          <input v-model="directorySearch" type="search" placeholder="Search name, email, company, city…"
+            class="border rounded px-3 py-1.5 text-sm w-72" />
+          <div class="flex gap-1 flex-wrap">
+            <button v-for="opt in directorySourceOptions" :key="opt.value"
+              @click="toggleDirectorySource(opt.value)"
+              :class="['text-xs px-2.5 py-1 rounded-full border', directorySourceFilter.has(opt.value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400']">
+              {{ opt.label }}
+            </button>
+          </div>
+          <select v-if="directoryAllTags.length > 0" :value="directoryTagFilter || ''" @change="directoryTagFilter = $event.target.value || null"
+            class="border rounded px-3 py-1.5 text-sm">
+            <option value="">All tags</option>
+            <option v-for="t in directoryAllTags" :key="t" :value="t">{{ t }}</option>
+          </select>
+          <span v-if="hasDirectoryFilters" class="text-xs text-gray-500">{{ filteredDirectoryRows.length }} / {{ directoryRows.length }}</span>
+          <button v-if="hasDirectoryFilters" @click="clearDirectoryFilters" class="text-xs text-blue-600 hover:underline">Clear</button>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+          <div v-if="directoryLoading" class="p-8 text-center text-gray-500">Loading…</div>
+          <div v-else-if="filteredDirectoryRows.length === 0" class="p-8 text-center text-gray-500">
+            <div v-if="directoryRows.length === 0">No people yet — applications and lead-magnet captures will appear here.</div>
+            <div v-else>No people match your filters.</div>
+          </div>
+          <table v-else class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs text-gray-600 uppercase tracking-wide">
+              <tr>
+                <th class="text-left py-2 px-3 font-medium">Name</th>
+                <th class="text-left py-2 px-3 font-medium">Email</th>
+                <th class="text-left py-2 px-3 font-medium">Company</th>
+                <th class="text-left py-2 px-3 font-medium">City</th>
+                <th class="text-left py-2 px-3 font-medium">Sources</th>
+                <th class="text-left py-2 px-3 font-medium">Tags</th>
+                <th class="text-left py-2 px-3 font-medium">Last touch</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in filteredDirectoryRows.slice(0, directoryDisplayLimit)" :key="row.email"
+                class="border-t hover:bg-gray-50 cursor-pointer"
+                @click="openDirectoryDetail(row)">
+                <td class="py-2 px-3 font-medium">{{ row.name || '—' }}</td>
+                <td class="py-2 px-3 text-gray-600">{{ row.email }}</td>
+                <td class="py-2 px-3 text-gray-600">{{ row.company || '—' }}</td>
+                <td class="py-2 px-3 text-gray-600">{{ row.city || '—' }}</td>
+                <td class="py-2 px-3">
+                  <span v-for="s in row.sources" :key="s"
+                    :class="['inline-block text-xs px-1.5 py-0.5 rounded mr-1 mb-1', directorySourceBadgeClass(s)]">
+                    {{ directorySourceLabel(s) }}
+                  </span>
+                </td>
+                <td class="py-2 px-3">
+                  <span v-for="t in row.tags" :key="t" class="inline-block text-xs px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded mr-1">{{ t }}</span>
+                  <span v-if="row.tags.length === 0" class="text-xs text-gray-400">—</span>
+                </td>
+                <td class="py-2 px-3 text-gray-500 text-xs">{{ directoryFormatRelative(row.lastTouchAt) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="filteredDirectoryRows.length > directoryDisplayLimit" class="p-3 border-t text-center">
+            <button @click="directoryDisplayLimit += 50" class="text-sm text-blue-600 hover:underline">
+              Show 50 more ({{ filteredDirectoryRows.length - directoryDisplayLimit }} remaining)
+            </button>
+          </div>
+        </div>
+
+        <!-- Detail drawer -->
+        <div v-if="directoryDetail" class="fixed inset-0 bg-black bg-opacity-30 z-40" @click.self="closeDirectoryDetail">
+          <div class="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-white shadow-2xl overflow-y-auto">
+            <div class="p-5 border-b sticky top-0 bg-white z-10">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-xl font-semibold">{{ directoryDetail.name || directoryDetail.email }}</div>
+                  <div class="text-sm text-gray-500">{{ directoryDetail.email }}</div>
+                  <div class="text-xs text-gray-400 mt-1">{{ [directoryDetail.company, directoryDetail.city].filter(x => x).join(' · ') || '—' }}</div>
+                </div>
+                <button @click="closeDirectoryDetail" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              </div>
+              <div class="mt-3 flex gap-1 flex-wrap text-xs">
+                <span v-for="s in directoryDetail.sources" :key="s" :class="['px-2 py-0.5 rounded', directorySourceBadgeClass(s)]">{{ directorySourceLabel(s) }}</span>
+              </div>
+            </div>
+            <div class="p-5 border-b">
+              <h4 class="text-sm font-semibold text-gray-700 mb-2">Tags</h4>
+              <div class="flex flex-wrap gap-1 mb-2">
+                <span v-for="t in directoryDetail.tags" :key="t" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded">
+                  {{ t }}
+                  <button @click="removeDirectoryTag(t)" class="text-amber-600 hover:text-amber-800">×</button>
+                </span>
+                <span v-if="directoryDetail.tags.length === 0" class="text-xs text-gray-400">No tags yet</span>
+              </div>
+              <form @submit.prevent="addDirectoryTag" class="flex gap-2">
+                <input v-model="newDirectoryTag" type="text" placeholder="add tag (e.g. AI-Austin)"
+                  class="flex-1 border rounded px-2 py-1 text-sm">
+                <button type="submit" :disabled="!newDirectoryTag.trim()" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">Add</button>
+              </form>
+            </div>
+            <div class="p-5">
+              <h4 class="text-sm font-semibold text-gray-700 mb-2">Source records</h4>
+              <div class="space-y-3">
+                <div v-for="(src, idx) in directoryDetail.rawSources" :key="idx" class="border rounded p-3 bg-gray-50">
+                  <div class="text-xs font-medium text-gray-600 mb-1">{{ directorySourceLabel(src.source) }} <span class="text-gray-400">· id {{ src.id }}</span></div>
+                  <pre class="text-xs text-gray-700 whitespace-pre-wrap font-mono break-all">{{ JSON.stringify(src.data, null, 2) }}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     <!-- Signups Tab -->
       <div v-if="activeTab === 'signups'">
 
@@ -3660,6 +3807,7 @@
           }
           if (tabId === 'leaderboard') loadFounderLeaderboard();
           if (tabId === 'categories') loadCategories();
+          if (tabId === 'directory') loadDirectory();
           if (tabId === 'signups') loadSignups();
           if (tabId === 'brands') loadBrands();
         }

@@ -1168,3 +1168,22 @@ export const brands = sqliteTable('brands', {
 
 export type Brand = typeof brands.$inferSelect;
 export type NewBrand = typeof brands.$inferInsert;
+
+// People captures — universal entry point for lead magnets (equity calculator,
+// dilution planner, future tools). Public POST /api/people-captures writes
+// here. De-duped on (email, source) so the same person hitting the same
+// magnet twice doesn't bloat the table. The unified admin People view (PR 2)
+// will UNION this in with founders / signups / public_users / founder_leads.
+export const peopleCaptures = sqliteTable('people_captures', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  email: text('email').notNull(),
+  name: text('name'),
+  city: text('city'),
+  source: text('source').notNull(),
+  metadata: text('metadata'),
+  capturedAt: text('captured_at').notNull().default('CURRENT_TIMESTAMP'),
+  autoEmailedAt: text('auto_emailed_at'),
+});
+
+export type PeopleCapture = typeof peopleCaptures.$inferSelect;
+export type NewPeopleCapture = typeof peopleCaptures.$inferInsert;

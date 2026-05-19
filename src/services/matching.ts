@@ -964,7 +964,14 @@ export async function generateMatchSuggestions(
         const weeksSinceContact = investorWeeksSinceContact.get(investorId) ?? 52;
         const recencyBonus = Math.min(30, weeksSinceContact * 5);
         const fit = classifyMatchFit(founderCats, data.investorCatMap.get(investorId));
-        const matchScore = computeFitScore(conn.connectionStrength, fit, recencyBonus);
+        const baseScore = computeFitScore(conn.connectionStrength, fit, recencyBonus);
+        // Soft angel preference: when the founder has preferAnglesOnly set, an
+        // angel (firm is null OR in NON_FIRM_NAMES — investorFirmMap only stores
+        // real firm names, so missing here = angel) gets +20 to outrank VCs of
+        // equivalent base fit. VCs still surface; they just need to fit better.
+        const isAngel = !investorFirmMap.get(investorId);
+        const anglePreferenceBonus = founder.preferAnglesOnly && isAngel ? 20 : 0;
+        const matchScore = baseScore + anglePreferenceBonus;
 
         suggestions.push({
           founderId: founder.id,

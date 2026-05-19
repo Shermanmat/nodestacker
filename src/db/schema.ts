@@ -65,6 +65,10 @@ export const founders = sqliteTable('founders', {
   country: text('country'),
   introTargetPerWeek: integer('intro_target_per_week').default(2),
   introCadenceActive: integer('intro_cadence_active', { mode: 'boolean' }).default(false),
+  // Soft preference: when true, the matching algorithm gives a +20 score
+  // bonus to angels (firm in NON_FIRM_NAMES or null) so they rank above
+  // institutional VCs of equivalent base score. VCs still get suggested.
+  preferAnglesOnly: integer('prefer_angels_only', { mode: 'boolean' }).default(false),
   cadenceStartDate: text('cadence_start_date'),
   // Intro draft content — used by the agent + manual approve flow to assemble
   // a final-shaped intro email instead of a skeleton.

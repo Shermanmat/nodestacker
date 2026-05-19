@@ -31,6 +31,7 @@ const createIntroRequestSchema = z.object({
 const updateIntroRequestSchema = z.object({
   nodeId: z.number().optional(),
   status: z.enum(introStatusValues).optional(),
+  dateRequested: z.string().nullable().optional(),
   dateNodeAsked: z.string().nullable().optional(),
   dateIntroduced: z.string().nullable().optional(),
   firstMeetingDate: z.string().nullable().optional(),

@@ -80,7 +80,235 @@
       </nav>
 
       <!-- Content -->
-      <main class="max-w-5xl mx-auto px-4 py-6">
+      <main :class="activeTab === 'pipeline' ? 'max-w-7xl mx-auto px-4 py-6' : 'max-w-5xl mx-auto px-4 py-6'">
+        <!-- Pipeline (Investor CRM) -->
+        <div v-if="activeTab === 'pipeline'">
+          <!-- Header + Add -->
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-xl font-semibold">Pipeline</h2>
+              <p class="text-sm text-gray-500">Your investor pipeline — MatCap-sent intros and investors you're tracking yourself.</p>
+            </div>
+            <div class="flex gap-2">
+              <button @click="openAddInvestorModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">+ Add investor</button>
+            </div>
+          </div>
+
+          <!-- Stat cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wide">Active</div>
+              <div class="text-2xl font-bold">{{ crmStats.active }}</div>
+              <div class="text-xs text-gray-500 mt-1">in conversation</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wide">Needs follow-up</div>
+              <div class="text-2xl font-bold" :class="crmStats.dueSoon > 0 ? 'text-amber-600' : ''">{{ crmStats.dueSoon }}</div>
+              <div class="text-xs text-gray-500 mt-1">next action ≤ 7 days</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wide">Self-added</div>
+              <div class="text-2xl font-bold">{{ crmStats.selfAdded }}</div>
+              <div class="text-xs text-gray-500 mt-1">outside MatCap network</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-xs text-gray-500 uppercase tracking-wide">Closed</div>
+              <div class="text-2xl font-bold">{{ crmStats.closed }}</div>
+              <div class="text-xs text-gray-500 mt-1">passed + invested</div>
+            </div>
+          </div>
+
+          <!-- Filters -->
+          <div class="bg-white rounded-lg shadow p-3 mb-4 flex flex-wrap items-center gap-3">
+            <input v-model="crmSearch" type="search" placeholder="Search name or firm…"
+              class="border rounded px-3 py-1.5 text-sm w-56" />
+            <div class="flex gap-1 flex-wrap">
+              <button v-for="opt in crmStatusFilterOptions" :key="opt.value"
+                @click="toggleStatusFilter(opt.value)"
+                :class="['text-xs px-2.5 py-1 rounded-full border', crmStatusFilter.has(opt.value) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400']">
+                {{ opt.label }}
+              </button>
+            </div>
+            <div class="flex gap-1">
+              <button v-for="opt in crmSourceFilterOptions" :key="opt.value"
+                @click="toggleSourceFilter(opt.value)"
+                :class="['text-xs px-2.5 py-1 rounded-full border', crmSourceFilter.has(opt.value) ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-300 hover:border-gray-400']">
+                {{ opt.label }}
+              </button>
+            </div>
+            <label class="text-xs text-gray-600 ml-auto flex items-center gap-1.5">
+              <input type="checkbox" v-model="crmNeedsAttentionOnly" class="rounded">
+              Needs my attention
+            </label>
+            <span v-if="hasActiveCrmFilters" class="text-xs text-gray-500">{{ filteredCrmRows.length }} / {{ crmRows.length }}</span>
+            <button v-if="hasActiveCrmFilters" @click="clearCrmFilters" class="text-xs text-blue-600 hover:underline">Clear</button>
+          </div>
+
+          <!-- Table -->
+          <div class="bg-white rounded-lg shadow overflow-hidden">
+            <div v-if="crmLoading" class="p-8 text-center text-gray-500">Loading…</div>
+            <div v-else-if="filteredCrmRows.length === 0" class="p-8 text-center text-gray-500">
+              <div v-if="crmRows.length === 0">No investors yet. Click <strong>+ Add investor</strong> to track someone outside MatCap.</div>
+              <div v-else>No rows match your filters. <button @click="clearCrmFilters" class="text-blue-600 hover:underline">Clear filters</button></div>
+            </div>
+            <table v-else class="w-full text-sm">
+              <thead class="bg-gray-50 text-xs text-gray-600 uppercase tracking-wide">
+                <tr>
+                  <th class="text-left py-2 px-3 font-medium">Investor</th>
+                  <th class="text-left py-2 px-3 font-medium">Status</th>
+                  <th class="text-left py-2 px-3 font-medium">Source</th>
+                  <th class="text-left py-2 px-3 font-medium">Last touch</th>
+                  <th class="text-left py-2 px-3 font-medium">Next action</th>
+                  <th class="text-left py-2 px-3 font-medium">Check size</th>
+                  <th class="text-left py-2 px-3 font-medium">Notes</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in filteredCrmRows" :key="row.kind + ':' + row.id" class="border-t hover:bg-gray-50 cursor-pointer"
+                  :class="needsAttention(row) ? 'border-l-2 border-l-amber-400' : ''"
+                  @click="openRowDetail(row)">
+                  <td class="py-2 px-3">
+                    <div class="font-medium">{{ row.investorName || '(no name)' }}</div>
+                    <div class="text-xs text-gray-500">{{ row.firm || '—' }}</div>
+                  </td>
+                  <td class="py-2 px-3">
+                    <span :class="['inline-block px-2 py-0.5 rounded text-xs font-medium', statusBadgeClass(row.status)]">
+                      {{ formatStatusLabel(row.status) }}
+                    </span>
+                  </td>
+                  <td class="py-2 px-3">
+                    <span :class="['inline-block px-2 py-0.5 rounded text-xs', sourceBadgeClass(row.source)]">
+                      {{ formatSourceLabel(row.source) }}
+                    </span>
+                  </td>
+                  <td class="py-2 px-3 text-gray-600 text-xs">{{ formatRelativeDate(row.lastTouchAt) }}</td>
+                  <td class="py-2 px-3" @click.stop>
+                    <input :value="row.nextActionText || ''" type="text" placeholder="—"
+                      @blur="saveCellEdit(row, 'nextActionText', $event.target.value)"
+                      class="w-full bg-transparent border-0 px-0 py-0 text-sm focus:bg-yellow-50 focus:ring-0 focus:outline-none" />
+                    <input :value="row.nextActionDate || ''" type="date"
+                      @blur="saveCellEdit(row, 'nextActionDate', $event.target.value || null)"
+                      :class="['w-full bg-transparent border-0 px-0 py-0 text-xs focus:bg-yellow-50 focus:ring-0 focus:outline-none', dateClass(row.nextActionDate)]" />
+                  </td>
+                  <td class="py-2 px-3" @click.stop>
+                    <input :value="row.checkSize || ''" type="text" placeholder="—"
+                      @blur="saveCellEdit(row, 'checkSize', $event.target.value)"
+                      class="w-full bg-transparent border-0 px-0 py-0 text-sm focus:bg-yellow-50 focus:ring-0 focus:outline-none" />
+                  </td>
+                  <td class="py-2 px-3 text-gray-600 text-xs max-w-[180px] truncate">{{ row.founderNotes || '—' }}</td>
+                  <td class="py-2 px-3 text-right text-gray-400">›</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Add investor modal -->
+        <div v-if="showAddInvestorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showAddInvestorModal = false">
+          <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4">Add investor to your pipeline</h3>
+            <form @submit.prevent="saveAddInvestor">
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
+                  <input v-model="addInvestorForm.name" required type="text" class="w-full border rounded px-3 py-2 text-sm" placeholder="Jane Doe">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Firm</label>
+                  <input v-model="addInvestorForm.firm" type="text" class="w-full border rounded px-3 py-2 text-sm" placeholder="Acme Capital — leave blank if angel">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                    <input v-model="addInvestorForm.role" type="text" class="w-full border rounded px-3 py-2 text-sm" placeholder="Partner">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                    <input v-model="addInvestorForm.email" type="email" class="w-full border rounded px-3 py-2 text-sm">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">How did you find them?</label>
+                  <select v-model="addInvestorForm.source" class="w-full border rounded px-3 py-2 text-sm">
+                    <option value="self_added">I reached out</option>
+                    <option value="cold_inbound">They reached out</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
+                  <textarea v-model="addInvestorForm.notes" rows="2" class="w-full border rounded px-3 py-2 text-sm" placeholder="Anything to remember about them"></textarea>
+                </div>
+              </div>
+              <div class="flex justify-end gap-2 mt-5">
+                <button type="button" @click="showAddInvestorModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" :disabled="!addInvestorForm.name || addingInvestor">{{ addingInvestor ? 'Saving…' : 'Add to pipeline' }}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <!-- Row detail drawer -->
+        <div v-if="detailRow" class="fixed inset-0 bg-black bg-opacity-30 z-40" @click.self="closeRowDetail">
+          <div class="fixed right-0 top-0 bottom-0 w-full max-w-md bg-white shadow-2xl overflow-y-auto">
+            <div class="p-5 border-b sticky top-0 bg-white z-10">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <div class="text-xl font-semibold">{{ detailRow.investorName }}</div>
+                  <div class="text-sm text-gray-500">{{ [detailRow.firm, detailRow.role].filter(x => x).join(' · ') || '—' }}</div>
+                  <div class="text-xs text-gray-400 mt-1">{{ [detailRow.email, detailRow.geography].filter(x => x).join(' · ') }}</div>
+                </div>
+                <button @click="closeRowDetail" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+              </div>
+              <div class="mt-3 flex gap-2 items-center text-xs">
+                <span :class="['px-2 py-0.5 rounded font-medium', statusBadgeClass(detailRow.status)]">{{ formatStatusLabel(detailRow.status) }}</span>
+                <span :class="['px-2 py-0.5 rounded', sourceBadgeClass(detailRow.source)]">{{ formatSourceLabel(detailRow.source) }}</span>
+                <span v-if="detailRow.nodeName" class="text-gray-500">via {{ detailRow.nodeName }}</span>
+              </div>
+              <div class="mt-4 flex gap-2">
+                <button @click="openInteractionModal('meeting')" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">+ Log meeting</button>
+                <button @click="openInteractionModal('note')" class="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200">+ Note</button>
+                <button @click="openInteractionModal('email')" class="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200">+ Email</button>
+                <button v-if="detailRow.kind === 'self_record'" @click="deleteSelfRecord" class="ml-auto text-xs text-red-600 hover:underline">Delete</button>
+              </div>
+            </div>
+            <div class="p-5">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3">Timeline</h4>
+              <div v-if="detailInteractions.length === 0" class="text-sm text-gray-500">No interactions logged yet.</div>
+              <div v-else class="space-y-3">
+                <div v-for="ix in detailInteractions" :key="ix.id" class="border-l-2 border-gray-200 pl-3">
+                  <div class="text-xs text-gray-500">{{ formatRelativeDate(ix.occurredAt) }} · {{ ix.interactionType }}</div>
+                  <div v-if="ix.content" class="text-sm text-gray-800 mt-0.5 whitespace-pre-wrap">{{ ix.content }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Log interaction modal -->
+        <div v-if="showInteractionModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showInteractionModal = false">
+          <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-1">Log {{ interactionForm.interactionType }}</h3>
+            <p class="text-xs text-gray-500 mb-4">With {{ detailRow?.investorName }}</p>
+            <form @submit.prevent="submitInteraction">
+              <div class="space-y-3">
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">When</label>
+                  <input v-model="interactionForm.occurredAt" type="date" required class="w-full border rounded px-3 py-2 text-sm">
+                </div>
+                <div>
+                  <label class="block text-xs font-medium text-gray-700 mb-1">What happened?</label>
+                  <textarea v-model="interactionForm.content" rows="4" class="w-full border rounded px-3 py-2 text-sm" placeholder="A few sentences — what did they ask? Are they passing? Next steps?"></textarea>
+                </div>
+              </div>
+              <div class="flex justify-end gap-2 mt-5">
+                <button type="button" @click="showInteractionModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" :disabled="loggingInteraction">{{ loggingInteraction ? 'Saving…' : 'Save' }}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <!-- Dashboard -->
         <div v-if="activeTab === 'dashboard'">
           <h2 class="text-xl font-semibold mb-4">Dashboard</h2>
@@ -801,15 +1029,16 @@
     createApp({
       setup() {
         const tabs = [
+          { id: 'pipeline', label: 'Pipeline' },
           { id: 'dashboard', label: 'Dashboard' },
           { id: 'onboarding', label: 'Onboarding' },
           { id: 'tasks', label: 'Tasks' },
           { id: 'intros', label: 'My Intros' },
           { id: 'nodes', label: 'Nodes' },
-          { id: 'network', label: 'Investors' },
+          { id: 'network', label: 'Network' },
         ];
 
-        const activeTab = ref('dashboard');
+        const activeTab = ref('pipeline');
         const session = ref(null);
         const loginEmail = ref('');
         const loggingIn = ref(false);
@@ -842,6 +1071,349 @@
           founderTitle: 'Founder & CEO',
           boardMembers: [{ name: '', email: '', title: '' }],
         });
+
+        // ===== Pipeline / Investor CRM =====
+        const crmRows = ref([]);
+        const crmLoading = ref(false);
+        const crmSearch = ref('');
+        const crmStatusFilter = ref(new Set());
+        const crmSourceFilter = ref(new Set());
+        const crmNeedsAttentionOnly = ref(false);
+
+        const crmStatusFilterOptions = [
+          { value: 'pending_suggestion', label: 'Pending' },
+          { value: 'intro_request_sent', label: 'Intro sent' },
+          { value: 'introduced', label: 'Introduced' },
+          { value: 'first_meeting_complete', label: 'Met' },
+          { value: 'follow_up_questions', label: 'Follow-up' },
+          { value: 'self_outreach', label: 'My outreach' },
+          { value: 'passed', label: 'Passed' },
+          { value: 'invested', label: 'Invested' },
+        ];
+        const crmSourceFilterOptions = [
+          { value: 'matcap', label: 'MatCap' },
+          { value: 'self_added', label: 'Self-added' },
+          { value: 'cold_inbound', label: 'Cold inbound' },
+        ];
+
+        const toggleStatusFilter = (v) => {
+          const s = new Set(crmStatusFilter.value);
+          s.has(v) ? s.delete(v) : s.add(v);
+          crmStatusFilter.value = s;
+        };
+        const toggleSourceFilter = (v) => {
+          const s = new Set(crmSourceFilter.value);
+          s.has(v) ? s.delete(v) : s.add(v);
+          crmSourceFilter.value = s;
+        };
+        const hasActiveCrmFilters = computed(() =>
+          crmStatusFilter.value.size > 0 || crmSourceFilter.value.size > 0 ||
+          crmSearch.value.trim() !== '' || crmNeedsAttentionOnly.value
+        );
+        const clearCrmFilters = () => {
+          crmStatusFilter.value = new Set();
+          crmSourceFilter.value = new Set();
+          crmSearch.value = '';
+          crmNeedsAttentionOnly.value = false;
+        };
+
+        const needsAttention = (row) => {
+          const stale = ['introduced', 'first_meeting_complete', 'follow_up_questions'];
+          if (stale.includes(row.status) && !row.nextActionDate) return true;
+          if (row.nextActionDate) {
+            const d = new Date(row.nextActionDate);
+            const now = new Date();
+            const diffDays = (d - now) / (1000 * 60 * 60 * 24);
+            if (diffDays < 0) return true; // overdue
+          }
+          return false;
+        };
+
+        const filteredCrmRows = computed(() => {
+          let rows = crmRows.value;
+          const q = crmSearch.value.trim().toLowerCase();
+          if (q) {
+            rows = rows.filter(r =>
+              (r.investorName || '').toLowerCase().includes(q) ||
+              (r.firm || '').toLowerCase().includes(q)
+            );
+          }
+          if (crmStatusFilter.value.size > 0) {
+            rows = rows.filter(r => crmStatusFilter.value.has(r.status));
+          }
+          if (crmSourceFilter.value.size > 0) {
+            rows = rows.filter(r => crmSourceFilter.value.has(r.source));
+          }
+          if (crmNeedsAttentionOnly.value) {
+            rows = rows.filter(needsAttention);
+          }
+          return rows;
+        });
+
+        const crmStats = computed(() => {
+          const active = crmRows.value.filter(r =>
+            ['intro_request_sent', 'introduced', 'first_meeting_complete', 'second_meeting_complete', 'follow_up_questions', 'self_outreach'].includes(r.status)
+          ).length;
+          const dueSoon = crmRows.value.filter(r => {
+            if (!r.nextActionDate) return false;
+            const days = (new Date(r.nextActionDate) - new Date()) / (1000 * 60 * 60 * 24);
+            return days <= 7;
+          }).length;
+          const selfAdded = crmRows.value.filter(r => r.source !== 'matcap').length;
+          const closed = crmRows.value.filter(r => ['passed', 'invested', 'ignored'].includes(r.status)).length;
+          return { active, dueSoon, selfAdded, closed };
+        });
+
+        const STATUS_LABELS = {
+          pending_suggestion: 'Pending',
+          intro_request_sent: 'Intro sent',
+          introduced: 'Introduced',
+          first_meeting_complete: 'Met',
+          second_meeting_complete: '2nd meeting',
+          follow_up_questions: 'Follow-up',
+          circle_back_round_opens: 'Circle back',
+          self_outreach: 'My outreach',
+          cold_inbound: 'Cold inbound',
+          passed: 'Passed',
+          ignored: 'Ignored',
+          invested: 'Invested',
+        };
+        const formatStatusLabel = (s) => STATUS_LABELS[s] || s;
+        const statusBadgeClass = (s) => {
+          const map = {
+            pending_suggestion: 'bg-gray-100 text-gray-700',
+            intro_request_sent: 'bg-blue-100 text-blue-700',
+            introduced: 'bg-indigo-100 text-indigo-700',
+            first_meeting_complete: 'bg-purple-100 text-purple-700',
+            second_meeting_complete: 'bg-purple-100 text-purple-700',
+            follow_up_questions: 'bg-amber-100 text-amber-700',
+            circle_back_round_opens: 'bg-amber-100 text-amber-700',
+            self_outreach: 'bg-cyan-100 text-cyan-700',
+            cold_inbound: 'bg-cyan-100 text-cyan-700',
+            passed: 'bg-gray-100 text-gray-500',
+            ignored: 'bg-gray-100 text-gray-500',
+            invested: 'bg-green-100 text-green-700',
+          };
+          return map[s] || 'bg-gray-100 text-gray-600';
+        };
+        const formatSourceLabel = (s) => ({
+          matcap: '🟢 MatCap',
+          self_added: '⚪ Self-added',
+          cold_inbound: '🟡 Cold inbound',
+        }[s] || s);
+        const sourceBadgeClass = (s) => ({
+          matcap: 'bg-green-50 text-green-700',
+          self_added: 'bg-gray-50 text-gray-700',
+          cold_inbound: 'bg-yellow-50 text-yellow-700',
+        }[s] || 'bg-gray-50 text-gray-600');
+
+        const formatRelativeDate = (iso) => {
+          if (!iso) return '—';
+          const d = new Date(iso);
+          const now = new Date();
+          const diffMs = now - d;
+          const diffDays = diffMs / (1000 * 60 * 60 * 24);
+          if (diffDays < 0) {
+            const future = -diffDays;
+            if (future < 1) return 'today';
+            if (future < 2) return 'tomorrow';
+            return `in ${Math.round(future)}d`;
+          }
+          if (diffDays < 1) return 'today';
+          if (diffDays < 2) return '1d ago';
+          if (diffDays < 7) return `${Math.round(diffDays)}d ago`;
+          if (diffDays < 30) return `${Math.round(diffDays / 7)}w ago`;
+          return `${Math.round(diffDays / 30)}mo ago`;
+        };
+        const dateClass = (iso) => {
+          if (!iso) return 'text-gray-400';
+          const days = (new Date(iso) - new Date()) / (1000 * 60 * 60 * 24);
+          if (days < 0) return 'text-red-600 font-medium';
+          if (days <= 3) return 'text-amber-600';
+          return 'text-gray-600';
+        };
+
+        const loadCrm = async () => {
+          if (!session.value) return;
+          crmLoading.value = true;
+          try {
+            const res = await fetch('/api/portal/crm/investor-crm', {
+              headers: { 'X-Session-Id': session.value.sessionId },
+            });
+            const data = await res.json();
+            crmRows.value = data.rows || [];
+          } catch (e) {
+            console.error('CRM load failed', e);
+          } finally {
+            crmLoading.value = false;
+          }
+        };
+
+        // Inline edit — save on blur. Maps field names between matcap_intro and self_record.
+        const saveCellEdit = async (row, field, value) => {
+          if (!session.value) return;
+          const cleaned = (value === '' || value === undefined) ? null : value;
+          // Optimistic local update so the UI doesn't flicker.
+          row[field] = cleaned;
+          const url = row.kind === 'matcap_intro'
+            ? `/api/portal/crm/intro-requests/${row.id}`
+            : `/api/portal/crm/founder-investor-records/${row.id}`;
+          const fieldMap = row.kind === 'matcap_intro'
+            ? {
+                nextActionText: 'founderNextActionText',
+                nextActionDate: 'founderNextActionDate',
+                checkSize: 'founderCheckSize',
+                founderNotes: 'founderOwnedNotes',
+              }
+            : {
+                nextActionText: 'nextActionText',
+                nextActionDate: 'nextActionDate',
+                checkSize: 'checkSize',
+                founderNotes: 'notes',
+              };
+          const apiField = fieldMap[field] || field;
+          await fetch(url, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Session-Id': session.value.sessionId,
+            },
+            body: JSON.stringify({ [apiField]: cleaned }),
+          });
+        };
+
+        // Add investor modal
+        const showAddInvestorModal = ref(false);
+        const addingInvestor = ref(false);
+        const addInvestorForm = reactive({ name: '', firm: '', role: '', email: '', source: 'self_added', notes: '' });
+        const openAddInvestorModal = () => {
+          Object.assign(addInvestorForm, { name: '', firm: '', role: '', email: '', source: 'self_added', notes: '' });
+          showAddInvestorModal.value = true;
+        };
+        const saveAddInvestor = async () => {
+          if (!session.value || addingInvestor.value || !addInvestorForm.name) return;
+          addingInvestor.value = true;
+          try {
+            await fetch('/api/portal/crm/founder-investor-records', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Id': session.value.sessionId,
+              },
+              body: JSON.stringify({
+                name: addInvestorForm.name,
+                firm: addInvestorForm.firm || null,
+                role: addInvestorForm.role || null,
+                email: addInvestorForm.email || null,
+                source: addInvestorForm.source,
+                notes: addInvestorForm.notes || null,
+              }),
+            });
+            showAddInvestorModal.value = false;
+            await loadCrm();
+          } catch (e) {
+            alert('Failed to add investor');
+          } finally {
+            addingInvestor.value = false;
+          }
+        };
+
+        // Row detail drawer + interaction timeline
+        const detailRow = ref(null);
+        const detailInteractions = ref([]);
+        const openRowDetail = async (row) => {
+          detailRow.value = row;
+          detailInteractions.value = [];
+          await loadInteractions(row);
+        };
+        const closeRowDetail = () => {
+          detailRow.value = null;
+          detailInteractions.value = [];
+        };
+        const loadInteractions = async (row) => {
+          if (!session.value) return;
+          const param = row.kind === 'matcap_intro'
+            ? `investorId=${row.kind === 'matcap_intro' ? '' : ''}`
+            : `recordId=${row.id}`;
+          // For matcap_intro we need investorId, which is on the source row.
+          // The API row doesn't expose investorId directly, so use intro request id mapping:
+          // simplest path is to scope by the joined investor — but our row only has the intro id.
+          // For now, just load by record id for self_record. MatCap intros: we'd need a per-intro lookup.
+          // TODO(PR3): expose investorId on the row payload so the timeline filter is per-investor.
+          let url = '';
+          if (row.kind === 'self_record') {
+            url = `/api/portal/crm/investor-interactions?recordId=${row.id}`;
+          } else {
+            // No-op for now; we don't have investorId on the row. Just show empty timeline.
+            return;
+          }
+          const res = await fetch(url, {
+            headers: { 'X-Session-Id': session.value.sessionId },
+          });
+          const data = await res.json();
+          detailInteractions.value = data.interactions || [];
+        };
+
+        // Log interaction
+        const showInteractionModal = ref(false);
+        const loggingInteraction = ref(false);
+        const interactionForm = reactive({ interactionType: 'meeting', occurredAt: '', content: '' });
+        const openInteractionModal = (type) => {
+          interactionForm.interactionType = type;
+          interactionForm.occurredAt = new Date().toISOString().split('T')[0];
+          interactionForm.content = '';
+          showInteractionModal.value = true;
+        };
+        const submitInteraction = async () => {
+          if (!session.value || loggingInteraction.value || !detailRow.value) return;
+          loggingInteraction.value = true;
+          try {
+            const body = {
+              interactionType: interactionForm.interactionType,
+              occurredAt: interactionForm.occurredAt,
+              content: interactionForm.content || null,
+            };
+            if (detailRow.value.kind === 'self_record') {
+              body.founderInvestorRecordId = detailRow.value.id;
+            } else {
+              // matcap_intro — we don't currently have investorId on the row payload.
+              // PR 3 will add it. For now, allow logging only on self_record rows.
+              alert('Logging on MatCap intros lands in PR 3 — for now, use the My Intros tab to update status.');
+              loggingInteraction.value = false;
+              showInteractionModal.value = false;
+              return;
+            }
+            await fetch('/api/portal/crm/investor-interactions', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Session-Id': session.value.sessionId,
+              },
+              body: JSON.stringify(body),
+            });
+            showInteractionModal.value = false;
+            await loadInteractions(detailRow.value);
+            await loadCrm();
+          } catch (e) {
+            alert('Failed to log interaction');
+          } finally {
+            loggingInteraction.value = false;
+          }
+        };
+
+        const deleteSelfRecord = async () => {
+          if (!session.value || !detailRow.value || detailRow.value.kind !== 'self_record') return;
+          if (!confirm('Delete this investor from your pipeline? Interactions logged for them will also be removed.')) return;
+          await fetch(`/api/portal/crm/founder-investor-records/${detailRow.value.id}`, {
+            method: 'DELETE',
+            headers: { 'X-Session-Id': session.value.sessionId },
+          });
+          closeRowDetail();
+          await loadCrm();
+        };
+
+        // Load CRM whenever Pipeline tab becomes active (or on first session load).
+        watch(activeTab, (t) => { if (t === 'pipeline') loadCrm(); });
 
         // Filters
         const investorSearch = ref('');
@@ -958,6 +1530,7 @@
           availableInvestors.value = await api('/portal/available-investors') || [];
           myIntros.value = await api('/portal/my-intros') || [];
           nodesData.value = await api('/portal/nodes') || { workingWith: [], available: [] };
+          loadCrm();
           loadOnboarding(true); // Set tab to onboarding if active
         };
 
@@ -1285,6 +1858,17 @@
           showIntroDetail, submitIntroUpdate, showTaskAction,
           toggleFounderFilter, clearFounderFilters, toggleResearchExpand,
           truncateText, extractFounderPrefs,
+          // Pipeline / CRM
+          crmRows, crmLoading, crmSearch, crmStatusFilter, crmSourceFilter, crmNeedsAttentionOnly,
+          crmStatusFilterOptions, crmSourceFilterOptions, toggleStatusFilter, toggleSourceFilter,
+          hasActiveCrmFilters, clearCrmFilters, needsAttention,
+          filteredCrmRows, crmStats,
+          formatStatusLabel, statusBadgeClass, formatSourceLabel, sourceBadgeClass,
+          formatRelativeDate, dateClass, saveCellEdit,
+          showAddInvestorModal, addingInvestor, addInvestorForm, openAddInvestorModal, saveAddInvestor,
+          detailRow, detailInteractions, openRowDetail, closeRowDetail,
+          showInteractionModal, loggingInteraction, interactionForm, openInteractionModal, submitInteraction,
+          deleteSelfRecord,
           // Onboarding
           onboarding, entityForm,
           showNotIncorporatedOptions, incorporationPath, selectedPartner,

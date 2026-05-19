@@ -744,12 +744,24 @@ export async function generateMatchSuggestions(
     existingSuggestions.map(s => s.investorId)
   );
 
-  // Count intros in last 7 days per founder — only those actually sent (or
+  // Count intros this calendar week per founder — only those actually sent (or
   // beyond). Pending_suggestion rows are agent-generated proposals that
   // haven't been approved/sent yet; counting them against the weekly quota
   // would let unreviewed drafts block new generation. Drafts age out via
   // discard/reject/mark-sent, not via "quota use."
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  //
+  // Week boundary is Monday 00:00 UTC — matches marketplace-health.ts and
+  // weekly-digest.ts (the rest of the codebase already uses Monday-UTC).
+  // Was a rolling 7-day window, which on Monday mornings counted the entire
+  // previous week and made every founder look at-cap.
+  const weekStart = (() => {
+    const d = new Date();
+    const day = d.getUTCDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+    const daysFromMonday = day === 0 ? 6 : day - 1;
+    d.setUTCDate(d.getUTCDate() - daysFromMonday);
+    d.setUTCHours(0, 0, 0, 0);
+    return d.getTime();
+  })();
   const SENT_OR_PROGRESSED_STATUSES = new Set([
     'intro_request_sent', 'introduced', 'first_meeting_complete',
     'second_meeting_complete', 'invested', 'follow_up_questions',
@@ -758,7 +770,7 @@ export async function generateMatchSuggestions(
   const weeklyIntroCount = new Map<number, number>();
   for (const ir of data.allIntroRequests) {
     if (!ir.createdAt) continue;
-    if (new Date(ir.createdAt).getTime() <= sevenDaysAgo) continue;
+    if (new Date(ir.createdAt).getTime() < weekStart) continue;
     if (!SENT_OR_PROGRESSED_STATUSES.has(ir.status)) continue;
     weeklyIntroCount.set(ir.founderId, (weeklyIntroCount.get(ir.founderId) || 0) + 1);
   }

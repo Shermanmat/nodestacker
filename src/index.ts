@@ -945,6 +945,7 @@ app.get('/case-studies/othersideai', serveStatic({ path: './public/case-studies/
 app.get('/case-studies/kalendar-ai', serveStatic({ path: './public/case-studies/kalendar-ai.html' }));
 app.get('/case-studies/stealth-vertical-ai', serveStatic({ path: './public/case-studies/stealth-vertical-ai.html' }));
 app.get('/case-studies/stealth-proptech', serveStatic({ path: './public/case-studies/stealth-proptech.html' }));
+app.get('/case-studies/stealth-300k', serveStatic({ path: './public/case-studies/stealth-300k.html' }));
 
 // Admin dashboard - serve with no-cache headers to prevent proxy caching
 const serveAdminHtml = async (c: any) => {

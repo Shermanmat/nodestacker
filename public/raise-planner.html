@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raise Planner — MatCap</title>
+  <meta name="description" content="Plan your raise. See dilution across this round + Series A, with option pool refresh, founder splits, and exit payoff.">
+  <meta property="og:title" content="Raise Planner — MatCap">
+  <meta property="og:description" content="Plan your raise across this round + Series A. See dilution, option pool impact, and your exit payoff.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#FFFFFF;--bg-alt:#F5F5F5;--bg-alt2:#FAFAFA;--text:#000;--muted:#555;
+      --accent:#00C2E0;--accent-dim:rgba(0,194,224,.12);--rule:#e5e5e5;
+      --founder:#00C2E0;--founder-2:#0AA3BD;--founder-3:#067E92;--founder-4:#045865;
+      --inv-seed:#222;--inv-a:#555;--pool:#bbb;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+    a{color:inherit}
+
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#000;color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid #333;padding-left:14px}
+    nav.topnav .links{display:flex;gap:28px;align-items:center}
+    nav.topnav .links a{color:#fff;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{background:var(--accent);color:#000;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:#fff;color:#000}
+    @media (max-width:720px){nav.topnav .links a:not(.btn){display:none}}
+
+    .inner{max-width:1080px;margin:0 auto;padding:0 24px}
+    .narrow{max-width:760px;margin:0 auto;padding:0 24px}
+
+    .hero{padding:140px 0 40px}
+    .kicker{font-family:'Bebas Neue',sans-serif;letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px}
+    .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,7vw,84px);line-height:.95;letter-spacing:2px;margin-bottom:22px}
+    .hero h1 .accent{color:var(--accent)}
+    .hero p{font-size:clamp(16px,1.4vw,19px);max-width:720px;color:#222}
+
+    section.section{padding:24px 0}
+    .card{background:#fff;border:1px solid var(--rule);padding:32px;margin-bottom:24px}
+    @media (max-width:640px){.card{padding:22px}}
+
+    .card-title{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:22px;margin-bottom:18px;display:flex;align-items:center;gap:10px}
+    .card-title .num{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;background:#000;color:#fff;font-family:'Inter',sans-serif;font-size:14px;font-weight:700;border-radius:50%}
+    .card-sub{font-size:13px;color:var(--muted);margin-bottom:18px;margin-top:-8px}
+
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+    @media (max-width:640px){.grid-2{grid-template-columns:1fr;gap:14px}}
+
+    .field{display:flex;flex-direction:column;gap:5px}
+    .field label{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:12px;color:#000;display:flex;align-items:center;gap:8px}
+    .field .input-wrap{position:relative;display:flex;align-items:center;border:2px solid var(--rule);background:#fff}
+    .field .input-wrap:focus-within{border-color:#000}
+    .field .prefix,.field .suffix{font-size:18px;font-weight:600;color:#999;padding:0 12px;user-select:none}
+    .field .prefix{border-right:1px solid var(--rule)}
+    .field .suffix{border-left:1px solid var(--rule)}
+    .field input{flex:1;border:none;outline:none;background:transparent;font-family:'Inter',sans-serif;font-size:18px;font-weight:600;padding:11px 10px;width:100%;min-width:0;color:#000}
+    .field input::placeholder{color:#bbb;font-weight:500}
+    .field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+    .field .hint{font-size:11px;color:var(--muted);min-height:14px}
+
+    /* Tooltip */
+    .info{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:#000;color:#fff;font-size:9px;font-weight:700;cursor:help;position:relative}
+    .info .pop{position:absolute;left:50%;top:140%;transform:translateX(-50%);background:#000;color:#fff;font-family:'Inter',sans-serif;font-weight:400;letter-spacing:0;font-size:12px;line-height:1.5;padding:10px 12px;width:240px;text-align:left;z-index:50;opacity:0;pointer-events:none;transition:opacity .15s ease;text-transform:none}
+    .info:hover .pop,.info:focus .pop{opacity:1;pointer-events:auto}
+    .info .pop::before{content:'';position:absolute;left:50%;top:-6px;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#000;border-top:none}
+
+    /* Founder rows */
+    .founders{display:flex;flex-direction:column;gap:10px;margin-bottom:8px}
+    .founder-row{display:grid;grid-template-columns:1fr 120px 32px;gap:8px;align-items:center}
+    @media (max-width:520px){.founder-row{grid-template-columns:1fr 100px 28px}}
+    .founder-row input.name{border:2px solid var(--rule);padding:10px 12px;font-size:15px;font-family:'Inter',sans-serif;font-weight:500;outline:none}
+    .founder-row input.name:focus{border-color:#000}
+    .founder-row .pct-wrap{display:flex;align-items:center;border:2px solid var(--rule)}
+    .founder-row .pct-wrap input{flex:1;border:none;outline:none;font-family:'Inter',sans-serif;font-size:15px;font-weight:600;padding:10px 10px;width:100%;min-width:0;text-align:right}
+    .founder-row .pct-wrap .suffix{font-size:14px;color:#999;padding:0 10px;border-left:1px solid var(--rule)}
+    .founder-row .pct-wrap:focus-within{border-color:#000}
+    .founder-row .remove{background:transparent;border:1px solid var(--rule);width:32px;height:32px;cursor:pointer;color:#999;font-size:18px;line-height:1}
+    .founder-row .remove:hover{border-color:#000;color:#000}
+    .founder-row.dot-1 .name{border-left:6px solid var(--founder)}
+    .founder-row.dot-2 .name{border-left:6px solid var(--founder-2)}
+    .founder-row.dot-3 .name{border-left:6px solid var(--founder-3)}
+    .founder-row.dot-4 .name{border-left:6px solid var(--founder-4)}
+
+    .add-founder{background:transparent;border:1px dashed var(--rule);padding:10px 14px;cursor:pointer;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;color:#666;text-transform:uppercase;letter-spacing:1.5px;width:100%}
+    .add-founder:hover{border-color:#000;color:#000}
+
+    .founder-sum{font-size:12px;color:var(--muted);margin-top:6px;font-weight:600}
+    .founder-sum.warn{color:#c44}
+
+    /* Stacked bars */
+    .timeline{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:24px}
+    @media (max-width:640px){.timeline{grid-template-columns:1fr;gap:14px}}
+    .stage{display:flex;flex-direction:column;gap:8px}
+    .stage .label{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:13px;color:#000}
+    .stage .sublabel{font-size:11px;color:var(--muted);margin-top:-4px}
+    .stage .bar{display:flex;height:32px;border:1px solid var(--rule);overflow:hidden;font-family:'Inter',sans-serif;font-size:10px;font-weight:700}
+    .stage .bar .seg{display:flex;align-items:center;justify-content:center;color:#fff;text-overflow:ellipsis;white-space:nowrap;overflow:hidden;padding:0 4px;min-width:0}
+    .stage .bar .seg.dark{color:#fff}
+    .stage .bar .seg.light{color:#000}
+
+    table.cap{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
+    table.cap th,table.cap td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--rule)}
+    table.cap th:first-child,table.cap td:first-child{text-align:left}
+    table.cap th{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:11px;color:#000;background:var(--bg-alt2)}
+    table.cap td.label-cell{font-weight:600}
+    table.cap td .swatch{display:inline-block;width:9px;height:9px;margin-right:8px;vertical-align:middle;border-radius:1px}
+    table.cap tr.subtotal td{font-weight:700;background:#fafafa}
+
+    /* Exit slider */
+    .slider-wrap{margin-top:14px}
+    .slider-value{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,5vw,60px);color:var(--accent);line-height:1;letter-spacing:1px;margin-bottom:4px}
+    .slider-value .sub{font-size:14px;color:var(--muted);font-family:'Inter',sans-serif;letter-spacing:0;font-weight:500;display:block;margin-top:6px}
+    input[type=range]{width:100%;-webkit-appearance:none;appearance:none;background:transparent;cursor:pointer}
+    input[type=range]::-webkit-slider-runnable-track{height:4px;background:#000;border-radius:2px}
+    input[type=range]::-moz-range-track{height:4px;background:#000;border-radius:2px}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;height:22px;width:22px;border-radius:50%;background:var(--accent);margin-top:-9px;border:2px solid #000;cursor:grab}
+    input[type=range]::-moz-range-thumb{height:22px;width:22px;border-radius:50%;background:var(--accent);border:2px solid #000;cursor:grab}
+    .slider-bounds{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:6px;font-weight:600}
+
+    .payout-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(180px,1fr));gap:12px;margin-top:22px}
+    .payout-card{border:1px solid var(--rule);padding:18px;background:#fff}
+    .payout-card .who{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:13px;display:flex;align-items:center;gap:6px}
+    .payout-card .who .dot{width:9px;height:9px;border-radius:1px;display:inline-block}
+    .payout-card .pct{font-size:11px;color:var(--muted);margin-top:2px}
+    .payout-card .amt{font-family:'Bebas Neue',sans-serif;font-size:30px;color:#000;margin-top:8px;line-height:1}
+    .payout-card.founder .amt{color:var(--accent)}
+
+    /* Plain-English summary */
+    .summary{background:#000;color:#fff;padding:28px;margin-top:4px}
+    .summary p{font-size:15px;line-height:1.7;color:#ddd}
+    .summary p strong{color:var(--accent);font-weight:600}
+
+    /* Education */
+    details.edu{border:1px solid var(--rule);padding:16px 20px;margin-bottom:10px;background:#fff}
+    details.edu summary{cursor:pointer;font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:15px;list-style:none;display:flex;align-items:center;justify-content:space-between}
+    details.edu summary::-webkit-details-marker{display:none}
+    details.edu summary::after{content:'+';font-size:24px;font-weight:300;color:#999}
+    details.edu[open] summary::after{content:'−'}
+    details.edu .body{padding-top:14px;font-size:14px;color:#333;line-height:1.7}
+    details.edu .body p{margin-bottom:10px}
+
+    .footer-cta{background:#000;color:#fff;padding:80px 0;text-align:center;margin-top:60px}
+    .footer-cta h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4.5vw,52px);letter-spacing:2px;margin-bottom:14px;line-height:1}
+    .footer-cta h2 .accent{color:var(--accent)}
+    .footer-cta p{color:#bbb;font-size:16px;max-width:560px;margin:0 auto 24px}
+    .footer-cta a.btn{display:inline-block;background:var(--accent);color:#000;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:2px;padding:14px 28px;text-decoration:none}
+    .footer-cta a.btn:hover{background:#fff}
+
+    footer{padding:30px 0;border-top:1px solid var(--rule);color:var(--muted);font-size:13px;text-align:center}
+    footer a{color:var(--muted);text-decoration:none;margin:0 10px}
+    footer a:hover{color:#000}
+
+    .disclaimer{font-size:11px;color:#999;margin-top:14px;line-height:1.5;font-style:italic}
+  
+    /* Tools dropdown (added by add-tools-nav script) */
+    .tools-dd{position:relative;display:inline-block}
+    .tools-dd > a.tools-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
+    .tools-dd > a.tools-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+    .tools-dd .tools-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:220px;padding:6px 0;display:none;z-index:200;margin-top:0}
+    .tools-dd:hover .tools-menu,.tools-dd.open .tools-menu{display:block}
+    .tools-dd .tools-menu a{display:block!important;padding:12px 18px!important;color:#fff!important;font-size:12px!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-decoration:none;background:transparent!important;border:none!important}
+    .tools-dd .tools-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}
+
+    /* Case Studies dropdown (cs-dd; reuses tools-menu visuals) */
+    .cs-dd{position:relative;display:inline-block}
+    .cs-dd > a.cs-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
+    .cs-dd > a.cs-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+    .cs-dd .cs-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:260px;padding:6px 0;display:none;z-index:200;margin-top:0}
+    .cs-dd:hover .cs-menu,.cs-dd.open .cs-menu{display:block}
+    .cs-dd .cs-menu a{display:flex!important;justify-content:space-between!important;align-items:center;gap:14px;padding:10px 18px!important;color:#fff!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-decoration:none;background:transparent!important;border:none!important}
+    .cs-dd .cs-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}
+    .cs-dd .cs-menu a .raise{color:var(--accent,#00C2E0);font-weight:700}
+    .cs-dd .cs-menu a.view-all{border-top:1px solid #333;margin-top:4px;padding-top:12px!important;color:var(--accent,#00C2E0)!important;font-weight:700;justify-content:center!important}
+    .cs-dd .cs-menu a.view-all:hover{background:transparent!important;color:#fff!important}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="/">
+    <img src="/matcap-logo.png" alt="MatCap" onerror="this.style.display='none'">
+    <span class="tag">RAISE PLANNER</span>
+  </a>
+  <div class="links">
+        <div class="tools-dd">
+      <a href="#" class="tools-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Tools</a>
+      <div class="tools-menu">
+        <a href="/equity-calculator">Equity Calculator</a>
+        <a href="/raise-planner">Raise Planner</a>
+      </div>
+    </div>
+    <div class="cs-dd">
+      <a href="#" class="cs-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Case Studies</a>
+      <div class="cs-menu">
+        <a href="/case-studies/stealth-vertical-ai"><span>Stealth · Vertical AI</span><span class="raise">$1.5M</span></a>
+        <a href="/case-studies/stealth-proptech"><span>Stealth · PropTech</span><span class="raise">$600K</span></a>
+        <a href="/case-studies/stealth-300k"><span>Stealth · Verdict</span><span class="raise">$300K</span></a>
+        <a href="/case-studies" class="view-all">View all →</a>
+      </div>
+    </div>
+    
+    <a href="/equity-calculator">Equity calc</a>
+    <a href="/" class="btn">Apply</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="inner">
+    <div class="kicker">FOUNDER TOOL</div>
+    <h1>Plan your <span class="accent">raise</span>.</h1>
+    <p>See what this round means two rounds from now. Dilution across this round + Series A, with option pool, founder splits, and your exit payoff.</p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="inner">
+
+    <!-- Setup -->
+    <div class="card">
+      <div class="card-title"><span class="num">1</span> Founders</div>
+      <div class="card-sub">Who's on the cap table today, and what % each owns.</div>
+
+      <div class="founders" id="founders"></div>
+      <div class="founder-sum" id="founder-sum"></div>
+      <button class="add-founder" id="add-founder" type="button">+ Add founder</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="num">2</span> This round</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Raise amount</label>
+          <div class="input-wrap"><span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="r1-raise" value="2,000,000"></div>
+          <div class="hint">How much you're raising now.</div>
+        </div>
+        <div class="field">
+          <label>Post-money valuation</label>
+          <div class="input-wrap"><span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="r1-post" value="10,000,000"></div>
+          <div class="hint">Pre-money + this raise.</div>
+        </div>
+        <div class="field">
+          <label>
+            Option pool target
+            <span class="info" tabindex="0">?<span class="pop">A pool is created in the pre-money before investors come in, so existing shareholders (you) bear the dilution — not the new investor. At pre-seed, most rounds skip this; the pool usually gets carved out at Series A.</span></span>
+          </label>
+          <div class="input-wrap">
+            <input type="text" inputmode="decimal" id="r1-pool" value="0">
+            <span class="suffix">%</span></div>
+          <div class="hint">Less common at pre-seed — that's why this defaults to 0. Bump to 5–10% if your lead requires one.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="num">3</span> Series A (estimated)</div>
+      <div class="card-sub">Your best guess at the next round, 18–24 months out. A common rule: 3× the post-money of this round and ~$5–8M raise.</div>
+      <div class="grid-2">
+        <div class="field">
+          <label>Raise amount</label>
+          <div class="input-wrap"><span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="r2-raise" value="6,000,000"></div>
+          <div class="hint">Typical Series A: $4M–$15M.</div>
+        </div>
+        <div class="field">
+          <label>Post-money valuation</label>
+          <div class="input-wrap"><span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="r2-post" value="30,000,000"></div>
+          <div class="hint">3× rule of thumb means $30M off a $10M post-seed.</div>
+        </div>
+        <div class="field">
+          <label>
+            Option pool top-up
+            <span class="info" tabindex="0">?<span class="pop">Series A investors usually want the pool at 10–15% of post-money. The top-up dilutes existing shareholders again.</span></span>
+          </label>
+          <div class="input-wrap">
+            <input type="text" inputmode="decimal" id="r2-pool" value="10">
+            <span class="suffix">%</span></div>
+          <div class="hint">Usually 10–15% post-money.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cap table evolution -->
+    <div class="card">
+      <div class="card-title">Cap table over time</div>
+      <div class="card-sub">How ownership shifts at each round.</div>
+
+      <div class="timeline">
+        <div class="stage">
+          <div class="label">Today</div>
+          <div class="sublabel">Before this round</div>
+          <div class="bar" id="bar-0"></div>
+        </div>
+        <div class="stage">
+          <div class="label">After this round</div>
+          <div class="sublabel" id="r1-sublabel">$2M @ $10M post</div>
+          <div class="bar" id="bar-1"></div>
+        </div>
+        <div class="stage">
+          <div class="label">After Series A</div>
+          <div class="sublabel" id="r2-sublabel">$6M @ $30M post</div>
+          <div class="bar" id="bar-2"></div>
+        </div>
+      </div>
+
+      <table class="cap">
+        <thead>
+          <tr>
+            <th>Holder</th>
+            <th>Today</th>
+            <th>After this round</th>
+            <th>After Series A</th>
+          </tr>
+        </thead>
+        <tbody id="cap-tbody"></tbody>
+      </table>
+
+      <div class="summary" id="summary"></div>
+    </div>
+
+    <!-- Exit payoff -->
+    <div class="card">
+      <div class="card-title">If you exit at…</div>
+      <div class="card-sub">Slide to see what each holder walks away with.</div>
+
+      <div class="slider-value">
+        <span id="exit-display">$200M</span>
+        <span class="sub">Exit valuation (gross, before fees & taxes)</span>
+      </div>
+
+      <div class="slider-wrap">
+        <input type="range" id="exit-slider" min="10000000" max="2000000000" step="10000000" value="200000000">
+        <div class="slider-bounds">
+          <span>$10M</span><span>$500M</span><span>$1B</span><span>$2B</span>
+        </div>
+      </div>
+
+      <div class="payout-grid" id="payout-grid"></div>
+      <div class="disclaimer">
+        Simplification: assumes 1× non-participating preferred (everyone converts to common at exit). Real outcomes depend on liquidation preferences, debt, taxes, and the terms of each round.
+      </div>
+    </div>
+
+    <!-- Education -->
+    <div class="card">
+      <div class="card-title">How this works</div>
+
+      <details class="edu">
+        <summary>What is dilution, exactly?</summary>
+        <div class="body">
+          <p>When new investors put money in, the company issues *new* shares to them. Your share count stays the same — but the total share count goes up. So your **%** of the company drops, even though your share count is unchanged.</p>
+          <p>Example: you own 100 shares of 100 total = 100%. Investor buys 25 new shares. Now there are 125 total. You still own 100, but that's 80% of the company.</p>
+        </div>
+      </details>
+
+      <details class="edu">
+        <summary>Why does the option pool dilute me, not the new investor?</summary>
+        <div class="body">
+          <p>This is the trick most first-time founders miss. When investors agree to a "10% pool", that pool is created **in the pre-money** — *before* the investor's dollars hit the cap table.</p>
+          <p>That means existing shareholders (you) get diluted by the pool. The new investor still gets exactly their % of post-money. Net effect: a 10% pool on a $10M post is paid for entirely by the founders.</p>
+          <p>You can negotiate this. Smaller pool = less founder dilution. But you'll need to top it back up at the next round.</p>
+        </div>
+      </details>
+
+      <details class="edu">
+        <summary>What's a healthy markup between rounds?</summary>
+        <div class="body">
+          <p>Rough rule of thumb: <strong>3× the post-money of the prior round</strong>. So a $10M post-seed should lead to ~$30M Series A.</p>
+          <p>2× is a soft round. 1× is a flat round (you might still get done but it signals trouble). Below 1× is a down round and usually triggers anti-dilution clauses that make things worse.</p>
+          <p>The "right" raise amount is roughly 20–25% dilution per round. Above 30% and you're giving up too much; below 15% and you're probably leaving capital on the table.</p>
+        </div>
+      </details>
+
+      <details class="edu">
+        <summary>What about liquidation preferences?</summary>
+        <div class="body">
+          <p>Preferred shares (what investors get) usually have a 1× liquidation preference: at exit, they get their money back before common shareholders see a dime.</p>
+          <p>At a healthy exit (say, 5× the last valuation), this rarely matters — everyone converts to common and takes their share. But at a low exit, preferences can mean founders walk away with much less than the simple % math suggests.</p>
+          <p>This tool assumes everyone converts to common (the "good exit" case). Don't take it as gospel for a fire sale.</p>
+        </div>
+      </details>
+
+      <details class="edu">
+        <summary>Why two rounds and not more?</summary>
+        <div class="body">
+          <p>Beyond Series A, the model gets fuzzy. Series B valuations depend on metrics you don't have yet. Adding more rounds compounds assumptions until the numbers tell you nothing.</p>
+          <p>Two rounds is enough to answer the real question: <strong>is this round the right size given what's coming next?</strong></p>
+        </div>
+      </details>
+    </div>
+
+  </div>
+</section>
+
+<section class="footer-cta">
+  <div class="inner">
+    <h2>Now go <span class="accent">raise it</span>.</h2>
+    <p>MatCap is a social network for fundraising — warm intros to top investors, founder dinners, real community. Stay in your city. Raise like you didn't have to.</p>
+    <a href="/" class="btn">Apply to MatCap</a>
+  </div>
+</section>
+
+<footer>
+  <div class="inner">
+    <a href="/">Home</a>
+    <a href="/equity-calculator">Equity calculator</a>
+    <div style="margin-top:10px">© 2026 MatCap</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  // ----- State -----
+  let founders = [
+    { name: 'Founder 1', pct: 100 },
+  ];
+  const founderColors = ['var(--founder)','var(--founder-2)','var(--founder-3)','var(--founder-4)'];
+
+  // ----- Number helpers -----
+  function parseNumber(str){
+    if (str === null || str === undefined) return null;
+    const cleaned = String(str).replace(/[,$\s%]/g,'').trim();
+    if (cleaned === '') return null;
+    const n = Number(cleaned);
+    return Number.isFinite(n) ? n : null;
+  }
+  function formatMoney(n){
+    if (n === null || !Number.isFinite(n)) return '$0';
+    const r = Math.round(n);
+    if (Math.abs(r) >= 1e9) return '$' + (r/1e9).toFixed(2).replace(/\.0+$/,'') + 'B';
+    if (Math.abs(r) >= 1e6) return '$' + (r/1e6).toFixed(2).replace(/\.0+$/,'') + 'M';
+    if (Math.abs(r) >= 1e3) return '$' + (r/1e3).toFixed(0) + 'K';
+    return '$' + r.toLocaleString('en-US');
+  }
+  function formatFull(n){
+    if (n === null || !Number.isFinite(n)) return '$0';
+    return '$' + Math.round(n).toLocaleString('en-US');
+  }
+  function pct(n){ return (n*100).toFixed(1) + '%'; }
+
+  // ----- Render founder rows -----
+  const foundersEl = document.getElementById('founders');
+  const founderSumEl = document.getElementById('founder-sum');
+
+  function renderFounders(){
+    foundersEl.innerHTML = '';
+    founders.forEach((f, idx) => {
+      const row = document.createElement('div');
+      row.className = 'founder-row dot-' + ((idx % 4) + 1);
+      row.innerHTML = `
+        <input class="name" type="text" value="${escapeHtml(f.name)}" data-idx="${idx}" data-k="name" placeholder="Founder name">
+        <div class="pct-wrap">
+          <input type="text" inputmode="decimal" value="${f.pct}" data-idx="${idx}" data-k="pct">
+          <span class="suffix">%</span>
+        </div>
+        <button class="remove" data-rm="${idx}" type="button" ${founders.length===1?'disabled style="opacity:.3;cursor:not-allowed"':''}>×</button>
+      `;
+      foundersEl.appendChild(row);
+    });
+
+    foundersEl.querySelectorAll('input').forEach(input => {
+      input.addEventListener('input', e => {
+        const idx = +e.target.dataset.idx, k = e.target.dataset.k;
+        if (k === 'name') {
+          founders[idx].name = e.target.value;
+        } else {
+          const newVal = Math.max(0, Math.min(100, parseNumber(e.target.value) || 0));
+          founders[idx].pct = newVal;
+          // Only auto-rebalance with exactly 2 founders. With 3+, every keystroke
+          // would fight the user trying to enter intentional splits like 50/30/20 —
+          // let them type freely and rely on the "Total: X%" warning to nudge.
+          if (founders.length === 2) {
+            const otherIdx = idx === 0 ? 1 : 0;
+            founders[otherIdx].pct = +(100 - newVal).toFixed(2);
+            const otherInput = foundersEl.querySelector(`input[data-k="pct"][data-idx="${otherIdx}"]`);
+            if (otherInput) otherInput.value = founders[otherIdx].pct;
+          }
+        }
+        updateFounderSum();
+        recalc();
+      });
+    });
+    foundersEl.querySelectorAll('.remove').forEach(btn => {
+      btn.addEventListener('click', e => {
+        if (founders.length === 1) return;
+        const idx = +e.target.dataset.rm;
+        founders.splice(idx, 1);
+        // Renormalize remaining founders to 100%
+        const sum = founders.reduce((s,f) => s + f.pct, 0);
+        if (sum > 0) {
+          founders.forEach(f => { f.pct = +(f.pct / sum * 100).toFixed(2); });
+        } else {
+          const each = +(100 / founders.length).toFixed(2);
+          founders.forEach(f => { f.pct = each; });
+        }
+        renderFounders();
+        updateFounderSum();
+        recalc();
+      });
+    });
+    updateFounderSum();
+  }
+
+  function updateFounderSum(){
+    const total = founders.reduce((s,f) => s + (f.pct || 0), 0);
+    const rounded = Math.round(total*100)/100;
+    if (Math.abs(rounded - 100) < 0.1) {
+      founderSumEl.textContent = 'Total: 100%';
+      founderSumEl.classList.remove('warn');
+    } else {
+      founderSumEl.textContent = `Total: ${rounded}% (should sum to 100%)`;
+      founderSumEl.classList.add('warn');
+    }
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  document.getElementById('add-founder').addEventListener('click', () => {
+    if (founders.length >= 4) return;
+    // When adding a founder, default their % to a sensible split
+    const n = founders.length + 1;
+    const each = 100 / n;
+    founders.forEach(f => f.pct = +(each).toFixed(2));
+    founders.push({ name: `Founder ${n}`, pct: +(each).toFixed(2) });
+    renderFounders();
+    recalc();
+  });
+
+  // ----- Number inputs -----
+  const moneyInputs = ['r1-raise','r1-post','r2-raise','r2-post'];
+  moneyInputs.forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', () => recalc());
+    el.addEventListener('blur', () => {
+      const n = parseNumber(el.value);
+      if (n !== null) el.value = Math.round(n).toLocaleString('en-US');
+    });
+  });
+  ['r1-pool','r2-pool'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => recalc());
+  });
+
+  // ----- Cap table math -----
+  // Apply a round: pool refresh to T of post-money + new investor at R/P.
+  // Existing non-pool holders share what's left, pro-rata.
+  function applyRound(holders, raise, post, poolTarget, investorLabel, poolColor, investorColor){
+    if (!(raise > 0) || !(post > 0) || raise >= post) return null;
+    const invPct = raise / post;
+    const remaining = 1 - invPct - poolTarget;
+    if (remaining < 0) return null;
+    const nonPool = holders.filter(h => h.type !== 'pool');
+    const nonPoolSum = nonPool.reduce((s,h) => s + h.pct, 0);
+    if (nonPoolSum <= 0) return null;
+    const factor = remaining / nonPoolSum;
+    const next = nonPool.map(h => ({ ...h, pct: h.pct * factor }));
+    next.push({ name: 'Option pool', pct: poolTarget, type: 'pool', color: poolColor });
+    next.push({ name: investorLabel, pct: invPct, type: 'investor', color: investorColor });
+    return next;
+  }
+
+  function recalc(){
+    const r1Raise = parseNumber(document.getElementById('r1-raise').value);
+    const r1Post = parseNumber(document.getElementById('r1-post').value);
+    const r1Pool = (parseNumber(document.getElementById('r1-pool').value) || 0) / 100;
+    const r2Raise = parseNumber(document.getElementById('r2-raise').value);
+    const r2Post = parseNumber(document.getElementById('r2-post').value);
+    const r2Pool = (parseNumber(document.getElementById('r2-pool').value) || 0) / 100;
+
+    document.getElementById('r1-sublabel').textContent = `${formatMoney(r1Raise)} @ ${formatMoney(r1Post)} post`;
+    document.getElementById('r2-sublabel').textContent = `${formatMoney(r2Raise)} @ ${formatMoney(r2Post)} post`;
+
+    // Stage 0: just founders, normalized to 100%
+    const founderSum = founders.reduce((s,f) => s + (f.pct || 0), 0) || 1;
+    const stage0 = founders.map((f, idx) => ({
+      name: f.name || `Founder ${idx+1}`,
+      pct: (f.pct || 0) / founderSum,
+      type: 'founder',
+      color: founderColors[idx % 4],
+      founderIdx: idx,
+    }));
+
+    const stage1 = applyRound(stage0, r1Raise, r1Post, r1Pool, 'This-round investor', 'var(--pool)', 'var(--inv-seed)') || stage0;
+    const stage2 = applyRound(stage1, r2Raise, r2Post, r2Pool, 'Series A investor', 'var(--pool)', 'var(--inv-a)') || stage1;
+
+    renderBars(stage0, stage1, stage2);
+    renderTable(stage0, stage1, stage2);
+    renderSummary(stage0, stage1, stage2, { r1Raise, r1Post, r2Raise, r2Post });
+    renderPayout(stage2);
+  }
+
+  function renderBars(s0, s1, s2){
+    [['bar-0', s0], ['bar-1', s1], ['bar-2', s2]].forEach(([id, st]) => {
+      const el = document.getElementById(id);
+      el.innerHTML = '';
+      st.forEach(h => {
+        const seg = document.createElement('div');
+        seg.className = 'seg ' + (h.type === 'pool' ? 'light' : 'dark');
+        seg.style.width = (h.pct*100) + '%';
+        seg.style.background = h.color || '#999';
+        seg.title = `${h.name}: ${pct(h.pct)}`;
+        seg.textContent = h.pct > 0.06 ? pct(h.pct) : '';
+        el.appendChild(seg);
+      });
+    });
+  }
+
+  function renderTable(s0, s1, s2){
+    // Build aligned rows: founders (one per founder), then pool(s), then investors
+    const tbody = document.getElementById('cap-tbody');
+    tbody.innerHTML = '';
+
+    // Founder rows
+    founders.forEach((f, idx) => {
+      const tr = document.createElement('tr');
+      const a = s0.find(h => h.founderIdx === idx);
+      const b = s1.find(h => h.founderIdx === idx);
+      const c = s2.find(h => h.founderIdx === idx);
+      tr.innerHTML = `
+        <td class="label-cell"><span class="swatch" style="background:${founderColors[idx%4]}"></span>${escapeHtml(f.name || ('Founder '+(idx+1)))}</td>
+        <td>${a ? pct(a.pct) : '—'}</td>
+        <td>${b ? pct(b.pct) : '—'}</td>
+        <td>${c ? pct(c.pct) : '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    // Founders subtotal
+    if (founders.length > 1) {
+      const sum = (st) => st.filter(h => h.type === 'founder').reduce((s,h) => s + h.pct, 0);
+      const tr = document.createElement('tr');
+      tr.className = 'subtotal';
+      tr.innerHTML = `
+        <td>Founders total</td>
+        <td>${pct(sum(s0))}</td>
+        <td>${pct(sum(s1))}</td>
+        <td>${pct(sum(s2))}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    // This-round investor
+    const inv1_b = s1.find(h => h.name === 'This-round investor');
+    const inv1_c = s2.find(h => h.name === 'This-round investor');
+    if (inv1_b || inv1_c) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="label-cell"><span class="swatch" style="background:var(--inv-seed)"></span>This-round investor</td>
+        <td>—</td>
+        <td>${inv1_b ? pct(inv1_b.pct) : '—'}</td>
+        <td>${inv1_c ? pct(inv1_c.pct) : '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    // Series A investor
+    const inv2_c = s2.find(h => h.name === 'Series A investor');
+    if (inv2_c) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="label-cell"><span class="swatch" style="background:var(--inv-a)"></span>Series A investor</td>
+        <td>—</td>
+        <td>—</td>
+        <td>${pct(inv2_c.pct)}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+
+    // Pool (combined — there's at most one pool entry per stage)
+    const poolB = s1.find(h => h.type === 'pool');
+    const poolC = s2.find(h => h.type === 'pool');
+    if (poolB || poolC) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="label-cell"><span class="swatch" style="background:var(--pool)"></span>Option pool</td>
+        <td>—</td>
+        <td>${poolB ? pct(poolB.pct) : '—'}</td>
+        <td>${poolC ? pct(poolC.pct) : '—'}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderSummary(s0, s1, s2, inputs){
+    const founderSum0 = s0.filter(h => h.type==='founder').reduce((s,h) => s + h.pct, 0);
+    const founderSum1 = s1.filter(h => h.type==='founder').reduce((s,h) => s + h.pct, 0);
+    const founderSum2 = s2.filter(h => h.type==='founder').reduce((s,h) => s + h.pct, 0);
+
+    const d1 = (founderSum0 - founderSum1) / founderSum0;
+    const dTotal = (founderSum0 - founderSum2) / founderSum0;
+
+    let healthNote = '';
+    if (inputs.r1Post && inputs.r2Post) {
+      const markup = inputs.r2Post / inputs.r1Post;
+      if (markup >= 2.5) healthNote = ` That's a healthy ${markup.toFixed(1)}× markup.`;
+      else if (markup >= 1.5) healthNote = ` That's a soft ${markup.toFixed(1)}× markup — still doable, but you'll feel it.`;
+      else if (markup >= 1) healthNote = ` That's a flat ${markup.toFixed(1)}× — your A signals trouble.`;
+      else healthNote = ` That's a down round (${markup.toFixed(2)}×) — anti-dilution clauses will hurt.`;
+    }
+
+    document.getElementById('summary').innerHTML = `
+      <p>Today, founders own <strong>${pct(founderSum0)}</strong> of the company.
+      After this round, you'll own <strong>${pct(founderSum1)}</strong> — a ${pct(d1)} hit, mostly from the ${pct(s1.find(h=>h.type==='pool')?.pct || 0)} pool and the ${pct(s1.find(h=>h.name==='This-round investor')?.pct || 0)} new investor.</p>
+      <p>After Series A, founders are at <strong>${pct(founderSum2)}</strong>. Total founder dilution from start: <strong>${pct(dTotal)}</strong>.${healthNote}</p>
+    `;
+  }
+
+  // ----- Exit slider -----
+  const slider = document.getElementById('exit-slider');
+  const exitDisplay = document.getElementById('exit-display');
+  slider.addEventListener('input', () => {
+    exitDisplay.textContent = formatMoney(+slider.value);
+    renderPayout(currentStage2);
+  });
+  let currentStage2 = [];
+
+  function renderPayout(stage2){
+    currentStage2 = stage2;
+    const E = +slider.value;
+    exitDisplay.textContent = formatMoney(E);
+    const grid = document.getElementById('payout-grid');
+    grid.innerHTML = '';
+
+    // Each founder card
+    founders.forEach((f, idx) => {
+      const h = stage2.find(x => x.founderIdx === idx);
+      const payout = h ? h.pct * E : 0;
+      const card = document.createElement('div');
+      card.className = 'payout-card founder';
+      card.innerHTML = `
+        <div class="who"><span class="dot" style="background:${founderColors[idx%4]}"></span>${escapeHtml(f.name || ('Founder '+(idx+1)))}</div>
+        <div class="pct">${h ? pct(h.pct) : '—'}</div>
+        <div class="amt">${formatMoney(payout)}</div>
+      `;
+      grid.appendChild(card);
+    });
+
+    // Investors combined into one card each
+    const inv1 = stage2.find(h => h.name === 'This-round investor');
+    const inv2 = stage2.find(h => h.name === 'Series A investor');
+    const pool = stage2.find(h => h.type === 'pool');
+
+    if (inv1) {
+      const card = document.createElement('div');
+      card.className = 'payout-card';
+      card.innerHTML = `
+        <div class="who"><span class="dot" style="background:var(--inv-seed)"></span>This-round investor</div>
+        <div class="pct">${pct(inv1.pct)}</div>
+        <div class="amt">${formatMoney(inv1.pct * E)}</div>
+      `;
+      grid.appendChild(card);
+    }
+    if (inv2) {
+      const card = document.createElement('div');
+      card.className = 'payout-card';
+      card.innerHTML = `
+        <div class="who"><span class="dot" style="background:var(--inv-a)"></span>Series A investor</div>
+        <div class="pct">${pct(inv2.pct)}</div>
+        <div class="amt">${formatMoney(inv2.pct * E)}</div>
+      `;
+      grid.appendChild(card);
+    }
+    if (pool) {
+      const card = document.createElement('div');
+      card.className = 'payout-card';
+      card.innerHTML = `
+        <div class="who"><span class="dot" style="background:var(--pool)"></span>Option pool (employees)</div>
+        <div class="pct">${pct(pool.pct)}</div>
+        <div class="amt">${formatMoney(pool.pct * E)}</div>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  // ----- Initial render -----
+  renderFounders();
+  recalc();
+})();
+</script>
+
+</body>
+</html>

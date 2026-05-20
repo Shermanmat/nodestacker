@@ -54,6 +54,27 @@ nav.topnav .links a.btn{
 }
 nav.topnav .links a.btn:hover{background:#fff;color:#000}
 
+/* Tools dropdown in the topnav */
+nav.topnav .tools-dd{position:relative;display:inline-block}
+nav.topnav .tools-dd > a.tools-trigger{cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+nav.topnav .tools-dd > a.tools-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+nav.topnav .tools-dd .tools-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent);min-width:220px;padding:6px 0;display:none;z-index:200;margin-top:0}
+nav.topnav .tools-dd:hover .tools-menu,nav.topnav .tools-dd.open .tools-menu{display:block}
+nav.topnav .tools-dd .tools-menu a{display:block;padding:12px 18px;color:#fff;font-size:12px;text-transform:uppercase;letter-spacing:1.5px;text-decoration:none}
+nav.topnav .tools-dd .tools-menu a:hover{color:var(--accent);background:#111}
+
+/* Case Studies dropdown in the topnav */
+nav.topnav .cs-dd{position:relative;display:inline-block}
+nav.topnav .cs-dd > a.cs-trigger{cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+nav.topnav .cs-dd > a.cs-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+nav.topnav .cs-dd .cs-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent);min-width:260px;padding:6px 0;display:none;z-index:200;margin-top:0}
+nav.topnav .cs-dd:hover .cs-menu,nav.topnav .cs-dd.open .cs-menu{display:block}
+nav.topnav .cs-dd .cs-menu a{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:10px 18px;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:1.4px;text-decoration:none}
+nav.topnav .cs-dd .cs-menu a:hover{color:var(--accent);background:#111}
+nav.topnav .cs-dd .cs-menu a .raise{color:var(--accent);font-weight:700}
+nav.topnav .cs-dd .cs-menu a.view-all{border-top:1px solid #333;margin-top:4px;padding-top:12px;color:var(--accent);font-weight:700;justify-content:center}
+nav.topnav .cs-dd .cs-menu a.view-all:hover{background:transparent;color:#fff}
+
 /* ========== Sections ========== */
 section{position:relative;overflow:hidden}
 .inner{max-width:1080px;margin:0 auto;padding:0 24px;position:relative;z-index:2}

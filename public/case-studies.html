@@ -146,7 +146,16 @@
       .card{padding:28px 24px}
       .card .stat{font-size:52px}
     }
-  </style>
+  
+    /* Tools dropdown (added by add-tools-nav script) */
+    .tools-dd{position:relative;display:inline-block}
+    .tools-dd > a.tools-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
+    .tools-dd > a.tools-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+    .tools-dd .tools-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:220px;padding:6px 0;display:none;z-index:200;margin-top:6px}
+    .tools-dd:hover .tools-menu,.tools-dd.open .tools-menu{display:block}
+    .tools-dd .tools-menu a{display:block!important;padding:12px 18px!important;color:#fff!important;font-size:12px!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-decoration:none;background:transparent!important;border:none!important}
+    .tools-dd .tools-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}
+</style>
 </head>
 <body>
 
@@ -156,6 +165,13 @@
     <span class="tag">CASE STUDIES</span>
   </a>
   <div class="links">
+        <div class="tools-dd">
+      <a href="#" class="tools-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Tools</a>
+      <div class="tools-menu">
+        <a href="/equity-calculator">Equity Calculator</a>
+        <a href="/raise-planner">Raise Planner</a>
+      </div>
+    </div>
     <a href="https://matcap.vc">matcap.vc</a>
     <a class="btn" href="/community">Apply</a>
   </div>
@@ -172,6 +188,15 @@
 <section class="grid-section">
   <div class="inner">
     <div class="grid">
+
+      <a class="card reveal" href="/case-studies/stealth-300k">
+        <div class="year">STEALTH</div>
+        <div class="stat">$300K</div>
+        <div class="stat-sub">Verdict Capital · 14 firms engaged of 51 intros</div>
+        <div class="company">STEALTH · PRE-SEED</div>
+        <div class="one-liner">Pre-seed round led by Niko Bonatsos at Verdict Capital — broken down by every intro we sent. Founder name withheld until announced.</div>
+        <div class="meta"><span>Founder withheld · Pre-seed</span><span class="read">Read →</span></div>
+      </a>
 
       <a class="card reveal" href="/case-studies/stealth-vertical-ai">
         <div class="year">STEALTH</div>

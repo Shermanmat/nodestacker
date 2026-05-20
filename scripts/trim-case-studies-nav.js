@@ -56,7 +56,9 @@ for (const rel of FILES) {
     skipped++;
     continue;
   }
-  src = src.replace(re, m[1] + NEW_ITEMS + m[3]);
+  // Use function replacement so `$` in NEW_ITEMS (e.g. "$1.5M") isn't
+  // interpreted as a regex backreference.
+  src = src.replace(re, () => m[1] + NEW_ITEMS + m[3]);
   fs.writeFileSync(full, src, 'utf8');
   console.log(`OK      ${rel}`);
   updated++;

@@ -35,7 +35,7 @@ const CSS = `
     .cs-dd{position:relative;display:inline-block}
     .cs-dd > a.cs-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
     .cs-dd > a.cs-trigger::after{content:'\\25BE';font-size:9px;opacity:.7}
-    .cs-dd .cs-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:260px;padding:6px 0;display:none;z-index:200;margin-top:6px}
+    .cs-dd .cs-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:260px;padding:6px 0;display:none;z-index:200;margin-top:0}
     .cs-dd:hover .cs-menu,.cs-dd.open .cs-menu{display:block}
     .cs-dd .cs-menu a{display:flex!important;justify-content:space-between!important;align-items:center;gap:14px;padding:10px 18px!important;color:#fff!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-decoration:none;background:transparent!important;border:none!important}
     .cs-dd .cs-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}

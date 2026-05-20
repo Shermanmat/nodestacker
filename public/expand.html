@@ -158,52 +158,11 @@
   <div class="inner">
     <div class="kicker reveal">TOP CITIES BY FOUNDER DENSITY</div>
     <h2 class="reveal">Where MatCap founders <span class="accent">already are.</span></h2>
-    <p class="sub reveal">Pulled from the MatCap signup pool — combined founders + network sign-ups, normalized by metro area. Updated May 2026.</p>
-    <div class="rank-list reveal">
-      <div class="rank-row">
-        <div class="n">01</div>
-        <div class="city">PHOENIX <small>Scottsdale · Tempe · Mesa</small></div>
-        <div class="count">12</div>
-        <div class="status active">ACTIVE</div>
-      </div>
-      <div class="rank-row">
-        <div class="n">02</div>
-        <div class="city">SAN FRANCISCO BAY <small>SF · San Mateo</small></div>
-        <div class="count">5</div>
-        <div class="status signal">Signal</div>
-      </div>
-      <div class="rank-row">
-        <div class="n">03</div>
-        <div class="city">LOS ANGELES</div>
-        <div class="count">3</div>
-        <div class="status signal">Signal</div>
-      </div>
-      <div class="rank-row">
-        <div class="n">04</div>
-        <div class="city">NEW YORK CITY</div>
-        <div class="count">1</div>
-        <div class="status signal">Early</div>
-      </div>
-      <div class="rank-row">
-        <div class="n">05</div>
-        <div class="city">WASHINGTON DC</div>
-        <div class="count">1</div>
-        <div class="status signal">Early</div>
-      </div>
-      <div class="rank-row">
-        <div class="n">06</div>
-        <div class="city">MIAMI</div>
-        <div class="count">1</div>
-        <div class="status signal">Early</div>
-      </div>
-      <div class="rank-row">
-        <div class="n">07</div>
-        <div class="city">LAS VEGAS</div>
-        <div class="count">1</div>
-        <div class="status signal">Early</div>
-      </div>
+    <p class="sub reveal">Pulled live from the MatCap signup pool — combined founders + network sign-ups, normalized by metro area. <span id="updatedAt"></span></p>
+    <div class="rank-list reveal" id="rankList">
+      <div class="rank-row"><div class="n">…</div><div class="city">Loading live density…</div><div class="count"></div><div class="status"></div></div>
     </div>
-    <p style="margin-top:20px;color:var(--muted);font-size:14px;font-style:italic">Plus a long tail of single founders across the US — Tuscaloosa, Vicksburg, Delaware, Santa Rosa — and a growing international ping list (London, Toronto, Dubai, Delhi, Valencia).</p>
+    <p id="tailNote" style="margin-top:20px;color:var(--muted);font-size:14px;font-style:italic"></p>
   </div>
 </section>
 
@@ -249,16 +208,6 @@
   }, { threshold: 0.1 });
   document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
 
-  var CITIES = [
-    { name: 'PHOENIX',      coords: [-112.0740, 33.4484], count: 12, active: true },
-    { name: 'SF BAY',       coords: [-122.4194, 37.7749], count: 5 },
-    { name: 'LOS ANGELES',  coords: [-118.2437, 34.0522], count: 3 },
-    { name: 'NYC',          coords: [ -74.0060, 40.7128], count: 1 },
-    { name: 'DC',           coords: [ -77.0369, 38.9072], count: 1 },
-    { name: 'MIAMI',        coords: [ -80.1918, 25.7617], count: 1 },
-    { name: 'LAS VEGAS',    coords: [-115.1398, 36.1699], count: 1 },
-  ];
-
   function radiusFor(count, isActive){
     if (isActive) return 13;
     if (count >= 5) return 10;
@@ -266,7 +215,30 @@
     return 6;
   }
 
-  function renderMap(us){
+  function statusFor(city){
+    if (city.active) return { text: 'ACTIVE', cls: 'active' };
+    if (city.count >= 3) return { text: 'Signal', cls: 'signal' };
+    return { text: 'Early', cls: 'signal' };
+  }
+
+  function pad2(n){ return n < 10 ? '0' + n : '' + n; }
+
+  function renderRankList(cities){
+    var list = document.getElementById('rankList');
+    if (!cities.length) { list.innerHTML = '<div class="rank-row"><div class="n">—</div><div class="city">No signals yet</div><div class="count">0</div><div class="status"></div></div>'; return; }
+    var html = cities.map(function(c, i){
+      var s = statusFor(c);
+      return '<div class="rank-row">' +
+        '<div class="n">' + pad2(i + 1) + '</div>' +
+        '<div class="city">' + c.label + '</div>' +
+        '<div class="count">' + c.count + '</div>' +
+        '<div class="status ' + s.cls + '">' + s.text + '</div>' +
+      '</div>';
+    }).join('');
+    list.innerHTML = html;
+  }
+
+  function renderMap(us, cities){
     var container = document.getElementById('usMap');
     container.innerHTML = '';
     container.classList.remove('map-loading');
@@ -292,8 +264,8 @@
       .attr('d', path);
 
     var pinGroup = svg.append('g');
-    CITIES.forEach(function(city){
-      var pt = projection(city.coords);
+    cities.forEach(function(city){
+      var pt = projection([city.lng, city.lat]);
       if (!pt) return;
       var r = radiusFor(city.count, city.active);
       var g = pinGroup.append('g').attr('transform', 'translate(' + pt[0] + ',' + pt[1] + ')');
@@ -302,14 +274,14 @@
         .attr('class', city.active ? 'pin pin-active' : 'pin')
         .attr('r', r);
 
-      var labelX = (city.coords[0] < -110) ? -r - 6 : r + 6;
+      var labelX = (city.lng < -110) ? -r - 6 : r + 6;
       var anchor = labelX < 0 ? 'end' : 'start';
       g.append('text')
         .attr('class', 'pin-label')
         .attr('x', labelX)
         .attr('y', -2)
         .attr('text-anchor', anchor)
-        .text(city.name);
+        .text(city.label);
       g.append('text')
         .attr('class', 'pin-count' + (city.active ? ' active' : ''))
         .attr('x', labelX)
@@ -319,12 +291,36 @@
     });
   }
 
-  d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
-    .then(renderMap)
-    .catch(function(err){
-      console.error('Map load failed', err);
-      document.getElementById('usMap').textContent = 'Map failed to load.';
-    });
+  Promise.all([
+    d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json'),
+    fetch('/api/public/density').then(function(r){ return r.json(); })
+  ]).then(function(results){
+    var us = results[0];
+    var density = results[1];
+    var cities = Array.isArray(density.cities) ? density.cities : [];
+    renderMap(us, cities);
+    renderRankList(cities);
+
+    var tail = document.getElementById('tailNote');
+    if (density.totalUnmapped > 0) {
+      var sample = (density.unmappedSample || []).slice(0, 5).map(function(s){
+        return s.replace(/\b\w/g, function(c){ return c.toUpperCase(); });
+      });
+      var more = density.totalUnmapped - sample.length;
+      tail.textContent = 'Plus ' + density.totalUnmapped + ' founders in cities not yet on the metro map' +
+        (sample.length ? ' — ' + sample.join(', ') + (more > 0 ? ', and ' + more + ' more.' : '.') : '.');
+    }
+
+    var updated = document.getElementById('updatedAt');
+    if (density.updatedAt) {
+      var d = new Date(density.updatedAt);
+      updated.textContent = 'Updated ' + d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '.';
+    }
+  }).catch(function(err){
+    console.error('Live density load failed', err);
+    document.getElementById('usMap').textContent = 'Map failed to load.';
+    document.getElementById('rankList').innerHTML = '<div class="rank-row"><div class="n">!</div><div class="city">Failed to load live density</div><div class="count"></div><div class="status"></div></div>';
+  });
 
   var form = document.getElementById('expansionForm');
   var msg = document.getElementById('formMsg');

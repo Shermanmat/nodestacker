@@ -18,15 +18,15 @@
     html{scroll-behavior:smooth}
     body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
     a{color:inherit}
-    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#000;color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
-    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff}
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#fff;color:#000;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
     nav.topnav img{height:34px;width:auto;display:block}
-    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid #333;padding-left:14px}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid var(--rule);padding-left:14px}
     nav.topnav .links{display:flex;gap:28px;align-items:center}
-    nav.topnav .links a{color:#fff;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a{color:#000;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
     nav.topnav .links a:hover{color:var(--accent)}
-    nav.topnav .links a.btn{background:var(--accent);color:#000;padding:10px 16px}
-    nav.topnav .links a.btn:hover{background:#fff;color:#000}
+    nav.topnav .links a.btn{background:#000;color:#fff;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:var(--accent);color:#000}
     .inner{max-width:920px;margin:0 auto;padding:0 24px}
     .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
     .reveal.in{opacity:1;transform:translateY(0)}

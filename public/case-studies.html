@@ -111,6 +111,13 @@
     }
     .card .meta .read{color:var(--accent);font-weight:700;letter-spacing:.5px}
 
+    .legacy-section{padding:70px 0 90px;background:#fff;border-top:1px solid var(--rule)}
+    .legacy-title{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:2px;margin-bottom:8px;color:#000}
+    .legacy-sub{font-size:15px;color:var(--muted);max-width:720px;margin-bottom:24px;line-height:1.5}
+    .legacy-list{list-style:none;padding:0;margin:0;border-top:1px solid var(--rule)}
+    .legacy-list li{padding:14px 0;border-bottom:1px solid var(--rule);font-size:14px;color:#555}
+    .legacy-list li strong{color:#000;font-weight:700;margin-right:6px}
+
     .cta-band{
       padding:90px 0;background:#000;color:#fff;text-align:center;
     }
@@ -187,15 +194,9 @@
     <div class="cs-dd">
       <a href="#" class="cs-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Case Studies</a>
       <div class="cs-menu">
-        <a href="/case-studies/rosotics"><span>Rosotics</span><span class="raise">$1M</span></a>
-        <a href="/case-studies/othersideai"><span>OthersideAI</span><span class="raise">$2.6M</span></a>
-        <a href="/case-studies/kalendar-ai"><span>Kalendar AI</span><span class="raise">$3.2M</span></a>
-        <a href="/case-studies/stealth-vertical-ai"><span>Stealth · Vertical AI</span><span class="raise">$1.5M</span></a>
-        <a href="/case-studies/insured-nomads"><span>Insured Nomads</span><span class="raise">$750K</span></a>
+        <a href="/case-studies/stealth-vertical-ai"><span>Stealth · Vertical AI</span><span class="raise"><div class="cs-menu">.5M</span></a>
         <a href="/case-studies/stealth-proptech"><span>Stealth · PropTech</span><span class="raise">$600K</span></a>
-        <a href="/case-studies/autio"><span>Autio</span><span class="raise">$500K</span></a>
-        <a href="/case-studies/peachpay"><span>PeachPay</span><span class="raise">$379K</span></a>
-        <a href="/case-studies/stealth-300k"><span>Stealth · Verdict</span><span class="raise">$300K</span></a>
+        <a href="/case-studies/stealth-300k"><span>Stealth · Verdict</span><span class="raise"></div>00K</span></a>
         <a href="/case-studies" class="view-all">View all →</a>
       </div>
     </div>
@@ -244,61 +245,22 @@
         <div class="meta"><span>Founder withheld · PropTech</span><span class="read">Read →</span></div>
       </a>
 
-<a class="card reveal" href="/case-studies/insured-nomads">
-        <div class="year">2023</div>
-        <div class="stat">$750K</div>
-        <div class="stat-sub">Via intros · $3.2M total</div>
-        <div class="company">INSURED NOMADS</div>
-        <div class="one-liner">Insurance for global companies and remote workers.</div>
-        <div class="meta"><span>Andrew Jernigan · InsurTech</span><span class="read">Read →</span></div>
-      </a>
-
-      <a class="card reveal" href="/case-studies/autio">
-        <div class="year">2023</div>
-        <div class="stat">$500K+</div>
-        <div class="stat-sub">Via intros · $10.7M total</div>
-        <div class="company">AUTIO</div>
-        <div class="one-liner">Location-based audio storytelling for road trips.</div>
-        <div class="meta"><span>Woody Sears · Consumer</span><span class="read">Read →</span></div>
-      </a>
-
-      <a class="card reveal" href="/case-studies/peachpay">
-        <div class="year">2023</div>
-        <div class="stat">$379K</div>
-        <div class="stat-sub">Via intros · $3.1M total</div>
-        <div class="company">PEACHPAY</div>
-        <div class="one-liner">All-in-one payments and checkout solution.</div>
-        <div class="meta"><span>Aaryaman Anerao · Fintech</span><span class="read">Read →</span></div>
-      </a>
-
-      <a class="card reveal" href="/case-studies/kalendar-ai">
-        <div class="year">2023</div>
-        <div class="stat">$3.2M</div>
-        <div class="stat-sub">Village Global led · TechCrunch covered</div>
-        <div class="company">KALENDAR AI</div>
-        <div class="one-liner">AI SDR — GPT-powered prospecting that runs 24/7.</div>
-        <div class="meta"><span>Ravi Vadrevu · Sales · AI</span><span class="read">Read →</span></div>
-      </a>
-
-      <a class="card reveal" href="/case-studies/rosotics">
-        <div class="year">2022</div>
-        <div class="stat">$1M</div>
-        <div class="stat-sub">Draper · Vibe · Sequoia Scout</div>
-        <div class="company">ROSOTICS</div>
-        <div class="one-liner">3D-printing drones for massive structures, starting with rockets.</div>
-        <div class="meta"><span>Christian LaRosa · Aerospace</span><span class="read">Read →</span></div>
-      </a>
-
-      <a class="card reveal" href="/case-studies/othersideai">
-        <div class="year">2021</div>
-        <div class="stat">$2.6M</div>
-        <div class="stat-sub">Seed round · Hustle Fund led</div>
-        <div class="company">OTHERSIDEAI</div>
-        <div class="one-liner">AI-powered written communication built on GPT-3.</div>
-        <div class="meta"><span>Matt Shumer · AI</span><span class="read">Read →</span></div>
-      </a>
-
     </div>
+  </div>
+</section>
+
+<section class="legacy-section">
+  <div class="inner">
+    <h3 class="legacy-title">Legacy raises</h3>
+    <p class="legacy-sub">From earlier MatCap deals, when we operated as Seedscout. Kept on the site as receipts but no longer the focus.</p>
+    <ul class="legacy-list">
+      <li><strong>OthersideAI</strong> &middot; $2.6M &middot; 2021 &middot; Hustle Fund led</li>
+      <li><strong>Kalendar AI</strong> &middot; $3.2M &middot; 2023 &middot; Village Global led &middot; TechCrunch covered</li>
+      <li><strong>Rosotics</strong> &middot; $1M &middot; 2022 &middot; Draper &middot; Vibe &middot; Sequoia Scout</li>
+      <li><strong>Insured Nomads</strong> &middot; $750K &middot; 2023 &middot; Via intros</li>
+      <li><strong>Autio</strong> &middot; $500K+ &middot; 2023 &middot; Via intros</li>
+      <li><strong>PeachPay</strong> &middot; $379K &middot; 2023 &middot; Via intros</li>
+    </ul>
   </div>
 </section>
 

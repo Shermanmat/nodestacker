@@ -2521,6 +2521,37 @@
               </div>
             </div>
             <div class="p-5 border-b">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-semibold text-gray-700">Edit details</h4>
+                <span v-if="directoryDetail.override" class="text-xs text-amber-600">Overrides applied</span>
+              </div>
+              <div class="grid grid-cols-1 gap-2 mb-3">
+                <label class="block">
+                  <span class="text-xs text-gray-500">Name</span>
+                  <input v-model="directoryEdit.name" type="text" class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500">City</span>
+                  <input v-model="directoryEdit.city" type="text" class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500">Company</span>
+                  <input v-model="directoryEdit.company" type="text" class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500">Notes (admin-only)</span>
+                  <textarea v-model="directoryEdit.notes" rows="2" class="w-full border rounded px-2 py-1 text-sm mt-0.5"></textarea>
+                </label>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="saveDirectoryOverride" :disabled="directorySaving" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">
+                  {{ directorySaving ? 'Saving…' : 'Save changes' }}
+                </button>
+                <span v-if="directorySavedAt" class="text-xs text-green-600">Saved</span>
+                <span class="text-xs text-gray-400 ml-auto">Empty fields revert to source data</span>
+              </div>
+            </div>
+            <div class="p-5 border-b">
               <h4 class="text-sm font-semibold text-gray-700 mb-2">Tags</h4>
               <div class="flex flex-wrap gap-1 mb-2">
                 <span v-for="t in directoryDetail.tags" :key="t" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded">
@@ -4082,14 +4113,57 @@
           }
         }
 
+        const directoryEdit = ref({ name: '', city: '', company: '', notes: '' });
+        const directorySaving = ref(false);
+        const directorySavedAt = ref(0);
+
         function openDirectoryDetail(row) {
           directoryDetail.value = row;
           newDirectoryTag.value = '';
+          // Seed the edit form: prefer the override (so admin can see + change what they set),
+          // otherwise fall back to the merged source values shown in the row.
+          const ov = row.override || {};
+          directoryEdit.value = {
+            name: ov.name ?? row.name ?? '',
+            city: ov.city ?? row.city ?? '',
+            company: ov.company ?? row.company ?? '',
+            notes: ov.notes ?? '',
+          };
+          directorySavedAt.value = 0;
         }
 
         function closeDirectoryDetail() {
           directoryDetail.value = null;
           newDirectoryTag.value = '';
+          directorySavedAt.value = 0;
+        }
+
+        async function saveDirectoryOverride() {
+          if (!directoryDetail.value) return;
+          directorySaving.value = true;
+          try {
+            const body = {
+              email: directoryDetail.value.email,
+              name: directoryEdit.value.name || null,
+              city: directoryEdit.value.city || null,
+              company: directoryEdit.value.company || null,
+              notes: directoryEdit.value.notes || null,
+            };
+            const res = await api('/admin/people/overrides', { method: 'PUT', body });
+            // Update the row in place so the table + drawer reflect the change without a refetch.
+            directoryDetail.value.override = res.override;
+            if (body.name) directoryDetail.value.name = body.name;
+            if (body.city) directoryDetail.value.city = body.city;
+            if (body.company) directoryDetail.value.company = body.company;
+            directorySavedAt.value = Date.now();
+            setTimeout(() => {
+              if (Date.now() - directorySavedAt.value >= 1900) directorySavedAt.value = 0;
+            }, 2000);
+          } catch (e) {
+            console.error('saveDirectoryOverride failed:', e);
+          } finally {
+            directorySaving.value = false;
+          }
         }
 
         async function addDirectoryTag() {
@@ -7385,6 +7459,7 @@
           directorySourceLabel, directorySourceBadgeClass, directoryFormatRelative,
           loadDirectory, openDirectoryDetail, closeDirectoryDetail,
           addDirectoryTag, removeDirectoryTag,
+          directoryEdit, directorySaving, directorySavedAt, saveDirectoryOverride,
           // Signups
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,

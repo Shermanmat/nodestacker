@@ -1200,3 +1200,19 @@ export const peopleTags = sqliteTable('people_tags', {
 
 export type PeopleTag = typeof peopleTags.$inferSelect;
 export type NewPeopleTag = typeof peopleTags.$inferInsert;
+
+// People overrides — admin-edited values that supersede whatever the merged
+// source data shows for that email. Keyed by email so one row per person.
+// Non-destructive: source tables (founders, public_users, founder_leads,
+// people_captures) are untouched; the Directory view layers these on top.
+export const peopleOverrides = sqliteTable('people_overrides', {
+  email: text('email').primaryKey(),
+  name: text('name'),
+  city: text('city'),
+  company: text('company'),
+  notes: text('notes'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type PeopleOverride = typeof peopleOverrides.$inferSelect;
+export type NewPeopleOverride = typeof peopleOverrides.$inferInsert;

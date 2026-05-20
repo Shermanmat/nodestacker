@@ -254,6 +254,21 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// People overrides — admin-edited values that layer on top of merged source data.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`people_overrides\` (
+    \`email\` text PRIMARY KEY NOT NULL,
+    \`name\` text,
+    \`city\` text,
+    \`company\` text,
+    \`notes\` text,
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  console.log('  Ensured people_overrides table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

@@ -3957,6 +3957,159 @@
           } catch (e) { console.error('updateBrandStatus failed:', e); }
         }
 
+        // Directory — unified People view
+        const directoryRows = ref([]);
+        const directoryAllTags = ref([]);
+        const directoryLoading = ref(false);
+        const directorySearch = ref('');
+        const directorySourceFilter = ref(new Set());
+        const directoryTagFilter = ref(null);
+        const directoryDetail = ref(null);
+        const newDirectoryTag = ref('');
+        const directoryDisplayLimit = ref(100);
+
+        const directorySourceOptions = [
+          { value: 'founder', label: 'Founders' },
+          { value: 'public_user', label: 'Signups' },
+          { value: 'founder_lead', label: 'Leads' },
+          { value: 'capture', label: 'Captures' },
+        ];
+
+        const directoryStatsBySource = computed(() => {
+          const out = { founder: 0, public_user: 0, founder_lead: 0 };
+          for (const row of directoryRows.value) {
+            for (const s of row.sources) {
+              if (s === 'founder') out.founder++;
+              else if (s === 'public_user') out.public_user++;
+              else if (s === 'founder_lead') out.founder_lead++;
+            }
+          }
+          return out;
+        });
+
+        const directoryCaptureCount = computed(() => {
+          let n = 0;
+          for (const row of directoryRows.value) {
+            if (row.sources.some(s => s.startsWith('capture:'))) n++;
+          }
+          return n;
+        });
+
+        const hasDirectoryFilters = computed(() => {
+          return !!(directorySearch.value || directorySourceFilter.value.size > 0 || directoryTagFilter.value);
+        });
+
+        const filteredDirectoryRows = computed(() => {
+          const q = directorySearch.value.trim().toLowerCase();
+          const sf = directorySourceFilter.value;
+          const tf = directoryTagFilter.value;
+          return directoryRows.value.filter(row => {
+            if (q) {
+              const hay = [row.name, row.email, row.company, row.city].filter(Boolean).join(' ').toLowerCase();
+              if (!hay.includes(q)) return false;
+            }
+            if (sf.size > 0) {
+              const match = row.sources.some(s => {
+                if (sf.has('capture')) return s.startsWith('capture:') || sf.has(s);
+                return sf.has(s);
+              });
+              if (!match) return false;
+            }
+            if (tf && !row.tags.includes(tf)) return false;
+            return true;
+          });
+        });
+
+        function toggleDirectorySource(value) {
+          const next = new Set(directorySourceFilter.value);
+          if (next.has(value)) next.delete(value);
+          else next.add(value);
+          directorySourceFilter.value = next;
+        }
+
+        function clearDirectoryFilters() {
+          directorySearch.value = '';
+          directorySourceFilter.value = new Set();
+          directoryTagFilter.value = null;
+        }
+
+        function directorySourceLabel(source) {
+          if (source === 'founder') return 'Founder';
+          if (source === 'public_user') return 'Signup';
+          if (source === 'founder_lead') return 'Lead';
+          if (source.startsWith('capture:')) return 'Capture: ' + source.slice(8);
+          return source;
+        }
+
+        function directorySourceBadgeClass(source) {
+          if (source === 'founder') return 'bg-emerald-100 text-emerald-700';
+          if (source === 'public_user') return 'bg-blue-100 text-blue-700';
+          if (source === 'founder_lead') return 'bg-purple-100 text-purple-700';
+          if (source.startsWith('capture:')) return 'bg-amber-100 text-amber-700';
+          return 'bg-gray-100 text-gray-700';
+        }
+
+        function directoryFormatRelative(iso) {
+          if (!iso) return '—';
+          const t = new Date(iso).getTime();
+          if (isNaN(t)) return iso;
+          const diff = Date.now() - t;
+          const days = Math.floor(diff / 86400000);
+          if (days < 1) return 'today';
+          if (days < 2) return 'yesterday';
+          if (days < 30) return days + 'd ago';
+          if (days < 365) return Math.floor(days / 30) + 'mo ago';
+          return Math.floor(days / 365) + 'y ago';
+        }
+
+        async function loadDirectory() {
+          directoryLoading.value = true;
+          try {
+            const [peopleRes, tagsRes] = await Promise.all([
+              api('/admin/people'),
+              api('/admin/people/tags'),
+            ]);
+            directoryRows.value = peopleRes.rows || [];
+            directoryAllTags.value = tagsRes.tags || [];
+          } catch (e) {
+            console.error('loadDirectory failed:', e);
+          } finally {
+            directoryLoading.value = false;
+          }
+        }
+
+        function openDirectoryDetail(row) {
+          directoryDetail.value = row;
+          newDirectoryTag.value = '';
+        }
+
+        function closeDirectoryDetail() {
+          directoryDetail.value = null;
+          newDirectoryTag.value = '';
+        }
+
+        async function addDirectoryTag() {
+          if (!directoryDetail.value) return;
+          const tag = newDirectoryTag.value.trim();
+          if (!tag) return;
+          try {
+            await api('/admin/people/tags', { method: 'POST', body: { email: directoryDetail.value.email, tag } });
+            if (!directoryDetail.value.tags.includes(tag)) directoryDetail.value.tags.push(tag);
+            if (!directoryAllTags.value.includes(tag)) {
+              directoryAllTags.value = [...directoryAllTags.value, tag].sort();
+            }
+            newDirectoryTag.value = '';
+          } catch (e) { console.error('addDirectoryTag failed:', e); }
+        }
+
+        async function removeDirectoryTag(tag) {
+          if (!directoryDetail.value) return;
+          try {
+            await api('/admin/people/tags', { method: 'DELETE', body: { email: directoryDetail.value.email, tag } });
+            directoryDetail.value.tags = directoryDetail.value.tags.filter(t => t !== tag);
+          } catch (e) { console.error('removeDirectoryTag failed:', e); }
+        }
+
         // Signups
         const signups = ref([]);
         const signupStatusFilter = ref('');
@@ -7196,6 +7349,15 @@
           // Brands
           brandsData, brandStatusFilter, filteredBrands, showBrandModal, editingBrand, brandForm,
           loadBrands, saveBrand, editBrand, deleteBrand, updateBrandStatus,
+          // Directory
+          directoryRows, directoryAllTags, directoryLoading, directorySearch,
+          directorySourceFilter, directoryTagFilter, directoryDetail, newDirectoryTag,
+          directoryDisplayLimit, directorySourceOptions,
+          directoryStatsBySource, directoryCaptureCount, hasDirectoryFilters, filteredDirectoryRows,
+          toggleDirectorySource, clearDirectoryFilters,
+          directorySourceLabel, directorySourceBadgeClass, directoryFormatRelative,
+          loadDirectory, openDirectoryDetail, closeDirectoryDetail,
+          addDirectoryTag, removeDirectoryTag,
           // Signups
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,

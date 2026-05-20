@@ -151,6 +151,18 @@
     .tools-dd:hover .tools-menu,.tools-dd.open .tools-menu{display:block}
     .tools-dd .tools-menu a{display:block!important;padding:12px 18px!important;color:#fff!important;font-size:12px!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-decoration:none;background:transparent!important;border:none!important}
     .tools-dd .tools-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}
+
+    /* Case Studies dropdown (cs-dd; reuses tools-menu visuals) */
+    .cs-dd{position:relative;display:inline-block}
+    .cs-dd > a.cs-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
+    .cs-dd > a.cs-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+    .cs-dd .cs-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:260px;padding:6px 0;display:none;z-index:200;margin-top:6px}
+    .cs-dd:hover .cs-menu,.cs-dd.open .cs-menu{display:block}
+    .cs-dd .cs-menu a{display:flex!important;justify-content:space-between!important;align-items:center;gap:14px;padding:10px 18px!important;color:#fff!important;font-size:11px!important;text-transform:uppercase!important;letter-spacing:1.4px!important;text-decoration:none;background:transparent!important;border:none!important}
+    .cs-dd .cs-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}
+    .cs-dd .cs-menu a .raise{color:var(--accent,#00C2E0);font-weight:700}
+    .cs-dd .cs-menu a.view-all{border-top:1px solid #333;margin-top:4px;padding-top:12px!important;color:var(--accent,#00C2E0)!important;font-weight:700;justify-content:center!important}
+    .cs-dd .cs-menu a.view-all:hover{background:transparent!important;color:#fff!important}
 </style>
 </head>
 <body>
@@ -165,8 +177,23 @@
         <a href="/raise-planner">Raise Planner</a>
       </div>
     </div>
+    <div class="cs-dd">
+      <a href="#" class="cs-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Case Studies</a>
+      <div class="cs-menu">
+        <a href="/case-studies/rosotics"><span>Rosotics</span><span class="raise">$1M</span></a>
+        <a href="/case-studies/othersideai"><span>OthersideAI</span><span class="raise">$2.6M</span></a>
+        <a href="/case-studies/kalendar-ai"><span>Kalendar AI</span><span class="raise">$3.2M</span></a>
+        <a href="/case-studies/stealth-vertical-ai"><span>Stealth · Vertical AI</span><span class="raise">$1.5M</span></a>
+        <a href="/case-studies/insured-nomads"><span>Insured Nomads</span><span class="raise">$750K</span></a>
+        <a href="/case-studies/stealth-proptech"><span>Stealth · PropTech</span><span class="raise">$600K</span></a>
+        <a href="/case-studies/autio"><span>Autio</span><span class="raise">$500K</span></a>
+        <a href="/case-studies/peachpay"><span>PeachPay</span><span class="raise">$379K</span></a>
+        <a href="/case-studies/stealth-300k"><span>Stealth · Verdict</span><span class="raise">$300K</span></a>
+        <a href="/case-studies" class="view-all">View all →</a>
+      </div>
+    </div>
+    
     <a href="/community">Community</a>
-    <a href="/case-studies">Case Studies</a>
     <a class="btn" href="/community#apply">Apply</a>
   </div>
 </nav>

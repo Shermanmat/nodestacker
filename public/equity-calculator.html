@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Equity Calculator — MatCap</title>
+  <meta name="description" content="Pre-money / post-money / dilution calculator for founders. Fill in any two, get the other two.">
+  <meta property="og:title" content="Equity Calculator — MatCap">
+  <meta property="og:description" content="Pre-money, post-money, raise, dilution. Fill any two, get the other two.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root{--bg:#FFFFFF;--bg-alt:#F5F5F5;--bg-alt2:#FAFAFA;--text:#000;--muted:#555;--accent:#00C2E0;--accent-dim:rgba(0,194,224,.12);--rule:#e5e5e5}
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+    a{color:inherit}
+
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#000;color:#fff;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid #333;padding-left:14px}
+    nav.topnav .links{display:flex;gap:28px;align-items:center}
+    nav.topnav .links a{color:#fff;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{background:var(--accent);color:#000;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:#fff;color:#000}
+    @media (max-width:720px){nav.topnav .links a:not(.btn){display:none}}
+
+    .inner{max-width:880px;margin:0 auto;padding:0 24px}
+
+    .hero{padding:140px 0 40px}
+    .kicker{font-family:'Bebas Neue',sans-serif;letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px}
+    .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,7vw,84px);line-height:.95;letter-spacing:2px;margin-bottom:22px}
+    .hero h1 .accent{color:var(--accent)}
+    .hero p{font-size:clamp(16px,1.4vw,19px);max-width:720px;color:#222}
+
+    .calc{padding:20px 0 80px}
+    .calc-card{background:#fff;border:1px solid var(--rule);padding:36px;box-shadow:0 1px 0 rgba(0,0,0,0.02)}
+    .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+    @media (max-width:640px){.calc-card{padding:24px}.calc-grid{grid-template-columns:1fr;gap:16px}}
+
+    .field{display:flex;flex-direction:column;gap:6px}
+    .field label{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:13px;color:#000;display:flex;align-items:center;gap:8px}
+    .field .badge{display:inline-block;font-family:'Inter',sans-serif;font-size:10px;letter-spacing:1.5px;font-weight:700;padding:2px 6px;border-radius:2px;text-transform:uppercase}
+    .field .badge.input{background:var(--accent);color:#000}
+    .field .badge.derived{background:#eee;color:#666}
+    .field .input-wrap{position:relative;display:flex;align-items:center;border:2px solid var(--rule);background:#fff;transition:border-color .15s ease,background .15s ease}
+    .field .input-wrap.input{border-color:#000}
+    .field .input-wrap.derived{background:#fafafa}
+    .field .prefix,.field .suffix{font-family:'Inter',sans-serif;font-size:20px;font-weight:600;color:#999;padding:0 14px;user-select:none}
+    .field .prefix{border-right:1px solid var(--rule)}
+    .field .suffix{border-left:1px solid var(--rule)}
+    .field input{flex:1;border:none;outline:none;background:transparent;font-family:'Inter',sans-serif;font-size:22px;font-weight:600;padding:14px 12px;width:100%;min-width:0;color:#000}
+    .field input::placeholder{color:#bbb;font-weight:500}
+    .field input::-webkit-outer-spin-button,.field input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+    .field input[type=number]{-moz-appearance:textfield}
+    .field .hint{font-size:12px;color:var(--muted);min-height:18px}
+
+    .actions{margin-top:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+    .btn-reset{background:transparent;border:1px solid var(--rule);color:#000;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;padding:10px 18px;cursor:pointer}
+    .btn-reset:hover{border-color:#000}
+
+    .examples{margin-top:36px;padding-top:28px;border-top:1px solid var(--rule)}
+    .examples h3{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:18px;margin-bottom:10px}
+    .example-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .example{font-family:'Inter',sans-serif;font-size:13px;background:var(--bg-alt);border:1px solid var(--rule);padding:8px 14px;cursor:pointer;color:#000;transition:background .15s ease}
+    .example:hover{background:var(--accent-dim);border-color:var(--accent)}
+
+    .legend{margin-top:14px;font-size:13px;color:var(--muted);display:flex;gap:18px;flex-wrap:wrap}
+    .legend .swatch{display:inline-block;width:10px;height:10px;background:var(--accent);margin-right:6px;vertical-align:middle}
+    .legend .swatch.derived{background:#ddd}
+
+    .footer-cta{background:#000;color:#fff;padding:80px 0;text-align:center}
+    .footer-cta h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(32px,4.5vw,52px);letter-spacing:2px;margin-bottom:14px;line-height:1}
+    .footer-cta h2 .accent{color:var(--accent)}
+    .footer-cta p{color:#bbb;font-size:16px;max-width:560px;margin:0 auto 24px}
+    .footer-cta a.btn{display:inline-block;background:var(--accent);color:#000;font-weight:700;font-size:14px;text-transform:uppercase;letter-spacing:2px;padding:14px 28px;text-decoration:none}
+    .footer-cta a.btn:hover{background:#fff}
+
+    footer{padding:30px 0;border-top:1px solid var(--rule);color:var(--muted);font-size:13px;text-align:center}
+    footer a{color:var(--muted);text-decoration:none;margin:0 10px}
+    footer a:hover{color:#000}
+  
+    /* Tools dropdown (added by add-tools-nav script) */
+    .tools-dd{position:relative;display:inline-block}
+    .tools-dd > a.tools-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
+    .tools-dd > a.tools-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+    .tools-dd .tools-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent,#00C2E0);min-width:220px;padding:6px 0;display:none;z-index:200;margin-top:6px}
+    .tools-dd:hover .tools-menu,.tools-dd.open .tools-menu{display:block}
+    .tools-dd .tools-menu a{display:block!important;padding:12px 18px!important;color:#fff!important;font-size:12px!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-decoration:none;background:transparent!important;border:none!important}
+    .tools-dd .tools-menu a:hover{color:var(--accent,#00C2E0)!important;background:#111!important}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="/">
+    <img src="/matcap-logo.png" alt="MatCap" onerror="this.style.display='none'">
+    <span class="tag">EQUITY CALCULATOR</span>
+  </a>
+  <div class="links">
+        <div class="tools-dd">
+      <a href="#" class="tools-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Tools</a>
+      <div class="tools-menu">
+        <a href="/equity-calculator">Equity Calculator</a>
+        <a href="/raise-planner">Raise Planner</a>
+      </div>
+    </div>
+    <a href="/case-studies">Case studies</a>
+    <a href="/investors">Investors</a>
+    <a href="/" class="btn">Apply</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="inner">
+    <div class="kicker">FOUNDER TOOL</div>
+    <h1>Equity <span class="accent">calculator</span>.</h1>
+    <p>Pre-money, post-money, raise, dilution. Fill in any two — we'll do the other two for you.</p>
+  </div>
+</section>
+
+<section class="calc">
+  <div class="inner">
+    <div class="calc-card">
+      <div class="calc-grid">
+
+        <div class="field" data-field="raise">
+          <label>
+            Raise amount
+            <span class="badge derived" id="badge-raise">AUTO</span>
+          </label>
+          <div class="input-wrap derived" id="wrap-raise">
+            <span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="raise" placeholder="2,000,000" autocomplete="off">
+          </div>
+          <div class="hint">How much you're raising this round.</div>
+        </div>
+
+        <div class="field" data-field="dilution">
+          <label>
+            Dilution
+            <span class="badge derived" id="badge-dilution">AUTO</span>
+          </label>
+          <div class="input-wrap derived" id="wrap-dilution">
+            <input type="text" inputmode="decimal" id="dilution" placeholder="20" autocomplete="off">
+            <span class="suffix">%</span>
+          </div>
+          <div class="hint">% of the company sold in this round.</div>
+        </div>
+
+        <div class="field" data-field="pre">
+          <label>
+            Pre-money valuation
+            <span class="badge derived" id="badge-pre">AUTO</span>
+          </label>
+          <div class="input-wrap derived" id="wrap-pre">
+            <span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="pre" placeholder="8,000,000" autocomplete="off">
+          </div>
+          <div class="hint">Company value before the new money goes in.</div>
+        </div>
+
+        <div class="field" data-field="post">
+          <label>
+            Post-money valuation
+            <span class="badge derived" id="badge-post">AUTO</span>
+          </label>
+          <div class="input-wrap derived" id="wrap-post">
+            <span class="prefix">$</span>
+            <input type="text" inputmode="decimal" id="post" placeholder="10,000,000" autocomplete="off">
+          </div>
+          <div class="hint">Pre-money + the new raise.</div>
+        </div>
+
+      </div>
+
+      <div class="legend">
+        <span><span class="swatch"></span>Your inputs</span>
+        <span><span class="swatch derived"></span>Auto-calculated</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn-reset" id="reset">Reset</button>
+      </div>
+
+      <div class="examples">
+        <h3>Try one of these</h3>
+        <div class="example-row">
+          <button class="example" data-raise="2000000" data-dilution="20">$2M raise · 20% dilution</button>
+          <button class="example" data-raise="500000" data-pre="4500000">$500K on $4.5M pre</button>
+          <button class="example" data-post="15000000" data-dilution="15">$15M post · 15% dilution</button>
+          <button class="example" data-raise="3000000" data-post="20000000">$3M into $20M post</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="footer-cta">
+  <div class="inner">
+    <h2>Now go <span class="accent">raise it</span>.</h2>
+    <p>MatCap is a social network for fundraising — warm intros to top investors, founder dinners, real community. Stay in your city. Raise like you didn't have to.</p>
+    <a href="/" class="btn">Apply to MatCap</a>
+  </div>
+</section>
+
+<footer>
+  <div class="inner">
+    <a href="/">Home</a>
+    <a href="/investors">Investors</a>
+    <a href="/case-studies">Case studies</a>
+    <a href="/intros">Metrics</a>
+    <div style="margin-top:10px">© 2026 MatCap</div>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    const fields = ['raise','pre','post','dilution'];
+    // Track order of last touched inputs. Most recent at the end.
+    let touched = [];
+
+    const els = {};
+    fields.forEach(f => {
+      els[f] = {
+        input: document.getElementById(f),
+        wrap: document.getElementById('wrap-' + f),
+        badge: document.getElementById('badge-' + f),
+      };
+    });
+
+    function parseNumber(str){
+      if (str === null || str === undefined) return null;
+      const cleaned = String(str).replace(/[,$\s%]/g, '').trim();
+      if (cleaned === '') return null;
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function formatMoney(n){
+      if (n === null || !Number.isFinite(n)) return '';
+      // Round to nearest dollar; show with commas
+      const rounded = Math.round(n);
+      return rounded.toLocaleString('en-US');
+    }
+
+    function formatPct(n){
+      if (n === null || !Number.isFinite(n)) return '';
+      // Two decimals, trim trailing zero
+      const v = Math.round(n * 100) / 100;
+      return String(v);
+    }
+
+    function readInput(f){
+      const raw = els[f].input.value;
+      const n = parseNumber(raw);
+      return n;
+    }
+
+    function setDisplay(f, n){
+      if (n === null || !Number.isFinite(n)) {
+        els[f].input.value = '';
+        return;
+      }
+      els[f].input.value = (f === 'dilution') ? formatPct(n) : formatMoney(n);
+    }
+
+    function setRoleUI(f, role){
+      // role: 'input' | 'derived'
+      els[f].wrap.classList.remove('input','derived');
+      els[f].wrap.classList.add(role);
+      els[f].badge.classList.remove('input','derived');
+      els[f].badge.classList.add(role);
+      els[f].badge.textContent = role === 'input' ? 'YOU' : 'AUTO';
+    }
+
+    function compute(){
+      // The two most recently touched fields are the "drivers". Compute the other two.
+      const drivers = touched.slice(-2);
+      fields.forEach(f => setRoleUI(f, drivers.includes(f) ? 'input' : 'derived'));
+
+      if (drivers.length < 2) return;
+
+      // Read driver values
+      const vals = {};
+      drivers.forEach(f => { vals[f] = readInput(f); });
+
+      // If either driver is empty or invalid, clear the derived fields
+      if (drivers.some(f => vals[f] === null)) {
+        fields.forEach(f => { if (!drivers.includes(f)) setDisplay(f, null); });
+        return;
+      }
+
+      let raise=null, pre=null, post=null, dilution=null;
+      const has = (a,b) => drivers.includes(a) && drivers.includes(b);
+
+      // Dilution in input is %; convert to decimal for math
+      const dDec = drivers.includes('dilution') ? (vals.dilution / 100) : null;
+
+      if (has('raise','dilution')) {
+        raise = vals.raise; dilution = vals.dilution;
+        if (dDec > 0 && dDec < 1) {
+          post = raise / dDec;
+          pre = post - raise;
+        }
+      } else if (has('raise','pre')) {
+        raise = vals.raise; pre = vals.pre;
+        post = pre + raise;
+        dilution = post > 0 ? (raise / post) * 100 : null;
+      } else if (has('raise','post')) {
+        raise = vals.raise; post = vals.post;
+        pre = post - raise;
+        dilution = post > 0 ? (raise / post) * 100 : null;
+      } else if (has('pre','dilution')) {
+        pre = vals.pre; dilution = vals.dilution;
+        if (dDec >= 0 && dDec < 1) {
+          post = pre / (1 - dDec);
+          raise = post - pre;
+        }
+      } else if (has('pre','post')) {
+        pre = vals.pre; post = vals.post;
+        raise = post - pre;
+        dilution = post > 0 ? (raise / post) * 100 : null;
+      } else if (has('post','dilution')) {
+        post = vals.post; dilution = vals.dilution;
+        if (dDec >= 0 && dDec < 1) {
+          raise = post * dDec;
+          pre = post - raise;
+        }
+      }
+
+      // Only write to fields that are NOT drivers
+      if (!drivers.includes('raise')) setDisplay('raise', raise);
+      if (!drivers.includes('pre')) setDisplay('pre', pre);
+      if (!drivers.includes('post')) setDisplay('post', post);
+      if (!drivers.includes('dilution')) setDisplay('dilution', dilution);
+    }
+
+    function onInput(f){
+      // Remove f from history then append, so it becomes most recent
+      touched = touched.filter(x => x !== f);
+      touched.push(f);
+      // Keep at most 2 drivers
+      if (touched.length > 2) touched = touched.slice(-2);
+      compute();
+    }
+
+    function onBlur(f){
+      // Reformat the value the user typed (in case they typed raw digits)
+      const n = readInput(f);
+      if (n !== null) setDisplay(f, n);
+    }
+
+    fields.forEach(f => {
+      els[f].input.addEventListener('input', () => onInput(f));
+      els[f].input.addEventListener('blur', () => onBlur(f));
+    });
+
+    document.getElementById('reset').addEventListener('click', () => {
+      touched = [];
+      fields.forEach(f => { els[f].input.value = ''; setRoleUI(f, 'derived'); });
+    });
+
+    document.querySelectorAll('.example').forEach(btn => {
+      btn.addEventListener('click', () => {
+        touched = [];
+        fields.forEach(f => { els[f].input.value = ''; });
+        // Set the two specified fields from data attrs (in order of declaration)
+        const attrs = btn.attributes;
+        const order = [];
+        for (let i = 0; i < attrs.length; i++) {
+          const name = attrs[i].name;
+          if (name.startsWith('data-')) {
+            const f = name.slice(5);
+            if (fields.includes(f)) order.push({ f, v: btn.getAttribute(name) });
+          }
+        }
+        order.forEach(({f,v}) => {
+          els[f].input.value = (f === 'dilution') ? v : formatMoney(Number(v));
+          touched = touched.filter(x => x !== f);
+          touched.push(f);
+        });
+        compute();
+      });
+    });
+
+    // Initial UI state
+    fields.forEach(f => setRoleUI(f, 'derived'));
+  })();
+</script>
+
+</body>
+</html>

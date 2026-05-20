@@ -932,6 +932,8 @@ app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.
 app.get('/project2045', serveStatic({ path: './public/project2045.html' }));
 app.get('/community', serveStatic({ path: './public/community.html' }));
 app.get('/intros', serveStatic({ path: './public/intros.html' }));
+app.get('/equity-calculator', serveStatic({ path: './public/equity-calculator.html' }));
+app.get('/raise-planner', serveStatic({ path: './public/raise-planner.html' }));
 app.get('/case-studies', serveStatic({ path: './public/case-studies.html' }));
 app.get('/case-studies/rosotics', serveStatic({ path: './public/case-studies/rosotics.html' }));
 app.get('/case-studies/autio', serveStatic({ path: './public/case-studies/autio.html' }));

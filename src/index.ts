@@ -30,6 +30,7 @@ import publicProfileRoutes from './api/public-profile.js';
 import publicCompaniesRoutes from './api/public-companies.js';
 import publicIntrosRoutes from './api/public-intros.js';
 import publicPortfolioRoutes from './api/public-portfolio.js';
+import publicDensityRoutes from './api/public-density.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
 import marketplaceHealthRoutes from './api/marketplace-health.js';
@@ -68,6 +69,8 @@ app.route('/api/public', publicProfileRoutes);
 app.route('/api/public/companies', publicCompaniesRoutes);
 app.route('/api/public/intros', publicIntrosRoutes);
 app.route('/api/public/portfolio', publicPortfolioRoutes);
+// Aggregated founder/user city counts for /expand map. Public.
+app.route('/api/public/density', publicDensityRoutes);
 // Onboarding chat is public (founder intake interview)
 // Admin endpoints (/leads, /leads/:id/convert) are protected below
 app.route('/api/onboarding-chat', onboardingChatRoutes);
@@ -932,6 +935,7 @@ app.get('/retreats/7/sponsor', serveStatic({ path: './public/retreats/7/sponsor.
 app.get('/project2045', serveStatic({ path: './public/project2045.html' }));
 app.get('/community', serveStatic({ path: './public/community.html' }));
 app.get('/intros', serveStatic({ path: './public/intros.html' }));
+app.get('/expand', serveStatic({ path: './public/expand.html' }));
 app.get('/equity-calculator', serveStatic({ path: './public/equity-calculator.html' }));
 app.get('/raise-planner', serveStatic({ path: './public/raise-planner.html' }));
 app.get('/case-studies', serveStatic({ path: './public/case-studies.html' }));

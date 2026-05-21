@@ -336,10 +336,14 @@ export function classifyMatchFit(
     }
   }
 
+  const investorPersonaCats = invCats.filter(c => c.type === 'persona');
+  const investorAcceptsAny = investorPersonaCats.some(c => c.name.toLowerCase() === 'any');
   const founderPersonas = new Set(founderCategories.filter(c => c.type === 'persona').map(c => c.id));
-  const investorPersonas = new Set(invCats.filter(c => c.type === 'persona').map(c => c.id));
+  const investorPersonas = new Set(investorPersonaCats.map(c => c.id));
   let persona: 'exact' | 'untagged' = 'untagged';
-  if (founderPersonas.size > 0 && investorPersonas.size > 0) {
+  if (investorAcceptsAny) {
+    persona = 'exact';
+  } else if (founderPersonas.size > 0 && investorPersonas.size > 0) {
     for (const id of founderPersonas) {
       if (investorPersonas.has(id)) { persona = 'exact'; break; }
     }
@@ -596,10 +600,13 @@ export function passesCategoryFilter(
   // (e.g. "College / Recent Grad Hustler"), the founder MUST match it.
   // Unlike stage, an untagged founder is rejected here: we don't know if
   // they fit, and the investor was explicit about who they want.
+  // Exception: the "Any" persona is a wildcard — investors tagged with it
+  // have no preference, so every founder passes the gate.
   const investorPersonas = investorCategories
     ? investorCategories.filter(c => c.type === 'persona')
     : [];
-  if (investorPersonas.length > 0) {
+  const investorAcceptsAnyPersona = investorPersonas.some(c => c.name.toLowerCase() === 'any');
+  if (investorPersonas.length > 0 && !investorAcceptsAnyPersona) {
     const founderPersonas = founderCategories.filter(c => c.type === 'persona');
     if (founderPersonas.length === 0) return false;
     const investorPersonaIds = new Set(investorPersonas.map(c => c.id));

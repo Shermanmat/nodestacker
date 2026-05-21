@@ -274,6 +274,13 @@ try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
 } catch (_) { /* no-op if nodes table doesn't exist yet */ }
 
+// Seed the "Any" persona category — used when a VC has no founder-persona
+// preference. Matching treats it as a wildcard (every founder passes the
+// persona hard gate; persona fit scored as exact).
+try {
+  sqlite.exec(`INSERT OR IGNORE INTO investor_categories (name, type, color) VALUES ('Any', 'persona', 'gray')`);
+} catch (_) { /* no-op if investor_categories doesn't exist yet */ }
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

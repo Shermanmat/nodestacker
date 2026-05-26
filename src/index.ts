@@ -40,6 +40,7 @@ import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
+import { withCronRun } from './services/cron-log.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
@@ -134,6 +135,7 @@ app.use('/api/admin/people/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 app.use('/api/weekly-digest/preview-admin', adminGuard);
+app.use('/api/weekly-digest/cron-runs', adminGuard);
 // Shadow agent — admin-only manual trigger
 app.use('/api/agent/*', adminGuard);
 
@@ -979,7 +981,7 @@ console.log(`NodeStacker server running on http://localhost:${port}`);
 cron.schedule('0 0 * * 6', async () => {
   console.log('[CRON] Running weekly digest job...');
   try {
-    const result = await sendWeeklyDigests();
+    const result = await withCronRun('weekly_digest', () => sendWeeklyDigests());
     console.log('[CRON] Weekly digest complete:', result);
   } catch (err) {
     console.error('[CRON] Weekly digest failed:', err);
@@ -995,7 +997,7 @@ console.log('[CRON] Weekly digest scheduled for Saturday 00:00 UTC (Friday 5pm A
 cron.schedule('0 23 * * 5', async () => {
   console.log('[CRON] Sending digest preview to admin...');
   try {
-    const result = await sendDigestPreviewToAdmin();
+    const result = await withCronRun('weekly_digest_preview', () => sendDigestPreviewToAdmin());
     console.log('[CRON] Digest preview complete:', result);
   } catch (err) {
     console.error('[CRON] Digest preview failed:', err);

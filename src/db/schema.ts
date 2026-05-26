@@ -1216,3 +1216,20 @@ export const peopleOverrides = sqliteTable('people_overrides', {
 
 export type PeopleOverride = typeof peopleOverrides.$inferSelect;
 export type NewPeopleOverride = typeof peopleOverrides.$inferInsert;
+
+// Cron run log — one row per scheduled job invocation. Lets us answer
+// "did the weekly digest actually fire last week?" with a single query
+// instead of guessing from machine state. Status starts as 'running' on
+// insert; the wrapper updates to 'success' / 'error' on completion.
+export const cronRuns = sqliteTable('cron_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  startedAt: text('started_at').notNull().default('CURRENT_TIMESTAMP'),
+  finishedAt: text('finished_at'),
+  status: text('status').notNull().default('running'),
+  result: text('result'),
+  error: text('error'),
+});
+
+export type CronRun = typeof cronRuns.$inferSelect;
+export type NewCronRun = typeof cronRuns.$inferInsert;

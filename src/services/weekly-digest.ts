@@ -412,7 +412,7 @@ MatCap · You're receiving this because you're a MatCap portfolio founder.
  * (introCadenceActive=true) get a short "quiet week, reach out if this looks
  * wrong" email. Dormant founders are skipped entirely.
  */
-export async function sendWeeklyDigests(): Promise<{ sent: number; nudged: number; skipped: number; errors: string[] }> {
+export async function sendWeeklyDigests(opts: { preludeHtml?: string; preludeText?: string } = {}): Promise<{ sent: number; nudged: number; skipped: number; errors: string[] }> {
   const allFounders = await db.query.founders.findMany({
     where: eq(founders.hidden, false),
   });
@@ -424,6 +424,11 @@ export async function sendWeeklyDigests(): Promise<{ sent: number; nudged: numbe
 
   const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
   const portalUrl = `${baseUrl}/founder.html`;
+
+  const withPrelude = (html: string, text: string) => ({
+    html: opts.preludeHtml ? opts.preludeHtml + html : html,
+    text: opts.preludeText ? opts.preludeText + text : text,
+  });
 
   for (const founder of allFounders) {
     try {
@@ -438,18 +443,20 @@ export async function sendWeeklyDigests(): Promise<{ sent: number; nudged: numbe
         }
 
         const { subject, html, text } = generateNoActivityEmail(founder.name, portalUrl);
-        await sendEmail({ to: founder.email, subject, html, text });
+        const body = withPrelude(html, text);
+        await sendEmail({ to: founder.email, subject, html: body.html, text: body.text });
         nudged++;
         console.log(`[WEEKLY-DIGEST] Nudged ${founder.name} (${founder.email}) - no activity`);
         continue;
       }
 
       const { subject, html, text } = generateDigestEmail(founder.name, activity, portalUrl);
+      const body = withPrelude(html, text);
       await sendEmail({
         to: founder.email,
         subject,
-        html,
-        text,
+        html: body.html,
+        text: body.text,
       });
 
       sent++;

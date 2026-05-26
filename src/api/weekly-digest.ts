@@ -1,5 +1,7 @@
 import { Hono } from 'hono';
+import { desc } from 'drizzle-orm';
 import { sendWeeklyDigests, previewDigest, sendDigestPreviewToAdmin } from '../services/weekly-digest.js';
+import { db, cronRuns } from '../db/index.js';
 
 const app = new Hono();
 
@@ -22,8 +24,26 @@ app.post('/send', async (c) => {
     return c.json({ error: 'Invalid token' }, 401);
   }
 
-  console.log('[WEEKLY-DIGEST] Starting weekly digest send...');
-  const result = await sendWeeklyDigests();
+  // Optional apology / context note prepended to every founder's email.
+  // Used after a missed scheduled send so the off-cycle delivery doesn't
+  // feel unexplained.
+  const body = await c.req.json().catch(() => ({} as any));
+  const apology: string | undefined = (body?.apology || '').trim() || undefined;
+
+  let preludeHtml: string | undefined;
+  let preludeText: string | undefined;
+  if (apology) {
+    const safeApology = apology
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+    preludeHtml = `<div style="border-left:3px solid #00C2E0;padding:10px 14px;background:#f0fbfd;margin:0 0 22px 0;color:#333;font-size:14px;line-height:1.55;border-radius:2px"><strong>Quick note:</strong> ${safeApology}</div>`;
+    preludeText = `Quick note: ${apology}\n\n`;
+  }
+
+  console.log('[WEEKLY-DIGEST] Starting weekly digest send...', apology ? '(with apology note)' : '');
+  const result = await sendWeeklyDigests({ preludeHtml, preludeText });
 
   return c.json({
     success: true,
@@ -65,6 +85,12 @@ app.get('/preview/:founderId', async (c) => {
     html: preview.html,
     text: preview.text,
   });
+});
+
+// Recent cron runs — last 50 across all jobs. Admin-only.
+app.get('/cron-runs', async (c) => {
+  const rows = await db.select().from(cronRuns).orderBy(desc(cronRuns.startedAt)).limit(50);
+  return c.json({ rows });
 });
 
 export default app;

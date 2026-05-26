@@ -85,13 +85,16 @@ async function getFounderWeeklyActivity(founderId: number, weekOffset = 0): Prom
   const weekEndStr = weekEndExclusive.toISOString();
   const today = new Date().toISOString().split('T')[0];
 
-  // Get all intro requests for this founder
-  const allIntros = await db.query.introRequests.findMany({
+  // Get all intro requests for this founder. Exclude pending_suggestion — those
+  // are admin-only matching-agent suggestions awaiting approval; the founder
+  // shouldn't see them in their digest.
+  const allIntrosRaw = await db.query.introRequests.findMany({
     where: eq(introRequests.founderId, founderId),
     with: {
       investor: true,
     },
   });
+  const allIntros = allIntrosRaw.filter(i => i.status !== 'pending_suggestion');
 
   // Filter for activity in the target week (created or updated within the window)
   const weeklyIntros = allIntros.filter(intro => {
@@ -172,8 +175,9 @@ async function getFounderWeeklyActivity(founderId: number, weekOffset = 0): Prom
   ).length;
   const acceptRate = decided > 0 ? Math.round((introduced / decided) * 100) : 0;
 
-  // Global accept rate (all founders)
-  const allRequests = await db.select().from(introRequests);
+  // Global accept rate (all founders). Same exclusion of pending_suggestion.
+  const allRequestsRaw = await db.select().from(introRequests);
+  const allRequests = allRequestsRaw.filter(i => i.status !== 'pending_suggestion');
   const globalIntroduced = allRequests.filter(i =>
     ['introduced', 'first_meeting_complete', 'second_meeting_complete', 'circle_back_round_opens', 'invested'].includes(i.status)
   ).length;

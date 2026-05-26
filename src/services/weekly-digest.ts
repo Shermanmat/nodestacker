@@ -31,14 +31,15 @@ interface WeeklyActivity {
 }
 
 /**
- * Get the start of the current week (Monday 00:00 UTC)
+ * Get the start of a week (Monday 00:00 UTC). weekOffset 0 = current week,
+ * -1 = last week, etc. Lets us send a retrospective digest for a missed run.
  */
-function getWeekStart(): Date {
+function getWeekStart(weekOffset = 0): Date {
   const now = new Date();
   const dayOfWeek = now.getUTCDay();
   const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
   const monday = new Date(now);
-  monday.setUTCDate(now.getUTCDate() - daysFromMonday);
+  monday.setUTCDate(now.getUTCDate() - daysFromMonday + (weekOffset * 7));
   monday.setUTCHours(0, 0, 0, 0);
   return monday;
 }
@@ -72,9 +73,16 @@ function formatStatus(status: string): string {
 /**
  * Get weekly activity for a founder
  */
-async function getFounderWeeklyActivity(founderId: number): Promise<WeeklyActivity | null> {
-  const weekStart = getWeekStart();
+async function getFounderWeeklyActivity(founderId: number, weekOffset = 0): Promise<WeeklyActivity | null> {
+  const weekStart = getWeekStart(weekOffset);
   const weekStartStr = weekStart.toISOString();
+  // Exclusive upper bound — next Monday 00:00 UTC. With weekOffset=0 this is
+  // effectively "now or later" (filters by >= start only, since updatedAt
+  // can't be in the future). With weekOffset=-1 it confines the window to
+  // last week alone.
+  const weekEndExclusive = new Date(weekStart);
+  weekEndExclusive.setUTCDate(weekStart.getUTCDate() + 7);
+  const weekEndStr = weekEndExclusive.toISOString();
   const today = new Date().toISOString().split('T')[0];
 
   // Get all intro requests for this founder
@@ -85,10 +93,10 @@ async function getFounderWeeklyActivity(founderId: number): Promise<WeeklyActivi
     },
   });
 
-  // Filter for activity this week (created or updated this week)
+  // Filter for activity in the target week (created or updated within the window)
   const weeklyIntros = allIntros.filter(intro => {
     const updatedAt = intro.updatedAt || intro.createdAt;
-    return updatedAt >= weekStartStr;
+    return updatedAt >= weekStartStr && updatedAt < weekEndStr;
   });
 
   // If no activity this week, return null
@@ -104,14 +112,16 @@ async function getFounderWeeklyActivity(founderId: number): Promise<WeeklyActivi
   let investments = 0;
   const introUpdates: WeeklyActivity['introUpdates'] = [];
 
+  const weekStartDay = weekStartStr.split('T')[0];
+  const weekEndDay = weekEndStr.split('T')[0];
   for (const intro of weeklyIntros) {
-    // Check if created this week
-    if (intro.createdAt >= weekStartStr) {
+    // Check if created within the target week
+    if (intro.createdAt >= weekStartStr && intro.createdAt < weekEndStr) {
       newRequests++;
     }
 
     // Check status-based activity
-    if (intro.status === 'introduced' && intro.dateIntroduced && intro.dateIntroduced >= weekStartStr.split('T')[0]) {
+    if (intro.status === 'introduced' && intro.dateIntroduced && intro.dateIntroduced >= weekStartDay && intro.dateIntroduced < weekEndDay) {
       introsMade++;
     }
     if (intro.status === 'first_meeting_complete' || intro.status === 'second_meeting_complete') {
@@ -193,8 +203,8 @@ async function getFounderWeeklyActivity(founderId: number): Promise<WeeklyActivi
 /**
  * Generate the email HTML for a founder's weekly digest
  */
-function generateDigestEmail(founderName: string, activity: WeeklyActivity, portalUrl: string): { subject: string; html: string; text: string } {
-  const weekStart = getWeekStart();
+function generateDigestEmail(founderName: string, activity: WeeklyActivity, portalUrl: string, weekOffset = 0): { subject: string; html: string; text: string } {
+  const weekStart = getWeekStart(weekOffset);
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
 
@@ -412,7 +422,8 @@ MatCap · You're receiving this because you're a MatCap portfolio founder.
  * (introCadenceActive=true) get a short "quiet week, reach out if this looks
  * wrong" email. Dormant founders are skipped entirely.
  */
-export async function sendWeeklyDigests(opts: { preludeHtml?: string; preludeText?: string } = {}): Promise<{ sent: number; nudged: number; skipped: number; errors: string[] }> {
+export async function sendWeeklyDigests(opts: { preludeHtml?: string; preludeText?: string; weekOffset?: number } = {}): Promise<{ sent: number; nudged: number; skipped: number; errors: string[] }> {
+  const weekOffset = opts.weekOffset ?? 0;
   const allFounders = await db.query.founders.findMany({
     where: eq(founders.hidden, false),
   });
@@ -432,7 +443,7 @@ export async function sendWeeklyDigests(opts: { preludeHtml?: string; preludeTex
 
   for (const founder of allFounders) {
     try {
-      const activity = await getFounderWeeklyActivity(founder.id);
+      const activity = await getFounderWeeklyActivity(founder.id, weekOffset);
 
       if (!activity) {
         // No activity — only nudge actively-raising founders, skip dormant ones
@@ -450,7 +461,7 @@ export async function sendWeeklyDigests(opts: { preludeHtml?: string; preludeTex
         continue;
       }
 
-      const { subject, html, text } = generateDigestEmail(founder.name, activity, portalUrl);
+      const { subject, html, text } = generateDigestEmail(founder.name, activity, portalUrl, weekOffset);
       const body = withPrelude(html, text);
       await sendEmail({
         to: founder.email,

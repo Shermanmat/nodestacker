@@ -29,6 +29,7 @@ app.post('/send', async (c) => {
   // feel unexplained.
   const body = await c.req.json().catch(() => ({} as any));
   const apology: string | undefined = (body?.apology || '').trim() || undefined;
+  const weekOffset: number = Number.isFinite(body?.weekOffset) ? Number(body.weekOffset) : 0;
 
   let preludeHtml: string | undefined;
   let preludeText: string | undefined;
@@ -42,8 +43,8 @@ app.post('/send', async (c) => {
     preludeText = `Quick note: ${apology}\n\n`;
   }
 
-  console.log('[WEEKLY-DIGEST] Starting weekly digest send...', apology ? '(with apology note)' : '');
-  const result = await sendWeeklyDigests({ preludeHtml, preludeText });
+  console.log('[WEEKLY-DIGEST] Starting weekly digest send...', `weekOffset=${weekOffset}`, apology ? '(with apology note)' : '');
+  const result = await sendWeeklyDigests({ preludeHtml, preludeText, weekOffset });
 
   return c.json({
     success: true,

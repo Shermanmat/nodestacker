@@ -274,6 +274,23 @@ try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
 } catch (_) { /* no-op if nodes table doesn't exist yet */ }
 
+// Cron run log — one row per scheduled job invocation.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`cron_runs\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`name\` text NOT NULL,
+    \`started_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    \`finished_at\` text,
+    \`status\` text NOT NULL DEFAULT 'running',
+    \`result\` text,
+    \`error\` text
+  )`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_cron_runs_name_started\` ON \`cron_runs\` (\`name\`, \`started_at\`)`);
+  console.log('  Ensured cron_runs table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

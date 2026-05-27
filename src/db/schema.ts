@@ -105,6 +105,7 @@ export const investors = sqliteTable('investors', {
   pausedUntil: text('paused_until'), // ISO date — investor paused (e.g. raising fund)
   pauseReason: text('pause_reason'),
   city: text('city'),
+  state: text('state'), // 2-char US state code (e.g. "CA"). Inferred from city via us-states map at row create / backfill; admin can override on the investor edit form.
   country: text('country'),
   notes: text('notes'), // Free-form admin notes — non-categorical quirks ("doesn't take cold intros", "asks for revenue first")
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),

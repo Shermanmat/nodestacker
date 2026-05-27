@@ -1007,6 +1007,10 @@
               <option value="">All Countries</option>
               <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
             </select>
+            <select v-model="filterByState" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="">All States</option>
+              <option v-for="s in availableInvestorStates" :key="s" :value="s">{{ s }}</option>
+            </select>
             <input v-model="investorSearchQuery" type="text" placeholder="Search investors..."
               class="border rounded-lg px-3 py-2 text-sm w-64">
             <button @click="showInvestorModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
@@ -2970,10 +2974,18 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Geography</label>
               <input v-model="investorForm.geography" type="text" class="w-full border rounded px-3 py-2">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input v-model="investorForm.city" type="text" placeholder="e.g. San Francisco" class="w-full border rounded px-3 py-2">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">State <span class="text-gray-400 font-normal">(US)</span></label>
+                <select v-model="investorForm.state" class="w-full border rounded px-3 py-2">
+                  <option :value="null">-</option>
+                  <option v-for="s in usStates" :key="s.code" :value="s.code">{{ s.code }} — {{ s.name }}</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Auto-filled from city when known.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
@@ -4612,7 +4624,7 @@
           loadFounders();
         };
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', notes: '', excludedCategoryIds: [], newStageId: '', newPersonaId: '', newSectorId: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', state: null, country: '', notes: '', excludedCategoryIds: [], newStageId: '', newPersonaId: '', newSectorId: '' });
         // Full list of categories (any type) — used to populate the "Won't take" picker.
         const allExclusionCategories = ref([]);
 
@@ -4690,6 +4702,34 @@
         const filterByNodeId = ref('');
         const filterByCategoryId = ref('');
         const filterByCountry = ref('');
+        const filterByState = ref('');
+
+        // 50 US states + DC, matches src/services/us-states.ts.
+        const usStates = [
+          {code:'AL',name:'Alabama'},{code:'AK',name:'Alaska'},{code:'AZ',name:'Arizona'},{code:'AR',name:'Arkansas'},
+          {code:'CA',name:'California'},{code:'CO',name:'Colorado'},{code:'CT',name:'Connecticut'},{code:'DE',name:'Delaware'},
+          {code:'DC',name:'District of Columbia'},{code:'FL',name:'Florida'},{code:'GA',name:'Georgia'},{code:'HI',name:'Hawaii'},
+          {code:'ID',name:'Idaho'},{code:'IL',name:'Illinois'},{code:'IN',name:'Indiana'},{code:'IA',name:'Iowa'},
+          {code:'KS',name:'Kansas'},{code:'KY',name:'Kentucky'},{code:'LA',name:'Louisiana'},{code:'ME',name:'Maine'},
+          {code:'MD',name:'Maryland'},{code:'MA',name:'Massachusetts'},{code:'MI',name:'Michigan'},{code:'MN',name:'Minnesota'},
+          {code:'MS',name:'Mississippi'},{code:'MO',name:'Missouri'},{code:'MT',name:'Montana'},{code:'NE',name:'Nebraska'},
+          {code:'NV',name:'Nevada'},{code:'NH',name:'New Hampshire'},{code:'NJ',name:'New Jersey'},{code:'NM',name:'New Mexico'},
+          {code:'NY',name:'New York'},{code:'NC',name:'North Carolina'},{code:'ND',name:'North Dakota'},{code:'OH',name:'Ohio'},
+          {code:'OK',name:'Oklahoma'},{code:'OR',name:'Oregon'},{code:'PA',name:'Pennsylvania'},{code:'RI',name:'Rhode Island'},
+          {code:'SC',name:'South Carolina'},{code:'SD',name:'South Dakota'},{code:'TN',name:'Tennessee'},{code:'TX',name:'Texas'},
+          {code:'UT',name:'Utah'},{code:'VT',name:'Vermont'},{code:'VA',name:'Virginia'},{code:'WA',name:'Washington'},
+          {code:'WV',name:'West Virginia'},{code:'WI',name:'Wisconsin'},{code:'WY',name:'Wyoming'},
+        ];
+
+        // Only show state options that are actually present in the DB so the
+        // dropdown isn't a wall of 51 mostly-empty buckets. Sorted alphabetically.
+        const availableInvestorStates = computed(() => {
+          const set = new Set();
+          for (const inv of investors.value) {
+            if (inv.state) set.add(inv.state);
+          }
+          return [...set].sort();
+        });
 
         const countries = [
           {code:'AF',name:'Afghanistan'},{code:'AL',name:'Albania'},{code:'DZ',name:'Algeria'},{code:'AR',name:'Argentina'},
@@ -5176,6 +5216,11 @@
           // Filter by country
           if (filterByCountry.value) {
             results = results.filter(inv => inv.country === filterByCountry.value);
+          }
+
+          // Filter by US state
+          if (filterByState.value) {
+            results = results.filter(inv => inv.state === filterByState.value);
           }
 
           // Filter by search query
@@ -6108,6 +6153,7 @@
           filterByNodeId.value = '';
           filterByCategoryId.value = '';
           filterByCountry.value = '';
+          filterByState.value = '';
           activeTab.value = 'investors';
 
           // Wait for the v-if tab swap to render, then scroll + flash
@@ -7014,7 +7060,7 @@
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
+          Object.assign(investorForm, { name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', state: null, country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
         };
 
         const saveIntro = async () => {
@@ -7369,7 +7415,7 @@
           introFounderDropdownOpen, introNodeDropdownOpen, introInvestorDropdownOpen,
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
-          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filteredAdminInvestors,
+          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filterByState, usStates, availableInvestorStates, filteredAdminInvestors,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,

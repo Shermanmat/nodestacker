@@ -13,6 +13,21 @@ import {
   inboundIntroLogs,
   instantlyLeads,
 } from '../db/index.js';
+import { inferState, STATE_CODES } from '../services/us-states.js';
+
+// If admin didn't pass an explicit state but did pass a city we recognize,
+// fill it in. Normalizes state codes to uppercase. Returns the (possibly
+// mutated) data object — call before writing to DB.
+function applyStateInference<T extends { city?: string | null; state?: string | null }>(data: T): T {
+  if (data.state) {
+    data.state = String(data.state).trim().toUpperCase();
+    if (!STATE_CODES.has(data.state)) data.state = null;
+  } else if (data.city) {
+    const inferred = inferState(data.city);
+    if (inferred) data.state = inferred;
+  }
+  return data;
+}
 import { z } from 'zod';
 
 const app = new Hono();
@@ -25,6 +40,9 @@ const createInvestorSchema = z.object({
   focusAreas: z.array(z.string()).nullable().optional(),
   checkSize: z.string().nullable().optional(),
   geography: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
 });
 
 const updateInvestorSchema = createInvestorSchema.partial().extend({
@@ -32,8 +50,6 @@ const updateInvestorSchema = createInvestorSchema.partial().extend({
   vip: z.boolean().optional(),
   pausedUntil: z.string().nullable().optional(),
   pauseReason: z.string().nullable().optional(),
-  city: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -295,9 +311,10 @@ app.post('/', async (c) => {
   }
 
   const now = new Date().toISOString();
+  const data = applyStateInference({ ...parsed.data });
   const result = await db.insert(investors).values({
-    ...parsed.data,
-    focusAreas: parsed.data.focusAreas ? JSON.stringify(parsed.data.focusAreas) : null,
+    ...data,
+    focusAreas: data.focusAreas ? JSON.stringify(data.focusAreas) : null,
     createdAt: now,
   }).returning();
 
@@ -317,7 +334,7 @@ app.put('/:id', async (c) => {
     return c.json({ error: parsed.error.issues }, 400);
   }
 
-  const updateData: Record<string, unknown> = { ...parsed.data };
+  const updateData: Record<string, unknown> = { ...applyStateInference({ ...parsed.data }) };
   if (parsed.data.focusAreas) {
     updateData.focusAreas = JSON.stringify(parsed.data.focusAreas);
   }

@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { inferState } from '../services/us-states.js';
 
 const dbPath = process.env.DATABASE_PATH || 'nodestacker.db';
 
@@ -97,6 +98,9 @@ safeAddColumn('investors', 'pause_reason', 'text');
 safeAddColumn('investors', 'email', 'text');
 // Free-form admin notes (non-categorical quirks)
 safeAddColumn('investors', 'notes', 'text');
+// 2-char US state code, used for the admin /investors state filter.
+// Backfilled below from `city` using the us-states city→state map.
+safeAddColumn('investors', 'state', 'text');
 // One-time backfill: pull emails from instantly_leads where they're linked
 try {
   sqlite.exec(`UPDATE investors SET email = (
@@ -107,6 +111,25 @@ try {
     LIMIT 1
   ) WHERE email IS NULL OR email = ''`);
 } catch (_) { /* ok if instantly_leads doesn't exist or no rows match */ }
+
+// One-time backfill of investors.state from investors.city using the
+// us-states map. Only fills rows where state IS NULL (or empty), so admin
+// overrides are never clobbered. Cities not in the map stay NULL — admin
+// fills those manually later.
+try {
+  const rows = sqlite.prepare<unknown[], { id: number; city: string }>(
+    `SELECT id, city FROM investors WHERE (state IS NULL OR state = '') AND city IS NOT NULL AND city != ''`
+  ).all() as Array<{ id: number; city: string }>;
+  const upd = sqlite.prepare('UPDATE investors SET state = ? WHERE id = ?');
+  let n = 0;
+  for (const r of rows) {
+    const inferred = inferState(r.city);
+    if (inferred) { upd.run(inferred, r.id); n++; }
+  }
+  if (n > 0) console.log(`  Backfilled investors.state for ${n} rows from city`);
+} catch (e: any) {
+  if (!e.message?.includes('no such column')) throw e;
+}
 // intro request date tracking
 safeAddColumn('intro_requests', 'date_passed', 'text');
 // Auto-draft agent: track Gmail draft id created for a pending suggestion.

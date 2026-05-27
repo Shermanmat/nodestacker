@@ -12,20 +12,23 @@ import { classifyMatchFit, computeFitScore } from '../services/matching.js';
 
 const app = new Hono();
 
-// Cache the pre-seed stage category id. Looked up lazily on first request,
-// kept for the life of the process. If the row is missing (unlikely — it's
-// part of the seeded taxonomy) we silently omit the stage match.
-let preSeedStageIdPromise: Promise<number | null> | null = null;
-const getPreSeedStageId = async (): Promise<number | null> => {
-  if (!preSeedStageIdPromise) {
-    preSeedStageIdPromise = (async () => {
-      const row = await db.select().from(investorCategories)
-        .where(and(eq(investorCategories.type, 'stage'), eq(investorCategories.name, 'Pre-Seed')))
-        .get();
-      return row?.id ?? null;
+// Cache the pre-seed stage category ids. Prod stage names vary
+// ("pre-seed / seed", "Pre-Seed", etc.) so we match case-insensitively on any
+// name that starts with "pre-seed". Multiple matching rows means the founder
+// gets a stage-fit bonus against any of them. Looked up lazily, cached for
+// process life.
+let preSeedStageIdsPromise: Promise<number[]> | null = null;
+const getPreSeedStageIds = async (): Promise<number[]> => {
+  if (!preSeedStageIdsPromise) {
+    preSeedStageIdsPromise = (async () => {
+      const rows = await db.select().from(investorCategories)
+        .where(eq(investorCategories.type, 'stage'));
+      return rows
+        .filter(r => /^\s*pre[-\s]?seed/i.test(r.name))
+        .map(r => r.id);
     })();
   }
-  return preSeedStageIdPromise;
+  return preSeedStageIdsPromise;
 };
 
 const schema = z.object({
@@ -83,10 +86,10 @@ app.post('/', async (c) => {
   const input = parsed.data;
   const sectorIds = input.sectorIds ?? [];
 
-  // Synthetic founder categories: pre-seed stage + supplied sectors.
-  const preSeedId = await getPreSeedStageId();
+  // Synthetic founder categories: pre-seed stage(s) + supplied sectors.
+  const preSeedIds = await getPreSeedStageIds();
   const founderCategories: { id: number; name: string; type: string }[] = [];
-  if (preSeedId != null) founderCategories.push({ id: preSeedId, name: 'Pre-Seed', type: 'stage' });
+  for (const id of preSeedIds) founderCategories.push({ id, name: 'Pre-Seed', type: 'stage' });
   for (const id of sectorIds) founderCategories.push({ id, name: '', type: 'sector' });
 
   // Fetch all active investors with their category assignments. Join category

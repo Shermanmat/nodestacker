@@ -321,33 +321,14 @@
       const data = await res.json();
       const sectors = Array.isArray(data?.sectors) ? data.sectors : [];
       if (sectors.length === 0) throw new Error('No sectors returned');
-      // Group by parent: parents first, then children indented. Keep it simple —
-      // a single flat alphabetized list works fine if hierarchy is messy.
-      const byId = new Map(sectors.map(c => [c.id, c]));
-      const parents = sectors.filter(c => !c.parentId).sort((a,b) => a.name.localeCompare(b.name));
-      const childrenByParent = new Map();
-      for (const c of sectors) {
-        if (c.parentId) {
-          const arr = childrenByParent.get(c.parentId) || [];
-          arr.push(c);
-          childrenByParent.set(c.parentId, arr);
-        }
-      }
+      // Endpoint already filters to top-level parent sectors — render as a
+      // single alphabetized chip strip.
+      sectors.sort((a, b) => a.name.localeCompare(b.name));
       wrap.innerHTML = '';
-      for (const p of parents) {
-        const label = document.createElement('div');
-        label.className = 'chip-group-label';
-        label.textContent = p.name;
-        wrap.appendChild(label);
-        const chips = document.createElement('div');
-        chips.className = 'chips';
-        // Parent chip itself
-        chips.appendChild(makeChip(p));
-        // Children
-        const kids = (childrenByParent.get(p.id) || []).sort((a,b) => a.name.localeCompare(b.name));
-        for (const k of kids) chips.appendChild(makeChip(k));
-        wrap.appendChild(chips);
-      }
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      for (const s of sectors) chips.appendChild(makeChip(s));
+      wrap.appendChild(chips);
       state.sectorsLoaded = true;
     } catch (e) {
       wrap.innerHTML = '<div class="step-hint" style="color:#c44">Couldn\'t load sectors — continue anyway and we\'ll rank generalists for you.</div>';
@@ -462,6 +443,20 @@
   function escapeHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+
+  // URL auto-fill: when a founder types a LinkedIn or website without the
+  // protocol and tabs away, prepend "https://" so they see what gets submitted.
+  // Server also normalizes (defense-in-depth) but this fixes the field visually.
+  function autoFillProtocol(el){
+    const v = (el.value || '').trim();
+    if (!v) return;
+    if (/^https?:\/\//i.test(v)) return;
+    el.value = 'https://' + v;
+  }
+  ['f-linkedin', 'f-website'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => autoFillProtocol(el));
+  });
 
   setStep(1);
 })();

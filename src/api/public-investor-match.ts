@@ -53,16 +53,18 @@ const schema = z.object({
   email: z.string().email(),
 });
 
-// Public sector list for the matcher form. Returns a flat list of {id, name,
-// parentId} for `type='sector'` only. No stages / personas exposed — those
-// aren't needed by the form and could leak internal taxonomy.
+// Public sector list for the matcher form. Returns only **parent** sectors
+// (the ~15 top-level industry buckets) — sub-sectors are hidden to keep the
+// chip picker scannable. The scoring API still accepts sub-sector ids if a
+// future surface wants to send them; this endpoint just doesn't surface them.
 app.get('/sectors', async (c) => {
   const rows = await db.select({
     id: investorCategories.id,
     name: investorCategories.name,
     parentId: investorCategories.parentId,
   }).from(investorCategories).where(eq(investorCategories.type, 'sector'));
-  return c.json({ sectors: rows });
+  const parents = rows.filter(r => r.parentId == null);
+  return c.json({ sectors: parents });
 });
 
 type Match = {

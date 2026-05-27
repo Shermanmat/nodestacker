@@ -31,6 +31,7 @@ import publicCompaniesRoutes from './api/public-companies.js';
 import publicIntrosRoutes from './api/public-intros.js';
 import publicPortfolioRoutes from './api/public-portfolio.js';
 import publicDensityRoutes from './api/public-density.js';
+import publicInvestorMatchRoutes from './api/public-investor-match.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
 import marketplaceHealthRoutes from './api/marketplace-health.js';
@@ -72,6 +73,9 @@ app.route('/api/public/intros', publicIntrosRoutes);
 app.route('/api/public/portfolio', publicPortfolioRoutes);
 // Aggregated founder/user city counts for /expand map. Public.
 app.route('/api/public/density', publicDensityRoutes);
+// Investor matcher — public lead magnet. Takes founder profile, returns top
+// 10 investors by category fit; captures the profile into people_captures.
+app.route('/api/public/investor-match', publicInvestorMatchRoutes);
 // Onboarding chat is public (founder intake interview)
 // Admin endpoints (/leads, /leads/:id/convert) are protected below
 app.route('/api/onboarding-chat', onboardingChatRoutes);
@@ -940,6 +944,7 @@ app.get('/intros', serveStatic({ path: './public/intros.html' }));
 app.get('/expand', serveStatic({ path: './public/expand.html' }));
 app.get('/equity-calculator', serveStatic({ path: './public/equity-calculator.html' }));
 app.get('/raise-planner', serveStatic({ path: './public/raise-planner.html' }));
+app.get('/investor-matcher', serveStatic({ path: './public/investor-matcher.html' }));
 app.get('/case-studies', serveStatic({ path: './public/case-studies.html' }));
 app.get('/case-studies/rosotics', serveStatic({ path: './public/case-studies/rosotics.html' }));
 app.get('/case-studies/stealth-300k', serveStatic({ path: './public/case-studies/stealth-300k.html' }));

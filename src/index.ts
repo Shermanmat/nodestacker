@@ -206,6 +206,17 @@ app.post('/api/agent/followup-now', async (c) => {
   return c.json(result);
 });
 
+// One-shot: re-run the (now investor-scoped) reply check against every intro
+// where replyDetectedAt is set. If the new check says the investor never
+// actually replied, clear replyDetectedAt so the follow-up agent picks the
+// intro back up. Used to recover from the node-as-reply false positives that
+// existed before the gmail.ts fix.
+app.post('/api/agent/recheck-replies', async (c) => {
+  const { recheckReplyDetections } = await import('./services/agent.js');
+  const result = await recheckReplyDetections();
+  return c.json(result);
+});
+
 // Rescore every pending match_suggestion using the current scoring formula.
 // One-shot tool for the case where suggestions were generated under an older
 // algorithm and now show stale scores in the audit table.

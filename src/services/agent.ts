@@ -510,10 +510,12 @@ export async function runFollowupTick(): Promise<{
     const founder = await db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) });
     if (!investor || !investor.email || !founder || !intro.gmailThreadId) continue;
 
-    // 1. Check if investor has replied — if so, stop the follow-up cycle for them
+    // 1. Check if the *investor* (not the node) has replied. Passing the
+    //    investor's email scopes the check so node forwards in-thread don't
+    //    register as the investor replying.
     let threadInfo: { hasReply: boolean; lastReplyAt?: string };
     try {
-      threadInfo = await checkThreadReplies(intro.gmailThreadId);
+      threadInfo = await checkThreadReplies(intro.gmailThreadId, investor.email);
     } catch (e: any) {
       results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: `thread check failed: ${e.message || e}` });
       continue;
@@ -583,4 +585,63 @@ export async function runFollowupTick(): Promise<{
   }
 
   return { checked: candidates.length, drafted, repliesDetected, results };
+}
+
+// One-shot: re-evaluate every intro currently marked replyDetectedAt and
+// clear the flag for those where the *investor* never actually replied. Used
+// to recover from the pre-fix false positives (a node forwarding/replying
+// inside the thread used to count as the investor responding).
+export async function recheckReplyDetections(): Promise<{
+  checked: number;
+  cleared: number;
+  kept: number;
+  skipped: number;
+  rows: Array<{ introId: number; investorName: string; investorEmail: string | null; action: 'cleared' | 'kept' | 'skipped'; detail?: string }>;
+}> {
+  const gmail = await getGmailStatus();
+  if (!gmail.connected) {
+    return { checked: 0, cleared: 0, kept: 0, skipped: 0, rows: [] };
+  }
+
+  const flagged = await db.select().from(introRequests)
+    .where(and(
+      sql`${introRequests.replyDetectedAt} IS NOT NULL`,
+      sql`${introRequests.gmailThreadId} IS NOT NULL AND ${introRequests.gmailThreadId} != ''`,
+    ));
+
+  let cleared = 0, kept = 0, skipped = 0;
+  const rows: Array<{ introId: number; investorName: string; investorEmail: string | null; action: 'cleared' | 'kept' | 'skipped'; detail?: string }> = [];
+
+  for (const intro of flagged) {
+    const investor = await db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) });
+    if (!investor) {
+      skipped++;
+      rows.push({ introId: intro.id, investorName: 'Unknown', investorEmail: null, action: 'skipped', detail: 'investor not found' });
+      continue;
+    }
+    if (!investor.email) {
+      // Can't scope without an email; leave the flag alone rather than guess.
+      skipped++;
+      rows.push({ introId: intro.id, investorName: investor.name, investorEmail: null, action: 'skipped', detail: 'no investor email — flag left as-is' });
+      continue;
+    }
+    try {
+      const info = await checkThreadReplies(intro.gmailThreadId!, investor.email);
+      if (info.hasReply) {
+        kept++;
+        rows.push({ introId: intro.id, investorName: investor.name, investorEmail: investor.email, action: 'kept' });
+      } else {
+        await db.update(introRequests)
+          .set({ replyDetectedAt: null, updatedAt: new Date().toISOString() })
+          .where(eq(introRequests.id, intro.id));
+        cleared++;
+        rows.push({ introId: intro.id, investorName: investor.name, investorEmail: investor.email, action: 'cleared' });
+      }
+    } catch (e: any) {
+      skipped++;
+      rows.push({ introId: intro.id, investorName: investor.name, investorEmail: investor.email, action: 'skipped', detail: `thread check failed: ${e.message || e}` });
+    }
+  }
+
+  return { checked: flagged.length, cleared, kept, skipped, rows };
 }

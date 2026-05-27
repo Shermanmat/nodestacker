@@ -318,17 +318,33 @@ export async function sendGmail(input: DraftInput): Promise<{ messageId: string;
   };
 }
 
-// Inspect a Gmail thread for inbound messages — any message NOT sent by us.
-// Used by the follow-up agent to stop bumping investors who've replied.
-// Returns the most recent non-self message timestamp (ms) if one exists.
-export async function checkThreadReplies(threadId: string): Promise<{
+// Inspect a Gmail thread for a reply *from a specific sender* (the investor).
+// Earlier behavior counted any non-self message as a reply, which produced
+// false positives whenever the node forwarded/replied inside the thread to
+// pass the intro along — the node is not the investor, so that shouldn't
+// pause the follow-up cycle.
+//
+// Pass `investorEmail` to scope the check. If omitted, falls back to the old
+// "any non-self message" behavior for backwards compatibility (no callers
+// should rely on that going forward).
+export async function checkThreadReplies(
+  threadId: string,
+  investorEmail?: string,
+): Promise<{
   hasReply: boolean;
   lastReplyAt?: string;
   messageCount: number;
 }> {
   const client = await getAuthedClient();
   const stored = await loadStoredCredentials();
-  const myEmail = (stored?.email || '').toLowerCase();
+  // OAuth scope is gmail.modify, which doesn't cover userinfo.get() — so
+  // `stored.email` is typically undefined and `myEmail` was the empty string.
+  // That made every From: header non-empty pass the `from === myEmail` check
+  // and counted our own outbound intro as a reply (root cause of the false
+  // positives). Fall back to ADMIN_EMAIL so we can still recognize our own
+  // sends even without re-running OAuth.
+  const myEmail = (stored?.email || process.env.ADMIN_EMAIL || '').toLowerCase();
+  const targetEmail = (investorEmail || '').trim().toLowerCase();
   const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
   const res = await gmail.users.threads.get({
     userId: 'me',
@@ -346,6 +362,10 @@ export async function checkThreadReplies(threadId: string): Promise<{
     const emailMatch = fromHeader.match(/<([^>]+)>/);
     const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
     if (!from || from === myEmail) continue;
+    // If we know the investor's email, require a match — otherwise messages
+    // from the node (who forwarded the intro) would count as the investor
+    // replying.
+    if (targetEmail && from !== targetEmail) continue;
     hasReply = true;
     const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date')?.value;
     const t = dateHeader ? new Date(dateHeader).getTime() : (msg.internalDate ? parseInt(msg.internalDate) : 0);

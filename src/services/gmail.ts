@@ -337,7 +337,13 @@ export async function checkThreadReplies(
 }> {
   const client = await getAuthedClient();
   const stored = await loadStoredCredentials();
-  const myEmail = (stored?.email || '').toLowerCase();
+  // OAuth scope is gmail.modify, which doesn't cover userinfo.get() — so
+  // `stored.email` is typically undefined and `myEmail` was the empty string.
+  // That made every From: header non-empty pass the `from === myEmail` check
+  // and counted our own outbound intro as a reply (root cause of the false
+  // positives). Fall back to ADMIN_EMAIL so we can still recognize our own
+  // sends even without re-running OAuth.
+  const myEmail = (stored?.email || process.env.ADMIN_EMAIL || '').toLowerCase();
   const targetEmail = (investorEmail || '').trim().toLowerCase();
   const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
   const res = await gmail.users.threads.get({

@@ -31,15 +31,38 @@ const getPreSeedStageIds = async (): Promise<number[]> => {
   return preSeedStageIdsPromise;
 };
 
+// Lenient URL coerce: founders type "linkedin.com/in/me" without the protocol
+// all the time. We normalize before validating so submissions don't 400.
+const normalizeUrl = (v: unknown): unknown => {
+  if (typeof v !== 'string') return v;
+  const t = v.trim();
+  if (t === '') return undefined;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://${t}`;
+};
+const lenientUrl = z.preprocess(normalizeUrl, z.string().url().max(500).optional());
+
 const schema = z.object({
   name: z.string().min(1).max(120),
   companyName: z.string().min(1).max(120),
   oneLiner: z.string().min(1).max(280),
-  websiteUrl: z.string().url().nullable().optional().or(z.literal('')),
-  linkedinUrl: z.string().url(),
+  websiteUrl: lenientUrl,
+  linkedinUrl: z.preprocess(normalizeUrl, z.string().url().max(500)),
   city: z.string().min(1).max(120),
   sectorIds: z.array(z.number().int()).max(3).optional(),
   email: z.string().email(),
+});
+
+// Public sector list for the matcher form. Returns a flat list of {id, name,
+// parentId} for `type='sector'` only. No stages / personas exposed — those
+// aren't needed by the form and could leak internal taxonomy.
+app.get('/sectors', async (c) => {
+  const rows = await db.select({
+    id: investorCategories.id,
+    name: investorCategories.name,
+    parentId: investorCategories.parentId,
+  }).from(investorCategories).where(eq(investorCategories.type, 'sector'));
+  return c.json({ sectors: rows });
 });
 
 type Match = {

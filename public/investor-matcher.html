@@ -316,9 +316,11 @@
   async function loadSectors(){
     const wrap = $('chip-groups');
     try {
-      const res = await fetch('/api/categories');
-      const cats = await res.json();
-      const sectors = cats.filter(c => c.type === 'sector');
+      const res = await fetch('/api/public/investor-match/sectors');
+      if (!res.ok) throw new Error(`Sectors fetch returned ${res.status}`);
+      const data = await res.json();
+      const sectors = Array.isArray(data?.sectors) ? data.sectors : [];
+      if (sectors.length === 0) throw new Error('No sectors returned');
       // Group by parent: parents first, then children indented. Keep it simple —
       // a single flat alphabetized list works fine if hierarchy is messy.
       const byId = new Map(sectors.map(c => [c.id, c]));
@@ -400,13 +402,27 @@
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body),
       });
-      if (!res.ok) throw new Error(`Server returned ${res.status}`);
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const errBody = await res.json();
+          // zod flatten() shape: { fieldErrors: {fieldName: [msg, ...]} }
+          if (errBody?.error?.fieldErrors) {
+            const parts = [];
+            for (const [field, msgs] of Object.entries(errBody.error.fieldErrors)) {
+              if (Array.isArray(msgs) && msgs.length) parts.push(`${field}: ${msgs[0]}`);
+            }
+            detail = parts.join('\n');
+          }
+        } catch {}
+        throw new Error(detail || `Server returned ${res.status}`);
+      }
       const data = await res.json();
       renderResults(data.matches || []);
     } catch (e) {
       btn.disabled = false;
       btn.textContent = 'Show me my 10 investors →';
-      alert('Something went wrong. Please try again.');
+      alert(`Couldn't submit:\n\n${e.message || e}`);
       console.error(e);
     }
   });

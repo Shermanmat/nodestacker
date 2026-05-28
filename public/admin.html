@@ -1203,6 +1203,9 @@
             <button @click="runFollowupNow" class="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700" :disabled="runningFollowup || !gmailStatus.connected" :title="'For every sent intro with no reply in 7+ days, draft a short bump in the same thread. Max 2 bumps per intro.'">
               {{ runningFollowup ? 'Following up...' : 'Run follow-ups' }}
             </button>
+            <button @click="recheckReplies" class="bg-rose-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-rose-700" :disabled="recheckingReplies || !gmailStatus.connected" :title="'Re-run the (investor-scoped) reply check against every intro currently marked replyDetected. Clears the flag for any whose investor never actually replied so they re-enter the follow-up rotation.'">
+              {{ recheckingReplies ? 'Rechecking...' : 'Recheck replies' }}
+            </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
@@ -5454,6 +5457,26 @@
           finally { runningFollowup.value = false; }
         };
 
+        const recheckingReplies = ref(false);
+        const recheckReplies = async () => {
+          if (!confirm('Re-run the (investor-scoped) reply check against every intro currently marked replyDetected? Clears the flag for any whose investor never actually replied.')) return;
+          recheckingReplies.value = true;
+          try {
+            const result = await api('/agent/recheck-replies', { method: 'POST' });
+            let msg = `Checked ${result.checked} flagged intros.\nCleared (false positives): ${result.cleared}\nKept (real replies): ${result.kept}\nSkipped: ${result.skipped}`;
+            if (result.rows?.length) {
+              const cleared = result.rows.filter(r => r.action === 'cleared').map(r => `• ${r.investorName}`).join('\n');
+              const kept = result.rows.filter(r => r.action === 'kept').map(r => `• ${r.investorName}`).join('\n');
+              if (cleared) msg += `\n\nBack in rotation:\n${cleared}`;
+              if (kept) msg += `\n\nReal replies (flag kept):\n${kept}`;
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { alert('Recheck failed: ' + (e.message || e)); }
+          finally { recheckingReplies.value = false; }
+        };
+
         const sendingGmail = ref(false);
         const sendGmailFromCurrent = async () => {
           if (!introDraftIntroRequestId.value) return;
@@ -7424,6 +7447,7 @@
           runningAgent, runAgentNow,
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,
           runningFollowup, runFollowupNow,
+          recheckingReplies, recheckReplies,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,

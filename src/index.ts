@@ -235,6 +235,22 @@ app.post('/api/agent/followup-one/:id', async (c) => {
   return c.json(result);
 });
 
+// Reply classifier — runs the LLM over investor replies and applies the
+// status transitions. Wraps with withCronRun for the cron path; admin can
+// also trigger manually.
+app.post('/api/agent/classify-replies-now', async (c) => {
+  const { runReplyClassifierTick } = await import('./services/reply-classifier.js');
+  const { withCronRun } = await import('./services/cron-log.js');
+  const result = await withCronRun('reply_classifier', () => runReplyClassifierTick());
+  return c.json(result);
+});
+
+app.get('/api/agent/replies-needing-human', async (c) => {
+  const { getRepliesNeedingHuman } = await import('./services/reply-classifier.js');
+  const result = await getRepliesNeedingHuman();
+  return c.json(result);
+});
+
 // Rescore every pending match_suggestion using the current scoring formula.
 // One-shot tool for the case where suggestions were generated under an older
 // algorithm and now show stale scores in the audit table.
@@ -953,6 +969,24 @@ cron.schedule('0 18 * * *', async () => {
 });
 
 console.log('[CRON] Follow-up agent scheduled for daily 18:00 UTC (11am Arizona)');
+
+// Reply classifier — every hour at :15 past, classify any new investor
+// replies and apply status transitions.
+cron.schedule('15 * * * *', async () => {
+  console.log('[CRON] Running reply classifier tick...');
+  try {
+    const { runReplyClassifierTick } = await import('./services/reply-classifier.js');
+    const { withCronRun } = await import('./services/cron-log.js');
+    const result = await withCronRun('reply_classifier', () => runReplyClassifierTick());
+    console.log('[CRON] Reply classifier result:', result);
+  } catch (err) {
+    console.error('[CRON] Reply classifier failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Reply classifier scheduled hourly at :15');
 
 serve({
   fetch: app.fetch,

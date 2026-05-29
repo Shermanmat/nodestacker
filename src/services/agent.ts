@@ -469,7 +469,7 @@ const FOLLOWUP_GAP_DAYS = 7;
 const CLOSE_LOOP_DAYS = 21;
 
 // Polite bump — 7-21 days since intro request, no reply yet.
-const FOLLOWUP_POLITE = 'Hey {{first}} — wanted to bump this. Any additional info I can share to help you get to a yes or pass?';
+const FOLLOWUP_POLITE = 'Hey {{first}} — wanted to bump this. Any additional info I can share to help you get to a yes (for the intro) or pass? Thanks!';
 
 // Close-the-loop — 21+ days. More direct, asks for any response.
 const FOLLOWUP_CLOSE_LOOP = `Hey {{first}} — wanted to circle back. I'd rather hear from you than assume it's a pass, but sometimes intros just don't get seen the first time around.\n\nQuick yes / no / not now?`;

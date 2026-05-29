@@ -620,7 +620,9 @@ export async function getPendingReplies(): Promise<{
     lastFollowupAt: string | null;
     bucket: 'too-fresh' | 'polite' | 'close-loop';
     templatePreview: string;
-    canDraftBump: boolean; // followupCount < MAX_FOLLOWUPS
+    canDraftBump: boolean; // false when capped OR in cooldown
+    bumpBlockedReason: 'capped' | 'too-fresh' | 'cooldown' | null;
+    daysUntilNextBump: number | null;
     gmailThreadId: string | null;
   }>;
 }> {
@@ -656,6 +658,31 @@ export async function getPendingReplies(): Promise<{
       if (days >= CLOSE_LOOP_DAYS) bucket = 'close-loop';
       else if (days >= FOLLOWUP_GAP_DAYS) bucket = 'polite';
     }
+
+    // Same eligibility logic the cron uses:
+    //   - haven't hit the 2-bump cap
+    //   - intro is at least 7 days old
+    //   - last bump (if any) was at least 7 days ago
+    const fc = intro.followupCount ?? 0;
+    let canDraftBump = true;
+    let bumpBlockedReason: 'capped' | 'too-fresh' | 'cooldown' | null = null;
+    let daysUntilNextBump: number | null = null;
+    if (fc >= MAX_FOLLOWUPS) {
+      canDraftBump = false;
+      bumpBlockedReason = 'capped';
+    } else if (days === null || days < FOLLOWUP_GAP_DAYS) {
+      canDraftBump = false;
+      bumpBlockedReason = 'too-fresh';
+      daysUntilNextBump = days === null ? null : FOLLOWUP_GAP_DAYS - days;
+    } else if (intro.lastFollowupAt) {
+      const daysSinceLast = Math.floor((today - new Date(intro.lastFollowupAt).getTime()) / 86400000);
+      if (daysSinceLast < FOLLOWUP_GAP_DAYS) {
+        canDraftBump = false;
+        bumpBlockedReason = 'cooldown';
+        daysUntilNextBump = FOLLOWUP_GAP_DAYS - daysSinceLast;
+      }
+    }
+
     return {
       introId: intro.id,
       founderId: intro.founderId,
@@ -669,11 +696,13 @@ export async function getPendingReplies(): Promise<{
       nodeName: node?.name ?? null,
       dateRequested: intro.dateRequested,
       daysSinceRequested: days,
-      followupCount: intro.followupCount ?? 0,
+      followupCount: fc,
       lastFollowupAt: intro.lastFollowupAt,
       bucket,
       templatePreview: pickFollowupTemplate(intro.dateRequested),
-      canDraftBump: (intro.followupCount ?? 0) < MAX_FOLLOWUPS,
+      canDraftBump,
+      bumpBlockedReason,
+      daysUntilNextBump,
       gmailThreadId: intro.gmailThreadId,
     };
   });
@@ -714,6 +743,22 @@ export async function draftFollowupForIntro(introId: number): Promise<{
   }
   if ((intro.followupCount ?? 0) >= MAX_FOLLOWUPS) {
     return { ok: false, introId, error: `at max follow-ups (${MAX_FOLLOWUPS})` };
+  }
+  // Cooldown: same gap rule the cron uses. Don't allow a second bump within
+  // FOLLOWUP_GAP_DAYS of the previous one, or within FOLLOWUP_GAP_DAYS of the
+  // original send.
+  const today = Date.now();
+  if (intro.dateRequested) {
+    const daysSinceRequested = Math.floor((today - new Date(intro.dateRequested).getTime()) / 86400000);
+    if (daysSinceRequested < FOLLOWUP_GAP_DAYS) {
+      return { ok: false, introId, error: `intro is only ${daysSinceRequested}d old — wait ${FOLLOWUP_GAP_DAYS - daysSinceRequested}d` };
+    }
+  }
+  if (intro.lastFollowupAt) {
+    const daysSinceLast = Math.floor((today - new Date(intro.lastFollowupAt).getTime()) / 86400000);
+    if (daysSinceLast < FOLLOWUP_GAP_DAYS) {
+      return { ok: false, introId, error: `last bump was ${daysSinceLast}d ago — wait ${FOLLOWUP_GAP_DAYS - daysSinceLast}d` };
+    }
   }
   if (!intro.gmailThreadId) {
     return { ok: false, introId, error: 'no gmail thread id on this intro' };

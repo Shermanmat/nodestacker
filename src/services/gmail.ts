@@ -384,6 +384,7 @@ export async function checkThreadReplies(
 export async function sendThreadReply(input: {
   threadId: string;
   to: string;
+  cc?: string;
   subject: string;
   body: string;
   inReplyTo?: string; // Message-ID of the message we're replying to
@@ -398,6 +399,7 @@ export async function sendThreadReply(input: {
   const rawLines: string[] = [];
   rawLines.push(`From: ${from}`);
   rawLines.push(`To: ${input.to}`);
+  if (input.cc) rawLines.push(`Cc: ${input.cc}`);
   rawLines.push(`Subject: ${input.subject}`);
   if (input.inReplyTo) rawLines.push(`In-Reply-To: ${input.inReplyTo}`);
   if (input.references) rawLines.push(`References: ${input.references}`);
@@ -428,4 +430,89 @@ export async function sendThreadReply(input: {
     messageId: res.data.id || '',
     threadId: res.data.threadId || input.threadId,
   };
+}
+
+// Fetch the most recent message body in `threadId` from `fromEmail`. Used by
+// the reply classifier to grab the investor's actual reply text (not just the
+// "did anyone reply" flag).
+export async function getLatestMessageFromSender(
+  threadId: string,
+  fromEmail: string,
+): Promise<{ body: string; receivedAt: string | null; messageId: string } | null> {
+  const client = await getAuthedClient();
+  const target = (fromEmail || '').trim().toLowerCase();
+  if (!target) return null;
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const thread = await gmail.users.threads.get({
+    userId: 'me',
+    id: threadId,
+    format: 'full',
+  });
+  const messages = thread.data.messages || [];
+  // Walk newest-first.
+  const sorted = [...messages].sort((a, b) => {
+    const at = a.internalDate ? parseInt(a.internalDate) : 0;
+    const bt = b.internalDate ? parseInt(b.internalDate) : 0;
+    return bt - at;
+  });
+  for (const msg of sorted) {
+    const headers = msg.payload?.headers || [];
+    const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from')?.value || '';
+    const emailMatch = fromHeader.match(/<([^>]+)>/);
+    const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
+    if (from !== target) continue;
+    const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date')?.value;
+    const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : null;
+    const body = extractPlainTextBody(msg.payload) || msg.snippet || '';
+    return { body, receivedAt, messageId: msg.id || '' };
+  }
+  return null;
+}
+
+// Pull the text/plain part out of a Gmail message payload. Falls back through
+// nested multipart and HTML-stripped content if plain isn't available.
+function extractPlainTextBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
+  if (!payload) return '';
+  const decode = (b: string | undefined | null) => {
+    if (!b) return '';
+    try {
+      return Buffer.from(b.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    } catch { return ''; }
+  };
+  // 1. Direct text/plain
+  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+    return decode(payload.body.data);
+  }
+  // 2. Search parts
+  const parts = payload.parts || [];
+  for (const p of parts) {
+    if (p.mimeType === 'text/plain' && p.body?.data) return decode(p.body.data);
+  }
+  // 3. Recurse into multipart
+  for (const p of parts) {
+    const inner = extractPlainTextBody(p);
+    if (inner) return inner;
+  }
+  // 4. Fallback: text/html stripped of tags
+  if (payload.mimeType === 'text/html' && payload.body?.data) {
+    const html = decode(payload.body.data);
+    return html.replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  for (const p of parts) {
+    if (p.mimeType === 'text/html' && p.body?.data) {
+      const html = decode(p.body.data);
+      return html.replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
+  return '';
 }

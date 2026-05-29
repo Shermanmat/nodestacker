@@ -166,6 +166,17 @@ export const introRequests = sqliteTable('intro_requests', {
   // someone other than us in the thread. Stops the follow-up agent
   // from bumping investors who've already responded.
   replyDetectedAt: text('reply_detected_at'),
+  // Reply classifier (Phase 1 autonomous agent) — written by runReplyClassifierTick.
+  // Classification is one of: yes / no / not_now / needs_human / out_of_office / wrong_person.
+  // For no & not_now we ALSO write the short reason into passReason so it shows up in
+  // the admin's existing reports — this column is the structured machine label.
+  replyClassification: text('reply_classification'),
+  replyClassificationAt: text('reply_classification_at'),
+  replyClassificationConfidence: text('reply_classification_confidence'), // stored as string so we don't fight sqlite's REAL gotchas
+  replyBodySnippet: text('reply_body_snippet'), // first ~500 chars of what we classified, for audit
+  // Gmail draft id for the founder↔investor intro auto-generated on a "yes".
+  introHandoffDraftId: text('intro_handoff_draft_id'),
+  introHandoffDraftCreatedAt: text('intro_handoff_draft_created_at'),
   // Follow-up tracking
   followupCount: integer('followup_count').notNull().default(0),
   lastFollowupAt: text('last_followup_at'),

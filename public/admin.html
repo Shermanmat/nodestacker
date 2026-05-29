@@ -1296,8 +1296,10 @@
                       class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">
                       {{ pendingDrafting[r.introId] ? 'Drafting…' : 'Draft bump' }}
                     </button>
-                    <span v-else-if="!r.canDraftBump" class="text-xs text-gray-400">Max bumps</span>
-                    <span v-else-if="!r.gmailThreadId" class="text-xs text-gray-400">No thread</span>
+                    <span v-else-if="r.bumpBlockedReason === 'capped'" class="text-xs text-gray-400">Max bumps</span>
+                    <span v-else-if="r.bumpBlockedReason === 'cooldown'" class="text-xs text-gray-400">Wait {{ r.daysUntilNextBump }}d</span>
+                    <span v-else-if="r.bumpBlockedReason === 'too-fresh'" class="text-xs text-gray-400">Too fresh ({{ r.daysUntilNextBump }}d)</span>
+                    <span v-else-if="!r.gmailThreadId" class="text-xs text-gray-400" title="Intro was sent outside the app's Gmail flow, so we don't have a thread to reply into. Bump manually from Gmail.">No thread</span>
                     <span v-else class="text-xs text-gray-400">Connect Gmail</span>
                   </td>
                 </tr>

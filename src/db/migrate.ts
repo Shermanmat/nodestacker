@@ -297,6 +297,15 @@ try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
 } catch (_) { /* no-op if nodes table doesn't exist yet */ }
 
+// Drop dormant podcast-network tables (created in 0004, never used in any
+// route or UI; verified empty on prod before drop).
+try {
+  sqlite.exec('DROP TABLE IF EXISTS \`network_matches\`');
+  sqlite.exec('DROP TABLE IF EXISTS \`network_intro_requests\`');
+  sqlite.exec('DROP TABLE IF EXISTS \`network_founder_research\`');
+  sqlite.exec('DROP TABLE IF EXISTS \`network_founders\`');
+} catch (_) { /* no-op */ }
+
 // Cron run log — one row per scheduled job invocation.
 try {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS \`cron_runs\` (

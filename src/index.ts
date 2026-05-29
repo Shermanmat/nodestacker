@@ -217,6 +217,24 @@ app.post('/api/agent/recheck-replies', async (c) => {
   return c.json(result);
 });
 
+// List every intro where the investor hasn't replied yet, bucketed by age
+// (polite / close-loop), oldest first. Drives the "Awaiting reply" panel.
+app.get('/api/agent/pending-replies', async (c) => {
+  const { getPendingReplies } = await import('./services/agent.js');
+  const result = await getPendingReplies();
+  return c.json(result);
+});
+
+// Draft a single follow-up bump for one intro. Picks the template by age,
+// returns the Gmail draft URL so the admin lands on the draft in one click.
+app.post('/api/agent/followup-one/:id', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (!Number.isFinite(id)) return c.json({ ok: false, error: 'bad intro id' }, 400);
+  const { draftFollowupForIntro } = await import('./services/agent.js');
+  const result = await draftFollowupForIntro(id);
+  return c.json(result);
+});
+
 // Rescore every pending match_suggestion using the current scoring formula.
 // One-shot tool for the case where suggestions were generated under an older
 // algorithm and now show stale scores in the audit table.

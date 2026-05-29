@@ -1242,6 +1242,70 @@
           </div>
         </div>
 
+        <!-- Awaiting Reply panel — investors who haven't responded yet,
+             bucketed by age. Polite bump (7-21d) vs close-the-loop (21d+). -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-lg font-semibold">Awaiting reply</h3>
+              <p class="text-xs text-gray-500 mt-1">Sent intros with no response yet. 7–21d gets a polite nudge; 21d+ gets a "close the loop / yes-no-not-now" ask. Oldest first.</p>
+            </div>
+            <div class="flex gap-2">
+              <button @click="loadPendingReplies" :disabled="loadingPending" class="text-blue-600 text-sm hover:underline disabled:opacity-50">
+                {{ loadingPending ? 'Loading…' : 'Refresh' }}
+              </button>
+              <button @click="togglePendingShowFresh" class="text-xs text-gray-500 hover:text-gray-800">
+                {{ pendingShowFresh ? 'Hide < 7d' : 'Show < 7d' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingPending && pendingReplies.length === 0" class="text-sm text-gray-500 py-6 text-center">Loading…</div>
+          <div v-else-if="pendingRepliesFiltered.length === 0" class="text-sm text-gray-500 py-6 text-center">No pending intros — everything's either replied or hasn't been sent yet.</div>
+
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-gray-600 border-b">
+                  <th class="py-2 pr-3">Bucket</th>
+                  <th class="py-2 pr-3">Founder</th>
+                  <th class="py-2 pr-3">Investor</th>
+                  <th class="py-2 pr-3">Firm</th>
+                  <th class="py-2 pr-3">Sent</th>
+                  <th class="py-2 pr-3">Bumps</th>
+                  <th class="py-2 pr-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in pendingRepliesFiltered" :key="r.introId" class="border-b hover:bg-gray-50">
+                  <td class="py-2 pr-3">
+                    <span :class="['inline-block text-xs font-semibold px-2 py-0.5 rounded', pendingBucketClass(r.bucket)]">
+                      {{ pendingBucketLabel(r.bucket) }}
+                    </span>
+                  </td>
+                  <td class="py-2 pr-3">{{ r.founderName }}<span v-if="r.companyName" class="text-gray-500"> · {{ r.companyName }}</span></td>
+                  <td class="py-2 pr-3">{{ r.investorName }}</td>
+                  <td class="py-2 pr-3 text-gray-600">{{ r.investorFirm || '—' }}</td>
+                  <td class="py-2 pr-3 text-gray-600">{{ r.daysSinceRequested == null ? '—' : r.daysSinceRequested + 'd' }}</td>
+                  <td class="py-2 pr-3 text-gray-600">{{ r.followupCount }}/2</td>
+                  <td class="py-2 pr-3 text-right">
+                    <button v-if="r.canDraftBump && r.gmailThreadId && gmailStatus.connected"
+                      :disabled="pendingDrafting[r.introId]"
+                      @click="draftPendingBump(r)"
+                      :title="r.templatePreview"
+                      class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">
+                      {{ pendingDrafting[r.introId] ? 'Drafting…' : 'Draft bump' }}
+                    </button>
+                    <span v-else-if="!r.canDraftBump" class="text-xs text-gray-400">Max bumps</span>
+                    <span v-else-if="!r.gmailThreadId" class="text-xs text-gray-400">No thread</span>
+                    <span v-else class="text-xs text-gray-400">Connect Gmail</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="bg-white rounded-lg shadow overflow-hidden">
           <table class="w-full text-sm">
             <thead class="bg-gray-50">
@@ -3860,6 +3924,7 @@
           if (tabId === 'directory') loadDirectory();
           if (tabId === 'signups') loadSignups();
           if (tabId === 'brands') loadBrands();
+          if (tabId === 'intros') loadPendingReplies();
         }
 
         // Data
@@ -5475,6 +5540,67 @@
             loadAllIntroRequests();
           } catch (e) { alert('Recheck failed: ' + (e.message || e)); }
           finally { recheckingReplies.value = false; }
+        };
+
+        // Awaiting reply panel state
+        const pendingReplies = ref([]);
+        const loadingPending = ref(false);
+        const pendingShowFresh = ref(false);
+        const pendingDrafting = reactive({}); // { [introId]: bool }
+
+        const pendingRepliesFiltered = computed(() => {
+          return pendingShowFresh.value
+            ? pendingReplies.value
+            : pendingReplies.value.filter(r => r.bucket !== 'too-fresh');
+        });
+
+        const pendingBucketLabel = (b) => ({
+          'too-fresh': '< 7d',
+          'polite': '7–21d',
+          'close-loop': '21d+',
+        })[b] || b;
+
+        const pendingBucketClass = (b) => ({
+          'too-fresh': 'bg-gray-100 text-gray-600',
+          'polite': 'bg-blue-100 text-blue-700',
+          'close-loop': 'bg-amber-100 text-amber-700',
+        })[b] || 'bg-gray-100 text-gray-600';
+
+        const togglePendingShowFresh = () => {
+          pendingShowFresh.value = !pendingShowFresh.value;
+        };
+
+        const loadPendingReplies = async () => {
+          loadingPending.value = true;
+          try {
+            const res = await api('/agent/pending-replies');
+            pendingReplies.value = res.rows || [];
+          } catch (e) {
+            console.error('loadPendingReplies failed', e);
+          } finally {
+            loadingPending.value = false;
+          }
+        };
+
+        const draftPendingBump = async (row) => {
+          const tmplLabel = row.bucket === 'close-loop' ? 'close-the-loop' : 'polite bump';
+          if (!confirm(`Draft a ${tmplLabel} to ${row.investorName} (${row.investorFirm || 'no firm'}) in the existing thread?`)) return;
+          pendingDrafting[row.introId] = true;
+          try {
+            const result = await api(`/agent/followup-one/${row.introId}`, { method: 'POST' });
+            if (!result.ok) {
+              alert('Draft failed: ' + (result.error || 'unknown'));
+            } else if (result.gmailUrl) {
+              window.open(result.gmailUrl, '_blank');
+            } else {
+              alert('Draft created.');
+            }
+            await loadPendingReplies();
+          } catch (e) {
+            alert('Draft failed: ' + (e.message || e));
+          } finally {
+            delete pendingDrafting[row.introId];
+          }
         };
 
         const sendingGmail = ref(false);
@@ -7448,6 +7574,9 @@
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,
           runningFollowup, runFollowupNow,
           recheckingReplies, recheckReplies,
+          pendingReplies, loadingPending, pendingShowFresh, pendingDrafting,
+          pendingRepliesFiltered, pendingBucketLabel, pendingBucketClass,
+          togglePendingShowFresh, loadPendingReplies, draftPendingBump,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,

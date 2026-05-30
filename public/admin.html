@@ -3188,13 +3188,13 @@
 
           <!-- Header strip -->
           <div class="relative px-4 pt-3 pb-2 flex justify-between items-center text-white text-xs uppercase tracking-widest font-bold">
-            <span class="opacity-80">MatCap · Series ’26</span>
+            <span class="opacity-80">Joined {{ tradingCardJoinedLabel }}</span>
             <span class="opacity-60">#{{ tradingCardInvestor.id?.toString().padStart(4, '0') }}</span>
           </div>
 
-          <!-- Avatar frame (smaller to give room for hero stats) -->
-          <div class="relative mx-4 my-1 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg mx-auto"
-            style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); width: 45%; aspect-ratio: 1 / 1;">
+          <!-- Avatar frame -->
+          <div class="relative mx-auto my-1 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg"
+            style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); width: 32%; aspect-ratio: 1 / 1;">
             <img :src="tradingCardAvatarUrl" class="w-full h-full" :alt="tradingCardInvestor.name">
           </div>
 
@@ -5064,6 +5064,13 @@
             .map(p => p[0].toUpperCase())
             .join('.');
           return initials ? initials + '.' : '—';
+        });
+        const tradingCardJoinedLabel = computed(() => {
+          const iso = tradingCardInvestor.value?.createdAt;
+          if (!iso) return '—';
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return '—';
+          return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
         });
         function openTradingCard(item) {
           tradingCardInvestor.value = item;
@@ -8005,7 +8012,7 @@
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filterByState, usStates, availableInvestorStates, filteredAdminInvestors,
           investorSortBy, investorMinIntros, leaderboardShowDetails, leaderboardRankLabel,
           tradingCardInvestor, tradingCardAnonymize, tradingCardAvatarUrl, tradingCardSectors, tradingCardCodename,
-          openTradingCard, cycleAvatarStyle,
+          tradingCardJoinedLabel, openTradingCard, cycleAvatarStyle,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,

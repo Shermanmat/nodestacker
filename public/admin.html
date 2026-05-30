@@ -7,6 +7,7 @@
   <title>Matcap - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <style>
     [v-cloak] { display: none; }
     .sidebar-link { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #94a3b8; cursor: pointer; transition: all 0.15s; }
@@ -3180,7 +3181,7 @@
       @click.self="tradingCardInvestor = null">
       <div class="flex flex-col items-center gap-4">
         <!-- The card -->
-        <div class="relative w-80 rounded-2xl overflow-hidden shadow-2xl"
+        <div ref="tradingCardEl" class="relative w-80 rounded-2xl overflow-hidden shadow-2xl"
           style="background: linear-gradient(135deg, #004854 0%, #00C2E0 55%, #6fe4f3 100%); aspect-ratio: 3 / 4.2;">
           <!-- Holographic shimmer -->
           <div class="absolute inset-0 opacity-30 pointer-events-none"
@@ -3195,7 +3196,7 @@
           <!-- Avatar frame -->
           <div class="relative mx-auto my-1 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg"
             style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); width: 32%; aspect-ratio: 1 / 1;">
-            <img :src="tradingCardAvatarUrl" class="w-full h-full" :alt="tradingCardInvestor.name">
+            <img :src="tradingCardAvatarUrl" crossorigin="anonymous" class="w-full h-full" :alt="tradingCardInvestor.name">
           </div>
 
           <!-- Name plate -->
@@ -3254,6 +3255,10 @@
           </label>
           <button @click="cycleAvatarStyle" class="text-sm text-pink-600 hover:underline">
             Reroll avatar
+          </button>
+          <button @click="downloadTradingCard" :disabled="downloadingTradingCard"
+            class="text-sm text-cyan-700 hover:underline disabled:opacity-50">
+            {{ downloadingTradingCard ? 'Saving…' : 'Download PNG' }}
           </button>
           <button @click="tradingCardInvestor = null" class="text-sm text-gray-500 hover:text-gray-700">
             Close
@@ -5041,6 +5046,8 @@
         const tradingCardInvestor = ref(null);
         const tradingCardAnonymize = ref(false);
         const tradingCardAvatarStyleIdx = ref(0);
+        const tradingCardEl = ref(null);
+        const downloadingTradingCard = ref(false);
         const AVATAR_STYLES = ['avataaars', 'fun-emoji', 'bottts', 'lorelei', 'notionists', 'adventurer'];
         const tradingCardAvatarUrl = computed(() => {
           if (!tradingCardInvestor.value) return '';
@@ -5079,6 +5086,40 @@
         }
         function cycleAvatarStyle() {
           tradingCardAvatarStyleIdx.value++;
+        }
+        async function downloadTradingCard() {
+          if (!tradingCardEl.value || !window.html2canvas) return;
+          downloadingTradingCard.value = true;
+          try {
+            // backgroundColor: null preserves transparency outside the rounded
+            // corners (otherwise html2canvas fills the bounding box white).
+            // scale: 2 gives retina-resolution output.
+            const canvas = await window.html2canvas(tradingCardEl.value, {
+              useCORS: true,
+              backgroundColor: null,
+              scale: 2,
+            });
+            const safeName = (tradingCardAnonymize.value
+              ? tradingCardCodename.value
+              : (tradingCardInvestor.value?.name || 'investor')
+            ).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+            canvas.toBlob((blob) => {
+              if (!blob) return;
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `matcap-card-${safeName}.png`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }, 'image/png');
+          } catch (e) {
+            console.error('Trading card download failed', e);
+            alert('Could not save the card. Try rerolling the avatar (some styles fail CORS) then download again.');
+          } finally {
+            downloadingTradingCard.value = false;
+          }
         }
 
         // 50 US states + DC, matches src/services/us-states.ts.
@@ -8013,6 +8054,7 @@
           investorSortBy, investorMinIntros, leaderboardShowDetails, leaderboardRankLabel,
           tradingCardInvestor, tradingCardAnonymize, tradingCardAvatarUrl, tradingCardSectors, tradingCardCodename,
           tradingCardJoinedLabel, openTradingCard, cycleAvatarStyle,
+          tradingCardEl, downloadingTradingCard, downloadTradingCard,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,

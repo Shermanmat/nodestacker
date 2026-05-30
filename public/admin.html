@@ -3189,19 +3189,17 @@
           <!-- Header strip -->
           <div class="relative px-4 pt-3 pb-2 flex justify-between items-center text-white text-xs uppercase tracking-widest font-bold">
             <span class="opacity-80">MatCap · Series ’26</span>
-            <span class="bg-amber-400 text-amber-900 px-2 py-0.5 rounded-full">
-              {{ tradingCardInvestor.acceptRate != null ? tradingCardInvestor.acceptRate + '%' : 'NEW' }}
-            </span>
+            <span class="opacity-60">#{{ tradingCardInvestor.id?.toString().padStart(4, '0') }}</span>
           </div>
 
-          <!-- Avatar frame -->
-          <div class="relative mx-4 my-2 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg"
-            style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); aspect-ratio: 1 / 1;">
+          <!-- Avatar frame (smaller to give room for hero stats) -->
+          <div class="relative mx-4 my-1 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg mx-auto"
+            style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); width: 45%; aspect-ratio: 1 / 1;">
             <img :src="tradingCardAvatarUrl" class="w-full h-full" :alt="tradingCardInvestor.name">
           </div>
 
           <!-- Name plate -->
-          <div class="relative mx-4 mb-2 px-3 py-2 rounded bg-white/95 text-center">
+          <div class="relative mx-4 mt-2 mb-2 px-3 py-1.5 rounded bg-white/95 text-center">
             <div class="font-black text-base text-gray-900 truncate uppercase tracking-wide">
               {{ tradingCardAnonymize ? tradingCardCodename : tradingCardInvestor.name }}
             </div>
@@ -3219,31 +3217,32 @@
             <span v-if="!tradingCardSectors.length" class="text-[10px] text-white/60">Generalist</span>
           </div>
 
-          <!-- Stats block -->
-          <div class="relative mx-4 mb-3 bg-black/30 backdrop-blur rounded-lg p-3 text-white">
-            <div class="grid grid-cols-4 gap-1 text-center">
-              <div>
-                <div class="text-[9px] uppercase tracking-wider opacity-70">Sent</div>
-                <div class="font-bold tabular-nums">{{ tradingCardInvestor.introTotal || 0 }}</div>
-              </div>
-              <div>
-                <div class="text-[9px] uppercase tracking-wider opacity-70">Yes</div>
-                <div class="font-bold tabular-nums text-emerald-300">{{ tradingCardInvestor.introAccepted || 0 }}</div>
-              </div>
-              <div>
-                <div class="text-[9px] uppercase tracking-wider opacity-70">Pass</div>
-                <div class="font-bold tabular-nums text-rose-300">{{ tradingCardInvestor.introPassed || 0 }}</div>
-              </div>
-              <div>
-                <div class="text-[9px] uppercase tracking-wider opacity-70">Ignore</div>
-                <div class="font-bold tabular-nums text-gray-300">{{ tradingCardInvestor.introIgnored || 0 }}</div>
-              </div>
+          <!-- Hero stat: accept rate -->
+          <div class="relative mx-4 mb-2 bg-gradient-to-br from-amber-300 to-amber-500 rounded-lg px-3 py-2 text-center shadow-lg">
+            <div class="text-[10px] uppercase tracking-widest font-bold text-amber-900/80">Accept Rate</div>
+            <div class="font-black text-4xl tabular-nums leading-none text-amber-950 mt-0.5">
+              {{ tradingCardInvestor.acceptRate != null ? tradingCardInvestor.acceptRate + '%' : '—' }}
+            </div>
+            <div class="text-xs font-bold text-amber-900 mt-0.5 tabular-nums">
+              {{ tradingCardInvestor.introAccepted || 0 }} yes of {{ tradingCardInvestor.introTotal || 0 }} intros
+            </div>
+          </div>
+
+          <!-- Secondary stats: pass / ignored -->
+          <div class="relative mx-4 mb-2 grid grid-cols-2 gap-2 text-white">
+            <div class="bg-black/30 backdrop-blur rounded px-2 py-1 text-center">
+              <div class="text-[9px] uppercase tracking-wider opacity-70">Passed</div>
+              <div class="font-bold tabular-nums text-rose-300">{{ tradingCardInvestor.introPassed || 0 }}</div>
+            </div>
+            <div class="bg-black/30 backdrop-blur rounded px-2 py-1 text-center">
+              <div class="text-[9px] uppercase tracking-wider opacity-70">Ignored</div>
+              <div class="font-bold tabular-nums text-gray-300">{{ tradingCardInvestor.introIgnored || 0 }}</div>
             </div>
           </div>
 
           <!-- Footer -->
           <div class="absolute bottom-1 left-0 right-0 text-center text-white/40 text-[9px] tracking-widest">
-            #{{ tradingCardInvestor.id?.toString().padStart(4, '0') }} · {{ tradingCardInvestor.city || 'Anywhere' }}
+            {{ tradingCardInvestor.city || 'Anywhere' }}
           </div>
         </div>
 

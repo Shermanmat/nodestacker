@@ -7,7 +7,7 @@
   <title>Matcap - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <style>
     [v-cloak] { display: none; }
     .sidebar-link { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #94a3b8; cursor: pointer; transition: all 0.15s; }
@@ -5092,35 +5092,32 @@
           tradingCardAvatarStyleIdx.value++;
         }
         async function downloadTradingCard() {
-          if (!tradingCardEl.value || !window.html2canvas) return;
+          if (!tradingCardEl.value || !window.htmlToImage) return;
           downloadingTradingCard.value = true;
           try {
-            // backgroundColor: null preserves transparency outside the rounded
-            // corners (otherwise html2canvas fills the bounding box white).
-            // scale: 2 gives retina-resolution output.
-            const canvas = await window.html2canvas(tradingCardEl.value, {
-              useCORS: true,
-              backgroundColor: null,
-              scale: 2,
+            // html-to-image uses SVG foreignObject to render, which natively
+            // understands aspect-ratio, backdrop-filter, mix-blend-mode, and
+            // CSS gradients — html2canvas mangled all of those. pixelRatio
+            // gives us retina output; cacheBust forces a fresh avatar fetch
+            // so a cached non-CORS response doesn't taint the canvas.
+            const dataUrl = await window.htmlToImage.toPng(tradingCardEl.value, {
+              pixelRatio: 2,
+              cacheBust: true,
+              backgroundColor: undefined,
             });
             const safeName = (tradingCardAnonymize.value
               ? tradingCardCodename.value
               : (tradingCardInvestor.value?.name || 'investor')
             ).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-            canvas.toBlob((blob) => {
-              if (!blob) return;
-              const url = URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = `matcap-card-${safeName}.png`;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              URL.revokeObjectURL(url);
-            }, 'image/png');
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `matcap-card-${safeName}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
           } catch (e) {
             console.error('Trading card download failed', e);
-            alert('Could not save the card. Try rerolling the avatar (some styles fail CORS) then download again.');
+            alert('Could not save the card. Try rerolling the avatar then download again.');
           } finally {
             downloadingTradingCard.value = false;
           }

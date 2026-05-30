@@ -1013,6 +1013,12 @@
             </select>
             <input v-model="investorSearchQuery" type="text" placeholder="Search investors..."
               class="border rounded-lg px-3 py-2 text-sm w-64">
+            <select v-model="investorSortBy" class="border rounded-lg px-3 py-2 text-sm"
+              title="Accept-rate leaderboard requires ≥3 intros sent">
+              <option value="default">Sort: Default</option>
+              <option value="accept-rate">🏆 Accept rate (≥3 intros)</option>
+              <option value="intro-volume">Intro volume</option>
+            </select>
             <button @click="showInvestorModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               Add Investor
             </button>
@@ -1069,13 +1075,17 @@
         </div>
 
         <div class="space-y-4">
-          <div v-for="item in (planningFounderId ? plannedInvestors : filteredAdminInvestors)" :key="item.id || item.investor?.id"
+          <div v-for="(item, idx) in (planningFounderId ? plannedInvestors : filteredAdminInvestors)" :key="item.id || item.investor?.id"
             :id="'investor-row-' + (item.id || item.investor?.id)"
             class="bg-white rounded-lg shadow overflow-hidden transition-shadow">
             <!-- Investor Header -->
             <div class="p-4 border-b flex justify-between items-start">
               <div>
                 <div class="flex items-center gap-2">
+                  <span v-if="!planningFounderId && investorSortBy !== 'default'"
+                    class="text-sm font-bold text-gray-400 tabular-nums w-8 inline-block">
+                    {{ leaderboardRankLabel(idx) }}
+                  </span>
                   <h3 class="font-semibold text-lg">{{ item.name || item.investor?.name }}</h3>
                   <span v-if="(item.vip || item.investor?.vip)" class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium">★ VIP</span>
                   <span v-if="(item.active === false || item.investor?.active === false)" class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Inactive</span>
@@ -4859,6 +4869,7 @@
         const filterByCategoryId = ref('');
         const filterByCountry = ref('');
         const filterByState = ref('');
+        const investorSortBy = ref('default');
 
         // 50 US states + DC, matches src/services/us-states.ts.
         const usStates = [
@@ -5392,6 +5403,22 @@
             });
           }
 
+          // Sort
+          if (investorSortBy.value === 'accept-rate') {
+            // Leaderboard: rank by accept rate; require ≥3 intros to be meaningful.
+            // Tie-break by intro volume (more intros = stronger signal).
+            results = results
+              .filter(inv => (inv.introTotal || 0) >= 3)
+              .slice()
+              .sort((a, b) => {
+                const rateDiff = (b.acceptRate || 0) - (a.acceptRate || 0);
+                if (rateDiff !== 0) return rateDiff;
+                return (b.introTotal || 0) - (a.introTotal || 0);
+              });
+          } else if (investorSortBy.value === 'intro-volume') {
+            results = results.slice().sort((a, b) => (b.introTotal || 0) - (a.introTotal || 0));
+          }
+
           return results;
         });
 
@@ -5724,6 +5751,13 @@
           if (rate >= 50) return 'text-emerald-700';
           if (rate >= 25) return 'text-amber-700';
           return 'text-rose-700';
+        }
+
+        function leaderboardRankLabel(idx) {
+          if (idx === 0) return '🥇';
+          if (idx === 1) return '🥈';
+          if (idx === 2) return '🥉';
+          return '#' + (idx + 1);
         }
 
         function formatRelative(iso) {
@@ -7762,6 +7796,7 @@
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filterByState, usStates, availableInvestorStates, filteredAdminInvestors,
+          investorSortBy, leaderboardRankLabel,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,

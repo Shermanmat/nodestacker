@@ -115,6 +115,7 @@ app.get('/', async (c) => {
   const allIntros = await db.select({
     investorId: introRequests.investorId,
     status: introRequests.status,
+    dateRequested: introRequests.dateRequested,
   }).from(introRequests);
   const ACCEPTED_STATUSES = new Set([
     'introduced',
@@ -124,18 +125,25 @@ app.get('/', async (c) => {
     'circle_back_round_opens',
     'invested',
   ]);
-  const introStats = new Map<number, { total: number; accepted: number }>();
+  const introStats = new Map<number, {
+    total: number; accepted: number; passed: number; ignored: number; lastIntroAt: string | null;
+  }>();
   for (const i of allIntros) {
     if (i.status === 'pending_suggestion') continue;
-    const s = introStats.get(i.investorId) || { total: 0, accepted: 0 };
+    const s = introStats.get(i.investorId) || { total: 0, accepted: 0, passed: 0, ignored: 0, lastIntroAt: null };
     s.total++;
     if (ACCEPTED_STATUSES.has(i.status)) s.accepted++;
+    if (i.status === 'passed') s.passed++;
+    if (i.status === 'ignored') s.ignored++;
+    if (i.dateRequested && (!s.lastIntroAt || i.dateRequested > s.lastIntroAt)) {
+      s.lastIntroAt = i.dateRequested;
+    }
     introStats.set(i.investorId, s);
   }
 
   // Parse focusAreas JSON, attach research, categories, and intro stats.
   let parsed = allInvestors.map(inv => {
-    const stats = introStats.get(inv.id) || { total: 0, accepted: 0 };
+    const stats = introStats.get(inv.id) || { total: 0, accepted: 0, passed: 0, ignored: 0, lastIntroAt: null };
     const acceptRate = stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : null;
     return {
       ...inv,
@@ -144,6 +152,9 @@ app.get('/', async (c) => {
       categories: categoryMap.get(inv.id) || [],
       introTotal: stats.total,
       introAccepted: stats.accepted,
+      introPassed: stats.passed,
+      introIgnored: stats.ignored,
+      lastIntroAt: stats.lastIntroAt,
       acceptRate, // null = no intros sent yet, so UI can show "—"
     };
   });

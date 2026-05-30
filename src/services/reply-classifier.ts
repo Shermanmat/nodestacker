@@ -14,18 +14,34 @@
 // Nothing is sent. 'yes' creates a Gmail draft; the admin clicks send.
 
 import { eq, and, isNull, sql } from 'drizzle-orm';
-import { db, founders, investors, introRequests } from '../db/index.js';
+import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
 import { getStatus as getGmailStatus, getLatestMessageFromSender, sendThreadReply } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
 
+// Read the singleton agent_settings row. Falls back to safe defaults if the
+// row is missing for some reason.
+async function loadAgentSettings(): Promise<{
+  autoSendHandoff: boolean;
+  autoSendHandoffMinConfidence: number;
+  autoSendHandoffMaxReplyChars: number;
+}> {
+  const row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  return {
+    autoSendHandoff: row?.autoSendHandoff ?? false,
+    autoSendHandoffMinConfidence: row?.autoSendHandoffMinConfidence ? Number(row.autoSendHandoffMinConfidence) : 0.9,
+    autoSendHandoffMaxReplyChars: row?.autoSendHandoffMaxReplyChars ?? 400,
+  };
+}
+
 type RowAction =
-  | { action: 'classified'; classification: ReplyClass; confidence: number; reason: string; draftedHandoff?: boolean }
+  | { action: 'classified'; classification: ReplyClass; confidence: number; reason: string; draftedHandoff?: boolean; autoSentHandoff?: boolean }
   | { action: 'skipped'; detail: string };
 
 export interface ClassifierTickResult {
   checked: number;
   classified: number;
   drafted: number;
+  autoSent: number;
   skipped: number;
   rows: Array<{
     introId: number;
@@ -37,10 +53,10 @@ export interface ClassifierTickResult {
 export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
   const gmail = await getGmailStatus();
   if (!gmail.connected) {
-    return { checked: 0, classified: 0, drafted: 0, skipped: 0, rows: [] };
+    return { checked: 0, classified: 0, drafted: 0, autoSent: 0, skipped: 0, rows: [] };
   }
   if (!process.env.ANTHROPIC_API_KEY) {
-    return { checked: 0, classified: 0, drafted: 0, skipped: 0, rows: [] };
+    return { checked: 0, classified: 0, drafted: 0, autoSent: 0, skipped: 0, rows: [] };
   }
 
   const candidates = await db.select().from(introRequests).where(and(
@@ -50,9 +66,11 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
     sql`${introRequests.gmailThreadId} IS NOT NULL AND ${introRequests.gmailThreadId} != ''`,
   ));
 
+  const settings = await loadAgentSettings();
   const rows: ClassifierTickResult['rows'] = [];
   let classified = 0;
   let drafted = 0;
+  let autoSent = 0;
   let skipped = 0;
 
   for (const intro of candidates) {
@@ -108,12 +126,27 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
     };
 
     let draftedHandoff = false;
+    let autoSentHandoff = false;
 
     switch (result.classification) {
       case 'yes': {
         updates.status = 'introduced';
         updates.dateIntroduced = now.split('T')[0];
-        // Draft the founder↔investor intro reply in the same Gmail thread.
+
+        // Decide: auto-send the handoff, or just draft it? Auto-send only
+        // when ALL of these hold:
+        //   1. agent_settings.autoSendHandoff is true (admin kill switch)
+        //   2. classifier confidence is at or above the configured floor
+        //   3. investor reply was short/clear (no nuance hiding under a "yes")
+        //   4. founder has an email so we can Cc them
+        const replyShort = msg.body.trim().length <= settings.autoSendHandoffMaxReplyChars;
+        const confidenceOk = result.confidence >= settings.autoSendHandoffMinConfidence;
+        const canAutoSend =
+          settings.autoSendHandoff &&
+          confidenceOk &&
+          replyShort &&
+          !!founder.email;
+
         try {
           const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
           const founderFirst = (founder.name || '').split(/\s+/)[0] || founder.name;
@@ -126,19 +159,27 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
             cc: founder.email || undefined,
             subject,
             body: handoffBody,
-            asDraft: true,
+            asDraft: !canAutoSend,
           });
-          const draftId = (sent as any).draftId as string | undefined;
-          if (draftId) {
-            updates.introHandoffDraftId = draftId;
-            updates.introHandoffDraftCreatedAt = now;
-            draftedHandoff = true;
-            drafted++;
+          if (canAutoSend) {
+            updates.introHandoffSentAt = now;
+            updates.introHandoffAutoSent = true;
+            updates.introHandoffMessageId = sent.messageId || null;
+            autoSentHandoff = true;
+            autoSent++;
+          } else {
+            const draftId = (sent as any).draftId as string | undefined;
+            if (draftId) {
+              updates.introHandoffDraftId = draftId;
+              updates.introHandoffDraftCreatedAt = now;
+              draftedHandoff = true;
+              drafted++;
+            }
           }
         } catch (e: any) {
-          // Draft failure doesn't block the status transition — admin will
-          // just have to write the intro themselves. Note it in row detail.
-          console.error('[reply-classifier] handoff draft failed:', e);
+          // Failure here doesn't block the status transition — admin can
+          // write the intro themselves from the Gmail thread.
+          console.error('[reply-classifier] handoff send/draft failed:', e);
         }
         break;
       }
@@ -183,10 +224,11 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       confidence: result.confidence,
       reason: result.reason,
       draftedHandoff,
+      autoSentHandoff,
     });
   }
 
-  return { checked: candidates.length, classified, drafted, skipped, rows };
+  return { checked: candidates.length, classified, drafted, autoSent, skipped, rows };
 }
 
 // Read helper: the rows the new "Replies needing you" panel displays.

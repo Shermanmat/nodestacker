@@ -251,6 +251,43 @@ app.get('/api/agent/replies-needing-human', async (c) => {
   return c.json(result);
 });
 
+// Agent settings — kill switches + thresholds for autonomous behaviors.
+// Today exposes the handoff auto-send flag; future autonomous flags go here.
+app.get('/api/agent/settings', async (c) => {
+  const { db, agentSettings } = await import('./db/index.js');
+  const { eq } = await import('drizzle-orm');
+  let row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  if (!row) {
+    await db.insert(agentSettings).values({ id: 1 });
+    row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  }
+  return c.json(row);
+});
+
+app.put('/api/agent/settings', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { db, agentSettings } = await import('./db/index.js');
+  const { eq } = await import('drizzle-orm');
+  const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  if (typeof body.autoSendHandoff === 'boolean') patch.autoSendHandoff = body.autoSendHandoff;
+  if (typeof body.autoSendHandoffMinConfidence === 'number') {
+    const v = Math.max(0, Math.min(1, body.autoSendHandoffMinConfidence));
+    patch.autoSendHandoffMinConfidence = String(v);
+  }
+  if (typeof body.autoSendHandoffMaxReplyChars === 'number') {
+    patch.autoSendHandoffMaxReplyChars = Math.max(50, Math.min(2000, Math.floor(body.autoSendHandoffMaxReplyChars)));
+  }
+  // Upsert (id=1 singleton)
+  const existing = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  if (existing) {
+    await db.update(agentSettings).set(patch).where(eq(agentSettings.id, 1));
+  } else {
+    await db.insert(agentSettings).values({ id: 1, ...patch });
+  }
+  const row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  return c.json(row);
+});
+
 // Rescore every pending match_suggestion using the current scoring formula.
 // One-shot tool for the case where suggestions were generated under an older
 // algorithm and now show stale scores in the audit table.

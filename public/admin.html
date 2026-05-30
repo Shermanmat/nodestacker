@@ -1242,6 +1242,37 @@
           </div>
         </div>
 
+        <!-- Agent autonomy settings — kill switches for what the agent
+             can do without a human in the loop. -->
+        <div v-if="agentSettingsState" class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-700">Agent autonomy</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Kill switches for what the agent does without you. Defaults to off.</p>
+            </div>
+            <span v-if="savingAgentSettings" class="text-xs text-gray-400">Saving…</span>
+          </div>
+          <div class="flex items-start gap-4 flex-wrap">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" v-model="agentSettingsState.autoSendHandoff" @change="saveAgentSettings" class="mt-1">
+              <div>
+                <div class="text-sm font-medium">Auto-send handoff intros on "yes"</div>
+                <div class="text-xs text-gray-500">When the classifier sees a high-confidence yes reply, MatCap sends the founder↔investor intro automatically (no draft step).</div>
+              </div>
+            </label>
+            <div class="flex items-center gap-2 text-xs text-gray-600 ml-auto">
+              <label class="flex items-center gap-1">
+                Min confidence
+                <input type="number" min="0.5" max="1" step="0.05" v-model.number="agentSettingsState.autoSendHandoffMinConfidence" @change="saveAgentSettings" class="w-16 border rounded px-2 py-0.5">
+              </label>
+              <label class="flex items-center gap-1">
+                Max reply chars
+                <input type="number" min="50" max="2000" step="50" v-model.number="agentSettingsState.autoSendHandoffMaxReplyChars" @change="saveAgentSettings" class="w-20 border rounded px-2 py-0.5">
+              </label>
+            </div>
+          </div>
+        </div>
+
         <!-- Replies needing you — investors replied but the classifier
              punted (needs_human / wrong_person). Handle these manually. -->
         <div class="bg-white rounded-lg shadow p-4 mb-4">
@@ -3973,7 +4004,7 @@
           if (tabId === 'directory') loadDirectory();
           if (tabId === 'signups') loadSignups();
           if (tabId === 'brands') loadBrands();
-          if (tabId === 'intros') { loadPendingReplies(); loadRepliesNeedingHuman(); }
+          if (tabId === 'intros') { loadPendingReplies(); loadRepliesNeedingHuman(); loadAgentSettings(); }
         }
 
         // Data
@@ -5613,7 +5644,7 @@
           classifyingNow.value = true;
           try {
             const result = await api('/agent/classify-replies-now', { method: 'POST' });
-            let msg = `Checked ${result.checked} replies.\nClassified: ${result.classified}\nHandoff drafts: ${result.drafted}\nSkipped: ${result.skipped}`;
+            let msg = `Checked ${result.checked} replies.\nClassified: ${result.classified}\nHandoff drafts: ${result.drafted}\nHandoff AUTO-SENT: ${result.autoSent ?? 0}\nSkipped: ${result.skipped}`;
             if (result.rows?.length) {
               const byClass = {};
               for (const r of result.rows) {
@@ -5623,6 +5654,10 @@
               }
               const breakdown = Object.entries(byClass).map(([k, v]) => `${k}: ${v}`).join(', ');
               if (breakdown) msg += `\n\nBreakdown: ${breakdown}`;
+              const autoSentRows = result.rows.filter(r => r.action === 'classified' && r.autoSentHandoff);
+              if (autoSentRows.length) {
+                msg += `\n\n⚠ Auto-sent handoffs:\n${autoSentRows.map(r => `• ${r.founderName} → ${r.investorName}`).join('\n')}`;
+              }
             }
             alert(msg);
             await loadRepliesNeedingHuman();
@@ -5633,6 +5668,44 @@
             alert('Classifier failed: ' + (e.message || e));
           } finally {
             classifyingNow.value = false;
+          }
+        };
+
+        // Agent settings (kill switches + thresholds for autonomous behaviors)
+        const agentSettingsState = ref(null);
+        const loadingAgentSettings = ref(false);
+        const savingAgentSettings = ref(false);
+
+        const loadAgentSettings = async () => {
+          loadingAgentSettings.value = true;
+          try {
+            agentSettingsState.value = await api('/agent/settings');
+          } catch (e) {
+            console.error('loadAgentSettings failed', e);
+          } finally {
+            loadingAgentSettings.value = false;
+          }
+        };
+
+        const saveAgentSettings = async () => {
+          if (!agentSettingsState.value) return;
+          const s = agentSettingsState.value;
+          if (s.autoSendHandoff && !confirm('Turn ON auto-send for handoff intros? When the classifier sees a high-confidence "yes" reply, MatCap will SEND the founder↔investor intro automatically — no draft step.')) {
+            agentSettingsState.value.autoSendHandoff = false;
+            return;
+          }
+          savingAgentSettings.value = true;
+          try {
+            const body = {
+              autoSendHandoff: !!s.autoSendHandoff,
+              autoSendHandoffMinConfidence: Number(s.autoSendHandoffMinConfidence) || 0.9,
+              autoSendHandoffMaxReplyChars: Number(s.autoSendHandoffMaxReplyChars) || 400,
+            };
+            agentSettingsState.value = await api('/agent/settings', { method: 'PUT', body });
+          } catch (e) {
+            alert('Failed to save: ' + (e.message || e));
+          } finally {
+            savingAgentSettings.value = false;
           }
         };
 
@@ -7686,6 +7759,8 @@
           togglePendingShowFresh, loadPendingReplies, draftPendingBump,
           repliesNeedingHuman, loadingNeedsHuman, classifyingNow,
           loadRepliesNeedingHuman, classifyRepliesNow, formatRelative,
+          agentSettingsState, loadingAgentSettings, savingAgentSettings,
+          loadAgentSettings, saveAgentSettings,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,

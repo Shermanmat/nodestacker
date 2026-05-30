@@ -1116,6 +1116,7 @@
                   <td class="px-3 py-2 font-medium">
                     <a :href="'#investor-row-' + item.id" class="text-blue-600 hover:underline" @click="investorSortBy = 'default'">{{ item.name }}</a>
                     <span v-if="item.vip" class="ml-1 text-amber-600" title="VIP">★</span>
+                    <button @click="openTradingCard(item)" class="ml-2 text-pink-600 hover:underline text-xs" title="Open trading card">🃏</button>
                   </td>
                   <td class="px-3 py-2 text-gray-700">{{ item.firm || '—' }}</td>
                   <td class="px-3 py-2 text-gray-500 text-xs">
@@ -1199,6 +1200,7 @@
                 </button>
                 <button @click="openCategoryAssignModal('investor', item.investor || item)" class="text-teal-600 hover:underline text-sm">Categories</button>
                 <button @click="openResearchModal(item.investor || item)" class="text-purple-600 hover:underline text-sm">Research</button>
+                <button @click="openTradingCard(item.investor || item)" class="text-pink-600 hover:underline text-sm">Card</button>
                 <button @click="editInvestor(item.investor || item)" class="text-blue-600 hover:underline text-sm">Edit</button>
                 <button @click="toggleInvestorVip((item.investor || item))"
                   :class="(item.investor || item).vip ? 'text-amber-600' : 'text-gray-400'"
@@ -3173,6 +3175,94 @@
       </div>
     </div>
 
+    <!-- Trading Card Modal -->
+    <div v-if="tradingCardInvestor" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+      @click.self="tradingCardInvestor = null">
+      <div class="flex flex-col items-center gap-4">
+        <!-- The card -->
+        <div class="relative w-80 rounded-2xl overflow-hidden shadow-2xl"
+          style="background: linear-gradient(135deg, #1e293b 0%, #312e81 40%, #831843 100%); aspect-ratio: 3 / 4.2;">
+          <!-- Holographic shimmer -->
+          <div class="absolute inset-0 opacity-30 pointer-events-none"
+            style="background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.4) 50%, transparent 70%); mix-blend-mode: overlay;"></div>
+
+          <!-- Header strip -->
+          <div class="relative px-4 pt-3 pb-2 flex justify-between items-center text-white text-xs uppercase tracking-widest font-bold">
+            <span class="opacity-80">MatCap · Series ’26</span>
+            <span class="bg-amber-400 text-amber-900 px-2 py-0.5 rounded-full">
+              {{ tradingCardInvestor.acceptRate != null ? tradingCardInvestor.acceptRate + '%' : 'NEW' }}
+            </span>
+          </div>
+
+          <!-- Avatar frame -->
+          <div class="relative mx-4 my-2 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg"
+            style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); aspect-ratio: 1 / 1;">
+            <img :src="tradingCardAvatarUrl" class="w-full h-full" :alt="tradingCardInvestor.name">
+          </div>
+
+          <!-- Name plate -->
+          <div class="relative mx-4 mb-2 px-3 py-2 rounded bg-white/95 text-center">
+            <div class="font-black text-base text-gray-900 truncate uppercase tracking-wide">
+              {{ tradingCardAnonymize ? tradingCardCodename : tradingCardInvestor.name }}
+            </div>
+            <div class="text-xs text-gray-500 truncate">
+              {{ tradingCardAnonymize ? 'Undisclosed Fund' : (tradingCardInvestor.firm || 'Independent') }}
+            </div>
+          </div>
+
+          <!-- Type bar (sectors) -->
+          <div class="relative mx-4 mb-2 flex flex-wrap gap-1 justify-center">
+            <span v-for="sector in tradingCardSectors" :key="sector"
+              class="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-medium">
+              {{ sector }}
+            </span>
+            <span v-if="!tradingCardSectors.length" class="text-[10px] text-white/60">Generalist</span>
+          </div>
+
+          <!-- Stats block -->
+          <div class="relative mx-4 mb-3 bg-black/30 backdrop-blur rounded-lg p-3 text-white">
+            <div class="grid grid-cols-4 gap-1 text-center">
+              <div>
+                <div class="text-[9px] uppercase tracking-wider opacity-70">Sent</div>
+                <div class="font-bold tabular-nums">{{ tradingCardInvestor.introTotal || 0 }}</div>
+              </div>
+              <div>
+                <div class="text-[9px] uppercase tracking-wider opacity-70">Yes</div>
+                <div class="font-bold tabular-nums text-emerald-300">{{ tradingCardInvestor.introAccepted || 0 }}</div>
+              </div>
+              <div>
+                <div class="text-[9px] uppercase tracking-wider opacity-70">Pass</div>
+                <div class="font-bold tabular-nums text-rose-300">{{ tradingCardInvestor.introPassed || 0 }}</div>
+              </div>
+              <div>
+                <div class="text-[9px] uppercase tracking-wider opacity-70">Ignore</div>
+                <div class="font-bold tabular-nums text-gray-300">{{ tradingCardInvestor.introIgnored || 0 }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div class="absolute bottom-1 left-0 right-0 text-center text-white/40 text-[9px] tracking-widest">
+            #{{ tradingCardInvestor.id?.toString().padStart(4, '0') }} · {{ tradingCardInvestor.city || 'Anywhere' }}
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-lg px-4 py-3 flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" v-model="tradingCardAnonymize" class="rounded">
+            Anonymize
+          </label>
+          <button @click="cycleAvatarStyle" class="text-sm text-pink-600 hover:underline">
+            Reroll avatar
+          </button>
+          <button @click="tradingCardInvestor = null" class="text-sm text-gray-500 hover:text-gray-700">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Investor Modal -->
     <div v-if="showInvestorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -4944,6 +5034,44 @@
         const investorSortBy = ref('default');
         const investorMinIntros = ref(10);
         const leaderboardShowDetails = ref(false);
+
+        // Trading card generator: pure-frontend novelty. DiceBear gives us a
+        // free deterministic SVG avatar from a seed (no API key, no cost).
+        // Anonymize swaps the real name for a stat-derived codename so the
+        // card is shareable without doxxing the investor.
+        const tradingCardInvestor = ref(null);
+        const tradingCardAnonymize = ref(false);
+        const tradingCardAvatarStyleIdx = ref(0);
+        const AVATAR_STYLES = ['avataaars', 'fun-emoji', 'bottts', 'lorelei', 'notionists', 'adventurer'];
+        const CODENAME_TITLES = ['The Closer', 'The Oracle', 'The Patron', 'The Anchor', 'The Skeptic', 'Seed Whisperer', 'Term-Sheet Tycoon', 'Capital Hawk', 'Round Hopper', 'Pre-Seed Sniper', 'Bridge Builder', 'The Operator', 'The Quiet Wire', 'The First Yes'];
+        const tradingCardAvatarUrl = computed(() => {
+          if (!tradingCardInvestor.value) return '';
+          const style = AVATAR_STYLES[tradingCardAvatarStyleIdx.value % AVATAR_STYLES.length];
+          const seed = encodeURIComponent((tradingCardInvestor.value.name || 'unknown') + ':' + tradingCardAvatarStyleIdx.value);
+          return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundType=gradientLinear`;
+        });
+        const tradingCardSectors = computed(() => {
+          if (!tradingCardInvestor.value) return [];
+          return (tradingCardInvestor.value.categories || [])
+            .filter(c => c.type === 'sector')
+            .map(c => c.name)
+            .slice(0, 3);
+        });
+        const tradingCardCodename = computed(() => {
+          if (!tradingCardInvestor.value) return '';
+          // Deterministic per-investor pick so the same investor always gets
+          // the same codename across sessions.
+          const id = tradingCardInvestor.value.id || 0;
+          return CODENAME_TITLES[id % CODENAME_TITLES.length];
+        });
+        function openTradingCard(item) {
+          tradingCardInvestor.value = item;
+          tradingCardAnonymize.value = false;
+          tradingCardAvatarStyleIdx.value = 0;
+        }
+        function cycleAvatarStyle() {
+          tradingCardAvatarStyleIdx.value++;
+        }
 
         // 50 US states + DC, matches src/services/us-states.ts.
         const usStates = [
@@ -7875,6 +8003,8 @@
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filterByState, usStates, availableInvestorStates, filteredAdminInvestors,
           investorSortBy, investorMinIntros, leaderboardShowDetails, leaderboardRankLabel,
+          tradingCardInvestor, tradingCardAnonymize, tradingCardAvatarUrl, tradingCardSectors, tradingCardCodename,
+          openTradingCard, cycleAvatarStyle,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,

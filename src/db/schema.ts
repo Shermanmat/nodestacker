@@ -177,6 +177,12 @@ export const introRequests = sqliteTable('intro_requests', {
   // Gmail draft id for the founder↔investor intro auto-generated on a "yes".
   introHandoffDraftId: text('intro_handoff_draft_id'),
   introHandoffDraftCreatedAt: text('intro_handoff_draft_created_at'),
+  // Auto-send tracking (Phase 2). When classifier auto-sends the handoff
+  // reply instead of just drafting it, these record the send + the gmail
+  // message id. autoSent stays false for human-clicks-send cases.
+  introHandoffSentAt: text('intro_handoff_sent_at'),
+  introHandoffAutoSent: integer('intro_handoff_auto_sent', { mode: 'boolean' }).default(false),
+  introHandoffMessageId: text('intro_handoff_message_id'),
   // Follow-up tracking
   followupCount: integer('followup_count').notNull().default(0),
   lastFollowupAt: text('last_followup_at'),
@@ -1139,3 +1145,20 @@ export const cronRuns = sqliteTable('cron_runs', {
 
 export type CronRun = typeof cronRuns.$inferSelect;
 export type NewCronRun = typeof cronRuns.$inferInsert;
+
+// Agent settings — single-row table holding the kill switches + thresholds
+// for autonomous behaviors. Use id=1 as a sentinel so we can upsert.
+//
+// Today (Phase 2): auto-send the founder↔investor handoff on a high-confidence
+// 'yes' classification. Future phases will add more flags here (auto-send the
+// original intro, auto-send bumps, etc.).
+export const agentSettings = sqliteTable('agent_settings', {
+  id: integer('id').primaryKey(),
+  autoSendHandoff: integer('auto_send_handoff', { mode: 'boolean' }).notNull().default(false),
+  autoSendHandoffMinConfidence: text('auto_send_handoff_min_confidence').notNull().default('0.9'),
+  autoSendHandoffMaxReplyChars: integer('auto_send_handoff_max_reply_chars').notNull().default(400),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type AgentSettings = typeof agentSettings.$inferSelect;
+export type NewAgentSettings = typeof agentSettings.$inferInsert;

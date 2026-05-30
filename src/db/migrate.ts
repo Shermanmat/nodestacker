@@ -148,6 +148,10 @@ safeAddColumn('intro_requests', 'reply_classification_confidence', 'text');
 safeAddColumn('intro_requests', 'reply_body_snippet', 'text');
 safeAddColumn('intro_requests', 'intro_handoff_draft_id', 'text');
 safeAddColumn('intro_requests', 'intro_handoff_draft_created_at', 'text');
+// Phase 2 — auto-send tracking
+safeAddColumn('intro_requests', 'intro_handoff_sent_at', 'text');
+safeAddColumn('intro_requests', 'intro_handoff_auto_sent', 'integer NOT NULL DEFAULT 0');
+safeAddColumn('intro_requests', 'intro_handoff_message_id', 'text');
 // blurb builder columns
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');
@@ -326,6 +330,22 @@ try {
   )`);
   sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_cron_runs_name_started\` ON \`cron_runs\` (\`name\`, \`started_at\`)`);
   console.log('  Ensured cron_runs table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
+// agent_settings — single-row table (id=1) holding kill switches + thresholds.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`agent_settings\` (
+    \`id\` integer PRIMARY KEY,
+    \`auto_send_handoff\` integer NOT NULL DEFAULT 0,
+    \`auto_send_handoff_min_confidence\` text NOT NULL DEFAULT '0.9',
+    \`auto_send_handoff_max_reply_chars\` integer NOT NULL DEFAULT 400,
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  // Seed the singleton row if missing (defaults: auto-send OFF).
+  sqlite.exec(`INSERT OR IGNORE INTO \`agent_settings\` (id) VALUES (1)`);
+  console.log('  Ensured agent_settings table exists');
 } catch (e: any) {
   if (!e.message?.includes('already exists')) throw e;
 }

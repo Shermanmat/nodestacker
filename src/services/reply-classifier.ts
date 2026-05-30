@@ -59,9 +59,14 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
     return { checked: 0, classified: 0, drafted: 0, autoSent: 0, skipped: 0, rows: [] };
   }
 
+  // Pull every "still waiting" intro that has a Gmail thread. We DO NOT
+  // require replyDetectedAt to be set — that decouples reply detection
+  // from the once-daily follow-up tick (which previously was the only
+  // path that flipped that flag). Now this hourly tick is both the
+  // detector AND the classifier, so an overnight reply lands within
+  // ~60 min instead of waiting until 11am AZ.
   const candidates = await db.select().from(introRequests).where(and(
     eq(introRequests.status, 'intro_request_sent'),
-    sql`${introRequests.replyDetectedAt} IS NOT NULL`,
     isNull(introRequests.replyClassification),
     sql`${introRequests.gmailThreadId} IS NOT NULL AND ${introRequests.gmailThreadId} != ''`,
   ));
@@ -94,9 +99,18 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       continue;
     }
     if (!msg) {
-      skipped++;
-      rows.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: 'no message from investor found in thread' });
+      // Investor hasn't replied yet — this is the common case for most
+      // pending intros. Skip quietly (don't pollute the result log).
       continue;
+    }
+    // Flag that we found a reply if it wasn't already flagged. Other parts
+    // of the app (pending-replies panel, follow-up cooldown logic) rely on
+    // this field.
+    if (!intro.replyDetectedAt) {
+      await db.update(introRequests).set({
+        replyDetectedAt: msg.receivedAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }).where(eq(introRequests.id, intro.id));
     }
 
     // 2. Classify

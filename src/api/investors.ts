@@ -106,13 +106,47 @@ app.get('/', async (c) => {
   const categoryFilter = c.req.query('category');
   const countryFilter = c.req.query('country');
 
-  // Parse focusAreas JSON, attach research and categories
-  let parsed = allInvestors.map(inv => ({
-    ...inv,
-    focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
-    research: researchMap.get(inv.id) || null,
-    categories: categoryMap.get(inv.id) || [],
-  }));
+  // Aggregate intro_requests per investor so we can show accept rate in
+  // the list. "Accepted" = investor said yes (introduced or any downstream
+  // status). "Total" = every intro request sent to them, regardless of
+  // status. Pending intros count in the denominator — an investor with 5
+  // outstanding/ignored intros and 1 accepted is honestly 1/6 = 17%.
+  // Match-agent suggestions that were never sent are excluded.
+  const allIntros = await db.select({
+    investorId: introRequests.investorId,
+    status: introRequests.status,
+  }).from(introRequests);
+  const ACCEPTED_STATUSES = new Set([
+    'introduced',
+    'first_meeting_complete',
+    'second_meeting_complete',
+    'follow_up_questions',
+    'circle_back_round_opens',
+    'invested',
+  ]);
+  const introStats = new Map<number, { total: number; accepted: number }>();
+  for (const i of allIntros) {
+    if (i.status === 'pending_suggestion') continue;
+    const s = introStats.get(i.investorId) || { total: 0, accepted: 0 };
+    s.total++;
+    if (ACCEPTED_STATUSES.has(i.status)) s.accepted++;
+    introStats.set(i.investorId, s);
+  }
+
+  // Parse focusAreas JSON, attach research, categories, and intro stats.
+  let parsed = allInvestors.map(inv => {
+    const stats = introStats.get(inv.id) || { total: 0, accepted: 0 };
+    const acceptRate = stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : null;
+    return {
+      ...inv,
+      focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
+      research: researchMap.get(inv.id) || null,
+      categories: categoryMap.get(inv.id) || [],
+      introTotal: stats.total,
+      introAccepted: stats.accepted,
+      acceptRate, // null = no intros sent yet, so UI can show "—"
+    };
+  });
 
   if (categoryFilter) {
     const filterLower = categoryFilter.toLowerCase();

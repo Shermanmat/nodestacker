@@ -1098,6 +1098,14 @@
                 <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
                 <p v-if="(item.city || item.investor?.city) || (item.country || item.investor?.country)" class="text-sm text-gray-400">{{ [item.city || item.investor?.city, countryName(item.country || item.investor?.country)].filter(Boolean).join(', ') }}</p>
                 <p v-if="item.checkSize || item.investor?.checkSize" class="text-sm text-gray-400">Check: {{ item.checkSize || item.investor?.checkSize }}</p>
+                <p v-if="((item.introTotal ?? item.investor?.introTotal) || 0) > 0" class="text-sm text-gray-500 mt-1"
+                  :title="'Accepted = introduced, meetings, or invested. Total = every intro_request sent, regardless of status.'">
+                  <span class="font-medium" :class="acceptRateClass(item.acceptRate ?? item.investor?.acceptRate)">
+                    {{ item.acceptRate ?? item.investor?.acceptRate }}% accept
+                  </span>
+                  <span class="text-gray-400">·</span>
+                  {{ item.introAccepted ?? item.investor?.introAccepted }} / {{ item.introTotal ?? item.investor?.introTotal }} intros
+                </p>
                 <!-- Node connection info in planning mode -->
                 <p v-if="planningFounderId && item.nodeConnection" class="text-sm text-green-600 mt-1">
                   via {{ item.nodeConnection.nodeName }} ({{ item.nodeConnection.strength }})
@@ -5709,6 +5717,15 @@
           }
         };
 
+        // Color the accept-rate number by tier. Pure cosmetic; doesn't
+        // affect sorting or filtering.
+        function acceptRateClass(rate) {
+          if (rate == null) return 'text-gray-500';
+          if (rate >= 50) return 'text-emerald-700';
+          if (rate >= 25) return 'text-amber-700';
+          return 'text-rose-700';
+        }
+
         function formatRelative(iso) {
           if (!iso) return '';
           const ms = Date.now() - new Date(iso).getTime();
@@ -7759,6 +7776,7 @@
           togglePendingShowFresh, loadPendingReplies, draftPendingBump,
           repliesNeedingHuman, loadingNeedsHuman, classifyingNow,
           loadRepliesNeedingHuman, classifyRepliesNow, formatRelative,
+          acceptRateClass,
           agentSettingsState, loadingAgentSettings, savingAgentSettings,
           loadAgentSettings, saveAgentSettings,
           rescoring, rescorePending,

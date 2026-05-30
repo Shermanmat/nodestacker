@@ -5042,7 +5042,6 @@
         const tradingCardAnonymize = ref(false);
         const tradingCardAvatarStyleIdx = ref(0);
         const AVATAR_STYLES = ['avataaars', 'fun-emoji', 'bottts', 'lorelei', 'notionists', 'adventurer'];
-        const CODENAME_TITLES = ['The Closer', 'The Oracle', 'The Patron', 'The Anchor', 'The Skeptic', 'Seed Whisperer', 'Term-Sheet Tycoon', 'Capital Hawk', 'Round Hopper', 'Pre-Seed Sniper', 'Bridge Builder', 'The Operator', 'The Quiet Wire', 'The First Yes'];
         const tradingCardAvatarUrl = computed(() => {
           if (!tradingCardInvestor.value) return '';
           const style = AVATAR_STYLES[tradingCardAvatarStyleIdx.value % AVATAR_STYLES.length];
@@ -5058,10 +5057,13 @@
         });
         const tradingCardCodename = computed(() => {
           if (!tradingCardInvestor.value) return '';
-          // Deterministic per-investor pick so the same investor always gets
-          // the same codename across sessions.
-          const id = tradingCardInvestor.value.id || 0;
-          return CODENAME_TITLES[id % CODENAME_TITLES.length];
+          const name = tradingCardInvestor.value.name || '';
+          const initials = name
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(p => p[0].toUpperCase())
+            .join('.');
+          return initials ? initials + '.' : '—';
         });
         function openTradingCard(item) {
           tradingCardInvestor.value = item;

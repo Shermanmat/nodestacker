@@ -5644,7 +5644,7 @@
           classifyingNow.value = true;
           try {
             const result = await api('/agent/classify-replies-now', { method: 'POST' });
-            let msg = `Checked ${result.checked} replies.\nClassified: ${result.classified}\nHandoff drafts: ${result.drafted}\nHandoff AUTO-SENT: ${result.autoSent ?? 0}\nSkipped: ${result.skipped}`;
+            let msg = `Considered ${result.checked} pending intros.\nClassified: ${result.classified}\nHandoff drafts: ${result.drafted}\nHandoff AUTO-SENT: ${result.autoSent ?? 0}\nSkipped: ${result.skipped}\n(Intros with no reply yet are silently ignored — they'll be picked up when the investor responds.)`;
             if (result.rows?.length) {
               const byClass = {};
               for (const r of result.rows) {

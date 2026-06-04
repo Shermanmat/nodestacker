@@ -3,6 +3,7 @@ import { db, founders, investors, nodes, matchSuggestions, introRequests, type M
 import { generateMatchSuggestions } from './matching.js';
 import { sendEmail } from './email.js';
 import { buildIntroBody, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
+import { recordAction } from './agent-actions.js';
 
 /**
  * Phase 1 shadow agent — runs match generation on a schedule and emails an
@@ -187,6 +188,22 @@ export async function runAgentTick(): Promise<{
     emailSent = true;
   } catch (e) {
     console.error('Agent: failed to send digest email', e);
+  }
+
+  // Record this tick in the agent ledger (audit trail + scorecard input).
+  // Append-only and after-the-fact — does not change the shadow-agent behavior;
+  // the match_suggestions rows remain the approval surface for each pick.
+  try {
+    await recordAction({
+      agent: 'match-generator',
+      actionType: 'generate_matches',
+      summary: `Generated ${suggestions.length} match suggestion${suggestions.length === 1 ? '' : 's'} (${top.length} high-score, batch ${batchId})`,
+      reasoning: `Ran scheduled match generation across ${liquidity.length} eligible founder(s).`,
+      payload: { batchId, generated: suggestions.length, topRecommendations: top.length, scoreThreshold: SCORE_THRESHOLD },
+      status: 'executed',
+    });
+  } catch (e) {
+    console.error('Agent: failed to record ledger action', e);
   }
 
   const founderNameMap = new Map(founderRows.map(f => [f.id, f.name]));

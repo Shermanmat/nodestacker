@@ -291,6 +291,33 @@ try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
 } catch (_) { /* no-op if nodes table doesn't exist yet */ }
 
+// Agent actions ledger — accountability log + approval gate for the AI worker.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`agent_actions\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`agent\` text NOT NULL,
+    \`action_type\` text NOT NULL,
+    \`summary\` text NOT NULL,
+    \`reasoning\` text,
+    \`entity_type\` text,
+    \`entity_id\` integer,
+    \`payload\` text,
+    \`status\` text NOT NULL DEFAULT 'logged',
+    \`dry_run\` integer NOT NULL DEFAULT 0,
+    \`result\` text,
+    \`decided_by\` text,
+    \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`decided_at\` text,
+    \`executed_at\` text
+  )`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_agent_actions_status\` ON \`agent_actions\` (\`status\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_agent_actions_created\` ON \`agent_actions\` (\`created_at\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_agent_actions_agent\` ON \`agent_actions\` (\`agent\`)`);
+  console.log('  Ensured agent_actions table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

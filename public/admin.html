@@ -118,6 +118,10 @@
         <div class="sidebar-link" :class="{ active: activeTab === 'pipeline' }" @click="switchTab('pipeline')">Pipeline Health</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'marketplace' }" @click="switchTab('marketplace')">Marketplace Health</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'categories' }" @click="switchTab('categories')">Categories</div>
+        <div class="sidebar-link" :class="{ active: activeTab === 'agent' }" @click="switchTab('agent')">
+          AI Agent
+          <span v-if="agentPendingCount > 0" class="ml-1 inline-flex items-center justify-center text-xs font-semibold bg-cyan-500 text-white rounded-full px-1.5">{{ agentPendingCount }}</span>
+        </div>
       </nav>
 
       <!-- User -->
@@ -2570,6 +2574,90 @@
         </div>
       </div>
 
+    <!-- AI Agent Tab — agent actions ledger + approval queue -->
+      <div v-if="activeTab === 'agent'">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-semibold">AI Agent</h2>
+            <p class="text-sm text-gray-500">Everything the AI worker has done or proposed. Approve proposals to let them take effect.</p>
+          </div>
+          <button @click="loadAgentActions" class="text-sm text-gray-500 hover:text-gray-700">↻ Refresh</button>
+        </div>
+
+        <!-- Scorecard -->
+        <div v-if="agentScorecard" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div class="bg-white rounded-lg border p-4">
+            <div class="text-2xl font-bold text-gray-900">{{ agentScorecard.total }}</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Total actions</div>
+          </div>
+          <div class="bg-white rounded-lg border p-4">
+            <div class="text-2xl font-bold text-amber-600">{{ agentScorecard.byStatus?.proposed || 0 }}</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Awaiting approval</div>
+          </div>
+          <div class="bg-white rounded-lg border p-4">
+            <div class="text-2xl font-bold text-cyan-600">{{ agentScorecard.approvalRate === null ? '—' : agentScorecard.approvalRate + '%' }}</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Approval rate</div>
+          </div>
+          <div class="bg-white rounded-lg border p-4">
+            <div class="text-2xl font-bold text-red-600">{{ agentScorecard.byStatus?.failed || 0 }}</div>
+            <div class="text-xs text-gray-500 uppercase tracking-wide">Failed</div>
+          </div>
+        </div>
+
+        <!-- Status filter -->
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button v-for="f in agentFilters" :key="f.value" @click="agentFilter = f.value; loadAgentActions()"
+                  :class="agentFilter === f.value ? 'bg-gray-900 text-white' : 'bg-white text-gray-600 border'"
+                  class="text-xs px-3 py-1.5 rounded-full font-medium">{{ f.label }}</button>
+        </div>
+
+        <!-- Actions table -->
+        <div class="bg-white rounded-lg border overflow-hidden">
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-left text-xs text-gray-500 uppercase tracking-wide">
+              <tr>
+                <th class="px-4 py-3">When</th>
+                <th class="px-4 py-3">Agent</th>
+                <th class="px-4 py-3">Action</th>
+                <th class="px-4 py-3">Status</th>
+                <th class="px-4 py-3 text-right">Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in agentActions" :key="a.id" class="border-t align-top">
+                <td class="px-4 py-3 text-xs text-gray-400 whitespace-nowrap">{{ (a.createdAt || '').replace('T',' ').slice(0,16) }}</td>
+                <td class="px-4 py-3"><span class="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded">{{ a.agent }}</span></td>
+                <td class="px-4 py-3">
+                  <div class="font-medium text-gray-900">{{ a.summary }}</div>
+                  <div class="text-xs text-gray-400 mt-0.5">{{ a.actionType }}<span v-if="a.dryRun" class="ml-1 text-purple-500">· dry-run</span></div>
+                  <div v-if="a.reasoning" class="text-xs text-gray-500 mt-1">{{ a.reasoning }}</div>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="{
+                    'bg-amber-100 text-amber-700': a.status === 'proposed',
+                    'bg-blue-100 text-blue-700': a.status === 'approved',
+                    'bg-green-100 text-green-700': a.status === 'executed',
+                    'bg-gray-100 text-gray-600': a.status === 'logged',
+                    'bg-gray-100 text-gray-400': a.status === 'rejected',
+                    'bg-red-100 text-red-700': a.status === 'failed',
+                  }" class="text-xs px-2 py-0.5 rounded font-medium">{{ a.status }}</span>
+                </td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                  <template v-if="a.status === 'proposed'">
+                    <button @click="approveAgentAction(a.id)" class="text-xs text-green-600 hover:underline font-medium mr-3">Approve</button>
+                    <button @click="rejectAgentAction(a.id)" class="text-xs text-red-600 hover:underline">Reject</button>
+                  </template>
+                  <span v-else-if="a.decidedBy" class="text-xs text-gray-400">{{ a.decidedBy }}</span>
+                </td>
+              </tr>
+              <tr v-if="agentActions.length === 0">
+                <td colspan="5" class="px-4 py-10 text-center text-gray-400">No agent actions {{ agentFilter !== 'all' ? "with status '" + agentFilter + "'" : 'yet' }}.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     <!-- Directory Tab — Unified People view -->
       <div v-if="activeTab === 'directory'">
         <div class="flex items-start justify-between mb-4">
@@ -3989,6 +4077,7 @@
           if (tabId === 'brands') loadBrands();
           if (tabId === 'broadcast') loadBroadcastRecipients();
           if (tabId === 'trials') loadTrials();
+          if (tabId === 'agent') loadAgentActions();
         }
 
         // Data
@@ -4016,6 +4105,42 @@
 
         // Pipeline Health
         const pipelineHealth = ref({ founders: [], summary: {} });
+
+        // AI Agent — actions ledger / approval queue
+        const agentActions = ref([]);
+        const agentScorecard = ref(null);
+        const agentFilter = ref('proposed');
+        const agentPendingCount = ref(0);
+        const agentFilters = [
+          { value: 'proposed', label: 'Awaiting approval' },
+          { value: 'all', label: 'All' },
+          { value: 'executed', label: 'Executed' },
+          { value: 'logged', label: 'Logged' },
+          { value: 'rejected', label: 'Rejected' },
+          { value: 'failed', label: 'Failed' },
+        ];
+
+        async function loadAgentActions() {
+          const q = agentFilter.value && agentFilter.value !== 'all' ? `?status=${agentFilter.value}` : '';
+          const [actions, scorecard] = await Promise.all([
+            api(`/agent-actions${q}`),
+            api('/agent-actions/scorecard'),
+          ]);
+          agentActions.value = actions || [];
+          agentScorecard.value = scorecard || null;
+          agentPendingCount.value = scorecard?.byStatus?.proposed || 0;
+        }
+
+        async function approveAgentAction(id) {
+          await api(`/agent-actions/${id}/approve`, { method: 'POST', body: {} });
+          await loadAgentActions();
+        }
+
+        async function rejectAgentAction(id) {
+          if (!confirm('Reject this proposed action?')) return;
+          await api(`/agent-actions/${id}/reject`, { method: 'POST', body: {} });
+          await loadAgentActions();
+        }
 
         // Founder Leaderboard
         const founderLeaderboard = ref([]);
@@ -5447,7 +5572,17 @@
           loadOnboardingWorkflows();
           loadCategories();
           loadGmailStatus();
+          loadAgentPendingCount();
         };
+
+        // Lightweight badge count for the AI Agent sidebar link, fetched on load
+        // so pending proposals are visible without opening the tab.
+        async function loadAgentPendingCount() {
+          try {
+            const sc = await api('/agent-actions/scorecard');
+            agentPendingCount.value = sc?.byStatus?.proposed || 0;
+          } catch (_) { /* non-fatal */ }
+        }
 
         // Load functions
         const loadFounders = async () => { founders.value = await api('/founders'); };
@@ -7570,6 +7705,8 @@
           requestMagicLink, logout,
           // Data
           tabs, activeTab, sidebarOpen, switchTab, introStatuses,
+          agentActions, agentScorecard, agentFilter, agentFilters, agentPendingCount,
+          loadAgentActions, approveAgentAction, rejectAgentAction,
           founders, nodes, nodeStats, investors, introRequests, fnRelationships, niConnections, stats, overdueRequests, nodeTasks, trends, portfolio, eligibleFounders, expandedFounderTasks,
           inboundLogs, inboundFilterStatus, pendingInboundCount,
           showFounderModal, showNodeModal, showInvestorModal, showIntroModal, showFollowupModal, showFNRelModal, showNIConnModal,

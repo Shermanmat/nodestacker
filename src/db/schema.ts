@@ -1244,3 +1244,37 @@ export const peopleTags = sqliteTable('people_tags', {
 
 export type PeopleTag = typeof peopleTags.$inferSelect;
 export type NewPeopleTag = typeof peopleTags.$inferInsert;
+
+// Agent actions — the accountability ledger for the AI worker. Every action an
+// agent tick takes (or proposes) is appended here: what it did, why, what it
+// touched, and how it resolved. This is the single system-of-record that powers
+// both the audit trail (review what the agent has been doing) and the scorecard
+// (approval rate, volume, failure rate). It does NOT replace match_suggestions
+// or Gmail drafts — those stay the domain surfaces; this is the meta-log over
+// all of them, plus the approval gate for net-new autonomous actions.
+export const agentActions = sqliteTable('agent_actions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  // Which agent/tick produced this, e.g. 'match-generator', 'auto-draft',
+  // 'followup', 'intro-email', 'research'.
+  agent: text('agent').notNull(),
+  // What it did/proposes to do, e.g. 'generate_matches', 'draft_intro',
+  // 'send_founder_email', 'enrich_investor'.
+  actionType: text('action_type').notNull(),
+  summary: text('summary').notNull(),          // human-readable one-liner
+  reasoning: text('reasoning'),                // why the agent chose this
+  entityType: text('entity_type'),             // 'investor' | 'founder' | 'intro_request' | ...
+  entityId: integer('entity_id'),
+  payload: text('payload'),                    // JSON: the proposed change / inputs
+  // proposed = needs approval, approved/rejected = decided, executed = done,
+  // failed = execution error, logged = recorded after-the-fact (no gate needed).
+  status: text('status').notNull().default('logged'),
+  dryRun: integer('dry_run', { mode: 'boolean' }).notNull().default(false),
+  result: text('result'),                      // JSON: execution result / error
+  decidedBy: text('decided_by'),               // admin who approved/rejected
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  decidedAt: text('decided_at'),
+  executedAt: text('executed_at'),
+});
+
+export type AgentAction = typeof agentActions.$inferSelect;
+export type NewAgentAction = typeof agentActions.$inferInsert;

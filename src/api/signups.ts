@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, isNotNull } from 'drizzle-orm';
-import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, ensureDefaultNodeRelationship } from '../db/index.js';
+import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, founderLeads, ensureDefaultNodeRelationship } from '../db/index.js';
 import { z } from 'zod';
 import * as postmark from 'postmark';
 
@@ -25,10 +25,14 @@ app.get('/applications', async (c) => {
     .from(publicCompanies)
     .where(isNotNull(publicCompanies.applicationStatus));
 
-  // Enrich with user info
+  // Enrich with user info + any blurb the applicant built as the post-apply
+  // next step (linked back via founder_leads.publicCompanyId).
   const enriched = await Promise.all(apps.map(async (app) => {
     const user = await db.query.publicUsers.findFirst({
       where: eq(publicUsers.id, app.userId),
+    });
+    const lead = await db.query.founderLeads.findFirst({
+      where: eq(founderLeads.publicCompanyId, app.id),
     });
     return {
       ...app,
@@ -41,6 +45,10 @@ app.get('/applications', async (c) => {
         twitterHandle: user.twitterHandle,
         city: user.city,
         oneLiner: user.oneLiner,
+      } : null,
+      blurb: lead && lead.investorBlurb ? {
+        investorBlurb: lead.investorBlurb,
+        oneLiner: lead.oneLiner,
       } : null,
     };
   }));

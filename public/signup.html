@@ -50,7 +50,17 @@
         </div>
         <h2 class="text-2xl font-bold text-slate-900 mb-3">Application received</h2>
         <p class="text-slate-500 mb-8">We review every application personally. You'll hear from us soon.</p>
-        <a href="/" class="text-sm font-medium text-blue-600 hover:text-blue-700">Back to homepage</a>
+
+        <!-- Next step: sharpen the pitch while we review. Optional, but it gives
+             us your investor pitch to review alongside your application. -->
+        <div class="mx-auto max-w-md rounded-xl border border-slate-200 bg-slate-50 p-6 mb-8 text-left">
+          <p class="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">While we review — next step</p>
+          <h3 class="text-lg font-bold text-slate-900 mb-1.5">Sharpen your investor pitch ✨</h3>
+          <p class="text-sm text-slate-500 mb-4">Use the Blurb Builder to turn your description into a tight, investor-ready blurb. Takes ~2 minutes, and we'll review it with your application.</p>
+          <a :href="blurbUrl" class="inline-block rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Build my blurb →</a>
+        </div>
+
+        <a href="/" class="text-sm font-medium text-slate-400 hover:text-slate-600">Skip for now — back to homepage</a>
       </div>
 
       <!-- Application Form -->
@@ -177,6 +187,7 @@
         const loading = ref(false);
         const error = ref(null);
         const success = ref(false);
+        const blurbUrl = ref('/blurb');
 
         function normalizeLinkedin() {
           let url = form.linkedinUrl.trim();
@@ -208,6 +219,16 @@
 
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Application failed');
+
+            // Deep-link the Blurb Builder next step: prefill what they typed and
+            // carry the IDs so the generated blurb links back to this application.
+            const params = new URLSearchParams();
+            if (data.user?.id) params.set('userId', data.user.id);
+            if (data.company?.id) params.set('companyId', data.company.id);
+            if (form.companyName) params.set('company', form.companyName);
+            if (form.companyOneLiner) params.set('desc', form.companyOneLiner);
+            blurbUrl.value = '/blurb?' + params.toString();
+
             success.value = true;
           } catch (err) {
             error.value = err.message;
@@ -216,7 +237,7 @@
           }
         }
 
-        return { form, loading, error, success, handleSignup, normalizeLinkedin, normalizeCompanyUrl };
+        return { form, loading, error, success, blurbUrl, handleSignup, normalizeLinkedin, normalizeCompanyUrl };
       }
     }).mount('#app');
   </script>

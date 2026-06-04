@@ -3,6 +3,7 @@ import { eq, and, lt, isNull, inArray, sql, desc } from 'drizzle-orm';
 import { db, introRequests, founderNodeRelationships, nodeInvestorConnections, followupLogs, investors, matchSuggestions } from '../db/index.js';
 import { z } from 'zod';
 import { checkFirmBlocked } from '../services/matching.js';
+import { sendIntroSentEmail } from '../services/intro-emails.js';
 
 const app = new Hono();
 
@@ -216,9 +217,11 @@ app.put('/:id', async (c) => {
     return c.json({ error: errorMsg || 'Invalid data' }, 400);
   }
 
-  // Get existing intro request to check for status change
+  // Get existing intro request to check for status change. Load founder/investor/
+  // node so we can send the founder a coaching email when it flips to 'introduced'.
   const existing = await db.query.introRequests.findFirst({
     where: eq(introRequests.id, id),
+    with: { founder: true, investor: true, node: true },
   });
 
   if (!existing) {
@@ -254,6 +257,29 @@ app.put('/:id', async (c) => {
           eq(nodeInvestorConnections.investorId, existing.investorId)
         )
       );
+
+    // Email the founder coaching on how to reply + a CTA back into the CRM.
+    // Fire-and-forget: never let an email failure break the status update.
+    if (existing.founder && existing.investor) {
+      const priorIntros = await db.query.introRequests.findMany({
+        where: and(
+          eq(introRequests.founderId, existing.founderId),
+          eq(introRequests.status, 'introduced')
+        ),
+      });
+      // This intro was just set to 'introduced' above, so it's included; "first"
+      // means no other introduced intros exist for this founder.
+      const isFirstIntro = priorIntros.filter((i) => i.id !== id).length === 0;
+
+      sendIntroSentEmail({
+        founderName: existing.founder.name,
+        founderEmail: existing.founder.email,
+        investorName: existing.investor.name,
+        investorFirm: existing.investor.firm || '',
+        nodeName: existing.node?.name || 'Mat',
+        isFirstIntro,
+      }).catch((err) => console.error('[INTRO-EMAIL] send failed:', err));
+    }
   }
 
   return c.json(result[0]);
@@ -793,7 +819,7 @@ app.get('/tasks/node/:nodeId', async (c) => {
 
   const allIntros = await db.query.introRequests.findMany({
     where: eq(introRequests.nodeId, nodeId),
-    with: { founder: true, node: true, investor: true },
+    with: { founder: true, node: true, investor: true, followupLogs: true },
   });
 
   const tasks: {
@@ -842,18 +868,21 @@ app.get('/tasks/node/:nodeId', async (c) => {
       continue;
     }
 
-    // Check if founder/admin has updated this intro (updatedAt differs from createdAt by > 1 min)
-    const createdTime = new Date(intro.createdAt).getTime();
-    const updatedTime = new Date(intro.updatedAt || intro.createdAt).getTime();
-    const hasBeenUpdated = (updatedTime - createdTime) > 60000;
+    // Whether a real follow-up has been logged on this intro. Use followup logs
+    // rather than updatedAt — updatedAt is bumped by any write (e.g. marking the
+    // intro 'introduced'), which would wrongly suppress the task for 14 days.
+    const lastFollowup = (intro.followupLogs || [])
+      .map((l) => l.completedAt)
+      .sort()
+      .pop();
 
-    // If updated within last 14 days, suppress all tasks
-    if (hasBeenUpdated && intro.updatedAt && intro.updatedAt > fourteenDaysAgo) {
+    // If logged within last 14 days, suppress all tasks
+    if (lastFollowup && lastFollowup > fourteenDaysAgo) {
       continue;
     }
 
-    // If updated 14+ days ago, show check-in
-    if (hasBeenUpdated) {
+    // If last logged 14+ days ago, show check-in
+    if (lastFollowup) {
       tasks.push({
         type: 'check_in',
         priority: 'medium',

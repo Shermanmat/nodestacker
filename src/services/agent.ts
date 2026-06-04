@@ -478,14 +478,26 @@ export async function runAutoDraftTick(): Promise<{
 //   - followupCount >= MAX_FOLLOWUPS (1)
 //   - last follow-up was < 7 days ago
 
-const MAX_FOLLOWUPS = 1;
+// Two-stage follow-up: a polite bump in the 7-21 day window, then a "close
+// the loop" ask once we're past 21 days. Max one of each, so each intro can
+// see up to 2 follow-ups total.
+const MAX_FOLLOWUPS = 2;
 const FOLLOWUP_GAP_DAYS = 7;
-const FOLLOWUP_TEMPLATES = [
-  'Hi {{first}} — just bumping this back to the top. No worries if not a fit, didn\'t want it to get lost.',
-  'Hi {{first}} — checking in on this, no pressure either way. Let me know!',
-  'Hey {{first}} — circling back on this. Happy to drop it if not interesting.',
-  '{{first}} — quick bump in case this got buried. No worries if you\'re slammed.',
-];
+const CLOSE_LOOP_DAYS = 21;
+
+// Polite bump — 7-21 days since intro request, no reply yet.
+const FOLLOWUP_POLITE = 'Hey {{first}} — wanted to bump this. Any additional info I can share to help you get to a yes (for the intro) or pass? Thanks!';
+
+// Close-the-loop — 21+ days. More direct, asks for any response.
+const FOLLOWUP_CLOSE_LOOP = `Hey {{first}} — wanted to circle back. I'd rather hear from you than assume it's a pass, but sometimes intros just don't get seen the first time around.\n\nQuick yes / no / not now?`;
+
+// Pick the template that fits the intro's age. Pass the dateRequested string
+// (YYYY-MM-DD) — returns one of the two strings above.
+function pickFollowupTemplate(dateRequested: string | null): string {
+  if (!dateRequested) return FOLLOWUP_POLITE;
+  const days = Math.floor((Date.now() - new Date(dateRequested).getTime()) / 86400000);
+  return days >= CLOSE_LOOP_DAYS ? FOLLOWUP_CLOSE_LOOP : FOLLOWUP_POLITE;
+}
 
 export async function runFollowupTick(): Promise<{
   checked: number;
@@ -527,10 +539,12 @@ export async function runFollowupTick(): Promise<{
     const founder = await db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) });
     if (!investor || !investor.email || !founder || !intro.gmailThreadId) continue;
 
-    // 1. Check if investor has replied — if so, stop the follow-up cycle for them
+    // 1. Check if the *investor* (not the node) has replied. Passing the
+    //    investor's email scopes the check so node forwards in-thread don't
+    //    register as the investor replying.
     let threadInfo: { hasReply: boolean; lastReplyAt?: string };
     try {
-      threadInfo = await checkThreadReplies(intro.gmailThreadId);
+      threadInfo = await checkThreadReplies(intro.gmailThreadId, investor.email);
     } catch (e: any) {
       results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: `thread check failed: ${e.message || e}` });
       continue;
@@ -544,9 +558,9 @@ export async function runFollowupTick(): Promise<{
       continue;
     }
 
-    // 2. Pick a random follow-up template + fill {{first}}
+    // 2. Pick the template that fits the intro's age + fill {{first}}
     const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
-    const template = FOLLOWUP_TEMPLATES[Math.floor(Math.random() * FOLLOWUP_TEMPLATES.length)];
+    const template = pickFollowupTemplate(intro.dateRequested);
     const body = template.replace(/\{\{first\}\}/g, investorFirst);
 
     // 3. Build subject (Re: <original>) and reply in thread
@@ -600,4 +614,276 @@ export async function runFollowupTick(): Promise<{
   }
 
   return { checked: candidates.length, drafted, repliesDetected, results };
+}
+
+// List every intro awaiting a reply (status='intro_request_sent', no
+// replyDetectedAt). Bucketed by age so the admin UI can show "polite" vs
+// "close the loop" cohorts and pick the matching follow-up template.
+export async function getPendingReplies(): Promise<{
+  rows: Array<{
+    introId: number;
+    founderId: number;
+    founderName: string;
+    companyName: string;
+    investorId: number;
+    investorName: string;
+    investorFirm: string | null;
+    investorEmail: string | null;
+    nodeId: number;
+    nodeName: string | null;
+    dateRequested: string | null;
+    daysSinceRequested: number | null;
+    followupCount: number;
+    lastFollowupAt: string | null;
+    bucket: 'too-fresh' | 'polite' | 'close-loop';
+    templatePreview: string;
+    canDraftBump: boolean; // false when capped OR in cooldown
+    bumpBlockedReason: 'capped' | 'too-fresh' | 'cooldown' | null;
+    daysUntilNextBump: number | null;
+    gmailThreadId: string | null;
+  }>;
+}> {
+  const intros = await db.select().from(introRequests)
+    .where(and(
+      eq(introRequests.status, 'intro_request_sent'),
+      isNull(introRequests.replyDetectedAt),
+    ));
+
+  const investorIds = Array.from(new Set(intros.map(i => i.investorId)));
+  const founderIds = Array.from(new Set(intros.map(i => i.founderId)));
+  const nodeIds = Array.from(new Set(intros.map(i => i.nodeId)));
+
+  const [investorRows, founderRows, nodeRows] = await Promise.all([
+    investorIds.length ? db.select().from(investors).where(inArray(investors.id, investorIds)) : [],
+    founderIds.length ? db.select().from(founders).where(inArray(founders.id, founderIds)) : [],
+    nodeIds.length ? db.select().from(nodes).where(inArray(nodes.id, nodeIds)) : [],
+  ]);
+  const invMap = new Map(investorRows.map(i => [i.id, i]));
+  const foundMap = new Map(founderRows.map(f => [f.id, f]));
+  const nodeMap = new Map(nodeRows.map(n => [n.id, n]));
+
+  const today = Date.now();
+  const rows = intros.map(intro => {
+    const inv = invMap.get(intro.investorId);
+    const found = foundMap.get(intro.founderId);
+    const node = nodeMap.get(intro.nodeId);
+    const days = intro.dateRequested
+      ? Math.floor((today - new Date(intro.dateRequested).getTime()) / 86400000)
+      : null;
+    let bucket: 'too-fresh' | 'polite' | 'close-loop' = 'too-fresh';
+    if (days !== null) {
+      if (days >= CLOSE_LOOP_DAYS) bucket = 'close-loop';
+      else if (days >= FOLLOWUP_GAP_DAYS) bucket = 'polite';
+    }
+
+    // Same eligibility logic the cron uses:
+    //   - haven't hit the 2-bump cap
+    //   - intro is at least 7 days old
+    //   - last bump (if any) was at least 7 days ago
+    const fc = intro.followupCount ?? 0;
+    let canDraftBump = true;
+    let bumpBlockedReason: 'capped' | 'too-fresh' | 'cooldown' | null = null;
+    let daysUntilNextBump: number | null = null;
+    if (fc >= MAX_FOLLOWUPS) {
+      canDraftBump = false;
+      bumpBlockedReason = 'capped';
+    } else if (days === null || days < FOLLOWUP_GAP_DAYS) {
+      canDraftBump = false;
+      bumpBlockedReason = 'too-fresh';
+      daysUntilNextBump = days === null ? null : FOLLOWUP_GAP_DAYS - days;
+    } else if (intro.lastFollowupAt) {
+      const daysSinceLast = Math.floor((today - new Date(intro.lastFollowupAt).getTime()) / 86400000);
+      if (daysSinceLast < FOLLOWUP_GAP_DAYS) {
+        canDraftBump = false;
+        bumpBlockedReason = 'cooldown';
+        daysUntilNextBump = FOLLOWUP_GAP_DAYS - daysSinceLast;
+      }
+    }
+
+    return {
+      introId: intro.id,
+      founderId: intro.founderId,
+      founderName: found?.name || 'Unknown',
+      companyName: found?.companyName || '',
+      investorId: intro.investorId,
+      investorName: inv?.name || 'Unknown',
+      investorFirm: inv?.firm ?? null,
+      investorEmail: inv?.email ?? null,
+      nodeId: intro.nodeId,
+      nodeName: node?.name ?? null,
+      dateRequested: intro.dateRequested,
+      daysSinceRequested: days,
+      followupCount: fc,
+      lastFollowupAt: intro.lastFollowupAt,
+      bucket,
+      templatePreview: pickFollowupTemplate(intro.dateRequested),
+      canDraftBump,
+      bumpBlockedReason,
+      daysUntilNextBump,
+      gmailThreadId: intro.gmailThreadId,
+    };
+  });
+
+  // Oldest first — that's the action order the admin wants.
+  rows.sort((a, b) => {
+    const ad = a.daysSinceRequested ?? -1;
+    const bd = b.daysSinceRequested ?? -1;
+    return bd - ad;
+  });
+
+  return { rows };
+}
+
+// Draft a single follow-up bump for one intro. Picks the template by age,
+// reuses the same Gmail thread, increments followupCount. Returns the
+// drafted Gmail link so the UI can shortcut the admin straight to it.
+export async function draftFollowupForIntro(introId: number): Promise<{
+  ok: boolean;
+  error?: string;
+  introId: number;
+  bucket?: 'polite' | 'close-loop' | 'too-fresh';
+  followupCount?: number;
+  gmailUrl?: string;
+}> {
+  const gmail = await getGmailStatus();
+  if (!gmail.connected) {
+    return { ok: false, introId, error: 'Gmail not connected' };
+  }
+
+  const intro = await db.query.introRequests.findFirst({ where: eq(introRequests.id, introId) });
+  if (!intro) return { ok: false, introId, error: 'intro not found' };
+  if (intro.status !== 'intro_request_sent') {
+    return { ok: false, introId, error: `intro status is ${intro.status}, not intro_request_sent` };
+  }
+  if (intro.replyDetectedAt) {
+    return { ok: false, introId, error: 'reply already detected — clear with Recheck replies if it was a false positive' };
+  }
+  if ((intro.followupCount ?? 0) >= MAX_FOLLOWUPS) {
+    return { ok: false, introId, error: `at max follow-ups (${MAX_FOLLOWUPS})` };
+  }
+  // Cooldown: same gap rule the cron uses. Don't allow a second bump within
+  // FOLLOWUP_GAP_DAYS of the previous one, or within FOLLOWUP_GAP_DAYS of the
+  // original send.
+  const today = Date.now();
+  if (intro.dateRequested) {
+    const daysSinceRequested = Math.floor((today - new Date(intro.dateRequested).getTime()) / 86400000);
+    if (daysSinceRequested < FOLLOWUP_GAP_DAYS) {
+      return { ok: false, introId, error: `intro is only ${daysSinceRequested}d old — wait ${FOLLOWUP_GAP_DAYS - daysSinceRequested}d` };
+    }
+  }
+  if (intro.lastFollowupAt) {
+    const daysSinceLast = Math.floor((today - new Date(intro.lastFollowupAt).getTime()) / 86400000);
+    if (daysSinceLast < FOLLOWUP_GAP_DAYS) {
+      return { ok: false, introId, error: `last bump was ${daysSinceLast}d ago — wait ${FOLLOWUP_GAP_DAYS - daysSinceLast}d` };
+    }
+  }
+  if (!intro.gmailThreadId) {
+    return { ok: false, introId, error: 'no gmail thread id on this intro' };
+  }
+
+  const [investor, founder] = await Promise.all([
+    db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) }),
+    db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) }),
+  ]);
+  if (!investor || !investor.email) return { ok: false, introId, error: 'no investor email' };
+  if (!founder) return { ok: false, introId, error: 'no founder record' };
+
+  const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+  const template = pickFollowupTemplate(intro.dateRequested);
+  const body = template.replace(/\{\{first\}\}/g, investorFirst);
+  const originalSubject = founder.companyName || founder.name;
+  const subject = originalSubject.startsWith('Re:') ? originalSubject : `Re: ${originalSubject}`;
+
+  const bucket: 'polite' | 'close-loop' | 'too-fresh' = (() => {
+    if (!intro.dateRequested) return 'polite';
+    const days = Math.floor((Date.now() - new Date(intro.dateRequested).getTime()) / 86400000);
+    if (days >= CLOSE_LOOP_DAYS) return 'close-loop';
+    if (days >= FOLLOWUP_GAP_DAYS) return 'polite';
+    return 'too-fresh';
+  })();
+
+  try {
+    const sent = await sendThreadReply({
+      threadId: intro.gmailThreadId,
+      to: investor.email,
+      subject,
+      body,
+      asDraft: true,
+    });
+    const now = new Date().toISOString();
+    await db.update(introRequests).set({
+      followupCount: (intro.followupCount ?? 0) + 1,
+      lastFollowupAt: now,
+      updatedAt: now,
+    }).where(eq(introRequests.id, intro.id));
+    const draftId = (sent as any).draftId as string | undefined;
+    return {
+      ok: true,
+      introId,
+      bucket,
+      followupCount: (intro.followupCount ?? 0) + 1,
+      gmailUrl: draftId ? `https://mail.google.com/mail/u/0/#drafts/${draftId}` : undefined,
+    };
+  } catch (e: any) {
+    return { ok: false, introId, error: `draft failed: ${e.message || e}` };
+  }
+}
+
+// One-shot: re-evaluate every intro currently marked replyDetectedAt and
+// clear the flag for those where the *investor* never actually replied. Used
+// to recover from the pre-fix false positives (a node forwarding/replying
+// inside the thread used to count as the investor responding).
+export async function recheckReplyDetections(): Promise<{
+  checked: number;
+  cleared: number;
+  kept: number;
+  skipped: number;
+  rows: Array<{ introId: number; investorName: string; investorEmail: string | null; action: 'cleared' | 'kept' | 'skipped'; detail?: string }>;
+}> {
+  const gmail = await getGmailStatus();
+  if (!gmail.connected) {
+    return { checked: 0, cleared: 0, kept: 0, skipped: 0, rows: [] };
+  }
+
+  const flagged = await db.select().from(introRequests)
+    .where(and(
+      sql`${introRequests.replyDetectedAt} IS NOT NULL`,
+      sql`${introRequests.gmailThreadId} IS NOT NULL AND ${introRequests.gmailThreadId} != ''`,
+    ));
+
+  let cleared = 0, kept = 0, skipped = 0;
+  const rows: Array<{ introId: number; investorName: string; investorEmail: string | null; action: 'cleared' | 'kept' | 'skipped'; detail?: string }> = [];
+
+  for (const intro of flagged) {
+    const investor = await db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) });
+    if (!investor) {
+      skipped++;
+      rows.push({ introId: intro.id, investorName: 'Unknown', investorEmail: null, action: 'skipped', detail: 'investor not found' });
+      continue;
+    }
+    if (!investor.email) {
+      // Can't scope without an email; leave the flag alone rather than guess.
+      skipped++;
+      rows.push({ introId: intro.id, investorName: investor.name, investorEmail: null, action: 'skipped', detail: 'no investor email — flag left as-is' });
+      continue;
+    }
+    try {
+      const info = await checkThreadReplies(intro.gmailThreadId!, investor.email);
+      if (info.hasReply) {
+        kept++;
+        rows.push({ introId: intro.id, investorName: investor.name, investorEmail: investor.email, action: 'kept' });
+      } else {
+        await db.update(introRequests)
+          .set({ replyDetectedAt: null, updatedAt: new Date().toISOString() })
+          .where(eq(introRequests.id, intro.id));
+        cleared++;
+        rows.push({ introId: intro.id, investorName: investor.name, investorEmail: investor.email, action: 'cleared' });
+      }
+    } catch (e: any) {
+      skipped++;
+      rows.push({ introId: intro.id, investorName: investor.name, investorEmail: investor.email, action: 'skipped', detail: `thread check failed: ${e.message || e}` });
+    }
+  }
+
+  return { checked: flagged.length, cleared, kept, skipped, rows };
 }

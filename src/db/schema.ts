@@ -105,6 +105,7 @@ export const investors = sqliteTable('investors', {
   pausedUntil: text('paused_until'), // ISO date — investor paused (e.g. raising fund)
   pauseReason: text('pause_reason'),
   city: text('city'),
+  state: text('state'), // 2-char US state code (e.g. "CA"). Inferred from city via us-states map at row create / backfill; admin can override on the investor edit form.
   country: text('country'),
   notes: text('notes'), // Free-form admin notes — non-categorical quirks ("doesn't take cold intros", "asks for revenue first")
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
@@ -165,6 +166,23 @@ export const introRequests = sqliteTable('intro_requests', {
   // someone other than us in the thread. Stops the follow-up agent
   // from bumping investors who've already responded.
   replyDetectedAt: text('reply_detected_at'),
+  // Reply classifier (Phase 1 autonomous agent) — written by runReplyClassifierTick.
+  // Classification is one of: yes / no / not_now / needs_human / out_of_office / wrong_person.
+  // For no & not_now we ALSO write the short reason into passReason so it shows up in
+  // the admin's existing reports — this column is the structured machine label.
+  replyClassification: text('reply_classification'),
+  replyClassificationAt: text('reply_classification_at'),
+  replyClassificationConfidence: text('reply_classification_confidence'), // stored as string so we don't fight sqlite's REAL gotchas
+  replyBodySnippet: text('reply_body_snippet'), // first ~500 chars of what we classified, for audit
+  // Gmail draft id for the founder↔investor intro auto-generated on a "yes".
+  introHandoffDraftId: text('intro_handoff_draft_id'),
+  introHandoffDraftCreatedAt: text('intro_handoff_draft_created_at'),
+  // Auto-send tracking (Phase 2). When classifier auto-sends the handoff
+  // reply instead of just drafting it, these record the send + the gmail
+  // message id. autoSent stays false for human-clicks-send cases.
+  introHandoffSentAt: text('intro_handoff_sent_at'),
+  introHandoffAutoSent: integer('intro_handoff_auto_sent', { mode: 'boolean' }).default(false),
+  introHandoffMessageId: text('intro_handoff_message_id'),
   // Follow-up tracking
   followupCount: integer('followup_count').notNull().default(0),
   lastFollowupAt: text('last_followup_at'),
@@ -453,104 +471,6 @@ export type NewInvestorCategory = typeof investorCategories.$inferInsert;
 export type InvestorCategoryAssignment = typeof investorCategoryAssignments.$inferSelect;
 export type FounderCategoryAssignment = typeof founderCategoryAssignments.$inferSelect;
 
-// Network Founders Tables (for podcast network matching)
-
-export const NetworkMatchStatus = {
-  SUGGESTED: 'suggested',
-  INTERESTED: 'interested',
-  INTRO_MADE: 'intro_made',
-  PASSED: 'passed',
-} as const;
-
-export const NetworkIntroRequestStatus = {
-  PENDING: 'pending',
-  MATCHED: 'matched',
-  COMPLETED: 'completed',
-} as const;
-
-export const networkFounders = sqliteTable('network_founders', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-  companyName: text('company_name').notNull(),
-  email: text('email'),
-  linkedinUrl: text('linkedin_url'),
-  episodeTitle: text('episode_title').notNull(),
-  episodeUrl: text('episode_url'),
-  episodeDate: text('episode_date'),
-  notes: text('notes'), // Admin notes (e.g., "Company dead", "Now at Block")
-  status: text('status').default('active'), // active, inactive, unknown
-  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
-});
-
-export const networkFounderResearch = sqliteTable('network_founder_research', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  networkFounderId: integer('network_founder_id').notNull().references(() => networkFounders.id),
-  companyDescription: text('company_description'),
-  industry: text('industry'),
-  companyStage: text('company_stage'),
-  employeeCount: text('employee_count'),
-  targetCustomers: text('target_customers'),
-  recentNews: text('recent_news'),
-  sourceUrls: text('source_urls'), // JSON array
-  status: text('status').notNull().default('pending'), // pending, in_progress, completed, failed
-  errorMessage: text('error_message'),
-  researchedAt: text('researched_at'),
-  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
-});
-
-export const networkIntroRequests = sqliteTable('network_intro_requests', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  portfolioCompanyId: integer('portfolio_company_id').notNull().references(() => portfolioCompanies.id),
-  requestText: text('request_text').notNull(),
-  status: text('status').notNull().default('pending'), // pending, matched, completed
-  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
-});
-
-export const networkMatches = sqliteTable('network_matches', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  introRequestId: integer('intro_request_id').notNull().references(() => networkIntroRequests.id),
-  networkFounderId: integer('network_founder_id').notNull().references(() => networkFounders.id),
-  matchScore: integer('match_score').notNull(),
-  matchReasoning: text('match_reasoning'),
-  status: text('status').notNull().default('suggested'), // suggested, interested, intro_made, passed
-  notes: text('notes'),
-  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
-  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
-});
-
-// Network Relations
-
-export const networkFoundersRelations = relations(networkFounders, ({ many }) => ({
-  research: many(networkFounderResearch),
-  matches: many(networkMatches),
-}));
-
-export const networkFounderResearchRelations = relations(networkFounderResearch, ({ one }) => ({
-  networkFounder: one(networkFounders, {
-    fields: [networkFounderResearch.networkFounderId],
-    references: [networkFounders.id],
-  }),
-}));
-
-export const networkIntroRequestsRelations = relations(networkIntroRequests, ({ one, many }) => ({
-  portfolioCompany: one(portfolioCompanies, {
-    fields: [networkIntroRequests.portfolioCompanyId],
-    references: [portfolioCompanies.id],
-  }),
-  matches: many(networkMatches),
-}));
-
-export const networkMatchesRelations = relations(networkMatches, ({ one }) => ({
-  introRequest: one(networkIntroRequests, {
-    fields: [networkMatches.introRequestId],
-    references: [networkIntroRequests.id],
-  }),
-  networkFounder: one(networkFounders, {
-    fields: [networkMatches.networkFounderId],
-    references: [networkFounders.id],
-  }),
-}));
-
 // Type exports
 export type Founder = typeof founders.$inferSelect;
 export type NewFounder = typeof founders.$inferInsert;
@@ -570,14 +490,6 @@ export type InvestorResearch = typeof investorResearch.$inferSelect;
 export type NewInvestorResearch = typeof investorResearch.$inferInsert;
 export type PortfolioCompany = typeof portfolioCompanies.$inferSelect;
 export type NewPortfolioCompany = typeof portfolioCompanies.$inferInsert;
-export type NetworkFounder = typeof networkFounders.$inferSelect;
-export type NewNetworkFounder = typeof networkFounders.$inferInsert;
-export type NetworkFounderResearch = typeof networkFounderResearch.$inferSelect;
-export type NewNetworkFounderResearch = typeof networkFounderResearch.$inferInsert;
-export type NetworkIntroRequest = typeof networkIntroRequests.$inferSelect;
-export type NewNetworkIntroRequest = typeof networkIntroRequests.$inferInsert;
-export type NetworkMatch = typeof networkMatches.$inferSelect;
-export type NewNetworkMatch = typeof networkMatches.$inferInsert;
 
 // Admin Sessions Table (persistent admin login sessions)
 export const adminSessions = sqliteTable('admin_sessions', {
@@ -1278,3 +1190,52 @@ export const agentActions = sqliteTable('agent_actions', {
 
 export type AgentAction = typeof agentActions.$inferSelect;
 export type NewAgentAction = typeof agentActions.$inferInsert;
+// People overrides — admin-edited values that supersede whatever the merged
+// source data shows for that email. Keyed by email so one row per person.
+// Non-destructive: source tables (founders, public_users, founder_leads,
+// people_captures) are untouched; the Directory view layers these on top.
+export const peopleOverrides = sqliteTable('people_overrides', {
+  email: text('email').primaryKey(),
+  name: text('name'),
+  city: text('city'),
+  company: text('company'),
+  notes: text('notes'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type PeopleOverride = typeof peopleOverrides.$inferSelect;
+export type NewPeopleOverride = typeof peopleOverrides.$inferInsert;
+
+// Cron run log — one row per scheduled job invocation. Lets us answer
+// "did the weekly digest actually fire last week?" with a single query
+// instead of guessing from machine state. Status starts as 'running' on
+// insert; the wrapper updates to 'success' / 'error' on completion.
+export const cronRuns = sqliteTable('cron_runs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  startedAt: text('started_at').notNull().default('CURRENT_TIMESTAMP'),
+  finishedAt: text('finished_at'),
+  status: text('status').notNull().default('running'),
+  result: text('result'),
+  error: text('error'),
+});
+
+export type CronRun = typeof cronRuns.$inferSelect;
+export type NewCronRun = typeof cronRuns.$inferInsert;
+
+// Agent settings — single-row table holding the kill switches + thresholds
+// for autonomous behaviors. Use id=1 as a sentinel so we can upsert.
+//
+// Today (Phase 2): auto-send the founder↔investor handoff on a high-confidence
+// 'yes' classification. Future phases will add more flags here (auto-send the
+// original intro, auto-send bumps, etc.).
+export const agentSettings = sqliteTable('agent_settings', {
+  id: integer('id').primaryKey(),
+  autoSendHandoff: integer('auto_send_handoff', { mode: 'boolean' }).notNull().default(false),
+  autoSendHandoffMinConfidence: text('auto_send_handoff_min_confidence').notNull().default('0.9'),
+  autoSendHandoffMaxReplyChars: integer('auto_send_handoff_max_reply_chars').notNull().default(400),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type AgentSettings = typeof agentSettings.$inferSelect;
+export type NewAgentSettings = typeof agentSettings.$inferInsert;

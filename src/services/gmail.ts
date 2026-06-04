@@ -318,17 +318,33 @@ export async function sendGmail(input: DraftInput): Promise<{ messageId: string;
   };
 }
 
-// Inspect a Gmail thread for inbound messages — any message NOT sent by us.
-// Used by the follow-up agent to stop bumping investors who've replied.
-// Returns the most recent non-self message timestamp (ms) if one exists.
-export async function checkThreadReplies(threadId: string): Promise<{
+// Inspect a Gmail thread for a reply *from a specific sender* (the investor).
+// Earlier behavior counted any non-self message as a reply, which produced
+// false positives whenever the node forwarded/replied inside the thread to
+// pass the intro along — the node is not the investor, so that shouldn't
+// pause the follow-up cycle.
+//
+// Pass `investorEmail` to scope the check. If omitted, falls back to the old
+// "any non-self message" behavior for backwards compatibility (no callers
+// should rely on that going forward).
+export async function checkThreadReplies(
+  threadId: string,
+  investorEmail?: string,
+): Promise<{
   hasReply: boolean;
   lastReplyAt?: string;
   messageCount: number;
 }> {
   const client = await getAuthedClient();
   const stored = await loadStoredCredentials();
-  const myEmail = (stored?.email || '').toLowerCase();
+  // OAuth scope is gmail.modify, which doesn't cover userinfo.get() — so
+  // `stored.email` is typically undefined and `myEmail` was the empty string.
+  // That made every From: header non-empty pass the `from === myEmail` check
+  // and counted our own outbound intro as a reply (root cause of the false
+  // positives). Fall back to ADMIN_EMAIL so we can still recognize our own
+  // sends even without re-running OAuth.
+  const myEmail = (stored?.email || process.env.ADMIN_EMAIL || '').toLowerCase();
+  const targetEmail = (investorEmail || '').trim().toLowerCase();
   const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
   const res = await gmail.users.threads.get({
     userId: 'me',
@@ -346,6 +362,10 @@ export async function checkThreadReplies(threadId: string): Promise<{
     const emailMatch = fromHeader.match(/<([^>]+)>/);
     const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
     if (!from || from === myEmail) continue;
+    // If we know the investor's email, require a match — otherwise messages
+    // from the node (who forwarded the intro) would count as the investor
+    // replying.
+    if (targetEmail && from !== targetEmail) continue;
     hasReply = true;
     const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date')?.value;
     const t = dateHeader ? new Date(dateHeader).getTime() : (msg.internalDate ? parseInt(msg.internalDate) : 0);
@@ -364,6 +384,7 @@ export async function checkThreadReplies(threadId: string): Promise<{
 export async function sendThreadReply(input: {
   threadId: string;
   to: string;
+  cc?: string;
   subject: string;
   body: string;
   inReplyTo?: string; // Message-ID of the message we're replying to
@@ -378,6 +399,7 @@ export async function sendThreadReply(input: {
   const rawLines: string[] = [];
   rawLines.push(`From: ${from}`);
   rawLines.push(`To: ${input.to}`);
+  if (input.cc) rawLines.push(`Cc: ${input.cc}`);
   rawLines.push(`Subject: ${input.subject}`);
   if (input.inReplyTo) rawLines.push(`In-Reply-To: ${input.inReplyTo}`);
   if (input.references) rawLines.push(`References: ${input.references}`);
@@ -408,4 +430,89 @@ export async function sendThreadReply(input: {
     messageId: res.data.id || '',
     threadId: res.data.threadId || input.threadId,
   };
+}
+
+// Fetch the most recent message body in `threadId` from `fromEmail`. Used by
+// the reply classifier to grab the investor's actual reply text (not just the
+// "did anyone reply" flag).
+export async function getLatestMessageFromSender(
+  threadId: string,
+  fromEmail: string,
+): Promise<{ body: string; receivedAt: string | null; messageId: string } | null> {
+  const client = await getAuthedClient();
+  const target = (fromEmail || '').trim().toLowerCase();
+  if (!target) return null;
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const thread = await gmail.users.threads.get({
+    userId: 'me',
+    id: threadId,
+    format: 'full',
+  });
+  const messages = thread.data.messages || [];
+  // Walk newest-first.
+  const sorted = [...messages].sort((a, b) => {
+    const at = a.internalDate ? parseInt(a.internalDate) : 0;
+    const bt = b.internalDate ? parseInt(b.internalDate) : 0;
+    return bt - at;
+  });
+  for (const msg of sorted) {
+    const headers = msg.payload?.headers || [];
+    const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from')?.value || '';
+    const emailMatch = fromHeader.match(/<([^>]+)>/);
+    const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
+    if (from !== target) continue;
+    const dateHeader = headers.find(h => h.name?.toLowerCase() === 'date')?.value;
+    const receivedAt = dateHeader ? new Date(dateHeader).toISOString() : null;
+    const body = extractPlainTextBody(msg.payload) || msg.snippet || '';
+    return { body, receivedAt, messageId: msg.id || '' };
+  }
+  return null;
+}
+
+// Pull the text/plain part out of a Gmail message payload. Falls back through
+// nested multipart and HTML-stripped content if plain isn't available.
+function extractPlainTextBody(payload: gmail_v1.Schema$MessagePart | undefined): string {
+  if (!payload) return '';
+  const decode = (b: string | undefined | null) => {
+    if (!b) return '';
+    try {
+      return Buffer.from(b.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
+    } catch { return ''; }
+  };
+  // 1. Direct text/plain
+  if (payload.mimeType === 'text/plain' && payload.body?.data) {
+    return decode(payload.body.data);
+  }
+  // 2. Search parts
+  const parts = payload.parts || [];
+  for (const p of parts) {
+    if (p.mimeType === 'text/plain' && p.body?.data) return decode(p.body.data);
+  }
+  // 3. Recurse into multipart
+  for (const p of parts) {
+    const inner = extractPlainTextBody(p);
+    if (inner) return inner;
+  }
+  // 4. Fallback: text/html stripped of tags
+  if (payload.mimeType === 'text/html' && payload.body?.data) {
+    const html = decode(payload.body.data);
+    return html.replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  for (const p of parts) {
+    if (p.mimeType === 'text/html' && p.body?.data) {
+      const html = decode(p.body.data);
+      return html.replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+  }
+  return '';
 }

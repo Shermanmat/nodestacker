@@ -7,6 +7,7 @@
   <title>Matcap - Admin Dashboard</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js"></script>
   <style>
     [v-cloak] { display: none; }
     .sidebar-link { display: flex; align-items: center; padding: 6px 12px; border-radius: 6px; font-size: 13px; color: #94a3b8; cursor: pointer; transition: all 0.15s; }
@@ -1179,8 +1180,27 @@
               <option value="">All Countries</option>
               <option v-for="c in countries" :key="c.code" :value="c.code">{{ c.name }}</option>
             </select>
+            <select v-model="filterByState" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="">All States</option>
+              <option v-for="s in availableInvestorStates" :key="s" :value="s">{{ s }}</option>
+            </select>
             <input v-model="investorSearchQuery" type="text" placeholder="Search investors..."
               class="border rounded-lg px-3 py-2 text-sm w-64">
+            <select v-model="investorSortBy" class="border rounded-lg px-3 py-2 text-sm">
+              <option value="default">Sort: Default</option>
+              <option value="accept-rate">🏆 Accept rate</option>
+              <option value="intro-volume">Intro volume</option>
+            </select>
+            <label v-if="investorSortBy !== 'default'" class="flex items-center gap-1 text-sm text-gray-600">
+              Min intros
+              <input v-model.number="investorMinIntros" type="number" min="0" step="1"
+                class="border rounded-lg px-2 py-2 text-sm w-16"
+                title="Only rank investors with at least this many intros sent. Higher = less recency bias.">
+            </label>
+            <label v-if="investorSortBy !== 'default'" class="flex items-center gap-1 text-sm text-gray-600">
+              <input v-model="leaderboardShowDetails" type="checkbox" class="rounded">
+              Blurb
+            </label>
             <button @click="showInvestorModal = true" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
               Add Investor
             </button>
@@ -1236,8 +1256,76 @@
           </div>
         </div>
 
-        <div class="space-y-4">
-          <div v-for="item in (planningFounderId ? plannedInvestors : filteredAdminInvestors)" :key="item.id || item.investor?.id"
+        <!-- Leaderboard: dense table view when sorting -->
+        <div v-if="!planningFounderId && investorSortBy !== 'default'" class="bg-white rounded-lg shadow overflow-hidden mb-4">
+          <div class="px-4 py-2 text-xs text-gray-500 border-b flex justify-between items-center">
+            <span>
+              {{ filteredAdminInvestors.length }} investors with ≥{{ investorMinIntros }} intros sent
+              <span v-if="investorSortBy === 'accept-rate'">· ranked by accept rate</span>
+              <span v-else-if="investorSortBy === 'intro-volume'">· ranked by intro volume</span>
+            </span>
+            <span class="text-gray-400">Accepted = introduced + meetings + invested. Ignored/Passed = explicit statuses.</span>
+          </div>
+          <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-xs uppercase text-gray-500">
+              <tr>
+                <th class="px-3 py-2 text-left w-12">#</th>
+                <th class="px-3 py-2 text-left">Investor</th>
+                <th class="px-3 py-2 text-left">Firm</th>
+                <th class="px-3 py-2 text-left">Sectors</th>
+                <th class="px-3 py-2 text-left">City</th>
+                <th class="px-3 py-2 text-right">Sent</th>
+                <th class="px-3 py-2 text-right">Yes</th>
+                <th class="px-3 py-2 text-right">Pass</th>
+                <th class="px-3 py-2 text-right">Ignored</th>
+                <th class="px-3 py-2 text-right">Rate</th>
+                <th class="px-3 py-2 text-left">Last intro</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="(item, idx) in filteredAdminInvestors" :key="item.id">
+                <tr class="border-t hover:bg-gray-50">
+                  <td class="px-3 py-2 font-bold text-gray-400 tabular-nums">{{ leaderboardRankLabel(idx) }}</td>
+                  <td class="px-3 py-2 font-medium">
+                    <a :href="'#investor-row-' + item.id" class="text-blue-600 hover:underline" @click="investorSortBy = 'default'">{{ item.name }}</a>
+                    <span v-if="item.vip" class="ml-1 text-amber-600" title="VIP">★</span>
+                    <button @click="openTradingCard(item)" class="ml-2 text-pink-600 hover:underline text-xs" title="Open trading card">🃏</button>
+                  </td>
+                  <td class="px-3 py-2 text-gray-700">{{ item.firm || '—' }}</td>
+                  <td class="px-3 py-2 text-gray-500 text-xs">
+                    {{ (item.categories || []).filter(c => c.type === 'sector').map(c => c.name).slice(0, 3).join(', ') || '—' }}
+                  </td>
+                  <td class="px-3 py-2 text-gray-500 text-xs">{{ item.city || '—' }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums">{{ item.introTotal || 0 }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-emerald-700">{{ item.introAccepted || 0 }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-rose-700">{{ item.introPassed || 0 }}</td>
+                  <td class="px-3 py-2 text-right tabular-nums text-gray-500">{{ item.introIgnored || 0 }}</td>
+                  <td class="px-3 py-2 text-right font-bold tabular-nums" :class="acceptRateClass(item.acceptRate)">
+                    {{ item.acceptRate != null ? item.acceptRate + '%' : '—' }}
+                  </td>
+                  <td class="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{{ item.lastIntroAt ? formatRelative(item.lastIntroAt) : '—' }}</td>
+                </tr>
+                <tr v-if="leaderboardShowDetails && (item.research?.investmentThesis || item.research?.founderPreferences)"
+                  class="border-t bg-gray-50">
+                  <td></td>
+                  <td colspan="10" class="px-3 py-2 text-xs text-gray-600">
+                    <span v-if="item.research?.investmentThesis"><span class="font-medium text-gray-700">Thesis:</span> {{ item.research.investmentThesis }}</span>
+                    <span v-if="item.research?.investmentThesis && item.research?.founderPreferences" class="mx-2 text-gray-300">·</span>
+                    <span v-if="item.research?.founderPreferences"><span class="font-medium text-gray-700">Founder fit:</span> {{ item.research.founderPreferences }}</span>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="!filteredAdminInvestors.length">
+                <td colspan="11" class="px-4 py-6 text-center text-gray-400 text-sm">
+                  No investors meet the ≥{{ investorMinIntros }} intros bar. Lower the threshold to widen the field.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div v-if="planningFounderId || investorSortBy === 'default'" class="space-y-4">
+          <div v-for="(item, idx) in (planningFounderId ? plannedInvestors : filteredAdminInvestors)" :key="item.id || item.investor?.id"
             :id="'investor-row-' + (item.id || item.investor?.id)"
             class="bg-white rounded-lg shadow overflow-hidden transition-shadow">
             <!-- Investor Header -->
@@ -1266,6 +1354,14 @@
                 <p class="text-gray-500">{{ item.firm || item.investor?.firm }} {{ (item.role || item.investor?.role) ? '• ' + (item.role || item.investor?.role) : '' }}</p>
                 <p v-if="(item.city || item.investor?.city) || (item.country || item.investor?.country)" class="text-sm text-gray-400">{{ [item.city || item.investor?.city, countryName(item.country || item.investor?.country)].filter(Boolean).join(', ') }}</p>
                 <p v-if="item.checkSize || item.investor?.checkSize" class="text-sm text-gray-400">Check: {{ item.checkSize || item.investor?.checkSize }}</p>
+                <p v-if="((item.introTotal ?? item.investor?.introTotal) || 0) > 0" class="text-sm text-gray-500 mt-1"
+                  :title="'Accepted = introduced, meetings, or invested. Total = every intro_request sent, regardless of status.'">
+                  <span class="font-medium" :class="acceptRateClass(item.acceptRate ?? item.investor?.acceptRate)">
+                    {{ item.acceptRate ?? item.investor?.acceptRate }}% accept
+                  </span>
+                  <span class="text-gray-400">·</span>
+                  {{ item.introAccepted ?? item.investor?.introAccepted }} / {{ item.introTotal ?? item.investor?.introTotal }} intros
+                </p>
                 <!-- Node connection info in planning mode -->
                 <p v-if="planningFounderId && item.nodeConnection" class="text-sm text-green-600 mt-1">
                   via {{ item.nodeConnection.nodeName }} ({{ item.nodeConnection.strength }})
@@ -1277,6 +1373,7 @@
                 </button>
                 <button @click="openCategoryAssignModal('investor', item.investor || item)" class="text-teal-600 hover:underline text-sm">Categories</button>
                 <button @click="openResearchModal(item.investor || item)" class="text-purple-600 hover:underline text-sm">Research</button>
+                <button @click="openTradingCard(item.investor || item)" class="text-pink-600 hover:underline text-sm">Card</button>
                 <button @click="editInvestor(item.investor || item)" class="text-blue-600 hover:underline text-sm">Edit</button>
                 <button @click="toggleInvestorVip((item.investor || item))"
                   :class="(item.investor || item).vip ? 'text-amber-600' : 'text-gray-400'"
@@ -1371,6 +1468,9 @@
             <button @click="runFollowupNow" class="bg-pink-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-pink-700" :disabled="runningFollowup || !gmailStatus.connected" :title="'For every sent intro with no reply in 7+ days, draft a short bump in the same thread. Max 2 bumps per intro.'">
               {{ runningFollowup ? 'Following up...' : 'Run follow-ups' }}
             </button>
+            <button @click="recheckReplies" class="bg-rose-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-rose-700" :disabled="recheckingReplies || !gmailStatus.connected" :title="'Re-run the (investor-scoped) reply check against every intro currently marked replyDetected. Clears the flag for any whose investor never actually replied so they re-enter the follow-up rotation.'">
+              {{ recheckingReplies ? 'Rechecking...' : 'Recheck replies' }}
+            </button>
             <button @click="generateMatches" class="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700" :disabled="generatingMatches">
               {{ generatingMatches ? 'Generating...' : 'Generate Matches' }}
             </button>
@@ -1404,6 +1504,150 @@
               <option v-for="f in founders" :key="f.id" :value="f.id">{{ f.name }}</option>
             </select>
             <button @click="loadIntroRequests" class="bg-gray-200 px-4 py-2 rounded text-sm hover:bg-gray-300">Apply</button>
+          </div>
+        </div>
+
+        <!-- Agent autonomy settings — kill switches for what the agent
+             can do without a human in the loop. -->
+        <div v-if="agentSettingsState" class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex items-center justify-between mb-2">
+            <div>
+              <h3 class="text-sm font-semibold text-gray-700">Agent autonomy</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Kill switches for what the agent does without you. Defaults to off.</p>
+            </div>
+            <span v-if="savingAgentSettings" class="text-xs text-gray-400">Saving…</span>
+          </div>
+          <div class="flex items-start gap-4 flex-wrap">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" v-model="agentSettingsState.autoSendHandoff" @change="saveAgentSettings" class="mt-1">
+              <div>
+                <div class="text-sm font-medium">Auto-send handoff intros on "yes"</div>
+                <div class="text-xs text-gray-500">When the classifier sees a high-confidence yes reply, MatCap sends the founder↔investor intro automatically (no draft step).</div>
+              </div>
+            </label>
+            <div class="flex items-center gap-2 text-xs text-gray-600 ml-auto">
+              <label class="flex items-center gap-1">
+                Min confidence
+                <input type="number" min="0.5" max="1" step="0.05" v-model.number="agentSettingsState.autoSendHandoffMinConfidence" @change="saveAgentSettings" class="w-16 border rounded px-2 py-0.5">
+              </label>
+              <label class="flex items-center gap-1">
+                Max reply chars
+                <input type="number" min="50" max="2000" step="50" v-model.number="agentSettingsState.autoSendHandoffMaxReplyChars" @change="saveAgentSettings" class="w-20 border rounded px-2 py-0.5">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Replies needing you — investors replied but the classifier
+             punted (needs_human / wrong_person). Handle these manually. -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-lg font-semibold">Replies needing you</h3>
+              <p class="text-xs text-gray-500 mt-1">Investor replied with something the classifier couldn't safely auto-handle. Read, then mark passed / introduced / circle-back yourself.</p>
+            </div>
+            <div class="flex gap-2">
+              <button @click="loadRepliesNeedingHuman" :disabled="loadingNeedsHuman" class="text-blue-600 text-sm hover:underline disabled:opacity-50">
+                {{ loadingNeedsHuman ? 'Loading…' : 'Refresh' }}
+              </button>
+              <button @click="classifyRepliesNow" :disabled="classifyingNow || !gmailStatus.connected"
+                class="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+                title="Run the LLM classifier against every replied-but-not-yet-classified intro. Otherwise runs hourly.">
+                {{ classifyingNow ? 'Classifying…' : 'Classify now' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingNeedsHuman && repliesNeedingHuman.length === 0" class="text-sm text-gray-500 py-4 text-center">Loading…</div>
+          <div v-else-if="repliesNeedingHuman.length === 0" class="text-sm text-gray-500 py-4 text-center">Nothing needs you right now. Classifier handles yes / no / not_now / OOO automatically — only nuanced replies land here.</div>
+          <div v-else class="space-y-3">
+            <div v-for="r in repliesNeedingHuman" :key="r.introId" class="border rounded p-3 hover:bg-gray-50">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium">
+                    {{ r.founderName }}<span v-if="r.companyName" class="text-gray-500"> · {{ r.companyName }}</span>
+                    <span class="text-gray-400 mx-1">→</span>
+                    {{ r.investorName }}<span v-if="r.investorFirm" class="text-gray-500"> · {{ r.investorFirm }}</span>
+                  </div>
+                  <div class="text-xs text-gray-500 mt-0.5">
+                    <span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-700 mr-1">{{ r.classification }}</span>
+                    <span v-if="r.confidence != null">confidence {{ (r.confidence * 100).toFixed(0) }}%</span>
+                    <span v-if="r.classifiedAt"> · classified {{ formatRelative(r.classifiedAt) }}</span>
+                  </div>
+                  <div v-if="r.snippet" class="text-xs text-gray-700 mt-2 italic whitespace-pre-line">{{ r.snippet.length > 280 ? r.snippet.slice(0, 280) + '…' : r.snippet }}</div>
+                </div>
+                <div class="flex-shrink-0 flex flex-col gap-1">
+                  <a v-if="r.gmailThreadId" :href="'https://mail.google.com/mail/u/0/#inbox/' + r.gmailThreadId" target="_blank"
+                    class="text-xs text-blue-600 hover:underline">Open in Gmail →</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Awaiting Reply panel — investors who haven't responded yet,
+             bucketed by age. Polite bump (7-21d) vs close-the-loop (21d+). -->
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-lg font-semibold">Awaiting reply</h3>
+              <p class="text-xs text-gray-500 mt-1">Sent intros with no response yet. 7–21d gets a polite nudge; 21d+ gets a "close the loop / yes-no-not-now" ask. Oldest first.</p>
+            </div>
+            <div class="flex gap-2">
+              <button @click="loadPendingReplies" :disabled="loadingPending" class="text-blue-600 text-sm hover:underline disabled:opacity-50">
+                {{ loadingPending ? 'Loading…' : 'Refresh' }}
+              </button>
+              <button @click="togglePendingShowFresh" class="text-xs text-gray-500 hover:text-gray-800">
+                {{ pendingShowFresh ? 'Hide < 7d' : 'Show < 7d' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="loadingPending && pendingReplies.length === 0" class="text-sm text-gray-500 py-6 text-center">Loading…</div>
+          <div v-else-if="pendingRepliesFiltered.length === 0" class="text-sm text-gray-500 py-6 text-center">No pending intros — everything's either replied or hasn't been sent yet.</div>
+
+          <div v-else class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs uppercase tracking-wide text-gray-600 border-b">
+                  <th class="py-2 pr-3">Bucket</th>
+                  <th class="py-2 pr-3">Founder</th>
+                  <th class="py-2 pr-3">Investor</th>
+                  <th class="py-2 pr-3">Firm</th>
+                  <th class="py-2 pr-3">Sent</th>
+                  <th class="py-2 pr-3">Bumps</th>
+                  <th class="py-2 pr-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="r in pendingRepliesFiltered" :key="r.introId" class="border-b hover:bg-gray-50">
+                  <td class="py-2 pr-3">
+                    <span :class="['inline-block text-xs font-semibold px-2 py-0.5 rounded', pendingBucketClass(r.bucket)]">
+                      {{ pendingBucketLabel(r.bucket) }}
+                    </span>
+                  </td>
+                  <td class="py-2 pr-3">{{ r.founderName }}<span v-if="r.companyName" class="text-gray-500"> · {{ r.companyName }}</span></td>
+                  <td class="py-2 pr-3">{{ r.investorName }}</td>
+                  <td class="py-2 pr-3 text-gray-600">{{ r.investorFirm || '—' }}</td>
+                  <td class="py-2 pr-3 text-gray-600">{{ r.daysSinceRequested == null ? '—' : r.daysSinceRequested + 'd' }}</td>
+                  <td class="py-2 pr-3 text-gray-600">{{ r.followupCount }}/2</td>
+                  <td class="py-2 pr-3 text-right">
+                    <button v-if="r.canDraftBump && r.gmailThreadId && gmailStatus.connected"
+                      :disabled="pendingDrafting[r.introId]"
+                      @click="draftPendingBump(r)"
+                      :title="r.templatePreview"
+                      class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">
+                      {{ pendingDrafting[r.introId] ? 'Drafting…' : 'Draft bump' }}
+                    </button>
+                    <span v-else-if="r.bumpBlockedReason === 'capped'" class="text-xs text-gray-400">Max bumps</span>
+                    <span v-else-if="r.bumpBlockedReason === 'cooldown'" class="text-xs text-gray-400">Wait {{ r.daysUntilNextBump }}d</span>
+                    <span v-else-if="r.bumpBlockedReason === 'too-fresh'" class="text-xs text-gray-400">Too fresh ({{ r.daysUntilNextBump }}d)</span>
+                    <span v-else-if="!r.gmailThreadId" class="text-xs text-gray-400" title="Intro was sent outside the app's Gmail flow, so we don't have a thread to reply into. Bump manually from Gmail.">No thread</span>
+                    <span v-else class="text-xs text-gray-400">Connect Gmail</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -2777,6 +3021,37 @@
               </div>
             </div>
             <div class="p-5 border-b">
+              <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-semibold text-gray-700">Edit details</h4>
+                <span v-if="directoryDetail.override" class="text-xs text-amber-600">Overrides applied</span>
+              </div>
+              <div class="grid grid-cols-1 gap-2 mb-3">
+                <label class="block">
+                  <span class="text-xs text-gray-500">Name</span>
+                  <input v-model="directoryEdit.name" type="text" class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500">City</span>
+                  <input v-model="directoryEdit.city" type="text" class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500">Company</span>
+                  <input v-model="directoryEdit.company" type="text" class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+                </label>
+                <label class="block">
+                  <span class="text-xs text-gray-500">Notes (admin-only)</span>
+                  <textarea v-model="directoryEdit.notes" rows="2" class="w-full border rounded px-2 py-1 text-sm mt-0.5"></textarea>
+                </label>
+              </div>
+              <div class="flex items-center gap-2">
+                <button @click="saveDirectoryOverride" :disabled="directorySaving" class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">
+                  {{ directorySaving ? 'Saving…' : 'Save changes' }}
+                </button>
+                <span v-if="directorySavedAt" class="text-xs text-green-600">Saved</span>
+                <span class="text-xs text-gray-400 ml-auto">Empty fields revert to source data</span>
+              </div>
+            </div>
+            <div class="p-5 border-b">
               <h4 class="text-sm font-semibold text-gray-700 mb-2">Tags</h4>
               <div class="flex flex-wrap gap-1 mb-2">
                 <span v-for="t in directoryDetail.tags" :key="t" class="inline-flex items-center gap-1 text-xs px-2 py-1 bg-amber-100 text-amber-700 rounded">
@@ -3162,6 +3437,101 @@
       </div>
     </div>
 
+    <!-- Trading Card Modal -->
+    <div v-if="tradingCardInvestor" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4"
+      @click.self="tradingCardInvestor = null">
+      <div class="flex flex-col items-center gap-4">
+        <!-- The card -->
+        <div ref="tradingCardEl" class="relative w-80 rounded-2xl overflow-hidden shadow-2xl"
+          style="background: linear-gradient(135deg, #004854 0%, #00C2E0 55%, #6fe4f3 100%); aspect-ratio: 3 / 4.2;">
+          <!-- Holographic shimmer -->
+          <div class="absolute inset-0 opacity-30 pointer-events-none"
+            style="background: linear-gradient(115deg, transparent 30%, rgba(255,255,255,0.4) 50%, transparent 70%); mix-blend-mode: overlay;"></div>
+
+          <!-- Header strip -->
+          <div class="relative px-4 pt-3 pb-2 flex justify-between items-center text-white text-xs uppercase tracking-widest font-bold">
+            <span class="opacity-80">Joined {{ tradingCardJoinedLabel }}</span>
+            <span class="opacity-60">#{{ tradingCardInvestor.id?.toString().padStart(4, '0') }}</span>
+          </div>
+
+          <!-- Avatar frame -->
+          <div class="relative mx-auto my-1 rounded-lg overflow-hidden border-4 border-amber-300 shadow-lg"
+            style="background: linear-gradient(180deg, #fef3c7 0%, #fbbf24 100%); width: 32%; aspect-ratio: 1 / 1;">
+            <img :src="tradingCardAvatarUrl" crossorigin="anonymous" class="w-full h-full" :alt="tradingCardInvestor.name">
+          </div>
+
+          <!-- Name plate -->
+          <div class="relative mx-4 mt-2 mb-2 px-3 py-1.5 rounded bg-white/95 text-center">
+            <div class="font-black text-base text-gray-900 truncate uppercase tracking-wide">
+              {{ tradingCardAnonymize ? tradingCardCodename : tradingCardInvestor.name }}
+            </div>
+            <div class="text-xs text-gray-500 truncate">
+              {{ tradingCardAnonymize ? 'Undisclosed Fund' : (tradingCardInvestor.firm || 'Independent') }}
+            </div>
+          </div>
+
+          <!-- Type bar (sectors) -->
+          <div class="relative mx-4 mb-2 flex flex-wrap gap-1 justify-center">
+            <span v-for="sector in tradingCardSectors" :key="sector"
+              class="text-[10px] bg-indigo-500 text-white px-2 py-0.5 rounded-full font-medium">
+              {{ sector }}
+            </span>
+            <span v-if="!tradingCardSectors.length" class="text-[10px] text-white/60">Generalist</span>
+          </div>
+
+          <!-- Hero stat: accept rate -->
+          <div class="relative mx-4 mb-2 bg-gradient-to-br from-amber-300 to-amber-500 rounded-lg px-3 py-2 text-center shadow-lg">
+            <div class="text-[10px] uppercase tracking-widest font-bold text-amber-900/80">Accept Rate</div>
+            <div class="font-black text-4xl tabular-nums leading-none text-amber-950 mt-0.5">
+              {{ tradingCardInvestor.acceptRate != null ? tradingCardInvestor.acceptRate + '%' : '—' }}
+            </div>
+            <div class="text-xs font-bold text-amber-900 mt-0.5 tabular-nums">
+              {{ tradingCardInvestor.introAccepted || 0 }} yes of {{ tradingCardInvestor.introTotal || 0 }} intros
+            </div>
+          </div>
+
+          <!-- Secondary stats: pass / ignored -->
+          <div class="relative mx-4 mb-2 grid grid-cols-2 gap-2 text-white">
+            <div class="bg-black/30 backdrop-blur rounded px-2 py-1 text-center">
+              <div class="text-[9px] uppercase tracking-wider opacity-70">Passed</div>
+              <div class="font-bold tabular-nums text-rose-300">{{ tradingCardInvestor.introPassed || 0 }}</div>
+            </div>
+            <div class="bg-black/30 backdrop-blur rounded px-2 py-1 text-center">
+              <div class="text-[9px] uppercase tracking-wider opacity-70">Ignored</div>
+              <div class="font-bold tabular-nums text-gray-300">{{ tradingCardInvestor.introIgnored || 0 }}</div>
+            </div>
+          </div>
+
+          <!-- Set mark: subtle astro watermark so collectors can ID the set -->
+          <img src="/downloads/astro.svg" alt="" crossorigin="anonymous"
+            class="absolute bottom-2 right-2 w-8 h-8 opacity-25 pointer-events-none select-none">
+
+          <!-- Footer -->
+          <div class="absolute bottom-1 left-0 right-0 text-center text-white/40 text-[9px] tracking-widest">
+            {{ tradingCardInvestor.city || 'Anywhere' }}
+          </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-lg px-4 py-3 flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-gray-700">
+            <input type="checkbox" v-model="tradingCardAnonymize" class="rounded">
+            Anonymize
+          </label>
+          <button @click="cycleAvatarStyle" class="text-sm text-pink-600 hover:underline">
+            Reroll avatar
+          </button>
+          <button @click="downloadTradingCard" :disabled="downloadingTradingCard"
+            class="text-sm text-cyan-700 hover:underline disabled:opacity-50">
+            {{ downloadingTradingCard ? 'Saving…' : 'Download PNG' }}
+          </button>
+          <button @click="tradingCardInvestor = null" class="text-sm text-gray-500 hover:text-gray-700">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Investor Modal -->
     <div v-if="showInvestorModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -3200,10 +3570,18 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">Geography</label>
               <input v-model="investorForm.geography" type="text" class="w-full border rounded px-3 py-2">
             </div>
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
                 <input v-model="investorForm.city" type="text" placeholder="e.g. San Francisco" class="w-full border rounded px-3 py-2">
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">State <span class="text-gray-400 font-normal">(US)</span></label>
+                <select v-model="investorForm.state" class="w-full border rounded px-3 py-2">
+                  <option :value="null">-</option>
+                  <option v-for="s in usStates" :key="s.code" :value="s.code">{{ s.code }} — {{ s.name }}</option>
+                </select>
+                <p class="text-xs text-gray-500 mt-1">Auto-filled from city when known.</p>
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
@@ -4078,6 +4456,7 @@
           if (tabId === 'broadcast') loadBroadcastRecipients();
           if (tabId === 'trials') loadTrials();
           if (tabId === 'agent') loadAgentActions();
+          if (tabId === 'intros') { loadPendingReplies(); loadRepliesNeedingHuman(); loadAgentSettings(); }
         }
 
         // Data
@@ -4404,14 +4783,57 @@
           }
         }
 
+        const directoryEdit = ref({ name: '', city: '', company: '', notes: '' });
+        const directorySaving = ref(false);
+        const directorySavedAt = ref(0);
+
         function openDirectoryDetail(row) {
           directoryDetail.value = row;
           newDirectoryTag.value = '';
+          // Seed the edit form: prefer the override (so admin can see + change what they set),
+          // otherwise fall back to the merged source values shown in the row.
+          const ov = row.override || {};
+          directoryEdit.value = {
+            name: ov.name ?? row.name ?? '',
+            city: ov.city ?? row.city ?? '',
+            company: ov.company ?? row.company ?? '',
+            notes: ov.notes ?? '',
+          };
+          directorySavedAt.value = 0;
         }
 
         function closeDirectoryDetail() {
           directoryDetail.value = null;
           newDirectoryTag.value = '';
+          directorySavedAt.value = 0;
+        }
+
+        async function saveDirectoryOverride() {
+          if (!directoryDetail.value) return;
+          directorySaving.value = true;
+          try {
+            const body = {
+              email: directoryDetail.value.email,
+              name: directoryEdit.value.name || null,
+              city: directoryEdit.value.city || null,
+              company: directoryEdit.value.company || null,
+              notes: directoryEdit.value.notes || null,
+            };
+            const res = await api('/admin/people/overrides', { method: 'PUT', body });
+            // Update the row in place so the table + drawer reflect the change without a refetch.
+            directoryDetail.value.override = res.override;
+            if (body.name) directoryDetail.value.name = body.name;
+            if (body.city) directoryDetail.value.city = body.city;
+            if (body.company) directoryDetail.value.company = body.company;
+            directorySavedAt.value = Date.now();
+            setTimeout(() => {
+              if (Date.now() - directorySavedAt.value >= 1900) directorySavedAt.value = 0;
+            }, 2000);
+          } catch (e) {
+            console.error('saveDirectoryOverride failed:', e);
+          } finally {
+            directorySaving.value = false;
+          }
         }
 
         async function addDirectoryTag() {
@@ -4860,7 +5282,7 @@
           loadFounders();
         };
         const nodeForm = reactive({ name: '', email: '', company: '', role: '', geography: '', notes: '' });
-        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', notes: '', excludedCategoryIds: [], newStageId: '', newPersonaId: '', newSectorId: '' });
+        const investorForm = reactive({ name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', state: null, country: '', notes: '', excludedCategoryIds: [], newStageId: '', newPersonaId: '', newSectorId: '' });
         // Full list of categories (any type) — used to populate the "Won't take" picker.
         const allExclusionCategories = ref([]);
 
@@ -4938,6 +5360,117 @@
         const filterByNodeId = ref('');
         const filterByCategoryId = ref('');
         const filterByCountry = ref('');
+        const filterByState = ref('');
+        const investorSortBy = ref('default');
+        const investorMinIntros = ref(10);
+        const leaderboardShowDetails = ref(false);
+
+        // Trading card generator: pure-frontend novelty. DiceBear gives us a
+        // free deterministic SVG avatar from a seed (no API key, no cost).
+        // Anonymize swaps the real name for a stat-derived codename so the
+        // card is shareable without doxxing the investor.
+        const tradingCardInvestor = ref(null);
+        const tradingCardAnonymize = ref(false);
+        const tradingCardAvatarStyleIdx = ref(0);
+        const tradingCardEl = ref(null);
+        const downloadingTradingCard = ref(false);
+        const AVATAR_STYLES = ['avataaars', 'fun-emoji', 'bottts', 'lorelei', 'notionists', 'adventurer'];
+        const tradingCardAvatarUrl = computed(() => {
+          if (!tradingCardInvestor.value) return '';
+          const style = AVATAR_STYLES[tradingCardAvatarStyleIdx.value % AVATAR_STYLES.length];
+          const seed = encodeURIComponent((tradingCardInvestor.value.name || 'unknown') + ':' + tradingCardAvatarStyleIdx.value);
+          return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&backgroundType=gradientLinear`;
+        });
+        const tradingCardSectors = computed(() => {
+          if (!tradingCardInvestor.value) return [];
+          return (tradingCardInvestor.value.categories || [])
+            .filter(c => c.type === 'sector')
+            .map(c => c.name)
+            .slice(0, 3);
+        });
+        const tradingCardCodename = computed(() => {
+          if (!tradingCardInvestor.value) return '';
+          const name = tradingCardInvestor.value.name || '';
+          const initials = name
+            .split(/\s+/)
+            .filter(Boolean)
+            .map(p => p[0].toUpperCase())
+            .join('.');
+          return initials ? initials + '.' : '—';
+        });
+        const tradingCardJoinedLabel = computed(() => {
+          const iso = tradingCardInvestor.value?.createdAt;
+          if (!iso) return '—';
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return '—';
+          return d.toLocaleString('en-US', { month: 'short', year: 'numeric' });
+        });
+        function openTradingCard(item) {
+          tradingCardInvestor.value = item;
+          tradingCardAnonymize.value = false;
+          tradingCardAvatarStyleIdx.value = 0;
+        }
+        function cycleAvatarStyle() {
+          tradingCardAvatarStyleIdx.value++;
+        }
+        async function downloadTradingCard() {
+          if (!tradingCardEl.value || !window.htmlToImage) return;
+          downloadingTradingCard.value = true;
+          try {
+            // html-to-image uses SVG foreignObject to render, which natively
+            // understands aspect-ratio, backdrop-filter, mix-blend-mode, and
+            // CSS gradients — html2canvas mangled all of those. pixelRatio
+            // gives us retina output; cacheBust forces a fresh avatar fetch
+            // so a cached non-CORS response doesn't taint the canvas.
+            const dataUrl = await window.htmlToImage.toPng(tradingCardEl.value, {
+              pixelRatio: 2,
+              cacheBust: true,
+              backgroundColor: undefined,
+            });
+            const safeName = (tradingCardAnonymize.value
+              ? tradingCardCodename.value
+              : (tradingCardInvestor.value?.name || 'investor')
+            ).replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = `matcap-card-${safeName}.png`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          } catch (e) {
+            console.error('Trading card download failed', e);
+            alert('Could not save the card. Try rerolling the avatar then download again.');
+          } finally {
+            downloadingTradingCard.value = false;
+          }
+        }
+
+        // 50 US states + DC, matches src/services/us-states.ts.
+        const usStates = [
+          {code:'AL',name:'Alabama'},{code:'AK',name:'Alaska'},{code:'AZ',name:'Arizona'},{code:'AR',name:'Arkansas'},
+          {code:'CA',name:'California'},{code:'CO',name:'Colorado'},{code:'CT',name:'Connecticut'},{code:'DE',name:'Delaware'},
+          {code:'DC',name:'District of Columbia'},{code:'FL',name:'Florida'},{code:'GA',name:'Georgia'},{code:'HI',name:'Hawaii'},
+          {code:'ID',name:'Idaho'},{code:'IL',name:'Illinois'},{code:'IN',name:'Indiana'},{code:'IA',name:'Iowa'},
+          {code:'KS',name:'Kansas'},{code:'KY',name:'Kentucky'},{code:'LA',name:'Louisiana'},{code:'ME',name:'Maine'},
+          {code:'MD',name:'Maryland'},{code:'MA',name:'Massachusetts'},{code:'MI',name:'Michigan'},{code:'MN',name:'Minnesota'},
+          {code:'MS',name:'Mississippi'},{code:'MO',name:'Missouri'},{code:'MT',name:'Montana'},{code:'NE',name:'Nebraska'},
+          {code:'NV',name:'Nevada'},{code:'NH',name:'New Hampshire'},{code:'NJ',name:'New Jersey'},{code:'NM',name:'New Mexico'},
+          {code:'NY',name:'New York'},{code:'NC',name:'North Carolina'},{code:'ND',name:'North Dakota'},{code:'OH',name:'Ohio'},
+          {code:'OK',name:'Oklahoma'},{code:'OR',name:'Oregon'},{code:'PA',name:'Pennsylvania'},{code:'RI',name:'Rhode Island'},
+          {code:'SC',name:'South Carolina'},{code:'SD',name:'South Dakota'},{code:'TN',name:'Tennessee'},{code:'TX',name:'Texas'},
+          {code:'UT',name:'Utah'},{code:'VT',name:'Vermont'},{code:'VA',name:'Virginia'},{code:'WA',name:'Washington'},
+          {code:'WV',name:'West Virginia'},{code:'WI',name:'Wisconsin'},{code:'WY',name:'Wyoming'},
+        ];
+
+        // Only show state options that are actually present in the DB so the
+        // dropdown isn't a wall of 51 mostly-empty buckets. Sorted alphabetically.
+        const availableInvestorStates = computed(() => {
+          const set = new Set();
+          for (const inv of investors.value) {
+            if (inv.state) set.add(inv.state);
+          }
+          return [...set].sort();
+        });
 
         const countries = [
           {code:'AF',name:'Afghanistan'},{code:'AL',name:'Albania'},{code:'DZ',name:'Algeria'},{code:'AR',name:'Argentina'},
@@ -5426,6 +5959,11 @@
             results = results.filter(inv => inv.country === filterByCountry.value);
           }
 
+          // Filter by US state
+          if (filterByState.value) {
+            results = results.filter(inv => inv.state === filterByState.value);
+          }
+
           // Filter by search query
           if (investorSearchQuery.value) {
             const q = investorSearchQuery.value.toLowerCase();
@@ -5437,6 +5975,26 @@
               if (inv.research?.portfolioCompanies?.toLowerCase().includes(q)) return true;
               return false;
             });
+          }
+
+          // Sort. Leaderboard modes apply a min-intros floor so a single
+          // 100%-accept intro doesn't dominate the rankings (recency bias).
+          if (investorSortBy.value === 'accept-rate') {
+            const min = Math.max(0, parseInt(investorMinIntros.value) || 0);
+            results = results
+              .filter(inv => (inv.introTotal || 0) >= min)
+              .slice()
+              .sort((a, b) => {
+                const rateDiff = (b.acceptRate || 0) - (a.acceptRate || 0);
+                if (rateDiff !== 0) return rateDiff;
+                return (b.introTotal || 0) - (a.introTotal || 0);
+              });
+          } else if (investorSortBy.value === 'intro-volume') {
+            const min = Math.max(0, parseInt(investorMinIntros.value) || 0);
+            results = results
+              .filter(inv => (inv.introTotal || 0) >= min)
+              .slice()
+              .sort((a, b) => (b.introTotal || 0) - (a.introTotal || 0));
           }
 
           return results;
@@ -5665,6 +6223,203 @@
             loadAllIntroRequests();
           } catch (e) { alert('Follow-up failed: ' + (e.message || e)); }
           finally { runningFollowup.value = false; }
+        };
+
+        const recheckingReplies = ref(false);
+        const recheckReplies = async () => {
+          if (!confirm('Re-run the (investor-scoped) reply check against every intro currently marked replyDetected? Clears the flag for any whose investor never actually replied.')) return;
+          recheckingReplies.value = true;
+          try {
+            const result = await api('/agent/recheck-replies', { method: 'POST' });
+            let msg = `Checked ${result.checked} flagged intros.\nCleared (false positives): ${result.cleared}\nKept (real replies): ${result.kept}\nSkipped: ${result.skipped}`;
+            if (result.rows?.length) {
+              const cleared = result.rows.filter(r => r.action === 'cleared').map(r => `• ${r.investorName}`).join('\n');
+              const kept = result.rows.filter(r => r.action === 'kept').map(r => `• ${r.investorName}`).join('\n');
+              if (cleared) msg += `\n\nBack in rotation:\n${cleared}`;
+              if (kept) msg += `\n\nReal replies (flag kept):\n${kept}`;
+            }
+            alert(msg);
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) { alert('Recheck failed: ' + (e.message || e)); }
+          finally { recheckingReplies.value = false; }
+        };
+
+        // Replies needing you panel state
+        const repliesNeedingHuman = ref([]);
+        const loadingNeedsHuman = ref(false);
+        const classifyingNow = ref(false);
+
+        const loadRepliesNeedingHuman = async () => {
+          loadingNeedsHuman.value = true;
+          try {
+            const res = await api('/agent/replies-needing-human');
+            repliesNeedingHuman.value = res.rows || [];
+          } catch (e) {
+            console.error('loadRepliesNeedingHuman failed', e);
+          } finally {
+            loadingNeedsHuman.value = false;
+          }
+        };
+
+        const classifyRepliesNow = async () => {
+          if (!confirm('Run the reply classifier now? Reads every replied-but-unclassified intro, calls the LLM, and applies status transitions (yes → introduced + handoff draft, no → passed, etc.).')) return;
+          classifyingNow.value = true;
+          try {
+            const result = await api('/agent/classify-replies-now', { method: 'POST' });
+            let msg = `Considered ${result.checked} pending intros.\nClassified: ${result.classified}\nHandoff drafts: ${result.drafted}\nHandoff AUTO-SENT: ${result.autoSent ?? 0}\nSkipped: ${result.skipped}\n(Intros with no reply yet are silently ignored — they'll be picked up when the investor responds.)`;
+            if (result.rows?.length) {
+              const byClass = {};
+              for (const r of result.rows) {
+                if (r.action === 'classified') {
+                  byClass[r.classification] = (byClass[r.classification] || 0) + 1;
+                }
+              }
+              const breakdown = Object.entries(byClass).map(([k, v]) => `${k}: ${v}`).join(', ');
+              if (breakdown) msg += `\n\nBreakdown: ${breakdown}`;
+              const autoSentRows = result.rows.filter(r => r.action === 'classified' && r.autoSentHandoff);
+              if (autoSentRows.length) {
+                msg += `\n\n⚠ Auto-sent handoffs:\n${autoSentRows.map(r => `• ${r.founderName} → ${r.investorName}`).join('\n')}`;
+              }
+            }
+            alert(msg);
+            await loadRepliesNeedingHuman();
+            await loadPendingReplies();
+            loadIntroRequests();
+            loadAllIntroRequests();
+          } catch (e) {
+            alert('Classifier failed: ' + (e.message || e));
+          } finally {
+            classifyingNow.value = false;
+          }
+        };
+
+        // Agent settings (kill switches + thresholds for autonomous behaviors)
+        const agentSettingsState = ref(null);
+        const loadingAgentSettings = ref(false);
+        const savingAgentSettings = ref(false);
+
+        const loadAgentSettings = async () => {
+          loadingAgentSettings.value = true;
+          try {
+            agentSettingsState.value = await api('/agent/settings');
+          } catch (e) {
+            console.error('loadAgentSettings failed', e);
+          } finally {
+            loadingAgentSettings.value = false;
+          }
+        };
+
+        const saveAgentSettings = async () => {
+          if (!agentSettingsState.value) return;
+          const s = agentSettingsState.value;
+          if (s.autoSendHandoff && !confirm('Turn ON auto-send for handoff intros? When the classifier sees a high-confidence "yes" reply, MatCap will SEND the founder↔investor intro automatically — no draft step.')) {
+            agentSettingsState.value.autoSendHandoff = false;
+            return;
+          }
+          savingAgentSettings.value = true;
+          try {
+            const body = {
+              autoSendHandoff: !!s.autoSendHandoff,
+              autoSendHandoffMinConfidence: Number(s.autoSendHandoffMinConfidence) || 0.9,
+              autoSendHandoffMaxReplyChars: Number(s.autoSendHandoffMaxReplyChars) || 400,
+            };
+            agentSettingsState.value = await api('/agent/settings', { method: 'PUT', body });
+          } catch (e) {
+            alert('Failed to save: ' + (e.message || e));
+          } finally {
+            savingAgentSettings.value = false;
+          }
+        };
+
+        // Color the accept-rate number by tier. Pure cosmetic; doesn't
+        // affect sorting or filtering.
+        function acceptRateClass(rate) {
+          if (rate == null) return 'text-gray-500';
+          if (rate >= 50) return 'text-emerald-700';
+          if (rate >= 25) return 'text-amber-700';
+          return 'text-rose-700';
+        }
+
+        function leaderboardRankLabel(idx) {
+          if (idx === 0) return '🥇';
+          if (idx === 1) return '🥈';
+          if (idx === 2) return '🥉';
+          return '#' + (idx + 1);
+        }
+
+        function formatRelative(iso) {
+          if (!iso) return '';
+          const ms = Date.now() - new Date(iso).getTime();
+          if (isNaN(ms)) return '';
+          const min = Math.floor(ms / 60000);
+          if (min < 1) return 'just now';
+          if (min < 60) return `${min}m ago`;
+          const hr = Math.floor(min / 60);
+          if (hr < 24) return `${hr}h ago`;
+          const d = Math.floor(hr / 24);
+          return `${d}d ago`;
+        }
+
+        // Awaiting reply panel state
+        const pendingReplies = ref([]);
+        const loadingPending = ref(false);
+        const pendingShowFresh = ref(false);
+        const pendingDrafting = reactive({}); // { [introId]: bool }
+
+        const pendingRepliesFiltered = computed(() => {
+          return pendingShowFresh.value
+            ? pendingReplies.value
+            : pendingReplies.value.filter(r => r.bucket !== 'too-fresh');
+        });
+
+        const pendingBucketLabel = (b) => ({
+          'too-fresh': '< 7d',
+          'polite': '7–21d',
+          'close-loop': '21d+',
+        })[b] || b;
+
+        const pendingBucketClass = (b) => ({
+          'too-fresh': 'bg-gray-100 text-gray-600',
+          'polite': 'bg-blue-100 text-blue-700',
+          'close-loop': 'bg-amber-100 text-amber-700',
+        })[b] || 'bg-gray-100 text-gray-600';
+
+        const togglePendingShowFresh = () => {
+          pendingShowFresh.value = !pendingShowFresh.value;
+        };
+
+        const loadPendingReplies = async () => {
+          loadingPending.value = true;
+          try {
+            const res = await api('/agent/pending-replies');
+            pendingReplies.value = res.rows || [];
+          } catch (e) {
+            console.error('loadPendingReplies failed', e);
+          } finally {
+            loadingPending.value = false;
+          }
+        };
+
+        const draftPendingBump = async (row) => {
+          const tmplLabel = row.bucket === 'close-loop' ? 'close-the-loop' : 'polite bump';
+          if (!confirm(`Draft a ${tmplLabel} to ${row.investorName} (${row.investorFirm || 'no firm'}) in the existing thread?`)) return;
+          pendingDrafting[row.introId] = true;
+          try {
+            const result = await api(`/agent/followup-one/${row.introId}`, { method: 'POST' });
+            if (!result.ok) {
+              alert('Draft failed: ' + (result.error || 'unknown'));
+            } else if (result.gmailUrl) {
+              window.open(result.gmailUrl, '_blank');
+            } else {
+              alert('Draft created.');
+            }
+            await loadPendingReplies();
+          } catch (e) {
+            alert('Draft failed: ' + (e.message || e));
+          } finally {
+            delete pendingDrafting[row.introId];
+          }
         };
 
         const sendingGmail = ref(false);
@@ -6468,6 +7223,7 @@
           filterByNodeId.value = '';
           filterByCategoryId.value = '';
           filterByCountry.value = '';
+          filterByState.value = '';
           activeTab.value = 'investors';
 
           // Wait for the v-if tab swap to render, then scroll + flash
@@ -7374,7 +8130,7 @@
         const closeInvestorModal = () => {
           showInvestorModal.value = false;
           editingInvestor.value = null;
-          Object.assign(investorForm, { name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
+          Object.assign(investorForm, { name: '', firm: '', role: '', email: '', checkSize: '', geography: '', nodeId: '', active: true, city: '', state: null, country: '', newStageId: '', newPersonaId: '', newSectorId: '' });
         };
 
         const saveIntro = async () => {
@@ -7735,7 +8491,11 @@
           introFounderDropdownOpen, introNodeDropdownOpen, introInvestorDropdownOpen,
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
-          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filteredAdminInvestors,
+          introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filterByState, usStates, availableInvestorStates, filteredAdminInvestors,
+          investorSortBy, investorMinIntros, leaderboardShowDetails, leaderboardRankLabel,
+          tradingCardInvestor, tradingCardAnonymize, tradingCardAvatarUrl, tradingCardSectors, tradingCardCodename,
+          tradingCardJoinedLabel, openTradingCard, cycleAvatarStyle,
+          tradingCardEl, downloadingTradingCard, downloadTradingCard,
           countries, countryName,
           formatStatus, formatStage, formatRoundStatus, statusClass, roundStatusClass, strengthClass, isOverdue, trendArrow, trendClass, getBarHeight, getMauBarHeight, chartMetric, chartNodeId, getChartValue, getMonthShort, loadTrends, investorMau, loadInvestorMau, uniqueFirms, uniqueFirmsPeriod, loadUniqueFirms,
           loadIntroRequests, loadAllIntroRequests, generatingMatches, generateMatches, approveSuggestion, rejectSuggestion,
@@ -7744,6 +8504,15 @@
           runningAgent, runAgentNow,
           runningAutoDraft, runAutoDraftNow, markIntroSent, discardIntroDraft, markIntroInvested, deleteIntroRequest,
           runningFollowup, runFollowupNow,
+          recheckingReplies, recheckReplies,
+          pendingReplies, loadingPending, pendingShowFresh, pendingDrafting,
+          pendingRepliesFiltered, pendingBucketLabel, pendingBucketClass,
+          togglePendingShowFresh, loadPendingReplies, draftPendingBump,
+          repliesNeedingHuman, loadingNeedsHuman, classifyingNow,
+          loadRepliesNeedingHuman, classifyRepliesNow, formatRelative,
+          acceptRateClass,
+          agentSettingsState, loadingAgentSettings, savingAgentSettings,
+          loadAgentSettings, saveAgentSettings,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,
@@ -7825,6 +8594,7 @@
           directorySourceLabel, directorySourceBadgeClass, directoryFormatRelative,
           loadDirectory, openDirectoryDetail, closeDirectoryDetail,
           addDirectoryTag, removeDirectoryTag,
+          directoryEdit, directorySaving, directorySavedAt, saveDirectoryOverride,
           // Signups
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,

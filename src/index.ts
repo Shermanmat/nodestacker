@@ -34,6 +34,7 @@ import publicCompaniesRoutes from './api/public-companies.js';
 import publicIntrosRoutes from './api/public-intros.js';
 import publicPortfolioRoutes from './api/public-portfolio.js';
 import publicDensityRoutes from './api/public-density.js';
+import publicInvestorMatchRoutes from './api/public-investor-match.js';
 import categoriesRoutes from './api/categories.js';
 import matchingRoutes from './api/matching.js';
 import marketplaceHealthRoutes from './api/marketplace-health.js';
@@ -44,6 +45,7 @@ import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import agentActionsRoutes from './api/agent-actions.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
+import { withCronRun } from './services/cron-log.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
@@ -75,6 +77,9 @@ app.route('/api/public/intros', publicIntrosRoutes);
 app.route('/api/public/portfolio', publicPortfolioRoutes);
 // Aggregated founder/user city counts for /expand map. Public.
 app.route('/api/public/density', publicDensityRoutes);
+// Investor matcher — public lead magnet. Takes founder profile, returns top
+// 10 investors by category fit; captures the profile into people_captures.
+app.route('/api/public/investor-match', publicInvestorMatchRoutes);
 // Onboarding chat is public (founder intake interview)
 // Admin endpoints (/leads, /leads/:id/convert) are protected below
 app.route('/api/onboarding-chat', onboardingChatRoutes);
@@ -146,6 +151,7 @@ app.use('/api/admin/people/*', adminGuard);
 // Weekly digest - preview requires admin, send allows token auth for cron
 app.use('/api/weekly-digest/preview/*', adminGuard);
 app.use('/api/weekly-digest/preview-admin', adminGuard);
+app.use('/api/weekly-digest/cron-runs', adminGuard);
 // Shadow agent — admin-only manual trigger
 app.use('/api/agent/*', adminGuard);
 // Agent actions ledger / approval queue — admin-only
@@ -216,6 +222,88 @@ app.post('/api/agent/followup-now', async (c) => {
   const { runFollowupTick } = await import('./services/agent.js');
   const result = await runFollowupTick();
   return c.json(result);
+});
+
+// One-shot: re-run the (now investor-scoped) reply check against every intro
+// where replyDetectedAt is set. If the new check says the investor never
+// actually replied, clear replyDetectedAt so the follow-up agent picks the
+// intro back up. Used to recover from the node-as-reply false positives that
+// existed before the gmail.ts fix.
+app.post('/api/agent/recheck-replies', async (c) => {
+  const { recheckReplyDetections } = await import('./services/agent.js');
+  const result = await recheckReplyDetections();
+  return c.json(result);
+});
+
+// List every intro where the investor hasn't replied yet, bucketed by age
+// (polite / close-loop), oldest first. Drives the "Awaiting reply" panel.
+app.get('/api/agent/pending-replies', async (c) => {
+  const { getPendingReplies } = await import('./services/agent.js');
+  const result = await getPendingReplies();
+  return c.json(result);
+});
+
+// Draft a single follow-up bump for one intro. Picks the template by age,
+// returns the Gmail draft URL so the admin lands on the draft in one click.
+app.post('/api/agent/followup-one/:id', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (!Number.isFinite(id)) return c.json({ ok: false, error: 'bad intro id' }, 400);
+  const { draftFollowupForIntro } = await import('./services/agent.js');
+  const result = await draftFollowupForIntro(id);
+  return c.json(result);
+});
+
+// Reply classifier — runs the LLM over investor replies and applies the
+// status transitions. Wraps with withCronRun for the cron path; admin can
+// also trigger manually.
+app.post('/api/agent/classify-replies-now', async (c) => {
+  const { runReplyClassifierTick } = await import('./services/reply-classifier.js');
+  const { withCronRun } = await import('./services/cron-log.js');
+  const result = await withCronRun('reply_classifier', () => runReplyClassifierTick());
+  return c.json(result);
+});
+
+app.get('/api/agent/replies-needing-human', async (c) => {
+  const { getRepliesNeedingHuman } = await import('./services/reply-classifier.js');
+  const result = await getRepliesNeedingHuman();
+  return c.json(result);
+});
+
+// Agent settings — kill switches + thresholds for autonomous behaviors.
+// Today exposes the handoff auto-send flag; future autonomous flags go here.
+app.get('/api/agent/settings', async (c) => {
+  const { db, agentSettings } = await import('./db/index.js');
+  const { eq } = await import('drizzle-orm');
+  let row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  if (!row) {
+    await db.insert(agentSettings).values({ id: 1 });
+    row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  }
+  return c.json(row);
+});
+
+app.put('/api/agent/settings', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const { db, agentSettings } = await import('./db/index.js');
+  const { eq } = await import('drizzle-orm');
+  const patch: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+  if (typeof body.autoSendHandoff === 'boolean') patch.autoSendHandoff = body.autoSendHandoff;
+  if (typeof body.autoSendHandoffMinConfidence === 'number') {
+    const v = Math.max(0, Math.min(1, body.autoSendHandoffMinConfidence));
+    patch.autoSendHandoffMinConfidence = String(v);
+  }
+  if (typeof body.autoSendHandoffMaxReplyChars === 'number') {
+    patch.autoSendHandoffMaxReplyChars = Math.max(50, Math.min(2000, Math.floor(body.autoSendHandoffMaxReplyChars)));
+  }
+  // Upsert (id=1 singleton)
+  const existing = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  if (existing) {
+    await db.update(agentSettings).set(patch).where(eq(agentSettings.id, 1));
+  } else {
+    await db.insert(agentSettings).values({ id: 1, ...patch });
+  }
+  const row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  return c.json(row);
 });
 
 // Rescore every pending match_suggestion using the current scoring formula.
@@ -723,148 +811,6 @@ app.post('/api/community-apply', async (c) => {
   return c.json({ success: true });
 });
 
-// Temporary seed endpoint for Ben Ehrlich intro
-app.post('/api/debug/seed-ben-intro', async (c) => {
-  const now = new Date().toISOString();
-
-  // Find or create Will Preble
-  let founder = await db.query.founders.findFirst({
-    where: eq(founders.name, 'Will Preble'),
-  });
-
-  if (!founder) {
-    const [created] = await db.insert(founders).values({
-      name: 'Will Preble',
-      email: 'will@covenantlabs.com',
-      companyName: 'Covenant Labs',
-      companyStage: 'seed',
-      roundStatus: 'pre_round',
-      createdAt: now,
-    }).returning();
-    founder = created;
-  }
-
-  // Find Ben Ehrlich
-  const benNode = await db.query.nodes.findFirst({
-    where: eq(nodes.name, 'Ben Ehrlich'),
-  });
-
-  if (!benNode) {
-    return c.json({ error: 'Ben Ehrlich not found' }, 404);
-  }
-
-  // Find Zoe Weinberg
-  const zoe = await db.query.investors.findFirst({
-    where: eq(investors.name, 'Zoe Weinberg'),
-  });
-
-  if (!zoe) {
-    return c.json({ error: 'Zoe Weinberg not found' }, 404);
-  }
-
-  // Create founder-node relationship if not exists
-  const existingFnRel = await db.query.founderNodeRelationships.findFirst({
-    where: eq(founderNodeRelationships.founderId, founder.id),
-  });
-
-  if (!existingFnRel || existingFnRel.nodeId !== benNode.id) {
-    await db.insert(founderNodeRelationships).values({
-      founderId: founder.id,
-      nodeId: benNode.id,
-      relationshipStrength: 'medium',
-      howConnected: 'referred',
-      createdAt: now,
-    });
-  }
-
-  // Create intro request
-  const [intro] = await db.insert(introRequests).values({
-    founderId: founder.id,
-    nodeId: benNode.id,
-    investorId: zoe.id,
-    status: 'introduced',
-    dateRequested: '2025-01-02',
-    dateIntroduced: '2025-01-02',
-    createdAt: now,
-    updatedAt: now,
-  }).returning();
-
-  return c.json({
-    success: true,
-    intro: {
-      id: intro.id,
-      founder: founder.name,
-      node: benNode.name,
-      investor: zoe.name,
-      status: intro.status,
-      dateIntroduced: intro.dateIntroduced,
-    },
-  });
-});
-
-// Temporary seed endpoint for Ben Ehrlich's investors
-app.post('/api/debug/seed-ben-investors', async (c) => {
-  // Find Ben Ehrlich's node ID
-  const benNode = await db.query.nodes.findFirst({
-    where: eq(nodes.name, 'Ben Ehrlich'),
-  });
-
-  if (!benNode) {
-    return c.json({ error: 'Ben Ehrlich node not found' }, 404);
-  }
-
-  const investorsToAdd = [
-    { name: 'Zoe Weinberg', firm: 'ex/ante' },
-    { name: 'Nick Fitz', firm: 'Juniper Ventures' },
-    { name: 'Griff Bohm', firm: 'Juniper Ventures' },
-    { name: 'Arkady Kulik', firm: 'Arkane Capital' },
-  ];
-
-  const results = [];
-  const now = new Date().toISOString();
-
-  for (const inv of investorsToAdd) {
-    // Check if investor already exists
-    let investor = await db.query.investors.findFirst({
-      where: eq(investors.name, inv.name),
-    });
-
-    if (!investor) {
-      // Create investor
-      const [created] = await db.insert(investors).values({
-        name: inv.name,
-        firm: inv.firm,
-        createdAt: now,
-      }).returning();
-      investor = created;
-      results.push({ action: 'created', investor: inv.name });
-    } else {
-      results.push({ action: 'exists', investor: inv.name });
-    }
-
-    // Check if connection already exists
-    const allBenConns = await db.query.nodeInvestorConnections.findMany({
-      where: eq(nodeInvestorConnections.nodeId, benNode.id),
-    });
-    const connExists = allBenConns.some(c => c.investorId === investor.id);
-
-    if (!connExists) {
-      // Create connection
-      await db.insert(nodeInvestorConnections).values({
-        nodeId: benNode.id,
-        investorId: investor.id,
-        connectionStrength: 'medium',
-        addedBy: 'admin',
-        validated: false,
-        createdAt: now,
-      });
-      results.push({ action: 'connected', investor: inv.name, nodeId: benNode.id });
-    }
-  }
-
-  return c.json({ success: true, benNodeId: benNode.id, results });
-});
-
 // Temporary debug endpoint for node stats (public)
 app.get('/api/debug/node-stats', async (c) => {
   const allNodes = await db.select().from(nodes);
@@ -942,7 +888,6 @@ app.get('/trial', serveStatic({ path: './public/trial.html' }));
 app.get('/how-it-works', (c) => c.redirect('/trial', 301));
 
 // Marketing site
-app.get('/welcome', serveStatic({ path: './public/welcome.html' }));
 app.get('/founders', (c) => c.redirect('/signup', 302));
 app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
@@ -957,6 +902,7 @@ app.get('/intros', serveStatic({ path: './public/intros.html' }));
 app.get('/expand', serveStatic({ path: './public/expand.html' }));
 app.get('/equity-calculator', serveStatic({ path: './public/equity-calculator.html' }));
 app.get('/raise-planner', serveStatic({ path: './public/raise-planner.html' }));
+app.get('/investor-matcher', serveStatic({ path: './public/investor-matcher.html' }));
 app.get('/case-studies', serveStatic({ path: './public/case-studies.html' }));
 app.get('/case-studies/rosotics', serveStatic({ path: './public/case-studies/rosotics.html' }));
 app.get('/case-studies/stealth-300k', serveStatic({ path: './public/case-studies/stealth-300k.html' }));
@@ -998,7 +944,7 @@ console.log(`NodeStacker server running on http://localhost:${port}`);
 cron.schedule('0 0 * * 6', async () => {
   console.log('[CRON] Running weekly digest job...');
   try {
-    const result = await sendWeeklyDigests();
+    const result = await withCronRun('weekly_digest', () => sendWeeklyDigests());
     console.log('[CRON] Weekly digest complete:', result);
   } catch (err) {
     console.error('[CRON] Weekly digest failed:', err);
@@ -1014,7 +960,7 @@ console.log('[CRON] Weekly digest scheduled for Saturday 00:00 UTC (Friday 5pm A
 cron.schedule('0 23 * * 5', async () => {
   console.log('[CRON] Sending digest preview to admin...');
   try {
-    const result = await sendDigestPreviewToAdmin();
+    const result = await withCronRun('weekly_digest_preview', () => sendDigestPreviewToAdmin());
     console.log('[CRON] Digest preview complete:', result);
   } catch (err) {
     console.error('[CRON] Digest preview failed:', err);
@@ -1095,7 +1041,24 @@ cron.schedule('30 16 * * *', async () => {
   timezone: 'UTC'
 });
 
+// Reply classifier — every hour at :15 past, classify any new investor
+// replies and apply status transitions.
+cron.schedule('15 * * * *', async () => {
+  console.log('[CRON] Running reply classifier tick...');
+  try {
+    const { runReplyClassifierTick } = await import('./services/reply-classifier.js');
+    const { withCronRun } = await import('./services/cron-log.js');
+    const result = await withCronRun('reply_classifier', () => runReplyClassifierTick());
+    console.log('[CRON] Reply classifier result:', result);
+  } catch (err) {
+    console.error('[CRON] Reply classifier failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
 console.log('[CRON] Trial decision nudge scheduled for daily 16:30 UTC (9:30am Arizona)');
+console.log('[CRON] Reply classifier scheduled hourly at :15');
 
 serve({
   fetch: app.fetch,

@@ -13,6 +13,21 @@ import {
   inboundIntroLogs,
   instantlyLeads,
 } from '../db/index.js';
+import { inferState, STATE_CODES } from '../services/us-states.js';
+
+// If admin didn't pass an explicit state but did pass a city we recognize,
+// fill it in. Normalizes state codes to uppercase. Returns the (possibly
+// mutated) data object — call before writing to DB.
+function applyStateInference<T extends { city?: string | null; state?: string | null }>(data: T): T {
+  if (data.state) {
+    data.state = String(data.state).trim().toUpperCase();
+    if (!STATE_CODES.has(data.state)) data.state = null;
+  } else if (data.city) {
+    const inferred = inferState(data.city);
+    if (inferred) data.state = inferred;
+  }
+  return data;
+}
 import { z } from 'zod';
 
 const app = new Hono();
@@ -25,6 +40,9 @@ const createInvestorSchema = z.object({
   focusAreas: z.array(z.string()).nullable().optional(),
   checkSize: z.string().nullable().optional(),
   geography: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  state: z.string().nullable().optional(),
+  country: z.string().nullable().optional(),
 });
 
 const updateInvestorSchema = createInvestorSchema.partial().extend({
@@ -32,8 +50,6 @@ const updateInvestorSchema = createInvestorSchema.partial().extend({
   vip: z.boolean().optional(),
   pausedUntil: z.string().nullable().optional(),
   pauseReason: z.string().nullable().optional(),
-  city: z.string().nullable().optional(),
-  country: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
 
@@ -90,13 +106,58 @@ app.get('/', async (c) => {
   const categoryFilter = c.req.query('category');
   const countryFilter = c.req.query('country');
 
-  // Parse focusAreas JSON, attach research and categories
-  let parsed = allInvestors.map(inv => ({
-    ...inv,
-    focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
-    research: researchMap.get(inv.id) || null,
-    categories: categoryMap.get(inv.id) || [],
-  }));
+  // Aggregate intro_requests per investor so we can show accept rate in
+  // the list. "Accepted" = investor said yes (introduced or any downstream
+  // status). "Total" = every intro request sent to them, regardless of
+  // status. Pending intros count in the denominator — an investor with 5
+  // outstanding/ignored intros and 1 accepted is honestly 1/6 = 17%.
+  // Match-agent suggestions that were never sent are excluded.
+  const allIntros = await db.select({
+    investorId: introRequests.investorId,
+    status: introRequests.status,
+    dateRequested: introRequests.dateRequested,
+  }).from(introRequests);
+  const ACCEPTED_STATUSES = new Set([
+    'introduced',
+    'first_meeting_complete',
+    'second_meeting_complete',
+    'follow_up_questions',
+    'circle_back_round_opens',
+    'invested',
+  ]);
+  const introStats = new Map<number, {
+    total: number; accepted: number; passed: number; ignored: number; lastIntroAt: string | null;
+  }>();
+  for (const i of allIntros) {
+    if (i.status === 'pending_suggestion') continue;
+    const s = introStats.get(i.investorId) || { total: 0, accepted: 0, passed: 0, ignored: 0, lastIntroAt: null };
+    s.total++;
+    if (ACCEPTED_STATUSES.has(i.status)) s.accepted++;
+    if (i.status === 'passed') s.passed++;
+    if (i.status === 'ignored') s.ignored++;
+    if (i.dateRequested && (!s.lastIntroAt || i.dateRequested > s.lastIntroAt)) {
+      s.lastIntroAt = i.dateRequested;
+    }
+    introStats.set(i.investorId, s);
+  }
+
+  // Parse focusAreas JSON, attach research, categories, and intro stats.
+  let parsed = allInvestors.map(inv => {
+    const stats = introStats.get(inv.id) || { total: 0, accepted: 0, passed: 0, ignored: 0, lastIntroAt: null };
+    const acceptRate = stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : null;
+    return {
+      ...inv,
+      focusAreas: inv.focusAreas ? JSON.parse(inv.focusAreas) : [],
+      research: researchMap.get(inv.id) || null,
+      categories: categoryMap.get(inv.id) || [],
+      introTotal: stats.total,
+      introAccepted: stats.accepted,
+      introPassed: stats.passed,
+      introIgnored: stats.ignored,
+      lastIntroAt: stats.lastIntroAt,
+      acceptRate, // null = no intros sent yet, so UI can show "—"
+    };
+  });
 
   if (categoryFilter) {
     const filterLower = categoryFilter.toLowerCase();
@@ -295,9 +356,10 @@ app.post('/', async (c) => {
   }
 
   const now = new Date().toISOString();
+  const data = applyStateInference({ ...parsed.data });
   const result = await db.insert(investors).values({
-    ...parsed.data,
-    focusAreas: parsed.data.focusAreas ? JSON.stringify(parsed.data.focusAreas) : null,
+    ...data,
+    focusAreas: data.focusAreas ? JSON.stringify(data.focusAreas) : null,
     createdAt: now,
   }).returning();
 
@@ -317,7 +379,7 @@ app.put('/:id', async (c) => {
     return c.json({ error: parsed.error.issues }, 400);
   }
 
-  const updateData: Record<string, unknown> = { ...parsed.data };
+  const updateData: Record<string, unknown> = { ...applyStateInference({ ...parsed.data }) };
   if (parsed.data.focusAreas) {
     updateData.focusAreas = JSON.stringify(parsed.data.focusAreas);
   }

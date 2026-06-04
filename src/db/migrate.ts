@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { inferState } from '../services/us-states.js';
 
 const dbPath = process.env.DATABASE_PATH || 'nodestacker.db';
 
@@ -97,6 +98,9 @@ safeAddColumn('investors', 'pause_reason', 'text');
 safeAddColumn('investors', 'email', 'text');
 // Free-form admin notes (non-categorical quirks)
 safeAddColumn('investors', 'notes', 'text');
+// 2-char US state code, used for the admin /investors state filter.
+// Backfilled below from `city` using the us-states city→state map.
+safeAddColumn('investors', 'state', 'text');
 // One-time backfill: pull emails from instantly_leads where they're linked
 try {
   sqlite.exec(`UPDATE investors SET email = (
@@ -107,6 +111,25 @@ try {
     LIMIT 1
   ) WHERE email IS NULL OR email = ''`);
 } catch (_) { /* ok if instantly_leads doesn't exist or no rows match */ }
+
+// One-time backfill of investors.state from investors.city using the
+// us-states map. Only fills rows where state IS NULL (or empty), so admin
+// overrides are never clobbered. Cities not in the map stay NULL — admin
+// fills those manually later.
+try {
+  const rows = sqlite.prepare<unknown[], { id: number; city: string }>(
+    `SELECT id, city FROM investors WHERE (state IS NULL OR state = '') AND city IS NOT NULL AND city != ''`
+  ).all() as Array<{ id: number; city: string }>;
+  const upd = sqlite.prepare('UPDATE investors SET state = ? WHERE id = ?');
+  let n = 0;
+  for (const r of rows) {
+    const inferred = inferState(r.city);
+    if (inferred) { upd.run(inferred, r.id); n++; }
+  }
+  if (n > 0) console.log(`  Backfilled investors.state for ${n} rows from city`);
+} catch (e: any) {
+  if (!e.message?.includes('no such column')) throw e;
+}
 // intro request date tracking
 safeAddColumn('intro_requests', 'date_passed', 'text');
 // Auto-draft agent: track Gmail draft id created for a pending suggestion.
@@ -118,6 +141,17 @@ safeAddColumn('intro_requests', 'gmail_thread_id', 'text');
 safeAddColumn('intro_requests', 'reply_detected_at', 'text');
 safeAddColumn('intro_requests', 'followup_count', 'integer NOT NULL DEFAULT 0');
 safeAddColumn('intro_requests', 'last_followup_at', 'text');
+// Reply classifier columns
+safeAddColumn('intro_requests', 'reply_classification', 'text');
+safeAddColumn('intro_requests', 'reply_classification_at', 'text');
+safeAddColumn('intro_requests', 'reply_classification_confidence', 'text');
+safeAddColumn('intro_requests', 'reply_body_snippet', 'text');
+safeAddColumn('intro_requests', 'intro_handoff_draft_id', 'text');
+safeAddColumn('intro_requests', 'intro_handoff_draft_created_at', 'text');
+// Phase 2 — auto-send tracking
+safeAddColumn('intro_requests', 'intro_handoff_sent_at', 'text');
+safeAddColumn('intro_requests', 'intro_handoff_auto_sent', 'integer NOT NULL DEFAULT 0');
+safeAddColumn('intro_requests', 'intro_handoff_message_id', 'text');
 // blurb builder columns
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');
@@ -286,6 +320,21 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// People overrides — admin-edited values that layer on top of merged source data.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`people_overrides\` (
+    \`email\` text PRIMARY KEY NOT NULL,
+    \`name\` text,
+    \`city\` text,
+    \`company\` text,
+    \`notes\` text,
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  console.log('  Ensured people_overrides table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
@@ -314,6 +363,48 @@ try {
   sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_agent_actions_created\` ON \`agent_actions\` (\`created_at\`)`);
   sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_agent_actions_agent\` ON \`agent_actions\` (\`agent\`)`);
   console.log('  Ensured agent_actions table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
+// Drop dormant podcast-network tables (created in 0004, never used in any
+// route or UI; verified empty on prod before drop).
+try {
+  sqlite.exec('DROP TABLE IF EXISTS \`network_matches\`');
+  sqlite.exec('DROP TABLE IF EXISTS \`network_intro_requests\`');
+  sqlite.exec('DROP TABLE IF EXISTS \`network_founder_research\`');
+  sqlite.exec('DROP TABLE IF EXISTS \`network_founders\`');
+} catch (_) { /* no-op */ }
+
+// Cron run log — one row per scheduled job invocation.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`cron_runs\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`name\` text NOT NULL,
+    \`started_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    \`finished_at\` text,
+    \`status\` text NOT NULL DEFAULT 'running',
+    \`result\` text,
+    \`error\` text
+  )`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_cron_runs_name_started\` ON \`cron_runs\` (\`name\`, \`started_at\`)`);
+  console.log('  Ensured cron_runs table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
+// agent_settings — single-row table (id=1) holding kill switches + thresholds.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`agent_settings\` (
+    \`id\` integer PRIMARY KEY,
+    \`auto_send_handoff\` integer NOT NULL DEFAULT 0,
+    \`auto_send_handoff_min_confidence\` text NOT NULL DEFAULT '0.9',
+    \`auto_send_handoff_max_reply_chars\` integer NOT NULL DEFAULT 400,
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  // Seed the singleton row if missing (defaults: auto-send OFF).
+  sqlite.exec(`INSERT OR IGNORE INTO \`agent_settings\` (id) VALUES (1)`);
+  console.log('  Ensured agent_settings table exists');
 } catch (e: any) {
   if (!e.message?.includes('already exists')) throw e;
 }

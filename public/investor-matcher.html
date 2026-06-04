@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Investor Matcher — MatCap</title>
+  <meta name="description" content="Who in MatCap's network actually invests in companies like yours? Get matched to your top 10 and apply for warm intros.">
+  <meta property="og:title" content="Investor Matcher — MatCap">
+  <meta property="og:description" content="Who in MatCap's network actually invests in companies like yours? Get your top 10 matches.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root{--bg:#FFFFFF;--bg-alt:#F5F5F5;--bg-alt2:#FAFAFA;--text:#000;--muted:#555;--accent:#00C2E0;--accent-dim:rgba(0,194,224,.12);--rule:#e5e5e5}
+    *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--text);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+    a{color:inherit}
+
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#fff;color:#000;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--rule)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:3px;color:var(--accent);border-left:1px solid var(--rule);padding-left:14px}
+    nav.topnav .links{display:flex;gap:24px;align-items:center}
+    nav.topnav .links a{color:#000;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{background:#000;color:#fff;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:var(--accent);color:#000}
+    @media (max-width:720px){nav.topnav .links a:not(.btn){display:none}}
+
+    .inner{max-width:760px;margin:0 auto;padding:0 24px}
+
+    .hero{padding:130px 0 32px}
+    .kicker{font-family:'Bebas Neue',sans-serif;letter-spacing:4px;font-size:13px;color:var(--accent);margin-bottom:14px}
+    .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);line-height:.98;letter-spacing:1.5px;margin-bottom:18px}
+    .hero h1 .accent{color:var(--accent)}
+    .hero p{font-size:clamp(16px,1.4vw,18px);max-width:580px;color:#333;line-height:1.5}
+
+    .form-section{padding:18px 0 80px}
+
+    .progress{display:flex;align-items:center;gap:10px;margin-bottom:24px;font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:1.5px}
+    .progress .bar{flex:1;height:3px;background:var(--rule);position:relative;overflow:hidden}
+    .progress .bar .fill{position:absolute;top:0;left:0;height:100%;background:var(--accent);transition:width .35s ease;width:25%}
+
+    .step{background:#fff;border:1px solid var(--rule);padding:28px 28px 24px;margin-bottom:14px;transition:opacity .25s ease, filter .25s ease}
+    .step.locked{opacity:.5;filter:saturate(.3);pointer-events:none}
+    .step.locked .continue,.step.locked input,.step.locked textarea,.step.locked .chip{pointer-events:none}
+    .step.hidden{display:none}
+    .step.reveal{opacity:0;transform:translateY(8px);animation:slideUp .35s ease forwards}
+    @keyframes slideUp{to{opacity:1;transform:translateY(0)}}
+
+    .step h2{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:18px;margin-bottom:4px;color:#000}
+    .step .step-hint{font-size:13px;color:var(--muted);margin-bottom:18px}
+
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+    .field:last-of-type{margin-bottom:0}
+    .field label{font-size:12px;font-weight:700;color:#333;text-transform:uppercase;letter-spacing:1.2px}
+    .field label .req{color:var(--accent);margin-left:2px}
+    .field input,.field textarea{border:2px solid var(--rule);background:#fff;font-family:'Inter',sans-serif;font-size:15px;padding:11px 12px;width:100%;color:#000;outline:none;transition:border-color .15s ease}
+    .field input:focus,.field textarea:focus{border-color:#000}
+    .field textarea{min-height:64px;resize:vertical;line-height:1.45}
+    .field .hint{font-size:11px;color:var(--muted);margin-top:2px}
+    .field .err{font-size:12px;color:#c44;margin-top:2px;display:none}
+    .field.has-err input,.field.has-err textarea{border-color:#c44}
+    .field.has-err .err{display:block}
+
+    .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+    .chip{cursor:pointer;border:1.5px solid var(--rule);background:#fff;color:#222;font-size:13px;padding:7px 12px;border-radius:999px;transition:all .12s ease;user-select:none}
+    .chip:hover{border-color:#000}
+    .chip.selected{background:#000;color:#fff;border-color:#000}
+    .chip-group-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-weight:700;margin:14px 0 4px}
+    .chip-group-label:first-child{margin-top:0}
+
+    .continue{margin-top:18px;display:inline-flex;align-items:center;gap:8px;background:#000;color:#fff;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:1.5px;border:none;padding:13px 22px;cursor:pointer;transition:background .15s ease}
+    .continue:hover{background:var(--accent);color:#000}
+    .continue:disabled{opacity:.4;cursor:not-allowed}
+    .continue.big{font-size:14px;padding:16px 28px}
+
+    .results{margin-top:32px;display:none}
+    .results.show{display:block}
+    .results h2{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:28px;margin-bottom:6px}
+    .results .sub{color:var(--muted);font-size:14px;margin-bottom:20px}
+    .matches{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:24px}
+    .match-card{background:#fff;border:1px solid var(--rule);padding:18px 22px;display:grid;grid-template-columns:30px 1fr auto;gap:14px;align-items:center}
+    .match-card .rank{font-family:'Bebas Neue',sans-serif;font-size:24px;color:var(--accent);letter-spacing:1px}
+    .match-card .who{min-width:0}
+    .match-card .who .name{font-weight:700;font-size:16px;color:#000}
+    .match-card .who .firm{font-size:13px;color:var(--muted);margin-top:1px}
+    .match-card .who .reason{font-size:12px;color:#333;margin-top:6px;line-height:1.4}
+    .match-card .who .tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+    .match-card .who .tag{font-size:10px;text-transform:uppercase;letter-spacing:.8px;background:var(--bg-alt);color:#555;padding:2px 7px;border-radius:2px;font-weight:600}
+    .match-card .bucket{font-family:'Bebas Neue',sans-serif;letter-spacing:1.5px;font-size:11px;color:#000;padding:5px 10px;border:1px solid var(--rule);white-space:nowrap}
+    .match-card .bucket.Strong{background:var(--accent);color:#000;border-color:var(--accent)}
+    .match-card .bucket.Good{background:#000;color:#fff;border-color:#000}
+    @media (max-width:560px){.match-card{grid-template-columns:1fr;gap:8px}.match-card .rank{font-size:18px}.match-card .bucket{justify-self:start}}
+
+    .results .cta-band{background:#000;color:#fff;padding:28px;text-align:center;margin-top:18px}
+    .results .cta-band h3{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;margin-bottom:8px}
+    .results .cta-band p{color:#bbb;font-size:14px;margin-bottom:18px;max-width:520px;margin-left:auto;margin-right:auto;line-height:1.5}
+    .results .cta-band a.cta-btn{display:inline-block;background:var(--accent);color:#000;font-weight:700;font-size:13px;text-transform:uppercase;letter-spacing:2px;padding:14px 28px;text-decoration:none;transition:background .15s ease}
+    .results .cta-band a.cta-btn:hover{background:#fff}
+
+    .footer-note{font-size:11px;color:#999;text-align:center;margin-top:12px;font-style:italic}
+
+    footer{padding:24px 0;border-top:1px solid var(--rule);color:var(--muted);font-size:12px;text-align:center}
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="/">
+    <img src="/downloads/matcap-logo.png" alt="MatCap" onerror="this.style.display='none'">
+    <span class="tag">INVESTOR MATCHER</span>
+  </a>
+  <div class="links">
+    <a href="/equity-calculator">Equity calc</a>
+    <a href="/raise-planner">Raise planner</a>
+    <a href="/signup" class="btn">Apply</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="inner">
+    <div class="kicker">FOUNDER TOOL</div>
+    <h1>Who in MatCap's network actually <span class="accent">invests</span> in companies like yours?</h1>
+    <p>We score every investor in our network against your startup. See your top 10 — then apply to MatCap to get the warm intros.</p>
+  </div>
+</section>
+
+<section class="form-section">
+  <div class="inner">
+
+    <div class="progress" id="progress">
+      <span id="progress-text">Step 1 of 4</span>
+      <div class="bar"><div class="fill" id="progress-fill"></div></div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="step" id="step-1" data-step="1">
+      <h2>Tell us about your startup</h2>
+      <div class="step-hint">Two sentences. We're not grading the pitch.</div>
+
+      <div class="field" data-required="name">
+        <label>Your name<span class="req">*</span></label>
+        <input type="text" id="f-name" autocomplete="name" placeholder="Mat Sherman">
+        <div class="err">Add your name.</div>
+      </div>
+
+      <div class="field" data-required="companyName">
+        <label>Company name<span class="req">*</span></label>
+        <input type="text" id="f-company" autocomplete="organization" placeholder="Acme">
+        <div class="err">Add a company name.</div>
+      </div>
+
+      <div class="field" data-required="oneLiner">
+        <label>One-liner — what does the company do?<span class="req">*</span></label>
+        <textarea id="f-oneliner" maxlength="280" placeholder="An AI productivity tool for legal teams in mid-market firms."></textarea>
+        <div class="hint">~140 chars is plenty.</div>
+        <div class="err">Give us one sentence.</div>
+      </div>
+
+      <button class="continue" type="button" data-next="2">Continue →</button>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="step hidden" id="step-2" data-step="2">
+      <h2>Quick verification</h2>
+      <div class="step-hint">So investors know you're real if we end up making the intro.</div>
+
+      <div class="field" data-required="linkedinUrl">
+        <label>Founder LinkedIn URL<span class="req">*</span></label>
+        <input type="url" id="f-linkedin" placeholder="https://linkedin.com/in/...">
+        <div class="err">Add a valid LinkedIn URL.</div>
+      </div>
+
+      <div class="field">
+        <label>Website URL <span style="font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0">(optional)</span></label>
+        <input type="url" id="f-website" placeholder="https://acme.ai">
+      </div>
+
+      <div class="field" data-required="city">
+        <label>City<span class="req">*</span></label>
+        <input type="text" id="f-city" autocomplete="address-level2" placeholder="Phoenix">
+        <div class="err">Add your city.</div>
+      </div>
+
+      <button class="continue" type="button" data-next="3">Continue →</button>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="step hidden" id="step-3" data-step="3">
+      <h2>What sectors fit?</h2>
+      <div class="step-hint">Pick up to 3. Skip if you're undecided — we'll still rank generalists for you.</div>
+
+      <div id="chip-groups">
+        <div class="step-hint">Loading sectors…</div>
+      </div>
+
+      <button class="continue" type="button" data-next="4">Continue →</button>
+    </div>
+
+    <!-- Step 4 -->
+    <div class="step hidden" id="step-4" data-step="4">
+      <h2>One last thing</h2>
+      <div class="step-hint">We email your matches to you so you don't lose them.</div>
+
+      <div class="field" data-required="email">
+        <label>Email<span class="req">*</span></label>
+        <input type="email" id="f-email" autocomplete="email" placeholder="you@company.com">
+        <div class="err">Add a valid email.</div>
+      </div>
+
+      <button class="continue big" type="button" id="submit-btn">Show me my 10 investors →</button>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+      <h2>Your top 10 matches</h2>
+      <div class="sub" id="results-sub">Ranked by category fit against your profile.</div>
+      <div class="matches" id="matches-grid"></div>
+      <div class="cta-band">
+        <h3>Want the warm intros?</h3>
+        <p>Seeing the names is one thing. Getting on a call with these investors is the hard part. That's what MatCap does — warm intros via the right node in our network. Apply to start.</p>
+        <a href="/signup" class="cta-btn">Apply to MatCap</a>
+      </div>
+      <div class="footer-note">Investor data shown is curated by MatCap. No emails or contact details — those come after a successful application.</div>
+    </div>
+
+  </div>
+</section>
+
+<footer>
+  <div class="inner">
+    <a href="/">Home</a> &nbsp;·&nbsp;
+    <a href="/equity-calculator">Equity calc</a> &nbsp;·&nbsp;
+    <a href="/raise-planner">Raise planner</a>
+    <div style="margin-top:8px">© 2026 MatCap</div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const TOTAL_STEPS = 4;
+  const state = {
+    step: 1,
+    selectedSectorIds: new Set(),
+    sectorsLoaded: false,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const progressFill = $('progress-fill');
+  const progressText = $('progress-text');
+
+  function setStep(n){
+    state.step = n;
+    progressFill.style.width = (n/TOTAL_STEPS * 100) + '%';
+    progressText.textContent = `Step ${n} of ${TOTAL_STEPS}`;
+  }
+
+  function validateStep(stepNum){
+    const stepEl = document.querySelector(`#step-${stepNum}`);
+    const fields = stepEl.querySelectorAll('.field[data-required]');
+    let ok = true;
+    fields.forEach(f => {
+      const input = f.querySelector('input,textarea');
+      const val = (input.value || '').trim();
+      let valid = val.length > 0;
+      if (valid && input.type === 'email') valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+      if (valid && input.type === 'url') {
+        try { new URL(val); } catch { valid = false; }
+      }
+      if (!valid) {
+        f.classList.add('has-err');
+        ok = false;
+      } else {
+        f.classList.remove('has-err');
+      }
+    });
+    return ok;
+  }
+
+  function advance(toStep){
+    if (!validateStep(state.step)) {
+      // Focus first errored input
+      const firstErr = document.querySelector(`#step-${state.step} .field.has-err input, #step-${state.step} .field.has-err textarea`);
+      firstErr?.focus();
+      return;
+    }
+    // Lock current
+    document.querySelector(`#step-${state.step}`).classList.add('locked');
+    // Reveal next
+    const next = $(`step-${toStep}`);
+    next.classList.remove('hidden');
+    next.classList.add('reveal');
+    setStep(toStep);
+    // Smooth scroll into view
+    setTimeout(() => next.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+    // If revealing step 3 and sectors not loaded, load now
+    if (toStep === 3 && !state.sectorsLoaded) loadSectors();
+  }
+
+  // Wire continue buttons
+  document.querySelectorAll('.continue[data-next]').forEach(btn => {
+    btn.addEventListener('click', () => advance(parseInt(btn.dataset.next, 10)));
+  });
+
+  // Clear error on input
+  document.querySelectorAll('.field input, .field textarea').forEach(el => {
+    el.addEventListener('input', () => el.closest('.field')?.classList.remove('has-err'));
+  });
+
+  // Sectors loader
+  async function loadSectors(){
+    const wrap = $('chip-groups');
+    try {
+      const res = await fetch('/api/public/investor-match/sectors');
+      if (!res.ok) throw new Error(`Sectors fetch returned ${res.status}`);
+      const data = await res.json();
+      const sectors = Array.isArray(data?.sectors) ? data.sectors : [];
+      if (sectors.length === 0) throw new Error('No sectors returned');
+      // Endpoint already filters to top-level parent sectors — render as a
+      // single alphabetized chip strip.
+      sectors.sort((a, b) => a.name.localeCompare(b.name));
+      wrap.innerHTML = '';
+      const chips = document.createElement('div');
+      chips.className = 'chips';
+      for (const s of sectors) chips.appendChild(makeChip(s));
+      wrap.appendChild(chips);
+      state.sectorsLoaded = true;
+    } catch (e) {
+      wrap.innerHTML = '<div class="step-hint" style="color:#c44">Couldn\'t load sectors — continue anyway and we\'ll rank generalists for you.</div>';
+    }
+  }
+
+  function makeChip(cat){
+    const c = document.createElement('div');
+    c.className = 'chip';
+    c.textContent = cat.name;
+    c.dataset.id = cat.id;
+    c.addEventListener('click', () => {
+      const id = cat.id;
+      if (state.selectedSectorIds.has(id)) {
+        state.selectedSectorIds.delete(id);
+        c.classList.remove('selected');
+      } else if (state.selectedSectorIds.size >= 3) {
+        // Cap at 3
+        return;
+      } else {
+        state.selectedSectorIds.add(id);
+        c.classList.add('selected');
+      }
+    });
+    return c;
+  }
+
+  // Submit
+  $('submit-btn').addEventListener('click', async () => {
+    if (!validateStep(4)) {
+      document.querySelector('#step-4 .field.has-err input')?.focus();
+      return;
+    }
+    const btn = $('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'Matching…';
+
+    const body = {
+      name: $('f-name').value.trim(),
+      companyName: $('f-company').value.trim(),
+      oneLiner: $('f-oneliner').value.trim(),
+      websiteUrl: $('f-website').value.trim() || undefined,
+      linkedinUrl: $('f-linkedin').value.trim(),
+      city: $('f-city').value.trim(),
+      sectorIds: Array.from(state.selectedSectorIds),
+      email: $('f-email').value.trim(),
+    };
+
+    try {
+      const res = await fetch('/api/public/investor-match', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        let detail = '';
+        try {
+          const errBody = await res.json();
+          // zod flatten() shape: { fieldErrors: {fieldName: [msg, ...]} }
+          if (errBody?.error?.fieldErrors) {
+            const parts = [];
+            for (const [field, msgs] of Object.entries(errBody.error.fieldErrors)) {
+              if (Array.isArray(msgs) && msgs.length) parts.push(`${field}: ${msgs[0]}`);
+            }
+            detail = parts.join('\n');
+          }
+        } catch {}
+        throw new Error(detail || `Server returned ${res.status}`);
+      }
+      const data = await res.json();
+      renderResults(data.matches || []);
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Show me my 10 investors →';
+      alert(`Couldn't submit:\n\n${e.message || e}`);
+      console.error(e);
+    }
+  });
+
+  function renderResults(matches){
+    // Lock the submit step
+    document.querySelector('#step-4').classList.add('locked');
+    const grid = $('matches-grid');
+    grid.innerHTML = '';
+    if (matches.length === 0) {
+      grid.innerHTML = '<div class="step-hint">No matches found — try different sectors.</div>';
+    } else {
+      matches.forEach((m, i) => {
+        const tags = [];
+        if (m.stage) tags.push(m.stage);
+        for (const s of (m.sectors || []).slice(0, 3)) tags.push(s);
+        const card = document.createElement('div');
+        card.className = 'match-card';
+        card.innerHTML = `
+          <div class="rank">#${i+1}</div>
+          <div class="who">
+            <div class="name">${escapeHtml(m.name)}</div>
+            ${m.firm ? `<div class="firm">${escapeHtml(m.firm)}${m.city ? ` · ${escapeHtml(m.city)}` : ''}</div>` : (m.city ? `<div class="firm">${escapeHtml(m.city)}</div>` : '')}
+            <div class="reason">${escapeHtml(m.fitReason)}</div>
+            ${tags.length ? `<div class="tags">${tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}</div>` : ''}
+          </div>
+          <div class="bucket ${escapeHtml(m.fitBucket)}">${escapeHtml(m.fitBucket)} fit</div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+    const results = $('results');
+    results.classList.add('show');
+    setTimeout(() => results.scrollIntoView({behavior:'smooth', block:'start'}), 50);
+  }
+
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // URL auto-fill: when a founder types a LinkedIn or website without the
+  // protocol and tabs away, prepend "https://" so they see what gets submitted.
+  // Server also normalizes (defense-in-depth) but this fixes the field visually.
+  function autoFillProtocol(el){
+    const v = (el.value || '').trim();
+    if (!v) return;
+    if (/^https?:\/\//i.test(v)) return;
+    el.value = 'https://' + v;
+  }
+  ['f-linkedin', 'f-website'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('blur', () => autoFillProtocol(el));
+  });
+
+  setStep(1);
+})();
+</script>
+
+</body>
+</html>

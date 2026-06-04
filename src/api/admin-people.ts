@@ -8,6 +8,7 @@ import {
   founderLeads,
   peopleCaptures,
   peopleTags,
+  peopleOverrides,
 } from '../db/index.js';
 
 const app = new Hono();
@@ -21,6 +22,8 @@ type UnifiedRow = {
   tags: string[];
   firstSeenAt: string;
   lastTouchAt: string;
+  // Admin-applied overrides on top of merged source data (notes is admin-only)
+  override: { name: string | null; city: string | null; company: string | null; notes: string | null } | null;
   // Per-source detail for the drawer
   rawSources: Array<{ source: string; id: number; data: Record<string, unknown> }>;
 };
@@ -48,6 +51,7 @@ app.get('/', async (c) => {
         tags: [],
         firstSeenAt: partial.firstSeenAt ?? '',
         lastTouchAt: partial.lastTouchAt ?? '',
+        override: null,
         rawSources: [sourceRaw],
       });
       return;
@@ -125,6 +129,24 @@ app.get('/', async (c) => {
     if (!row.tags.includes(t.tag)) row.tags.push(t.tag);
   }
 
+  // 6. Apply overrides on top of merged source data. Non-destructive — source
+  // tables are untouched; we just surface the admin-edited values.
+  const overrideRows = await db.select().from(peopleOverrides);
+  for (const o of overrideRows) {
+    const email = normEmail(o.email);
+    const row = rowsByEmail.get(email);
+    if (!row) continue;
+    row.override = {
+      name: o.name ?? null,
+      city: o.city ?? null,
+      company: o.company ?? null,
+      notes: o.notes ?? null,
+    };
+    if (o.name) row.name = o.name;
+    if (o.city) row.city = o.city;
+    if (o.company) row.company = o.company;
+  }
+
   // Sort by lastTouchAt desc, falling back to firstSeenAt.
   const rows = [...rowsByEmail.values()].sort((a, b) => {
     const at = a.lastTouchAt || a.firstSeenAt || '';
@@ -173,6 +195,46 @@ app.delete('/tags', async (c) => {
 
   await db.delete(peopleTags).where(and(eq(peopleTags.email, email), eq(peopleTags.tag, tag)));
   return c.json({ ok: true });
+});
+
+// Save (upsert) admin overrides for a person. Empty string clears that field.
+const overrideSchema = z.object({
+  email: z.string().email(),
+  name: z.string().nullable().optional(),
+  city: z.string().nullable().optional(),
+  company: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+app.put('/overrides', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = overrideSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: parsed.error.flatten() }, 400);
+
+  const email = parsed.data.email.toLowerCase().trim();
+  const norm = (v: string | null | undefined) => {
+    if (v === null || v === undefined) return null;
+    const t = String(v).trim();
+    return t === '' ? null : t;
+  };
+  const fields = {
+    name: norm(parsed.data.name),
+    city: norm(parsed.data.city),
+    company: norm(parsed.data.company),
+    notes: norm(parsed.data.notes),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const existing = await db.query.peopleOverrides.findFirst({
+    where: eq(peopleOverrides.email, email),
+  });
+
+  if (existing) {
+    await db.update(peopleOverrides).set(fields).where(eq(peopleOverrides.email, email));
+  } else {
+    await db.insert(peopleOverrides).values({ email, ...fields });
+  }
+  return c.json({ ok: true, override: { ...fields, email } });
 });
 
 // Distinct tags across all people — used to populate the tag-filter dropdown.

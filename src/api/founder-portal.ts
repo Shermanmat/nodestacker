@@ -418,7 +418,6 @@ app.get('/tasks', async (c) => {
   const founderId = c.get('founderId') as number;
   const today = new Date().toISOString().split('T')[0];
   const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-  const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
   const allIntros = await db.query.introRequests.findMany({
     where: eq(introRequests.founderId, founderId),
@@ -460,19 +459,23 @@ app.get('/tasks', async (c) => {
       continue;
     }
 
-    // Determine if founder has taken action on this intro
-    // If updatedAt is more than 1 minute after createdAt, founder has touched it
-    const createdTime = new Date(intro.createdAt).getTime();
-    const updatedTime = new Date(intro.updatedAt || intro.createdAt).getTime();
-    const founderHasTouched = (updatedTime - createdTime) > 60000; // 1 minute buffer
+    // Determine if the founder has actually logged an update on this intro.
+    // Use followup logs (a real founder action) rather than updatedAt, which is
+    // bumped by any write — including an admin marking the intro 'introduced'.
+    // Keying off updatedAt would wrongly treat that as "founder followed up" and
+    // suppress the task for 14 days, so a just-introduced intro never surfaces.
+    const lastFollowup = (intro.followupLogs || [])
+      .map((l) => l.completedAt)
+      .sort()
+      .pop();
 
-    // 3. If founder has touched it within last 14 days, suppress
-    if (founderHasTouched && intro.updatedAt && intro.updatedAt > fourteenDaysAgo) {
+    // 3. If founder logged an update within the last 14 days, suppress
+    if (lastFollowup && lastFollowup > fourteenDaysAgo) {
       continue;
     }
 
-    // 4. If founder touched it 14+ days ago, show check-in
-    if (founderHasTouched) {
+    // 4. If founder last logged 14+ days ago, show check-in
+    if (lastFollowup) {
       tasks.push({
         type: 'check_in',
         priority: 'medium',
@@ -482,16 +485,13 @@ app.get('/tasks', async (c) => {
       continue;
     }
 
-    // 5. Founder hasn't touched it yet - show task based on status
-    // Give a 3-day grace period for newly introduced intros before showing task
-    if (intro.status === 'introduced' && intro.createdAt > threeDaysAgo) {
-      continue;
-    }
-
+    // 5. Founder hasn't logged anything yet - show task based on status.
+    // Newly introduced intros surface immediately so the founder can confirm the
+    // intro went out and log their meeting date, rather than searching it out.
     let message = '';
     switch (intro.status) {
       case 'introduced':
-        message = `Update needed: ${intro.investor.name} @ ${intro.investor.firm} - how did it go?`;
+        message = `New intro to ${intro.investor.name} @ ${intro.investor.firm} - check your email and log the meeting`;
         break;
       case 'first_meeting_complete':
         message = `Update needed: ${intro.investor.name} @ ${intro.investor.firm} - next steps?`;

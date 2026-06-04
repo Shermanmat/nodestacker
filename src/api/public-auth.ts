@@ -149,6 +149,12 @@ app.post('/signup', async (c) => {
       lastName: user.lastName,
       email: user.email,
     },
+    // Returned so the success screen can hand off to the Blurb Builder as the
+    // next step, prefilled and linked back to this application.
+    company: {
+      id: company.id,
+      companyName: company.companyName,
+    },
   }, 201);
 });
 

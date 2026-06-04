@@ -343,6 +343,50 @@ export const portfolioCompaniesRelations = relations(portfolioCompanies, ({ one 
   }),
 }));
 
+// Trials — the 2-week, no-equity audition between "applied" and "portfolio".
+// MatCap makes 5–15 intros, then decides offer (1%) or pass; the founder then
+// accepts or declines. Auto metrics (intros/replies/CRM activity) are computed
+// live from intro_requests + founder CRM tables; only the human-judgment
+// ratings are stored here.
+export const trials = sqliteTable('trials', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  // 'active' | 'offer_made' | 'passed' | 'offer_accepted' | 'offer_declined' | 'expired'
+  status: text('status').notNull().default('active'),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  introTargetMin: integer('intro_target_min').notNull().default(5),
+  introTargetMax: integer('intro_target_max').notNull().default(15),
+  offerEquityPercent: text('offer_equity_percent').notNull().default('1'),
+  // Decision (admin): offer or pass
+  decision: text('decision'), // 'offer' | 'pass' | null
+  decisionAt: text('decision_at'),
+  decisionNotes: text('decision_notes'),
+  // Founder response to an offer
+  founderResponse: text('founder_response'), // 'accepted' | 'declined' | null
+  founderRespondedAt: text('founder_responded_at'),
+  // After a pass/decline, CRM stays read-only until this timestamp, then off.
+  accessRevokesAt: text('access_revokes_at'),
+  // Scorecard ratings (1–5, admin judgment). Auto metrics are NOT stored.
+  scoreFounderActivity: integer('score_founder_activity'),
+  scoreCommsQuality: integer('score_comms_quality'),
+  scoreMindset: integer('score_mindset'),
+  scoreInvestorSentiment: integer('score_investor_sentiment'),
+  scoreFollowThrough: integer('score_follow_through'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const trialsRelations = relations(trials, ({ one }) => ({
+  founder: one(founders, {
+    fields: [trials.founderId],
+    references: [founders.id],
+  }),
+}));
+
+export type Trial = typeof trials.$inferSelect;
+export type NewTrial = typeof trials.$inferInsert;
+
 // Investor Research Table (AI-powered research)
 export const investorResearch = sqliteTable('investor_research', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -1113,6 +1157,39 @@ export const peopleTags = sqliteTable('people_tags', {
 export type PeopleTag = typeof peopleTags.$inferSelect;
 export type NewPeopleTag = typeof peopleTags.$inferInsert;
 
+// Agent actions — the accountability ledger for the AI worker. Every action an
+// agent tick takes (or proposes) is appended here: what it did, why, what it
+// touched, and how it resolved. This is the single system-of-record that powers
+// both the audit trail (review what the agent has been doing) and the scorecard
+// (approval rate, volume, failure rate). It does NOT replace match_suggestions
+// or Gmail drafts — those stay the domain surfaces; this is the meta-log over
+// all of them, plus the approval gate for net-new autonomous actions.
+export const agentActions = sqliteTable('agent_actions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  // Which agent/tick produced this, e.g. 'match-generator', 'auto-draft',
+  // 'followup', 'intro-email', 'research'.
+  agent: text('agent').notNull(),
+  // What it did/proposes to do, e.g. 'generate_matches', 'draft_intro',
+  // 'send_founder_email', 'enrich_investor'.
+  actionType: text('action_type').notNull(),
+  summary: text('summary').notNull(),          // human-readable one-liner
+  reasoning: text('reasoning'),                // why the agent chose this
+  entityType: text('entity_type'),             // 'investor' | 'founder' | 'intro_request' | ...
+  entityId: integer('entity_id'),
+  payload: text('payload'),                    // JSON: the proposed change / inputs
+  // proposed = needs approval, approved/rejected = decided, executed = done,
+  // failed = execution error, logged = recorded after-the-fact (no gate needed).
+  status: text('status').notNull().default('logged'),
+  dryRun: integer('dry_run', { mode: 'boolean' }).notNull().default(false),
+  result: text('result'),                      // JSON: execution result / error
+  decidedBy: text('decided_by'),               // admin who approved/rejected
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  decidedAt: text('decided_at'),
+  executedAt: text('executed_at'),
+});
+
+export type AgentAction = typeof agentActions.$inferSelect;
+export type NewAgentAction = typeof agentActions.$inferInsert;
 // People overrides — admin-edited values that supersede whatever the merged
 // source data shows for that email. Keyed by email so one row per person.
 // Non-destructive: source tables (founders, public_users, founder_leads,

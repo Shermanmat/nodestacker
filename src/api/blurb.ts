@@ -214,6 +214,10 @@ const applySchema = z.object({
   })),
   blurb: z.string().min(1),
   oneLiner: z.string().min(1),
+  // Set when the builder is reached as the post-application next step, so the
+  // generated blurb links back to the founder's public application.
+  publicUserId: z.number().int().nullish(),
+  publicCompanyId: z.number().int().nullish(),
 });
 
 app.post('/apply', async (c) => {
@@ -224,7 +228,7 @@ app.post('/apply', async (c) => {
     return c.json({ error: parsed.error.issues[0].message }, 400);
   }
 
-  const { name, email, companyName, description, signals, blurb, oneLiner } = parsed.data;
+  const { name, email, companyName, description, signals, blurb, oneLiner, publicUserId, publicCompanyId } = parsed.data;
   const now = new Date().toISOString();
 
   try {
@@ -260,6 +264,8 @@ app.post('/apply', async (c) => {
         detected: s.detected,
         answer: s.answer,
       }))),
+      publicUserId: publicUserId ?? null,
+      publicCompanyId: publicCompanyId ?? null,
       status: 'completed',
       createdAt: now,
       completedAt: now,

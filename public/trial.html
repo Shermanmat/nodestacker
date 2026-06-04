@@ -6,24 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
-  <title>Your MatCap Trial | MatCap</title>
-  <meta name="description" content="Build your investor blurb, see real results, and find out if MatCap is the right fit for your fundraise.">
-  <meta property="og:title" content="Your MatCap Trial">
-  <meta property="og:description" content="Build your investor blurb, see real results, and find out if MatCap is the right fit for your fundraise.">
+  <title>Your MatCap Trial Has Started</title>
+  <meta name="description" content="Your two-week trial is live. We're sending 5–15 intro requests into our investor network and watching how they respond and how you move — then we talk about a spot in the portfolio.">
+  <meta property="og:title" content="Your MatCap Trial Has Started">
+  <meta property="og:description" content="Two weeks, on us. 5–15 intro requests. Then we talk about a spot in the portfolio — 1%, if it's worth it.">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-          }
-        }
-      }
+      theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'] } } }
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    .hl { background: linear-gradient(180deg, transparent 60%, #dbeafe 60%); }
+    .tnum { font-variant-numeric: tabular-nums; letter-spacing: -0.04em; }
   </style>
 </head>
 <body class="font-sans antialiased text-slate-900 bg-white min-h-screen">
@@ -34,78 +30,188 @@
       <a href="/" class="flex items-center gap-2.5">
         <img src="/downloads/matcap-logo.png" alt="MatCap" style="height:40px;width:auto;" class="object-contain">
       </a>
-      <div class="hidden items-center gap-8 md:flex">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Apply as a Founder</a>
-      </div>
+      <a href="/founder" class="text-sm font-medium text-slate-500 transition hover:text-slate-900">Founder login</a>
     </div>
   </nav>
 
-  <div class="pt-24 pb-20">
-    <div class="mx-auto max-w-2xl px-6">
+  <!-- Hero -->
+  <header class="mx-auto max-w-4xl px-6 pt-36 pb-20 text-center">
+    <p class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-blue-600 mb-6">
+      <span class="inline-block h-2 w-2 rounded-full bg-blue-600"></span> Your trial is live
+    </p>
+    <h1 class="text-5xl sm:text-6xl font-extrabold leading-[1.02] tracking-tight mb-7">
+      Your trial has started.
+    </h1>
+    <p class="mx-auto max-w-2xl text-lg sm:text-xl text-slate-500 leading-relaxed">
+      The next two weeks are on us. We're putting <span class="text-slate-900 font-semibold">5–15 intro requests</span> into
+      our investor network on your behalf — and watching how they respond to your idea and how you move.
+      At the end, we talk about a <span class="hl text-slate-900 font-semibold">spot in the portfolio</span>.
+    </p>
+  </header>
 
-      <h1 class="text-4xl font-bold tracking-tight mb-4">Let's see if we're a fit</h1>
-      <p class="text-lg text-slate-500 mb-12">This starts with your blurb. We let in founders we think investors in our network would enjoy meeting. Put your best foot forward here, show off a little, and we'll do our best to dream with you. Whether or not you get accepted, we hope this is a useful exercise for you.</p>
+  <!-- What happens over the next two weeks -->
+  <section class="mx-auto max-w-3xl px-6 pb-8">
+    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 mb-8">What happens over the next two weeks</h2>
+    <div class="space-y-10">
 
-      <!-- Steps -->
-      <div class="space-y-10">
-
-        <!-- Step 1 -->
-        <div class="flex gap-5">
-          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
-            <span class="text-blue-600 font-semibold text-sm">1</span>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold mb-2">Build your blurb</h2>
-            <p class="text-slate-500 leading-relaxed">Use our blurb builder to put together how you'd want an investor to hear about you. It takes a few minutes, and you walk away with something useful regardless of what happens next.</p>
-          </div>
+      <div class="flex gap-5">
+        <div class="flex-shrink-0 w-11 h-11 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+          <span class="text-blue-600 font-bold">1</span>
         </div>
-
-        <!-- Step 2 -->
-        <div class="flex gap-5">
-          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
-            <span class="text-blue-600 font-semibold text-sm">2</span>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold mb-2">Our team reviews and reaches out</h2>
-            <p class="text-slate-500 leading-relaxed">We personally review your blurb and send intro requests to investors in our network who are a match. These are intro requests coming from people the investors already trust — not cold emails.</p>
-          </div>
+        <div>
+          <h3 class="text-xl font-bold mb-2">We go to work — free</h3>
+          <p class="text-slate-500 leading-relaxed">We send <span class="text-slate-900 font-semibold">5–15 intro requests</span> to matched investors in our network — warm asks from someone they already trust, not cold emails. No equity, no retainer, no invoice.</p>
         </div>
-
-        <!-- Step 3 -->
-        <div class="flex gap-5">
-          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
-            <span class="text-blue-600 font-semibold text-sm">3</span>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold mb-2">We both decide</h2>
-            <p class="text-slate-500 leading-relaxed">No paperwork, no obligations. You see real investor responses and we see how the network reacts. Either side can walk away at any point — this is about figuring out if there's a real fit.</p>
-          </div>
-        </div>
-
-        <!-- Step 4 -->
-        <div class="flex gap-5">
-          <div class="flex-shrink-0 w-10 h-10 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
-            <span class="text-blue-600 font-semibold text-sm">4</span>
-          </div>
-          <div>
-            <h2 class="text-xl font-semibold mb-2">If there's momentum, we make it official</h2>
-            <p class="text-slate-500 leading-relaxed">If intros are landing and we're both feeling it, we formalize with 1% equity. You're not obligated — but don't start the trial unless you'd be open to that if real value is being created.</p>
-          </div>
-        </div>
-
       </div>
 
-      <!-- CTA -->
-      <div class="mt-16 pt-10 border-t border-slate-200">
-        <p class="text-slate-500 mb-6">It starts with your blurb.</p>
-        <a href="/blurb"
-           class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-8 py-4 text-lg font-semibold text-white transition hover:bg-slate-800">
-          Build Your Blurb
-        </a>
+      <div class="flex gap-5">
+        <div class="flex-shrink-0 w-11 h-11 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+          <span class="text-blue-600 font-bold">2</span>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold mb-2">You run your pipeline</h3>
+          <p class="text-slate-500 leading-relaxed">You've got our investor CRM for the next two weeks — track every conversation, move fast, follow up. How you work it is part of what we're watching.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-5">
+        <div class="flex-shrink-0 w-11 h-11 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+          <span class="text-blue-600 font-bold">3</span>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold mb-2">We both watch</h3>
+          <p class="text-slate-500 leading-relaxed">You see how investors respond to your idea. We watch how you move — how fast, how sharp, how you show up. Two weeks of real signal, not promises.</p>
+        </div>
+      </div>
+
+      <div class="flex gap-5">
+        <div class="flex-shrink-0 w-11 h-11 rounded-full bg-blue-50 border border-blue-200 flex items-center justify-center">
+          <span class="text-blue-600 font-bold">4</span>
+        </div>
+        <div>
+          <h3 class="text-xl font-bold mb-2">At day 14, we talk</h3>
+          <p class="text-slate-500 leading-relaxed">If the intros are landing and we're both feeling it, we make it official with a spot in the portfolio — <span class="text-slate-900 font-semibold">1% of your company</span>. The call is yours: take it or leave it. You keep every intro either way.</p>
+        </div>
       </div>
 
     </div>
-  </div>
+  </section>
+
+  <!-- What the two weeks tell us -->
+  <section class="mx-auto max-w-4xl px-6 py-16">
+    <h2 class="text-center text-2xl font-bold mb-8">What the two weeks tell us</h2>
+    <div class="grid sm:grid-cols-2 gap-5">
+      <div class="rounded-2xl border border-slate-200 p-7">
+        <h3 class="text-lg font-bold mb-2">How the network responds to your idea</h3>
+        <p class="text-slate-500 leading-relaxed">Do investors lean in? Who replies, who wants the meeting. It's the market's read on your raise — fast, and from people who actually write checks.</p>
+      </div>
+      <div class="rounded-2xl border border-slate-200 p-7">
+        <h3 class="text-lg font-bold mb-2">How you move</h3>
+        <p class="text-slate-500 leading-relaxed">How you show up: responsiveness, clarity, follow-through, coachability. We back founders, not just ideas — so this is half of it.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- The taste line -->
+  <section class="border-y border-slate-200 bg-slate-50">
+    <div class="mx-auto max-w-3xl px-6 py-20 text-center">
+      <p class="text-3xl sm:text-4xl font-extrabold leading-tight tracking-tight">
+        It's a taste.<br>
+        <span class="text-blue-600">If it's worth it, you join the portfolio.</span>
+      </p>
+      <p class="mx-auto mt-6 max-w-xl text-lg text-slate-500">No retainers. No promises. No lock-in. We only ask for the 1% once we've shown you we're worth it.</p>
+    </div>
+  </section>
+
+  <!-- The deal, by the numbers -->
+  <section class="mx-auto max-w-5xl px-6 py-16">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+      <div class="rounded-2xl border border-slate-200 p-7">
+        <div class="tnum text-4xl sm:text-5xl font-extrabold mb-1">2 wks</div>
+        <div class="text-sm text-slate-500">free taste</div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 p-7">
+        <div class="tnum text-4xl sm:text-5xl font-extrabold mb-1">5–15</div>
+        <div class="text-sm text-slate-500">intro requests</div>
+      </div>
+      <div class="rounded-2xl border border-slate-200 p-7">
+        <div class="tnum text-4xl sm:text-5xl font-extrabold mb-1">0%</div>
+        <div class="text-sm text-slate-500">upfront</div>
+      </div>
+      <div class="rounded-2xl border border-blue-200 bg-blue-50 p-7">
+        <div class="tnum text-4xl sm:text-5xl font-extrabold mb-1 text-blue-600">1%</div>
+        <div class="text-sm text-slate-600">if it's worth it</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Bottom CTA: the one thing to do now -->
+  <section class="mx-auto max-w-3xl px-6 pb-28 text-center">
+    <h2 class="text-3xl sm:text-4xl font-extrabold tracking-tight mb-4">First move: sharpen your blurb.</h2>
+    <p class="text-lg text-slate-500 mb-9">The better your blurb, the better the intros we send. It takes a few minutes — start there.</p>
+    <a href="/blurb" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-8 py-4 text-base font-semibold text-white transition hover:bg-slate-800">Build your blurb →</a>
+  </section>
+
+  <!-- Deck: optional but strongly encouraged -->
+  <section class="mx-auto max-w-2xl px-6 pb-28">
+    <div class="rounded-2xl border-2 border-blue-200 bg-blue-50/50 p-7 sm:p-9 text-center">
+      <div class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-3">
+        Optional — but strongly encouraged
+      </div>
+      <h3 class="text-2xl font-extrabold tracking-tight mb-2">Share your deck</h3>
+      <p class="text-slate-500 mb-6">Founders who send a deck get sharper intros and more investor replies. Drop yours here (PDF) — it goes straight to Mat and rides along with your intros.</p>
+      <form id="deckForm" class="space-y-3 text-left">
+        <input id="deckEmail" type="email" required placeholder="The email on your application"
+          class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm">
+        <input id="deckFile" type="file" accept="application/pdf,.pdf" required
+          class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-white file:text-sm">
+        <button type="submit" id="deckSubmit"
+          class="w-full rounded-lg bg-blue-600 px-6 py-3.5 text-base font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+          Send my deck
+        </button>
+        <p id="deckMsg" class="text-sm text-center"></p>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    const form = document.getElementById('deckForm');
+    const msg = document.getElementById('deckMsg');
+    const btn = document.getElementById('deckSubmit');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('deckFile').files[0];
+      const email = document.getElementById('deckEmail').value.trim();
+      if (!file || !email) return;
+      btn.disabled = true; btn.textContent = 'Uploading…'; msg.textContent = '';
+      try {
+        const fd = new FormData();
+        fd.append('deck', file);
+        fd.append('email', email);
+        const res = await fetch('/api/trial-deck', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        msg.className = 'text-sm text-center text-green-600';
+        msg.textContent = 'Got it — your deck is in. Thank you!';
+        form.reset();
+      } catch (err) {
+        msg.className = 'text-sm text-center text-red-600';
+        msg.textContent = err.message || 'Something went wrong — try again.';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Send my deck';
+      }
+    });
+  </script>
+
+  <footer class="border-t border-slate-200">
+    <div class="mx-auto max-w-6xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-400">
+      <span>© MatCap</span>
+      <div class="flex gap-6">
+        <a href="/blurb" class="hover:text-slate-700">Blurb Builder</a>
+        <a href="/founder" class="hover:text-slate-700">Founder login</a>
+      </div>
+    </div>
+  </footer>
 
 </body>
 </html>

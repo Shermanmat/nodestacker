@@ -27,23 +27,51 @@
     }
   </script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap');
     .fade-enter-active, .fade-leave-active { transition: opacity 0.3s ease; }
     .fade-enter-from, .fade-leave-to { opacity: 0; }
     textarea:focus, input:focus, select:focus { outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); }
+
+    /* Shared MatCap tool header — matches equity-calculator / raise-planner */
+    :root{--accent:#00C2E0;--rule:#e5e5e5}
+    nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#fff;color:#000;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid var(--rule);padding-left:14px}
+    nav.topnav .links{display:flex;gap:28px;align-items:center}
+    nav.topnav .links a{color:#000;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{background:#000;color:#fff;padding:10px 16px}
+    nav.topnav .links a.btn:hover{background:var(--accent);color:#000}
+    @media (max-width:720px){nav.topnav .links a:not(.btn){display:none}}
+    .tools-dd{position:relative;display:inline-block}
+    .tools-dd > a.tools-trigger{cursor:pointer;display:inline-flex!important;align-items:center;gap:4px}
+    .tools-dd > a.tools-trigger::after{content:'\25BE';font-size:9px;opacity:.7}
+    .tools-dd .tools-menu{position:absolute;top:100%;right:0;background:#000;border:1px solid var(--accent);min-width:220px;padding:6px 0;display:none;z-index:200;margin-top:0}
+    .tools-dd:hover .tools-menu,.tools-dd.open .tools-menu{display:block}
+    .tools-dd .tools-menu a{display:block!important;padding:12px 18px!important;color:#fff!important;font-size:12px!important;text-transform:uppercase!important;letter-spacing:1.5px!important;text-decoration:none;background:transparent!important;border:none!important}
+    .tools-dd .tools-menu a:hover{color:var(--accent)!important;background:#111!important}
   </style>
 </head>
 <body class="font-sans antialiased text-slate-900 bg-white min-h-screen">
 
-  <!-- Nav -->
-  <nav class="fixed top-0 left-0 right-0 z-50 border-b border-slate-200 bg-white/80 backdrop-blur-md">
-    <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-      <a href="/" class="flex items-center gap-2.5">
-        <img src="/downloads/matcap-logo.png" alt="MatCap" style="height:40px;width:auto;" class="object-contain">
-      </a>
-      <div class="hidden items-center gap-8 md:flex">
-        <a href="/signup" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800">Apply as a Founder</a>
+  <!-- Nav — shared MatCap tool header -->
+  <nav class="topnav">
+    <a class="brand" href="/">
+      <img src="/downloads/matcap-logo.png" alt="MatCap" onerror="this.style.display='none'">
+      <span class="tag">BLURB BUILDER</span>
+    </a>
+    <div class="links">
+      <div class="tools-dd">
+        <a href="#" class="tools-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Tools</a>
+        <div class="tools-menu">
+          <a href="/blurb">Blurb Builder</a>
+          <a href="/equity-calculator">Equity Calculator</a>
+          <a href="/raise-planner">Raise Planner</a>
+        </div>
       </div>
+      <a href="/investors">Investors</a>
+      <a href="/signup" class="btn">Apply</a>
     </div>
   </nav>
 
@@ -231,9 +259,9 @@
               </div>
               <div>
                 <p class="text-slate-900 font-semibold mb-1">
-                  We have <span class="text-green-700">{{ nodeCount }} nodes</span> who know <span class="text-green-700">{{ investorCount }} investors</span> who invest in <span class="text-slate-900">{{ matchedSector }}</span> companies like yours.
+                  We have <span class="text-green-700">{{ investorCount }} investors</span> in our network who back <span class="text-slate-900">{{ matchedSector }}</span> companies like yours — we could intro you to them.
                 </p>
-                <p class="text-slate-500 text-sm">Send your blurb to get connected with the right investors.</p>
+                <p class="text-slate-500 text-sm">Send your blurb to Mat and get connected with the right investors.</p>
               </div>
             </div>
             <button @click="sendBlurb" :disabled="loading"
@@ -421,6 +449,19 @@
           }
         }
 
+        // Prefill + linkage when arriving from the application flow (signup.html
+        // hands off company/description and the IDs so the blurb links back to
+        // the application Mat reviews in /admin#signups).
+        const publicUserId = ref(null);
+        const publicCompanyId = ref(null);
+        onMounted(() => {
+          const p = new URLSearchParams(window.location.search);
+          if (p.get('company')) companyName.value = p.get('company');
+          if (p.get('desc')) description.value = p.get('desc');
+          if (p.get('userId')) publicUserId.value = parseInt(p.get('userId')) || null;
+          if (p.get('companyId')) publicCompanyId.value = parseInt(p.get('companyId')) || null;
+        });
+
         async function sendBlurb() {
           error.value = '';
           loading.value = true;
@@ -441,6 +482,8 @@
                 })),
                 blurb: blurb.value,
                 oneLiner: oneLiner.value,
+                publicUserId: publicUserId.value,
+                publicCompanyId: publicCompanyId.value,
               }),
             });
             const data = await res.json();

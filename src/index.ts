@@ -19,6 +19,9 @@ import peopleCapturesRoutes from './api/people-captures.js';
 import adminPeopleRoutes from './api/admin-people.js';
 import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
+import broadcastRoutes from './api/broadcast.js';
+import trialsRoutes from './api/trials.js';
+import trialDeckRoutes from './api/trial-deck.js';
 import adminAuthRoutes from './api/admin-auth.js';
 import inboundRoutes from './api/inbound.js';
 import onboardingRoutes from './api/onboarding.js';
@@ -40,6 +43,7 @@ import voiceInterviewsRoutes from './api/voice-interviews.js';
 import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
+import agentActionsRoutes from './api/agent-actions.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { withCronRun } from './services/cron-log.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
@@ -81,6 +85,8 @@ app.route('/api/public/investor-match', publicInvestorMatchRoutes);
 app.route('/api/onboarding-chat', onboardingChatRoutes);
 // Blurb builder is public (founder self-service)
 app.route('/api/blurb', blurbRoutes);
+// Trial deck upload is public — founders on /trial submit a deck by email
+app.route('/api/trial-deck', trialDeckRoutes);
 // Voice interview public endpoints (token-based auth)
 app.route('/api', voiceInterviewsRoutes);
 // Inbound webhook endpoint is public (uses token auth internally)
@@ -104,6 +110,12 @@ app.use('/api/digest', adminGuard);
 app.use('/api/digest/*', adminGuard);
 app.use('/api/portfolio', adminGuard);
 app.use('/api/portfolio/*', adminGuard);
+// Broadcast email to all portfolio founders — admin-only
+app.use('/api/broadcast', adminGuard);
+app.use('/api/broadcast/*', adminGuard);
+// Trials — admin-only management of the 2-week audition stage
+app.use('/api/trials', adminGuard);
+app.use('/api/trials/*', adminGuard);
 // Inbound admin endpoints (pending, logs, confirm, dismiss) - NOT the webhook
 // Note: /api/inbound/intro-email is public (uses token auth)
 app.use('/api/inbound/pending', adminGuard);
@@ -142,6 +154,9 @@ app.use('/api/weekly-digest/preview-admin', adminGuard);
 app.use('/api/weekly-digest/cron-runs', adminGuard);
 // Shadow agent — admin-only manual trigger
 app.use('/api/agent/*', adminGuard);
+// Agent actions ledger / approval queue — admin-only
+app.use('/api/agent-actions', adminGuard);
+app.use('/api/agent-actions/*', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -152,6 +167,8 @@ app.route('/api/intro-requests', introRequestsRoutes);
 app.route('/api/relationships', relationshipsRoutes);
 app.route('/api/digest', digestRoutes);
 app.route('/api/portfolio', portfolioRoutes);
+app.route('/api/broadcast', broadcastRoutes);
+app.route('/api/trials', trialsRoutes);
 app.route('/api/inbound', inboundRoutes);
 app.route('/api/onboarding', onboardingRoutes);
 app.route('/api/webhooks', webhooksRoutes);
@@ -161,6 +178,7 @@ app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
 app.route('/api/brands', brandsRoutes);
+app.route('/api/agent-actions', agentActionsRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -867,6 +885,7 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 // Blurb builder
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 app.get('/trial', serveStatic({ path: './public/trial.html' }));
+app.get('/how-it-works', (c) => c.redirect('/trial', 301));
 
 // Marketing site
 app.get('/founders', (c) => c.redirect('/signup', 302));
@@ -1007,6 +1026,21 @@ cron.schedule('0 18 * * *', async () => {
 
 console.log('[CRON] Follow-up agent scheduled for daily 18:00 UTC (11am Arizona)');
 
+// Trial decision nudge — daily 16:30 UTC (9:30am Arizona). Emails admin for any
+// active trial that hit its end date with no offer/pass decision.
+cron.schedule('30 16 * * *', async () => {
+  console.log('[CRON] Running trial decision nudge...');
+  try {
+    const { sendTrialDecisionNudges } = await import('./services/trials.js');
+    const result = await sendTrialDecisionNudges();
+    console.log('[CRON] Trial decision nudge result:', result);
+  } catch (err) {
+    console.error('[CRON] Trial decision nudge failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
 // Reply classifier — every hour at :15 past, classify any new investor
 // replies and apply status transitions.
 cron.schedule('15 * * * *', async () => {
@@ -1023,6 +1057,7 @@ cron.schedule('15 * * * *', async () => {
   timezone: 'UTC'
 });
 
+console.log('[CRON] Trial decision nudge scheduled for daily 16:30 UTC (9:30am Arizona)');
 console.log('[CRON] Reply classifier scheduled hourly at :15');
 
 serve({

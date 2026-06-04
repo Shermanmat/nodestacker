@@ -318,7 +318,7 @@ function generateDigestEmail(founderName: string, activity: WeeklyActivity, port
   </div>
 
   <p style="margin-top: 24px;">
-    <a href="${portalUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">View Your Dashboard</a>
+    <a href="${portalUrl}" style="display: inline-block; background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 500;">Go into your investor CRM to view intros &amp; open updates</a>
   </p>
 
   <p style="color: #6b7280; margin-top: 32px;">
@@ -352,7 +352,7 @@ ALL-TIME STATS
 Total Requests: ${activity.allTimeStats.totalRequests} | Introduced: ${activity.allTimeStats.introduced} | Invested: ${activity.allTimeStats.invested}
 Your Accept Rate: ${activity.allTimeStats.acceptRate}% (Network avg: ${activity.allTimeStats.globalAcceptRate}%)
 
-View your dashboard: ${portalUrl}
+Go into your investor CRM to view intros & open updates: ${portalUrl}
 
 Best,
 Mat

@@ -490,8 +490,8 @@
               <textarea v-model="broadcastForm.body" rows="12"
                 class="w-full border rounded-lg px-3 py-2 text-sm font-mono"
                 placeholder="Hi {{firstName}},&#10;&#10;Write your update here. Links are auto-linked.&#10;&#10;Mat"></textarea>
-              <p class="text-xs text-gray-500 mt-1">
-                Variables: <code>{{ '{{firstName}}' }}</code>, <code>{{ '{{name}}' }}</code>, <code>{{ '{{companyName}}' }}</code>.
+              <p class="text-xs text-gray-500 mt-1" v-pre>
+                Variables: <code>{{firstName}}</code>, <code>{{name}}</code>, <code>{{companyName}}</code>.
                 Plain text — line breaks and links are preserved.
               </p>
             </div>

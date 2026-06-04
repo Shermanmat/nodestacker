@@ -10,6 +10,7 @@ import {
   investorInteractions,
 } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
+import { getFounderAccess, CRM_GATE_ENFORCED } from './founder-access.js';
 
 type Variables = {
   founderId: number;
@@ -24,6 +25,21 @@ app.use('*', async (c, next) => {
   const founderId = getSessionFounderId(sessionId);
   if (!founderId) return c.json({ error: 'Unauthorized' }, 401);
   c.set('founderId', founderId);
+
+  // Trial-based CRM gate (only when ENFORCE_CRM_TRIAL_GATE=1). CRM is a trial
+  // perk: full access during an active trial / for portfolio founders;
+  // read-only for 14 days after a pass/decline; none after that.
+  if (CRM_GATE_ENFORCED) {
+    const access = await getFounderAccess(founderId);
+    if (access === 'none') {
+      return c.json({ error: 'CRM access requires an active MatCap trial', accessLevel: 'none' }, 403);
+    }
+    // Read-only: allow safe reads, block mutations.
+    if (access === 'readonly' && c.req.method !== 'GET' && c.req.method !== 'HEAD') {
+      return c.json({ error: 'Your trial ended — CRM is read-only', accessLevel: 'readonly' }, 403);
+    }
+  }
+
   await next();
 });
 

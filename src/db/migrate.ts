@@ -254,6 +254,38 @@ try {
   if (!e.message?.includes('already exists')) throw e;
 }
 
+// Trials — 2-week no-equity audition stage (start → offer/pass → accept/decline)
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`trials\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`founder_id\` integer NOT NULL REFERENCES \`founders\`(\`id\`),
+    \`status\` text NOT NULL DEFAULT 'active',
+    \`start_date\` text NOT NULL,
+    \`end_date\` text NOT NULL,
+    \`intro_target_min\` integer NOT NULL DEFAULT 5,
+    \`intro_target_max\` integer NOT NULL DEFAULT 15,
+    \`offer_equity_percent\` text NOT NULL DEFAULT '1',
+    \`decision\` text,
+    \`decision_at\` text,
+    \`decision_notes\` text,
+    \`founder_response\` text,
+    \`founder_responded_at\` text,
+    \`access_revokes_at\` text,
+    \`score_founder_activity\` integer,
+    \`score_comms_quality\` integer,
+    \`score_mindset\` integer,
+    \`score_investor_sentiment\` integer,
+    \`score_follow_through\` integer,
+    \`created_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP),
+    \`updated_at\` text NOT NULL DEFAULT (CURRENT_TIMESTAMP)
+  )`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_trials_founder\` ON \`trials\` (\`founder_id\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_trials_status\` ON \`trials\` (\`status\`)`);
+  console.log('  Ensured trials table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Mat Sherman's network (id=2) is not VIP — always available for intros
 try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);

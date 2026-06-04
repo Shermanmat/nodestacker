@@ -325,6 +325,50 @@ export const portfolioCompaniesRelations = relations(portfolioCompanies, ({ one 
   }),
 }));
 
+// Trials — the 2-week, no-equity audition between "applied" and "portfolio".
+// MatCap makes 5–15 intros, then decides offer (1%) or pass; the founder then
+// accepts or declines. Auto metrics (intros/replies/CRM activity) are computed
+// live from intro_requests + founder CRM tables; only the human-judgment
+// ratings are stored here.
+export const trials = sqliteTable('trials', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  // 'active' | 'offer_made' | 'passed' | 'offer_accepted' | 'offer_declined' | 'expired'
+  status: text('status').notNull().default('active'),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  introTargetMin: integer('intro_target_min').notNull().default(5),
+  introTargetMax: integer('intro_target_max').notNull().default(15),
+  offerEquityPercent: text('offer_equity_percent').notNull().default('1'),
+  // Decision (admin): offer or pass
+  decision: text('decision'), // 'offer' | 'pass' | null
+  decisionAt: text('decision_at'),
+  decisionNotes: text('decision_notes'),
+  // Founder response to an offer
+  founderResponse: text('founder_response'), // 'accepted' | 'declined' | null
+  founderRespondedAt: text('founder_responded_at'),
+  // After a pass/decline, CRM stays read-only until this timestamp, then off.
+  accessRevokesAt: text('access_revokes_at'),
+  // Scorecard ratings (1–5, admin judgment). Auto metrics are NOT stored.
+  scoreFounderActivity: integer('score_founder_activity'),
+  scoreCommsQuality: integer('score_comms_quality'),
+  scoreMindset: integer('score_mindset'),
+  scoreInvestorSentiment: integer('score_investor_sentiment'),
+  scoreFollowThrough: integer('score_follow_through'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export const trialsRelations = relations(trials, ({ one }) => ({
+  founder: one(founders, {
+    fields: [trials.founderId],
+    references: [founders.id],
+  }),
+}));
+
+export type Trial = typeof trials.$inferSelect;
+export type NewTrial = typeof trials.$inferInsert;
+
 // Investor Research Table (AI-powered research)
 export const investorResearch = sqliteTable('investor_research', {
   id: integer('id').primaryKey({ autoIncrement: true }),

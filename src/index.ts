@@ -20,6 +20,7 @@ import adminPeopleRoutes from './api/admin-people.js';
 import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
 import broadcastRoutes from './api/broadcast.js';
+import trialsRoutes from './api/trials.js';
 import adminAuthRoutes from './api/admin-auth.js';
 import inboundRoutes from './api/inbound.js';
 import onboardingRoutes from './api/onboarding.js';
@@ -103,6 +104,9 @@ app.use('/api/portfolio/*', adminGuard);
 // Broadcast email to all portfolio founders — admin-only
 app.use('/api/broadcast', adminGuard);
 app.use('/api/broadcast/*', adminGuard);
+// Trials — admin-only management of the 2-week audition stage
+app.use('/api/trials', adminGuard);
+app.use('/api/trials/*', adminGuard);
 // Inbound admin endpoints (pending, logs, confirm, dismiss) - NOT the webhook
 // Note: /api/inbound/intro-email is public (uses token auth)
 app.use('/api/inbound/pending', adminGuard);
@@ -151,6 +155,7 @@ app.route('/api/relationships', relationshipsRoutes);
 app.route('/api/digest', digestRoutes);
 app.route('/api/portfolio', portfolioRoutes);
 app.route('/api/broadcast', broadcastRoutes);
+app.route('/api/trials', trialsRoutes);
 app.route('/api/inbound', inboundRoutes);
 app.route('/api/onboarding', onboardingRoutes);
 app.route('/api/webhooks', webhooksRoutes);
@@ -1065,6 +1070,23 @@ cron.schedule('0 18 * * *', async () => {
 });
 
 console.log('[CRON] Follow-up agent scheduled for daily 18:00 UTC (11am Arizona)');
+
+// Trial decision nudge — daily 16:30 UTC (9:30am Arizona). Emails admin for any
+// active trial that hit its end date with no offer/pass decision.
+cron.schedule('30 16 * * *', async () => {
+  console.log('[CRON] Running trial decision nudge...');
+  try {
+    const { sendTrialDecisionNudges } = await import('./services/trials.js');
+    const result = await sendTrialDecisionNudges();
+    console.log('[CRON] Trial decision nudge result:', result);
+  } catch (err) {
+    console.error('[CRON] Trial decision nudge failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+
+console.log('[CRON] Trial decision nudge scheduled for daily 16:30 UTC (9:30am Arizona)');
 
 serve({
   fetch: app.fetch,

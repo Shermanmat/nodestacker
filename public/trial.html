@@ -152,6 +152,57 @@
     <a href="/blurb" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-8 py-4 text-base font-semibold text-white transition hover:bg-slate-800">Build your blurb →</a>
   </section>
 
+  <!-- Deck: optional but strongly encouraged -->
+  <section class="mx-auto max-w-2xl px-6 pb-28">
+    <div class="rounded-2xl border-2 border-blue-200 bg-blue-50/50 p-7 sm:p-9 text-center">
+      <div class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-blue-600 mb-3">
+        Optional — but strongly encouraged
+      </div>
+      <h3 class="text-2xl font-extrabold tracking-tight mb-2">Share your deck</h3>
+      <p class="text-slate-500 mb-6">Founders who send a deck get sharper intros and more investor replies. Drop yours here (PDF) — it goes straight to Mat and rides along with your intros.</p>
+      <form id="deckForm" class="space-y-3 text-left">
+        <input id="deckEmail" type="email" required placeholder="The email on your application"
+          class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm">
+        <input id="deckFile" type="file" accept="application/pdf,.pdf" required
+          class="w-full rounded-lg border border-slate-300 px-4 py-3 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-white file:text-sm">
+        <button type="submit" id="deckSubmit"
+          class="w-full rounded-lg bg-blue-600 px-6 py-3.5 text-base font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+          Send my deck
+        </button>
+        <p id="deckMsg" class="text-sm text-center"></p>
+      </form>
+    </div>
+  </section>
+
+  <script>
+    const form = document.getElementById('deckForm');
+    const msg = document.getElementById('deckMsg');
+    const btn = document.getElementById('deckSubmit');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('deckFile').files[0];
+      const email = document.getElementById('deckEmail').value.trim();
+      if (!file || !email) return;
+      btn.disabled = true; btn.textContent = 'Uploading…'; msg.textContent = '';
+      try {
+        const fd = new FormData();
+        fd.append('deck', file);
+        fd.append('email', email);
+        const res = await fetch('/api/trial-deck', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        msg.className = 'text-sm text-center text-green-600';
+        msg.textContent = 'Got it — your deck is in. Thank you!';
+        form.reset();
+      } catch (err) {
+        msg.className = 'text-sm text-center text-red-600';
+        msg.textContent = err.message || 'Something went wrong — try again.';
+      } finally {
+        btn.disabled = false; btn.textContent = 'Send my deck';
+      }
+    });
+  </script>
+
   <footer class="border-t border-slate-200">
     <div class="mx-auto max-w-6xl px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-slate-400">
       <span>© MatCap</span>

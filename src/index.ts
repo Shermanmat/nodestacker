@@ -21,6 +21,7 @@ import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
 import broadcastRoutes from './api/broadcast.js';
 import trialsRoutes from './api/trials.js';
+import trialDeckRoutes from './api/trial-deck.js';
 import adminAuthRoutes from './api/admin-auth.js';
 import inboundRoutes from './api/inbound.js';
 import onboardingRoutes from './api/onboarding.js';
@@ -79,6 +80,8 @@ app.route('/api/public/density', publicDensityRoutes);
 app.route('/api/onboarding-chat', onboardingChatRoutes);
 // Blurb builder is public (founder self-service)
 app.route('/api/blurb', blurbRoutes);
+// Trial deck upload is public — founders on /trial submit a deck by email
+app.route('/api/trial-deck', trialDeckRoutes);
 // Voice interview public endpoints (token-based auth)
 app.route('/api', voiceInterviewsRoutes);
 // Inbound webhook endpoint is public (uses token auth internally)

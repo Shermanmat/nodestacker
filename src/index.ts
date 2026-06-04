@@ -19,6 +19,7 @@ import peopleCapturesRoutes from './api/people-captures.js';
 import adminPeopleRoutes from './api/admin-people.js';
 import investorResearchRoutes from './api/investor-research.js';
 import portfolioRoutes from './api/portfolio.js';
+import broadcastRoutes from './api/broadcast.js';
 import adminAuthRoutes from './api/admin-auth.js';
 import inboundRoutes from './api/inbound.js';
 import onboardingRoutes from './api/onboarding.js';
@@ -99,6 +100,9 @@ app.use('/api/digest', adminGuard);
 app.use('/api/digest/*', adminGuard);
 app.use('/api/portfolio', adminGuard);
 app.use('/api/portfolio/*', adminGuard);
+// Broadcast email to all portfolio founders — admin-only
+app.use('/api/broadcast', adminGuard);
+app.use('/api/broadcast/*', adminGuard);
 // Inbound admin endpoints (pending, logs, confirm, dismiss) - NOT the webhook
 // Note: /api/inbound/intro-email is public (uses token auth)
 app.use('/api/inbound/pending', adminGuard);
@@ -146,6 +150,7 @@ app.route('/api/intro-requests', introRequestsRoutes);
 app.route('/api/relationships', relationshipsRoutes);
 app.route('/api/digest', digestRoutes);
 app.route('/api/portfolio', portfolioRoutes);
+app.route('/api/broadcast', broadcastRoutes);
 app.route('/api/inbound', inboundRoutes);
 app.route('/api/onboarding', onboardingRoutes);
 app.route('/api/webhooks', webhooksRoutes);

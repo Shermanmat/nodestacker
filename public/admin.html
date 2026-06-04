@@ -107,6 +107,7 @@
         </div>
         <div class="sidebar-link" :class="{ active: activeTab === 'relationships' }" @click="switchTab('relationships')">Relationships</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'portfolio' }" @click="switchTab('portfolio')">Portfolio</div>
+        <div class="sidebar-link" :class="{ active: activeTab === 'broadcast' }" @click="switchTab('broadcast')">Broadcast</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'onboarding' }" @click="switchTab('onboarding')">Onboarding</div>
         <div class="sidebar-link" :class="{ active: activeTab === 'brands' }" @click="switchTab('brands')">Brands</div>
 
@@ -464,6 +465,68 @@
             Status: A = Advisory Signed, E = Equity Signed, P = Shares Paid, C = Certificate Received
           </div>
         </template>
+      </div>
+
+      <!-- Broadcast Tab -->
+      <div v-if="activeTab === 'broadcast'">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-xl font-semibold">Broadcast to Portfolio Founders</h2>
+          <div class="text-sm text-gray-500">
+            {{ broadcast.recipients.length }} recipient{{ broadcast.recipients.length === 1 ? '' : 's' }}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-6">
+          <!-- Compose -->
+          <div class="col-span-2 bg-white rounded-lg shadow p-6 space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+              <input v-model="broadcastForm.subject" type="text" maxlength="200"
+                class="w-full border rounded-lg px-3 py-2 text-sm"
+                placeholder="A quick update from MatCap">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+              <textarea v-model="broadcastForm.body" rows="12"
+                class="w-full border rounded-lg px-3 py-2 text-sm font-mono"
+                placeholder="Hi {{firstName}},&#10;&#10;Write your update here. Links are auto-linked.&#10;&#10;Mat"></textarea>
+              <p class="text-xs text-gray-500 mt-1">
+                Variables: <code>{{ '{{firstName}}' }}</code>, <code>{{ '{{name}}' }}</code>, <code>{{ '{{companyName}}' }}</code>.
+                Plain text — line breaks and links are preserved.
+              </p>
+            </div>
+            <div class="flex items-center gap-3 pt-2 border-t">
+              <button @click="sendBroadcastTest" :disabled="broadcastSending || !broadcastForm.subject || !broadcastForm.body"
+                class="px-4 py-2 rounded-lg text-sm border border-gray-300 hover:bg-gray-50 disabled:opacity-50">
+                Send test to me
+              </button>
+              <button @click="sendBroadcast" :disabled="broadcastSending || !broadcastForm.subject || !broadcastForm.body || broadcast.recipients.length === 0"
+                class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
+                {{ broadcastSending ? 'Sending…' : `Send to ${broadcast.recipients.length} founder${broadcast.recipients.length === 1 ? '' : 's'}` }}
+              </button>
+              <span v-if="broadcastResult" :class="broadcastResult.failed ? 'text-amber-600' : 'text-green-600'" class="text-sm">
+                {{ broadcastResult.message }}
+              </span>
+            </div>
+            <div v-if="broadcastResult && broadcastResult.errors && broadcastResult.errors.length" class="text-xs text-red-600 space-y-1">
+              <div v-for="(err, i) in broadcastResult.errors" :key="i">{{ err }}</div>
+            </div>
+          </div>
+
+          <!-- Recipients -->
+          <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-sm font-semibold text-gray-700 mb-3">Recipients</h3>
+            <div v-if="broadcast.recipients.length === 0" class="text-sm text-gray-500">
+              No portfolio founders have an email on file.
+            </div>
+            <div v-else class="space-y-2 max-h-96 overflow-y-auto">
+              <div v-for="r in broadcast.recipients" :key="r.founderId" class="text-sm">
+                <div class="font-medium text-gray-900">{{ r.name }}</div>
+                <div class="text-xs text-gray-500">{{ r.companyName }} · {{ r.email }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Onboarding Tab -->
@@ -2584,6 +2647,11 @@
                   <div class="font-medium">{{ app.companyName }}</div>
                   <div class="text-xs text-gray-500">{{ app.oneLiner }}</div>
                   <a v-if="app.url" :href="app.url" target="_blank" class="text-xs text-blue-500 hover:underline">{{ app.url }}</a>
+                  <!-- Investor blurb the applicant built as the post-apply next step -->
+                  <details v-if="app.blurb" class="mt-1.5">
+                    <summary class="text-xs text-cyan-600 cursor-pointer hover:underline">✨ Investor blurb</summary>
+                    <div class="mt-1 text-xs text-gray-600 bg-cyan-50 border border-cyan-100 rounded p-2 max-w-xs whitespace-pre-line">{{ app.blurb.investorBlurb }}</div>
+                  </details>
                 </td>
                 <td class="px-4 py-3">
                   <span class="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded">{{ app.sector }}</span>
@@ -3814,6 +3882,7 @@
           if (tabId === 'directory') loadDirectory();
           if (tabId === 'signups') loadSignups();
           if (tabId === 'brands') loadBrands();
+          if (tabId === 'broadcast') loadBroadcastRecipients();
         }
 
         // Data
@@ -3894,6 +3963,12 @@
         const chartMetric = ref('requests'); // 'requests', 'meetings', or 'acceptRate'
         const chartNodeId = ref(''); // Filter chart by node
         const portfolio = ref({ companies: [], summary: {} });
+
+        // Broadcast email to portfolio founders
+        const broadcast = ref({ recipients: [] });
+        const broadcastForm = reactive({ subject: '', body: '' });
+        const broadcastSending = ref(false);
+        const broadcastResult = ref(null);
         const eligibleFounders = ref([]);
         const adminNodeId = 2; // Mat Sherman's node ID
         const expandedFounderTasks = ref({});
@@ -5861,6 +5936,52 @@
           eligibleFounders.value = await api('/portfolio/eligible/founders');
         };
 
+        const loadBroadcastRecipients = async () => {
+          broadcast.value = await api('/broadcast/recipients');
+        };
+
+        const sendBroadcastTest = async () => {
+          broadcastSending.value = true;
+          broadcastResult.value = null;
+          try {
+            const res = await api('/broadcast/send', {
+              method: 'POST',
+              body: { subject: broadcastForm.subject, body: broadcastForm.body, test: true },
+            });
+            broadcastResult.value = res.success
+              ? { failed: 0, message: `Test sent to ${res.sentTo}` }
+              : { failed: 1, message: `Test failed: ${res.error || 'unknown error'}` };
+          } catch (e) {
+            broadcastResult.value = { failed: 1, message: 'Test failed: ' + (e.message || e) };
+          } finally {
+            broadcastSending.value = false;
+          }
+        };
+
+        const sendBroadcast = async () => {
+          const n = broadcast.value.recipients.length;
+          if (!confirm(`Send this email to ${n} portfolio founder${n === 1 ? '' : 's'}? This cannot be undone.`)) return;
+          broadcastSending.value = true;
+          broadcastResult.value = null;
+          try {
+            const res = await api('/broadcast/send', {
+              method: 'POST',
+              body: { subject: broadcastForm.subject, body: broadcastForm.body },
+            });
+            broadcastResult.value = {
+              failed: res.failed,
+              errors: res.errors || [],
+              message: res.failed
+                ? `Sent ${res.sent}/${res.total} — ${res.failed} failed`
+                : `Sent to all ${res.sent} founders`,
+            };
+          } catch (e) {
+            broadcastResult.value = { failed: 1, message: 'Send failed: ' + (e.message || e) };
+          } finally {
+            broadcastSending.value = false;
+          }
+        };
+
         const savePortfolio = async () => {
           const body = {
             ...portfolioForm,
@@ -7277,6 +7398,8 @@
           showLoginLinkModal, loginLinkData, linkCopied,
           showPortfolioModal, editingPortfolio, portfolioView, portfolioForm,
           savePortfolio, editPortfolioCompany, deletePortfolioCompany, closePortfolioModal,
+          broadcast, broadcastForm, broadcastSending, broadcastResult,
+          loadBroadcastRecipients, sendBroadcast, sendBroadcastTest,
           showInboundConfirmModal, inboundConfirmLog, inboundConfirmForm,
           ssInboundFounder, ssInboundFounderOpen, ssInboundFounderFiltered, selectInboundFounder,
           ssInboundInvestor, ssInboundInvestorOpen, ssInboundInvestorFiltered, selectInboundInvestor,

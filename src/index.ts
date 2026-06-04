@@ -41,6 +41,7 @@ import voiceInterviewsRoutes from './api/voice-interviews.js';
 import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
+import agentActionsRoutes from './api/agent-actions.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
 import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
@@ -144,6 +145,9 @@ app.use('/api/weekly-digest/preview/*', adminGuard);
 app.use('/api/weekly-digest/preview-admin', adminGuard);
 // Shadow agent — admin-only manual trigger
 app.use('/api/agent/*', adminGuard);
+// Agent actions ledger / approval queue — admin-only
+app.use('/api/agent-actions', adminGuard);
+app.use('/api/agent-actions/*', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -165,6 +169,7 @@ app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
 app.route('/api/brands', brandsRoutes);
+app.route('/api/agent-actions', agentActionsRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -931,7 +936,7 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 // Blurb builder
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 app.get('/trial', serveStatic({ path: './public/trial.html' }));
-app.get('/how-it-works', serveStatic({ path: './public/how-it-works.html' }));
+app.get('/how-it-works', (c) => c.redirect('/trial', 301));
 
 // Marketing site
 app.get('/welcome', serveStatic({ path: './public/welcome.html' }));

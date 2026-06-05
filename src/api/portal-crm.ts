@@ -73,6 +73,7 @@ app.get('/investor-crm', async (c) => {
     founderNotes: ir.founderOwnedNotes ?? null,
     lastTouchAt: ir.updatedAt,
     nodeName: ir.node?.name ?? null,
+    warmIntroConnector: null,
   }));
 
   const records = await db.query.founderInvestorRecords.findMany({
@@ -88,7 +89,7 @@ app.get('/investor-crm', async (c) => {
     role: r.role,
     email: r.email,
     geography: r.geography,
-    source: r.source as 'self_added' | 'cold_inbound',
+    source: r.source as 'self_added' | 'cold_inbound' | 'warm_intro',
     status: r.status,
     nextActionText: r.nextActionText,
     nextActionDate: r.nextActionDate,
@@ -96,6 +97,7 @@ app.get('/investor-crm', async (c) => {
     founderNotes: r.notes,
     lastTouchAt: r.updatedAt,
     nodeName: null,
+    warmIntroConnector: r.warmIntroConnector,
   }));
 
   // Combined, sorted by lastTouchAt desc. UI handles further sort/filter.
@@ -150,12 +152,13 @@ const createRecordSchema = z.object({
   role: z.string().nullable().optional(),
   email: z.string().nullable().optional(),
   geography: z.string().nullable().optional(),
-  source: z.enum(['self_added', 'cold_inbound']).optional(),
+  source: z.enum(['self_added', 'cold_inbound', 'warm_intro']).optional(),
   status: z.string().optional(),
   nextActionText: z.string().nullable().optional(),
   nextActionDate: z.string().nullable().optional(),
   checkSize: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
+  warmIntroConnector: z.string().nullable().optional(),
 });
 
 app.post('/founder-investor-records', async (c) => {
@@ -178,6 +181,7 @@ app.post('/founder-investor-records', async (c) => {
     nextActionDate: parsed.data.nextActionDate ?? null,
     checkSize: parsed.data.checkSize ?? null,
     notes: parsed.data.notes ?? null,
+    warmIntroConnector: parsed.data.warmIntroConnector ?? null,
     createdAt: now,
     updatedAt: now,
   }).returning();

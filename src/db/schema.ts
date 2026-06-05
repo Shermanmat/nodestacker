@@ -209,13 +209,16 @@ export const founderInvestorRecords = sqliteTable('founder_investor_records', {
   role: text('role'),
   email: text('email'),
   geography: text('geography'),
-  // 'self_added' = founder proactively added; 'cold_inbound' = investor reached out
+  // 'self_added' = founder reached out; 'cold_inbound' = investor reached out;
+  // 'warm_intro' = someone connected them (connector in warm_intro_connector)
   source: text('source').notNull().default('self_added'),
   status: text('status').notNull().default('self_outreach'),
   nextActionText: text('next_action_text'),
   nextActionDate: text('next_action_date'),
   checkSize: text('check_size'),
   notes: text('notes'),
+  // For source='warm_intro': who connected the founder to this investor (optional)
+  warmIntroConnector: text('warm_intro_connector'),
   // Soft delete — set when archived (via portal or MCP). Archived rows drop out
   // of the pipeline view but are never hard-deleted, so archiving is reversible.
   archivedAt: text('archived_at'),

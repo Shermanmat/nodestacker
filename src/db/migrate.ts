@@ -342,6 +342,8 @@ try {
 
 // Soft-delete column for founder-private records (archive via portal/MCP).
 safeAddColumn('founder_investor_records', 'archived_at', 'text');
+// Warm-intro connector on founder CRM records (who connected them).
+safeAddColumn('founder_investor_records', 'warm_intro_connector', 'text');
 
 // MCP access tokens — founder-scoped tokens for connecting an AI client.
 try {

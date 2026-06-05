@@ -233,7 +233,12 @@
                   <select v-model="addInvestorForm.source" class="w-full border rounded px-3 py-2 text-sm">
                     <option value="self_added">I reached out</option>
                     <option value="cold_inbound">They reached out</option>
+                    <option value="warm_intro">Warm intro</option>
                   </select>
+                </div>
+                <div v-if="addInvestorForm.source === 'warm_intro'">
+                  <label class="block text-xs font-medium text-gray-700 mb-1">Who connected you? <span class="text-gray-400">(optional)</span></label>
+                  <input v-model="addInvestorForm.warmIntroConnector" type="text" class="w-full border rounded px-3 py-2 text-sm" placeholder="e.g. a mutual founder, an angel, Mat…">
                 </div>
                 <div>
                   <label class="block text-xs font-medium text-gray-700 mb-1">Notes</label>
@@ -264,6 +269,7 @@
                 <span :class="['px-2 py-0.5 rounded font-medium', statusBadgeClass(detailRow.status)]">{{ formatStatusLabel(detailRow.status) }}</span>
                 <span :class="['px-2 py-0.5 rounded', sourceBadgeClass(detailRow.source)]">{{ formatSourceLabel(detailRow.source) }}</span>
                 <span v-if="detailRow.nodeName" class="text-gray-500">via {{ detailRow.nodeName }}</span>
+                <span v-if="detailRow.source === 'warm_intro' && detailRow.warmIntroConnector" class="text-gray-500">via {{ detailRow.warmIntroConnector }}</span>
               </div>
               <div class="mt-4 flex gap-2">
                 <button @click="openInteractionModal('meeting')" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">+ Log meeting</button>
@@ -1027,8 +1033,11 @@
                 <button @click="copyText(newToken)" class="text-xs bg-amber-600 text-white px-3 py-2 rounded hover:bg-amber-700 whitespace-nowrap">{{ copied ? 'Copied!' : 'Copy' }}</button>
               </div>
               <details class="mt-3">
-                <summary class="text-xs text-amber-700 cursor-pointer">Show MCP client config snippet</summary>
-                <pre class="mt-2 text-[11px] bg-white border rounded p-3 overflow-x-auto">{{ configSnippet }}</pre>
+                <summary class="text-xs text-amber-700 cursor-pointer">Show client config (Cursor / Claude Desktop)</summary>
+                <p class="mt-2 text-[11px] text-gray-500">Cursor (and clients with native remote MCP) — paste into your MCP config:</p>
+                <pre class="mt-1 text-[11px] bg-white border rounded p-3 overflow-x-auto">{{ configSnippet }}</pre>
+                <p class="mt-2 text-[11px] text-gray-500">Claude Desktop (bridges the remote server via the public <code>mcp-remote</code>):</p>
+                <pre class="mt-1 text-[11px] bg-white border rounded p-3 overflow-x-auto">{{ claudeDesktopSnippet }}</pre>
               </details>
             </div>
           </div>
@@ -1172,6 +1181,7 @@
           { value: 'matcap', label: 'MatCap' },
           { value: 'self_added', label: 'Self-added' },
           { value: 'cold_inbound', label: 'Cold inbound' },
+          { value: 'warm_intro', label: 'Warm intro' },
         ];
 
         const toggleStatusFilter = (v) => {
@@ -1278,11 +1288,13 @@
           matcap: '🟢 MatCap',
           self_added: '⚪ Self-added',
           cold_inbound: '🟡 Cold inbound',
+          warm_intro: '🤝 Warm intro',
         }[s] || s);
         const sourceBadgeClass = (s) => ({
           matcap: 'bg-green-50 text-green-700',
           self_added: 'bg-gray-50 text-gray-700',
           cold_inbound: 'bg-yellow-50 text-yellow-700',
+          warm_intro: 'bg-blue-50 text-blue-700',
         }[s] || 'bg-gray-50 text-gray-600');
 
         const formatRelativeDate = (iso) => {
@@ -1363,9 +1375,9 @@
         // Add investor modal
         const showAddInvestorModal = ref(false);
         const addingInvestor = ref(false);
-        const addInvestorForm = reactive({ name: '', firm: '', role: '', email: '', source: 'self_added', notes: '' });
+        const addInvestorForm = reactive({ name: '', firm: '', role: '', email: '', source: 'self_added', warmIntroConnector: '', notes: '' });
         const openAddInvestorModal = () => {
-          Object.assign(addInvestorForm, { name: '', firm: '', role: '', email: '', source: 'self_added', notes: '' });
+          Object.assign(addInvestorForm, { name: '', firm: '', role: '', email: '', source: 'self_added', warmIntroConnector: '', notes: '' });
           showAddInvestorModal.value = true;
         };
         const saveAddInvestor = async () => {
@@ -1384,6 +1396,7 @@
                 role: addInvestorForm.role || null,
                 email: addInvestorForm.email || null,
                 source: addInvestorForm.source,
+                warmIntroConnector: addInvestorForm.source === 'warm_intro' ? (addInvestorForm.warmIntroConnector || null) : null,
                 notes: addInvestorForm.notes || null,
               }),
             });
@@ -1505,12 +1518,22 @@
         const tokenError = ref('');
         const copied = ref(false);
         const nowIso = new Date().toISOString();
+        const mcpUrl = window.location.origin + '/mcp';
+        // Cursor (and other clients with native remote-MCP support).
         const configSnippet = computed(() => JSON.stringify({
           mcpServers: {
             'matcap-pipeline': {
-              command: 'node',
-              args: ['/absolute/path/to/mcp-server/index.mjs'],
-              env: { MATCAP_MCP_TOKEN: newToken.value || 'mcp_…', MATCAP_API_URL: 'https://matcap.vc' },
+              url: mcpUrl,
+              headers: { Authorization: 'Bearer ' + (newToken.value || 'mcp_…') },
+            },
+          },
+        }, null, 2));
+        // Claude Desktop bridges a remote server via the public mcp-remote tool.
+        const claudeDesktopSnippet = computed(() => JSON.stringify({
+          mcpServers: {
+            'matcap-pipeline': {
+              command: 'npx',
+              args: ['mcp-remote', mcpUrl, '--header', 'Authorization: Bearer ' + (newToken.value || 'mcp_…')],
             },
           },
         }, null, 2));
@@ -1975,7 +1998,7 @@
 
         return {
           tabs, activeTab, session,
-          mcpTokens, newToken, tokenName, tokenExpiry, tokenLoading, tokenError, copied, nowIso, configSnippet,
+          mcpTokens, newToken, tokenName, tokenExpiry, tokenLoading, tokenError, copied, nowIso, configSnippet, claudeDesktopSnippet,
           loadMcpTokens, createMcpToken, revokeMcpToken, copyText,
           loginEmail, loggingIn, loginError, magicLinkSent,
           dashboard, tasks, myNodes, availableInvestors, myIntros, nodesData,

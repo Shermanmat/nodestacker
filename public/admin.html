@@ -6748,7 +6748,7 @@
           const calendlyUrl = (f.calendlyUrl || '').trim();
           const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
 
-          const subject = `${i.name || 'Investor'} <> ${f.name || 'Founder'}`;
+          const subject = companyName || f.name || 'Intro';
 
           // Template variable substitution — used in blurb.
           // {{investorName}} / {{founderName}} default to first name (matches server side).
@@ -6762,21 +6762,22 @@
             .replace(/\{\{founderName\}\}/g, founderFirst)
             .replace(/\{\{companyName\}\}/g, companyName);
 
-          // Always the standard double-opt-in intro format — never the blurb.
-          const invRole = i.role || 'investor';
-          const invDesc = i.firm ? `${invRole} at ${i.firm}` : invRole;
-          const lines = [];
-          lines.push('Hi All,');
-          lines.push('');
-          lines.push('Wanted to make the intro here:');
-          lines.push('');
-          lines.push(`${f.name || 'Founder'} - Cofounder/CEO${companyName ? ` of ${companyName}` : ''}`);
-          lines.push(`${i.name || 'Investor'} - ${invDesc} who wanted to learn more`);
-          lines.push('');
-          lines.push("I'll let you all take it from here.");
-          lines.push('');
-          lines.push(`- ${nodeName}`);
-          const body = lines.join('\n');
+          // Stage 1 — the ask: the founder's blurb (forwardable pitch) to the investor.
+          let body;
+          if (blurb) {
+            body = fillVars(blurb);
+          } else {
+            const lines = [];
+            lines.push(`Hi ${investorFirst} —`);
+            lines.push('');
+            lines.push(`Wanted to see if you'd be open to meeting ${f.name || 'this founder'}${companyName ? `, founder of ${companyName}` : ''}.`);
+            if (stage) lines.push(`They're raising a ${stage} round.`);
+            lines.push('');
+            lines.push('Want me to make the intro?');
+            lines.push('');
+            lines.push(nodeFirst);
+            body = lines.join('\n');
+          }
 
           return {
             to: investorEmail,

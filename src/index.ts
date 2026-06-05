@@ -628,7 +628,8 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const deckUrl = (founder.deckUrl || '').trim();
   const calendlyUrl = (founder.calendlyUrl || '').trim();
 
-  const subject = `${investor.name || 'Investor'} <> ${founder.name}`;
+  // Stage 1 — the ask: subject is the company; body is the founder's blurb.
+  const subject = companyName || founder.name;
 
   // {{investorName}} / {{founderName}} default to first name (matches gmail.ts).
   const fillVars = (s: string) => s
@@ -641,21 +642,22 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     .replace(/\{\{founderName\}\}/g, founderFirst)
     .replace(/\{\{companyName\}\}/g, companyName);
 
-  // Always the standard double-opt-in intro format — never the founder blurb.
-  const invRole = investor.role || 'investor';
-  const invDesc = investor.firm ? `${invRole} at ${investor.firm}` : invRole;
-  const lines: string[] = [];
-  lines.push('Hi All,');
-  lines.push('');
-  lines.push('Wanted to make the intro here:');
-  lines.push('');
-  lines.push(`${founder.name} - Cofounder/CEO${companyName ? ` of ${companyName}` : ''}`);
-  lines.push(`${investor.name} - ${invDesc} who wanted to learn more`);
-  lines.push('');
-  lines.push("I'll let you all take it from here.");
-  lines.push('');
-  lines.push(`- ${node?.name || 'Mat Sherman'}`);
-  const bodyText = lines.join('\n');
+  // The founder's blurb is the forwardable ask. Fallback to a short ask if unset.
+  let bodyText: string;
+  if (blurb) {
+    bodyText = fillVars(blurb);
+  } else {
+    const lines: string[] = [];
+    lines.push(`Hi ${investorFirst} —`);
+    lines.push('');
+    lines.push(`Wanted to see if you'd be open to meeting ${founder.name}${companyName ? `, founder of ${companyName}` : ''}.`);
+    if (stage) lines.push(`They're raising a ${stage} round.`);
+    lines.push('');
+    lines.push('Want me to make the intro?');
+    lines.push('');
+    lines.push(nodeFirst);
+    bodyText = lines.join('\n');
+  }
 
   // Intros go out without the deck attached.
   const attachmentPath: string | undefined = undefined;

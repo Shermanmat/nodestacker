@@ -2,7 +2,7 @@ import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
 import { sendEmail } from './email.js';
-import { buildIntroBody, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
+import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 import { recordAction } from './agent-actions.js';
 
 /**
@@ -371,8 +371,8 @@ export async function runAutoDraftTick(): Promise<{
     const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.nodeId) });
     if (!founder) { skipped.missingFounder++; continue; }
 
-    // Build email + draft
-    const { subject, body } = buildIntroBody({
+    // Build the stage-1 ask (blurb → investor) + draft
+    const { subject, body } = buildAskEmail({
       founder: {
         name: founder.name,
         companyName: founder.companyName,

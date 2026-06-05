@@ -174,11 +174,60 @@ export interface DraftResult {
 }
 
 /**
- * Build the intro email body + subject for a (founder, investor, node) triple.
- * Mirrors the client-side buildIntroDraft in admin.html.
- *
- * Exported here so both the manual draft endpoint and the auto-draft cron
- * produce the same email.
+ * STAGE 1 — the "ask". Mat → investor only, carrying the founder's blurb (the
+ * forwardable pitch), asking if they'd like to meet. This is the FIRST email,
+ * sent before any connection is made. Used by the auto-draft cron + the manual
+ * "create draft" flow. The investor accepting is what later flips the intro to
+ * 'introduced', which triggers buildIntroBody (the stage-2 connection email).
+ */
+export function buildAskEmail(args: {
+  founder: { name: string; companyName: string; email: string | null; blurb: string | null; companyStage: string; deckUrl: string | null; calendlyUrl: string | null };
+  investor: { name: string; firm: string | null; role: string | null };
+  node: { name: string } | null;
+}): { subject: string; body: string } {
+  const { founder, investor, node } = args;
+  const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
+  const founderFirst = (founder.name || '').split(/\s+/)[0] || '';
+  const companyName = founder.companyName || '';
+  const stage = founder.companyStage ? String(founder.companyStage).replace(/_/g, ' ') : '';
+  const nodeFirst = (node?.name || 'Mat').split(/\s+/)[0];
+  const blurb = (founder.blurb || '').trim();
+
+  const subject = companyName || founder.name;
+
+  const fillVars = (s: string) => s
+    .replace(/\{\{investorFirst\}\}/g, investorFirst)
+    .replace(/\{\{investorName\}\}/g, investorFirst)
+    .replace(/\{\{investorFirm\}\}/g, investor.firm || '')
+    .replace(/\{\{founderFirst\}\}/g, founderFirst)
+    .replace(/\{\{founderFull\}\}/g, founder.name || '')
+    .replace(/\{\{founderName\}\}/g, founderFirst)
+    .replace(/\{\{companyName\}\}/g, companyName);
+
+  let body: string;
+  if (blurb) {
+    // The blurb is the founder's complete forwardable pitch — use it verbatim.
+    body = fillVars(blurb);
+  } else {
+    // Fallback ask when the founder has no blurb yet.
+    const lines: string[] = [];
+    lines.push(`Hi ${investorFirst} —`);
+    lines.push('');
+    lines.push(`Wanted to see if you'd be open to meeting ${founder.name}${companyName ? `, founder of ${companyName}` : ''}.`);
+    if (stage) lines.push(`They're raising a ${stage} round.`);
+    lines.push('');
+    lines.push('Want me to make the intro?');
+    lines.push('');
+    lines.push(nodeFirst);
+    body = lines.join('\n');
+  }
+  return { subject, body };
+}
+
+/**
+ * STAGE 2 — the connection. The "Hi All, wanted to make the intro here…"
+ * double opt-in email connecting founder + investor. Only sent AFTER the
+ * investor accepts (intro flips to 'introduced'). Never the blurb; no deck.
  */
 export function buildIntroBody(args: {
   founder: { name: string; companyName: string; email: string | null; blurb: string | null; companyStage: string; deckUrl: string | null; calendlyUrl: string | null };

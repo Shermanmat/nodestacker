@@ -44,6 +44,8 @@ import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import agentActionsRoutes from './api/agent-actions.js';
+import mcpRoutes from './api/mcp.js';
+import mcpTokensRoutes from './api/mcp-tokens-routes.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { withCronRun } from './services/cron-log.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
@@ -64,6 +66,11 @@ app.route('/api/portal', founderPortalRoutes);
 // Founder-private CRM: investor pipeline + self-added records + interaction logs.
 // All routes scoped to the logged-in founder; no admin endpoint reads any of these.
 app.route('/api/portal/crm', portalCrmRoutes);
+// MCP token management — session-authed (founder mints/revokes their own tokens)
+app.route('/api/portal/mcp-tokens', mcpTokensRoutes);
+// MCP pipeline API — Bearer-token authed (the MCP server calls these). Auth is
+// enforced inside the router via the token, so it's mounted with the public routes.
+app.route('/api/mcp', mcpRoutes);
 // Public lead-magnet capture — any standalone tool/page posts here to land
 // an email in the unified people directory. No auth.
 app.route('/api/people-captures', peopleCapturesRoutes);
@@ -628,6 +635,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const deckUrl = (founder.deckUrl || '').trim();
   const calendlyUrl = (founder.calendlyUrl || '').trim();
 
+  // Stage 1 — the ask: subject is the company; body is the founder's blurb.
   const subject = companyName || founder.name;
 
   // {{investorName}} / {{founderName}} default to first name (matches gmail.ts).
@@ -641,6 +649,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     .replace(/\{\{founderName\}\}/g, founderFirst)
     .replace(/\{\{companyName\}\}/g, companyName);
 
+  // The founder's blurb is the forwardable ask. Fallback to a short ask if unset.
   let bodyText: string;
   if (blurb) {
     bodyText = fillVars(blurb);
@@ -648,31 +657,18 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     const lines: string[] = [];
     lines.push(`Hi ${investorFirst} —`);
     lines.push('');
-    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
-    if (stage) {
-      lines.push('');
-      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
-    }
-    if (deckUrl || calendlyUrl) {
-      lines.push('');
-      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
-      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
-    }
+    lines.push(`Wanted to see if you'd be open to meeting ${founder.name}${companyName ? `, founder of ${companyName}` : ''}.`);
+    if (stage) lines.push(`They're raising a ${stage} round.`);
     lines.push('');
-    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
+    lines.push('Want me to make the intro?');
     lines.push('');
     lines.push(nodeFirst);
     bodyText = lines.join('\n');
   }
 
-  // Locate the deck file on disk if uploaded
-  let attachmentPath: string | undefined;
-  let attachmentName: string | undefined;
-  if (founder.deckFile) {
-    const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
-    attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
-    attachmentName = `${companyName || founder.name} Deck.pdf`;
-  }
+  // Intros go out without the deck attached.
+  const attachmentPath: string | undefined = undefined;
+  const attachmentName: string | undefined = undefined;
 
   // Admin overrides win — edits made in the draft modal land in the Gmail draft.
   const finalSubject = (subjectOverride != null && subjectOverride.trim()) ? subjectOverride : subject;

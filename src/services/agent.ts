@@ -2,7 +2,7 @@ import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
 import { sendEmail } from './email.js';
-import { buildIntroBody, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
+import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 import { recordAction } from './agent-actions.js';
 
 /**
@@ -371,8 +371,8 @@ export async function runAutoDraftTick(): Promise<{
     const node = await db.query.nodes.findFirst({ where: eq(nodes.id, c.nodeId) });
     if (!founder) { skipped.missingFounder++; continue; }
 
-    // Build email + draft
-    const { subject, body } = buildIntroBody({
+    // Build the stage-1 ask (blurb → investor) + draft
+    const { subject, body } = buildAskEmail({
       founder: {
         name: founder.name,
         companyName: founder.companyName,
@@ -386,13 +386,9 @@ export async function runAutoDraftTick(): Promise<{
       node: node ? { name: node.name } : null,
     });
 
-    let attachmentPath: string | undefined;
-    let attachmentName: string | undefined;
-    if (founder.deckFile) {
-      const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
-      attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
-      attachmentName = `${founder.companyName || founder.name} Deck.pdf`;
-    }
+    // Intros go out without the deck attached.
+    const attachmentPath: string | undefined = undefined;
+    const attachmentName: string | undefined = undefined;
 
     try {
       const draftResult = await createDraft({

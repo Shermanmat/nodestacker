@@ -216,6 +216,9 @@ export const founderInvestorRecords = sqliteTable('founder_investor_records', {
   nextActionDate: text('next_action_date'),
   checkSize: text('check_size'),
   notes: text('notes'),
+  // Soft delete — set when archived (via portal or MCP). Archived rows drop out
+  // of the pipeline view but are never hard-deleted, so archiving is reversible.
+  archivedAt: text('archived_at'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
 });
@@ -1239,3 +1242,28 @@ export const agentSettings = sqliteTable('agent_settings', {
 
 export type AgentSettings = typeof agentSettings.$inferSelect;
 export type NewAgentSettings = typeof agentSettings.$inferInsert;
+
+// MCP access tokens — a founder mints one of these to connect their AI client
+// (Claude Desktop, Cursor, …) to their pipeline via the MCP server. Each token
+// is scoped to exactly one founder; the MCP server resolves token → founderId
+// and every data operation runs scoped to that founder. The raw token is shown
+// to the founder ONCE at creation; only its SHA-256 hash is stored here, so a DB
+// leak can't reconstruct a usable token. Supports a human label, optional expiry,
+// and revocation.
+export const mcpTokens = sqliteTable('mcp_tokens', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull().references(() => founders.id),
+  // SHA-256 hex of the raw token. Unique so verification is a single indexed lookup.
+  tokenHash: text('token_hash').notNull().unique(),
+  // First few chars of the raw token (e.g. 'mcp_a1b2') — display only, to help
+  // the founder tell their tokens apart. Never enough to authenticate.
+  tokenPrefix: text('token_prefix').notNull(),
+  name: text('name'),                          // human label, e.g. "Claude Desktop"
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  expiresAt: text('expires_at'),               // null = no expiry
+  revokedAt: text('revoked_at'),               // null = active
+  lastUsedAt: text('last_used_at'),
+});
+
+export type McpToken = typeof mcpTokens.$inferSelect;
+export type NewMcpToken = typeof mcpTokens.$inferInsert;

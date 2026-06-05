@@ -280,6 +280,37 @@ app.put('/:id', async (c) => {
         isFirstIntro,
       }).catch((err) => console.error('[INTRO-EMAIL] send failed:', err));
     }
+
+    // Stage 2 — draft the connection email ("Hi All", to BOTH parties) now that
+    // the investor has accepted. Fire-and-forget: a Gmail issue must never block
+    // the status update. The transition guard above means this runs once.
+    if (existing.founder && existing.investor && existing.investor.email) {
+      void (async () => {
+        try {
+          const { getStatus, createDraft, buildIntroBody } = await import('../services/gmail.js');
+          const st = await getStatus();
+          if (!st.connected) return;
+          const { subject, body } = buildIntroBody({
+            founder: {
+              name: existing.founder!.name,
+              companyName: existing.founder!.companyName,
+              email: existing.founder!.email,
+              blurb: existing.founder!.blurb,
+              companyStage: existing.founder!.companyStage,
+              deckUrl: existing.founder!.deckUrl,
+              calendlyUrl: existing.founder!.calendlyUrl,
+            },
+            investor: { name: existing.investor!.name, firm: existing.investor!.firm, role: existing.investor!.role },
+            node: existing.node ? { name: existing.node.name } : null,
+          });
+          const to = [existing.investor!.email, existing.founder!.email].filter(Boolean).join(', ');
+          await createDraft({ to, subject, body });
+          console.log(`[INTRO-DRAFT] connection draft created for intro ${id} -> ${to}`);
+        } catch (err) {
+          console.error('[INTRO-DRAFT] connection draft failed:', err);
+        }
+      })();
+    }
   }
 
   return c.json(result[0]);

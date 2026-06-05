@@ -46,6 +46,7 @@ import brandsRoutes from './api/brands.js';
 import agentActionsRoutes from './api/agent-actions.js';
 import mcpRoutes from './api/mcp.js';
 import mcpTokensRoutes from './api/mcp-tokens-routes.js';
+import mcpRpcRoutes from './api/mcp-rpc.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { withCronRun } from './services/cron-log.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
@@ -68,9 +69,11 @@ app.route('/api/portal', founderPortalRoutes);
 app.route('/api/portal/crm', portalCrmRoutes);
 // MCP token management — session-authed (founder mints/revokes their own tokens)
 app.route('/api/portal/mcp-tokens', mcpTokensRoutes);
-// MCP pipeline API — Bearer-token authed (the MCP server calls these). Auth is
-// enforced inside the router via the token, so it's mounted with the public routes.
+// MCP pipeline API — Bearer-token authed (the legacy local connector calls these).
 app.route('/api/mcp', mcpRoutes);
+// Remote MCP server — hosted Streamable-HTTP endpoint clients connect to directly
+// (Cursor via URL+header, Claude Desktop via mcp-remote). Bearer-token auth inside.
+app.route('/mcp', mcpRpcRoutes);
 // Public lead-magnet capture — any standalone tool/page posts here to land
 // an email in the unified people directory. No auth.
 app.route('/api/people-captures', peopleCapturesRoutes);
@@ -666,9 +669,15 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     bodyText = lines.join('\n');
   }
 
-  // Intros go out without the deck attached.
-  const attachmentPath: string | undefined = undefined;
-  const attachmentName: string | undefined = undefined;
+  // Stage 1 (the ask) carries the founder's deck if one's uploaded. The stage-2
+  // connection email (founder <> investor) never attaches it.
+  let attachmentPath: string | undefined;
+  let attachmentName: string | undefined;
+  if (founder.deckFile) {
+    const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
+    attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
+    attachmentName = `${companyName || founder.name} Deck.pdf`;
+  }
 
   // Admin overrides win — edits made in the draft modal land in the Gmail draft.
   const finalSubject = (subjectOverride != null && subjectOverride.trim()) ? subjectOverride : subject;

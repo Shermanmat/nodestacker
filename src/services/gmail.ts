@@ -195,9 +195,9 @@ export function buildIntroBody(args: {
   const deckUrl = (founder.deckUrl || '').trim();
   const calendlyUrl = (founder.calendlyUrl || '').trim();
 
-  // Subject defaults to the company name (admin can edit in Gmail before sending).
-  // Falls back to founder name only if companyName is unset.
-  const subject = companyName || founder.name;
+  // Intro-style subject: "Investor Full <> Founder Full" (admin can edit in
+  // Gmail before sending).
+  const subject = `${investor.name || 'Investor'} <> ${founder.name}`;
 
   // {{investorName}} and {{founderName}} default to first name only — that's
   // what reads naturally in an intro email ("Hi Sarah"). Use {{investorFull}}
@@ -212,29 +212,21 @@ export function buildIntroBody(args: {
     .replace(/\{\{founderName\}\}/g, founderFirst)
     .replace(/\{\{companyName\}\}/g, companyName);
 
-  let body: string;
-  if (blurb) {
-    body = fillVars(blurb);
-  } else {
-    const lines: string[] = [];
-    lines.push(`Hi ${investorFirst} —`);
-    lines.push('');
-    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
-    if (stage) {
-      lines.push('');
-      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
-    }
-    if (deckUrl || calendlyUrl) {
-      lines.push('');
-      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
-      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
-    }
-    lines.push('');
-    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
-    lines.push('');
-    lines.push(nodeFirst);
-    body = lines.join('\n');
-  }
+  // Always the standard double-opt-in intro format — never the founder blurb.
+  const invRole = investor.role || 'investor';
+  const invDesc = investor.firm ? `${invRole} at ${investor.firm}` : invRole;
+  const lines: string[] = [];
+  lines.push('Hi All,');
+  lines.push('');
+  lines.push('Wanted to make the intro here:');
+  lines.push('');
+  lines.push(`${founder.name} - Cofounder/CEO${companyName ? ` of ${companyName}` : ''}`);
+  lines.push(`${investor.name} - ${invDesc} who wanted to learn more`);
+  lines.push('');
+  lines.push("I'll let you all take it from here.");
+  lines.push('');
+  lines.push(`- ${node?.name || 'Mat Sherman'}`);
+  const body = lines.join('\n');
 
   return { subject, body };
 }

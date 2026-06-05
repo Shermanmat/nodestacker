@@ -6748,7 +6748,7 @@
           const calendlyUrl = (f.calendlyUrl || '').trim();
           const oneLiner = (f.oneLiner || f.companyOneLiner || '').trim();
 
-          const subject = companyName || f.name || 'Intro';
+          const subject = `${i.name || 'Investor'} <> ${f.name || 'Founder'}`;
 
           // Template variable substitution — used in blurb.
           // {{investorName}} / {{founderName}} default to first name (matches server side).
@@ -6762,35 +6762,21 @@
             .replace(/\{\{founderName\}\}/g, founderFirst)
             .replace(/\{\{companyName\}\}/g, companyName);
 
-          let body;
-          if (blurb) {
-            // Use the founder's own blurb verbatim — it's expected to be the
-            // complete email (greeting, body, sign-off). Just substitute vars.
-            body = fillVars(blurb);
-          } else {
-            // Fallback skeleton when no blurb is set
-            const lines = [];
-            lines.push(`Hi ${investorFirst} —`);
-            lines.push('');
-            lines.push(`Want to intro you to ${f.name || 'this founder'}${companyName ? `, building ${companyName}` : ''}.`);
-            if (oneLiner) {
-              lines.push('');
-              lines.push(`${companyName ? companyName + ' is ' : ''}${oneLiner}`);
-            }
-            lines.push('');
-            if (stage) lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
-            else lines.push(`I think they'd be a strong fit for your thesis.`);
-            if (deckUrl || calendlyUrl) {
-              lines.push('');
-              if (deckUrl) lines.push(`Deck: ${deckUrl}`);
-              if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
-            }
-            lines.push('');
-            lines.push(`${founderFirst || f.name || 'Founder'}, meet ${investorFirst}${i.firm ? ` (${i.role || 'investor'} at ${i.firm})` : ''} — off to you both.`);
-            lines.push('');
-            lines.push(nodeFirst);
-            body = lines.join('\n');
-          }
+          // Always the standard double-opt-in intro format — never the blurb.
+          const invRole = i.role || 'investor';
+          const invDesc = i.firm ? `${invRole} at ${i.firm}` : invRole;
+          const lines = [];
+          lines.push('Hi All,');
+          lines.push('');
+          lines.push('Wanted to make the intro here:');
+          lines.push('');
+          lines.push(`${f.name || 'Founder'} - Cofounder/CEO${companyName ? ` of ${companyName}` : ''}`);
+          lines.push(`${i.name || 'Investor'} - ${invDesc} who wanted to learn more`);
+          lines.push('');
+          lines.push("I'll let you all take it from here.");
+          lines.push('');
+          lines.push(`- ${nodeName}`);
+          const body = lines.join('\n');
 
           return {
             to: investorEmail,

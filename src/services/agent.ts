@@ -386,13 +386,9 @@ export async function runAutoDraftTick(): Promise<{
       node: node ? { name: node.name } : null,
     });
 
-    let attachmentPath: string | undefined;
-    let attachmentName: string | undefined;
-    if (founder.deckFile) {
-      const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
-      attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
-      attachmentName = `${founder.companyName || founder.name} Deck.pdf`;
-    }
+    // Intros go out without the deck attached.
+    const attachmentPath: string | undefined = undefined;
+    const attachmentName: string | undefined = undefined;
 
     try {
       const draftResult = await createDraft({

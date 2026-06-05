@@ -628,7 +628,7 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
   const deckUrl = (founder.deckUrl || '').trim();
   const calendlyUrl = (founder.calendlyUrl || '').trim();
 
-  const subject = companyName || founder.name;
+  const subject = `${investor.name || 'Investor'} <> ${founder.name}`;
 
   // {{investorName}} / {{founderName}} default to first name (matches gmail.ts).
   const fillVars = (s: string) => s
@@ -641,38 +641,25 @@ app.post('/api/agent/gmail/draft-intro', async (c) => {
     .replace(/\{\{founderName\}\}/g, founderFirst)
     .replace(/\{\{companyName\}\}/g, companyName);
 
-  let bodyText: string;
-  if (blurb) {
-    bodyText = fillVars(blurb);
-  } else {
-    const lines: string[] = [];
-    lines.push(`Hi ${investorFirst} —`);
-    lines.push('');
-    lines.push(`Want to intro you to ${founder.name}${companyName ? `, building ${companyName}` : ''}.`);
-    if (stage) {
-      lines.push('');
-      lines.push(`They're raising a ${stage} round and I think they'd be a strong fit for your thesis.`);
-    }
-    if (deckUrl || calendlyUrl) {
-      lines.push('');
-      if (deckUrl) lines.push(`Deck: ${deckUrl}`);
-      if (calendlyUrl) lines.push(`Book time: ${calendlyUrl}`);
-    }
-    lines.push('');
-    lines.push(`${founderFirst || founder.name}, meet ${investorFirst}${investor.firm ? ` (${investor.role || 'investor'} at ${investor.firm})` : ''} — off to you both.`);
-    lines.push('');
-    lines.push(nodeFirst);
-    bodyText = lines.join('\n');
-  }
+  // Always the standard double-opt-in intro format — never the founder blurb.
+  const invRole = investor.role || 'investor';
+  const invDesc = investor.firm ? `${invRole} at ${investor.firm}` : invRole;
+  const lines: string[] = [];
+  lines.push('Hi All,');
+  lines.push('');
+  lines.push('Wanted to make the intro here:');
+  lines.push('');
+  lines.push(`${founder.name} - Cofounder/CEO${companyName ? ` of ${companyName}` : ''}`);
+  lines.push(`${investor.name} - ${invDesc} who wanted to learn more`);
+  lines.push('');
+  lines.push("I'll let you all take it from here.");
+  lines.push('');
+  lines.push(`- ${node?.name || 'Mat Sherman'}`);
+  const bodyText = lines.join('\n');
 
-  // Locate the deck file on disk if uploaded
-  let attachmentPath: string | undefined;
-  let attachmentName: string | undefined;
-  if (founder.deckFile) {
-    const dataDir = process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.');
-    attachmentPath = `${dataDir}/decks/${founder.deckFile}`;
-    attachmentName = `${companyName || founder.name} Deck.pdf`;
-  }
+  // Intros go out without the deck attached.
+  const attachmentPath: string | undefined = undefined;
+  const attachmentName: string | undefined = undefined;
 
   // Admin overrides win — edits made in the draft modal land in the Gmail draft.
   const finalSubject = (subjectOverride != null && subjectOverride.trim()) ? subjectOverride : subject;

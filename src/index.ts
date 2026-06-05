@@ -44,6 +44,8 @@ import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import agentActionsRoutes from './api/agent-actions.js';
+import mcpRoutes from './api/mcp.js';
+import mcpTokensRoutes from './api/mcp-tokens-routes.js';
 import { sendWeeklyDigests, sendDigestPreviewToAdmin } from './services/weekly-digest.js';
 import { withCronRun } from './services/cron-log.js';
 import { adminGuard } from './api/middleware/admin-guard.js';
@@ -64,6 +66,11 @@ app.route('/api/portal', founderPortalRoutes);
 // Founder-private CRM: investor pipeline + self-added records + interaction logs.
 // All routes scoped to the logged-in founder; no admin endpoint reads any of these.
 app.route('/api/portal/crm', portalCrmRoutes);
+// MCP token management — session-authed (founder mints/revokes their own tokens)
+app.route('/api/portal/mcp-tokens', mcpTokensRoutes);
+// MCP pipeline API — Bearer-token authed (the MCP server calls these). Auth is
+// enforced inside the router via the token, so it's mounted with the public routes.
+app.route('/api/mcp', mcpRoutes);
 // Public lead-magnet capture — any standalone tool/page posts here to land
 // an email in the unified people directory. No auth.
 app.route('/api/people-captures', peopleCapturesRoutes);

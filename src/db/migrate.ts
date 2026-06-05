@@ -340,6 +340,29 @@ try {
   sqlite.exec(`UPDATE nodes SET vip = 0 WHERE id = 2`);
 } catch (_) { /* no-op if nodes table doesn't exist yet */ }
 
+// Soft-delete column for founder-private records (archive via portal/MCP).
+safeAddColumn('founder_investor_records', 'archived_at', 'text');
+
+// MCP access tokens — founder-scoped tokens for connecting an AI client.
+try {
+  sqlite.exec(`CREATE TABLE IF NOT EXISTS \`mcp_tokens\` (
+    \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+    \`founder_id\` integer NOT NULL REFERENCES \`founders\`(\`id\`),
+    \`token_hash\` text NOT NULL,
+    \`token_prefix\` text NOT NULL,
+    \`name\` text,
+    \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    \`expires_at\` text,
+    \`revoked_at\` text,
+    \`last_used_at\` text
+  )`);
+  sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`mcp_tokens_token_hash_unique\` ON \`mcp_tokens\` (\`token_hash\`)`);
+  sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_mcp_tokens_founder\` ON \`mcp_tokens\` (\`founder_id\`)`);
+  console.log('  Ensured mcp_tokens table exists');
+} catch (e: any) {
+  if (!e.message?.includes('already exists')) throw e;
+}
+
 // Agent actions ledger — accountability log + approval gate for the AI worker.
 try {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS \`agent_actions\` (

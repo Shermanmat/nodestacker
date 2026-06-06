@@ -354,27 +354,10 @@
 <!-- ============ WAITLIST ============ -->
 <section class="section-centered" id="waitlist" style="padding-top:40px">
   <div class="cta-card reveal">
-    <h3>Want the CRM? <span class="accent">Get in with MatCap.</span></h3>
-    <p>It comes with a MatCap trial or a spot in the portfolio — not sold on its own. Leave your email and we'll reach out about getting you in.</p>
-
-    <form id="waitlist-form" class="apply-form">
-      <div>
-        <label for="wl-name">Name (optional)</label>
-        <input type="text" id="wl-name" name="name" placeholder="Jane Smith">
-      </div>
-      <div>
-        <label for="wl-email">Email *</label>
-        <input type="email" id="wl-email" name="email" required placeholder="jane@example.com">
-      </div>
-      <button type="submit">Request Early Access</button>
-    </form>
-
-    <div class="apply-success" id="waitlist-success">
-      <div class="icon">
-        <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-      </div>
-      <h4>You're on the list</h4>
-      <p>We're rolling this out a few founders at a time. We'll email you when your spot opens up.</p>
+    <h3>Apply to <span class="accent">MatCap.</span></h3>
+    <p>The CRM, the weekly inbox intros, and the AI access all come with a MatCap trial or a spot in the portfolio — not sold on its own. Apply and we'll take it from there.</p>
+    <div class="cta-stack" style="margin-top:8px">
+      <a href="/signup" class="btn-primary-light">Apply to MatCap</a>
     </div>
   </div>
 </section>
@@ -398,38 +381,5 @@
 </footer>
 
 <script src="/scripts/matcap.js"></script>
-<script>
-(function() {
-  var form = document.getElementById('waitlist-form');
-  if (!form) return;
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    var btn = form.querySelector('button[type="submit"]');
-    btn.textContent = 'Submitting...';
-    btn.disabled = true;
-
-    var data = {
-      email: form.querySelector('#wl-email').value,
-      name: form.querySelector('#wl-name').value || null,
-      source: 'crm'
-    };
-
-    fetch('/api/people-captures', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    })
-    .then(function(res) {
-      if (!res.ok) throw new Error('Failed');
-      form.style.display = 'none';
-      document.getElementById('waitlist-success').style.display = 'block';
-    })
-    .catch(function() {
-      btn.textContent = 'Something went wrong — try again';
-      btn.disabled = false;
-    });
-  });
-})();
-</script>
 </body>
 </html>

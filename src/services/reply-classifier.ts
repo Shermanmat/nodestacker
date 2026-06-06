@@ -15,7 +15,7 @@
 
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
-import { getStatus as getGmailStatus, getLatestMessageFromSender, sendThreadReply, buildIntroBody } from './gmail.js';
+import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
 
 // Read the singleton agent_settings row. Falls back to safe defaults if the
@@ -162,40 +162,36 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
           !!founder.email;
 
         try {
-          // Standard "Hi All" connection format (no blurb, no deck), kept as a
-          // reply so it stays in the same Gmail thread the investor replied on.
-          const subject = `Re: ${founder.companyName || founder.name}`;
-          const { body: handoffBody } = buildIntroBody({
-            founder: {
-              name: founder.name,
-              companyName: founder.companyName,
-              email: founder.email,
-              blurb: founder.blurb,
-              companyStage: founder.companyStage,
-              deckUrl: founder.deckUrl,
-              calendlyUrl: founder.calendlyUrl,
-            },
-            investor: { name: investor.name, firm: investor.firm, role: investor.role },
-            node: null,
-          });
-          const sent = await sendThreadReply({
-            threadId: intro.gmailThreadId,
-            to: investor.email!,
-            cc: founder.email || undefined,
-            subject,
-            body: handoffBody,
-            asDraft: !canAutoSend,
-          });
+          // Make the intro in a FRESH thread (not a reply on the investor's
+          // reply thread): a clean double-opt-in email to BOTH parties.
+          // NOTE: we don't store per-founder titles, so the founder's title
+          // defaults to "Cofounder/CEO" — admin edits the draft before sending.
+          const founderTitle = 'Cofounder/CEO';
+          const investorDesc = investor.firm
+            ? `investor at ${investor.firm} who wanted to learn more`
+            : 'investor who wanted to learn more';
+          const subject = `Intro: ${founder.companyName || founder.name} <> ${investor.name}`;
+          const handoffBody =
+            `Hi All,\n\n` +
+            `Wanted to make the intro here:\n\n` +
+            `${founder.name} - ${founderTitle} of ${founder.companyName}\n` +
+            `${investor.name} - ${investorDesc}\n\n` +
+            `I'll let you all take it from here.\n\n` +
+            `- Mat Sherman`;
+          // Both parties on the To line ("Hi All").
+          const to = [investor.email, founder.email].filter(Boolean).join(', ');
+
           if (canAutoSend) {
+            const sent = await sendGmail({ to, subject, body: handoffBody });
             updates.introHandoffSentAt = now;
             updates.introHandoffAutoSent = true;
             updates.introHandoffMessageId = sent.messageId || null;
             autoSentHandoff = true;
             autoSent++;
           } else {
-            const draftId = (sent as any).draftId as string | undefined;
-            if (draftId) {
-              updates.introHandoffDraftId = draftId;
+            const draft = await createDraft({ to, subject, body: handoffBody });
+            if (draft.draftId) {
+              updates.introHandoffDraftId = draft.draftId;
               updates.introHandoffDraftCreatedAt = now;
               draftedHandoff = true;
               drafted++;
@@ -203,7 +199,7 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
           }
         } catch (e: any) {
           // Failure here doesn't block the status transition — admin can
-          // write the intro themselves from the Gmail thread.
+          // write the intro themselves.
           console.error('[reply-classifier] handoff send/draft failed:', e);
         }
         break;

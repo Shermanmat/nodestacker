@@ -165,8 +165,8 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
           // Make the intro in a FRESH thread (not a reply on the investor's
           // reply thread): a clean double-opt-in email to BOTH parties.
           // NOTE: we don't store per-founder titles, so the founder's title
-          // defaults to "Cofounder/CEO" — admin edits the draft before sending.
-          const founderTitle = 'Cofounder/CEO';
+          // defaults to "Founder/CEO" — admin edits the draft before sending.
+          const founderTitle = 'Founder/CEO';
           const investorDesc = investor.firm
             ? `investor at ${investor.firm} who wanted to learn more`
             : 'investor who wanted to learn more';

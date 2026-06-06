@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, isNotNull } from 'drizzle-orm';
-import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, founderLeads, ensureDefaultNodeRelationship } from '../db/index.js';
+import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, founderLeads, trials, ensureDefaultNodeRelationship } from '../db/index.js';
 import { z } from 'zod';
 import * as postmark from 'postmark';
 
@@ -293,6 +293,82 @@ app.post('/applications/:id/trial', async (c) => {
   console.log(`[TRIAL] Sent trial invite to ${user.firstName} ${user.lastName} (${user.email}) for ${company.companyName}`);
 
   return c.json({ success: true });
+});
+
+// Start a REAL trial straight from an application, in one click.
+// Unlike /trial (which only emails an invite + sets the label) and unlike
+// /approve (which also spins up the equity onboarding), this does exactly what a
+// no-equity audition needs: convert to a founder (founder + default node rel
+// only — NO portfolio/onboarding/equity), create an active 2-week trial, and
+// turn on the intro cadence so they start getting intros.
+const TRIAL_DAYS = 14;
+app.post('/applications/:id/start-trial', async (c) => {
+  const companyId = parseInt(c.req.param('id'));
+  const company = await db.query.publicCompanies.findFirst({ where: eq(publicCompanies.id, companyId) });
+  if (!company) return c.json({ error: 'Company not found' }, 404);
+  const user = await db.query.publicUsers.findFirst({ where: eq(publicUsers.id, company.userId) });
+  if (!user) return c.json({ error: 'User not found' }, 404);
+
+  const now = new Date().toISOString();
+
+  // Convert → founder (find by email or create). Founder + default node
+  // relationship only; the equity onboarding is deliberately NOT created here.
+  let founder = await db.query.founders.findFirst({ where: eq(founders.email, user.email) });
+  if (!founder) {
+    const [created] = await db.insert(founders).values({
+      name: `${user.firstName} ${user.lastName}`,
+      email: user.email,
+      companyName: company.companyName,
+      companyStage: 'pre_seed',
+      roundStatus: 'pre_round',
+      city: user.city,
+      createdAt: now,
+    }).returning();
+    founder = created;
+    await ensureDefaultNodeRelationship(founder.id);
+  }
+
+  // Guard: one open trial per founder.
+  const founderTrials = await db.query.trials.findMany({ where: eq(trials.founderId, founder.id) });
+  if (founderTrials.some((t) => ['active', 'offer_made'].includes(t.status))) {
+    return c.json({ error: 'This founder already has an open trial' }, 400);
+  }
+
+  const end = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const [trial] = await db.insert(trials).values({
+    founderId: founder.id,
+    status: 'active',
+    startDate: now,
+    endDate: end,
+    introTargetMin: 5,
+    introTargetMax: 15,
+    createdAt: now,
+    updatedAt: now,
+  }).returning();
+
+  // Engage the intro cadence + reflect the stage on the application.
+  await db.update(founders).set({ introCadenceActive: true, cadenceStartDate: now.split('T')[0] }).where(eq(founders.id, founder.id));
+  await db.update(publicCompanies).set({ applicationStatus: 'trial_sent' }).where(eq(publicCompanies.id, companyId));
+  await db.update(publicUsers).set({ status: 'converted' }).where(eq(publicUsers.id, user.id));
+
+  // Notify the founder their trial is live (non-fatal — the trial is already started).
+  if (postmarkClient) {
+    const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+    try {
+      await postmarkClient.sendEmail({
+        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+        To: user.email,
+        Subject: `${user.firstName}, your MatCap trial is live`,
+        HtmlBody: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;"><p>Hi ${user.firstName},</p><p>Your 2-week MatCap trial just started — I'll begin sending your pitch to relevant investors in our network.</p><p>First step: build your investor blurb so the intros land well.</p><p style="margin:24px 0;"><a href="${baseUrl}/trial" style="background:#2563eb;color:#fff;padding:12px 24px;text-decoration:none;border-radius:6px;font-weight:600;display:inline-block;">See how the trial works</a></p><p>Mat Sherman<br>Founder, MatCap</p></div>`,
+        TextBody: `Hi ${user.firstName},\n\nYour 2-week MatCap trial just started — I'll begin sending your pitch to relevant investors in our network.\n\nFirst step: build your investor blurb so the intros land well.\n\nSee how the trial works: ${baseUrl}/trial\n\nMat Sherman\nFounder, MatCap`,
+      });
+    } catch (err) {
+      console.error('Failed to send trial-started email:', err);
+    }
+  }
+
+  console.log(`[TRIAL] Started trial #${trial.id} for ${user.firstName} ${user.lastName} → founder #${founder.id}`);
+  return c.json({ success: true, founderId: founder.id, trialId: trial.id });
 });
 
 // Update signup status

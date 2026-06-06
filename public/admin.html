@@ -3149,14 +3149,17 @@
                 <td class="px-4 py-3">
                   <div class="flex gap-2 flex-wrap">
                     <template v-if="app.applicationStatus === 'applied'">
+                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="requestMeeting(app.id)" class="text-xs text-cyan-600 hover:underline font-medium">Request meeting</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
                     <template v-else-if="app.applicationStatus === 'meeting_requested'">
+                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
                     <template v-else-if="app.applicationStatus === 'trial_sent'">
+                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
@@ -4978,6 +4981,18 @@
           try {
             await api(`/signups/applications/${companyId}/trial`, { method: 'POST' });
             await loadSignups();
+          } catch (e) { /* handled by api() */ }
+        }
+
+        // Start a REAL trial in one click: converts the applicant to a founder
+        // (no equity onboarding) + creates an active 2-week trial + turns on the
+        // intro cadence. Different from sendTrial(), which only emails an invite.
+        async function startTrialForApplicant(app) {
+          const who = app.companyName || (app.user ? app.user.firstName + ' ' + app.user.lastName : 'this founder');
+          if (!confirm(`Start a 2-week trial for ${who}? This converts them to a founder and turns on their intro cadence now.`)) return;
+          try {
+            const r = await api(`/signups/applications/${app.id}/start-trial`, { method: 'POST' });
+            if (r) await loadSignups();
           } catch (e) { /* handled by api() */ }
         }
 
@@ -8586,7 +8601,7 @@
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,
           portfolioApplications, filteredPortfolioApplications, hideDeclinedApps, showSignupsList,
-          approveApplication, declineApplication, sendTrial, requestMeeting,
+          approveApplication, declineApplication, sendTrial, startTrialForApplicant, requestMeeting,
           sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer, audioProxyUrl,
         };
       }

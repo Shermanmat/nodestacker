@@ -15,7 +15,7 @@
 
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
-import { getStatus as getGmailStatus, getLatestMessageFromSender, sendThreadReply } from './gmail.js';
+import { getStatus as getGmailStatus, getLatestMessageFromSender, sendThreadReply, buildIntroBody } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
 
 // Read the singleton agent_settings row. Falls back to safe defaults if the
@@ -162,11 +162,22 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
           !!founder.email;
 
         try {
-          const investorFirst = (investor.name || '').split(/\s+/)[0] || 'there';
-          const founderFirst = (founder.name || '').split(/\s+/)[0] || founder.name;
-          const blurbLine = founder.blurb ? `\n\n${founder.blurb.trim()}\n` : '';
+          // Standard "Hi All" connection format (no blurb, no deck), kept as a
+          // reply so it stays in the same Gmail thread the investor replied on.
           const subject = `Re: ${founder.companyName || founder.name}`;
-          const handoffBody = `Great, ${investorFirst}.\n\n${founderFirst}, meet ${investorFirst}${investor.firm ? ` (${investor.firm})` : ''}.${blurbLine}\nOver to you both — happy to be helpful from the sidelines.`;
+          const { body: handoffBody } = buildIntroBody({
+            founder: {
+              name: founder.name,
+              companyName: founder.companyName,
+              email: founder.email,
+              blurb: founder.blurb,
+              companyStage: founder.companyStage,
+              deckUrl: founder.deckUrl,
+              calendlyUrl: founder.calendlyUrl,
+            },
+            investor: { name: investor.name, firm: investor.firm, role: investor.role },
+            node: null,
+          });
           const sent = await sendThreadReply({
             threadId: intro.gmailThreadId,
             to: investor.email!,

@@ -25,6 +25,52 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/matcap.css">
+  <style>
+    /* ── /crm page-specific enhancements ── */
+    .hero-centered{position:relative}
+    .crm-glow{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+    .crm-glow::before{content:'';position:absolute;top:-32%;left:50%;transform:translateX(-50%);
+      width:72%;aspect-ratio:1;border-radius:50%;
+      background:radial-gradient(circle, rgba(0,194,224,0.20) 0%, transparent 62%);}
+    .hero-centered .inner{position:relative;z-index:1}
+
+    /* Works-with tool strip */
+    .tool-strip{padding:36px 24px 8px;text-align:center;background:var(--bg-alt2)}
+    .tool-strip .label{font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;
+      color:#8a8a8a;margin-bottom:22px}
+    .tool-logos{display:flex;flex-wrap:wrap;gap:16px 30px;justify-content:center;align-items:center;
+      max-width:780px;margin:0 auto}
+    .tool-logo{display:inline-flex;align-items:center;gap:9px;font-size:17px;font-weight:700;
+      color:#333;opacity:.92}
+    .tool-logo img{height:23px;width:23px;display:block}
+    .tool-logo.muted{color:#8c8c8c;font-weight:600;border:1px dashed var(--rule);
+      border-radius:999px;padding:6px 15px;font-size:14px}
+
+    /* MCP demo — faux chat window showing the CRM in action */
+    .mcp-demo{max-width:700px;margin:46px auto 0;text-align:left;border-radius:16px;overflow:hidden;
+      border:1px solid #222;background:#0e0e10;box-shadow:0 24px 64px rgba(0,0,0,0.30)}
+    .mcp-demo-bar{display:flex;align-items:center;gap:8px;padding:13px 16px;background:#161618;
+      border-bottom:1px solid #242427}
+    .mcp-demo-bar .dot{width:11px;height:11px;border-radius:50%;background:#3a3a3e}
+    .mcp-demo-bar .conn{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:12px;
+      font-weight:600;color:#9b9ba3;letter-spacing:.3px}
+    .mcp-demo-bar .conn::before{content:'';width:7px;height:7px;border-radius:50%;background:#22c55e;
+      box-shadow:0 0 0 3px rgba(34,197,94,0.18)}
+    .mcp-demo-body{padding:20px;display:flex;flex-direction:column;gap:13px}
+    .chat-msg{max-width:84%;padding:13px 16px;border-radius:14px;font-size:14.5px;line-height:1.5}
+    .chat-msg.user{align-self:flex-end;background:var(--accent);color:#042129;font-weight:600;
+      border-bottom-right-radius:4px}
+    .chat-msg.ai{align-self:flex-start;background:#1c1c20;color:#e7e7ec;border:1px solid #2a2a2f;
+      border-bottom-left-radius:4px}
+    .chat-msg.ai b{color:#fff;font-weight:700}
+    .chat-tool{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--accent);
+      background:rgba(0,194,224,0.08);border:1px solid rgba(0,194,224,0.25);border-radius:8px;
+      padding:6px 11px}
+    .chat-tool svg{width:13px;height:13px;flex:none}
+    .mcp-demo-cap{text-align:center;font-size:13px;color:#888;margin:16px auto 0;max-width:520px}
+    @media(max-width:820px){.chat-msg{max-width:92%}.mcp-demo{margin-top:32px}.tool-logo{font-size:15px}}
+  </style>
 </head>
 <body>
 
@@ -60,6 +106,7 @@
 
 <!-- ============ HERO ============ -->
 <section class="hero-centered">
+  <div class="crm-glow"></div>
   <div class="inner">
     <div class="reveal"><span class="eyebrow">MatCap CRM</span></div>
     <h1 class="reveal">Your smart investor CRM. <span class="accent">Plus a pipeline behind it.</span></h1>
@@ -75,12 +122,46 @@
   </div>
 </section>
 
+<!-- ============ WORKS WITH (logo strip) ============ -->
+<section class="tool-strip reveal">
+  <p class="label">Runs inside the AI tools you already use</p>
+  <div class="tool-logos">
+    <span class="tool-logo"><img src="https://cdn.simpleicons.org/claude/333" alt="" onerror="this.remove()">Claude</span>
+    <span class="tool-logo"><img src="https://cdn.simpleicons.org/cursor/333" alt="" onerror="this.remove()">Cursor</span>
+    <span class="tool-logo"><img src="https://cdn.simpleicons.org/windsurf/333" alt="" onerror="this.remove()">Windsurf</span>
+    <span class="tool-logo">Poke</span>
+    <span class="tool-logo muted">+ any MCP client</span>
+  </div>
+</section>
+
 <!-- ============ WORKS WITH YOUR AI TOOLS (MCP) ============ -->
 <section class="section-centered">
   <div class="inner">
     <div class="reveal"><span class="eyebrow">AI-native</span></div>
     <h2 class="h-section reveal">Run your CRM from <span class="accent">any AI tool you use.</span></h2>
     <p class="section-lede reveal">The CRM speaks MCP, so you don't sit in another dashboard. Connect Claude, Cursor, Poke — any MCP client — and just talk to your pipeline. Tell it to keep things updated, or ask it what needs your attention.</p>
+
+    <div class="mcp-demo reveal">
+      <div class="mcp-demo-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span class="conn">MatCap CRM · connected</span>
+      </div>
+      <div class="mcp-demo-body">
+        <div class="chat-msg user">Log that I met Jane Patel at Foundry today — she asked for the deck, follow up in two weeks.</div>
+        <div class="chat-tool">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+          log_touch → MatCap CRM
+        </div>
+        <div class="chat-msg ai">Done. Logged a meeting with <b>Jane Patel (Foundry)</b>, moved her to <b>First meeting complete</b>, and set a follow-up for <b>Jun 20</b>. Want me to draft the deck email?</div>
+        <div class="chat-msg user">Who's gone quiet this week?</div>
+        <div class="chat-tool">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          list_investors · needs attention → MatCap CRM
+        </div>
+        <div class="chat-msg ai"><b>3 need a nudge:</b> Solly Garber (no reply, 9 days), Eric Jorgenson (deck sent, no follow-up), and Ben Lang (intro accepted, never scheduled).</div>
+      </div>
+    </div>
+    <p class="mcp-demo-cap reveal">Illustrative — every action runs scoped to your pipeline through the MatCap MCP server.</p>
 
     <div class="card-grid">
       <div class="feature-card reveal">

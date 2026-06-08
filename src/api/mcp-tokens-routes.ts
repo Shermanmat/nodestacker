@@ -14,7 +14,7 @@ type Variables = { founderId: number };
 const app = new Hono<{ Variables: Variables }>();
 
 app.use('*', async (c, next) => {
-  const founderId = getSessionFounderId(c.req.header('X-Session-Id'));
+  const founderId = await getSessionFounderId(c.req.header('X-Session-Id'));
   if (!founderId) return c.json({ error: 'Unauthorized' }, 401);
   c.set('founderId', founderId);
   await next();

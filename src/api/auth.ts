@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
-import { db, founders } from '../db/index.js';
+import { eq, lt } from 'drizzle-orm';
+import { db, founders, founderSessions } from '../db/index.js';
 import { z } from 'zod';
 import crypto from 'crypto';
 import * as postmark from 'postmark';
@@ -12,9 +12,23 @@ const postmarkClient = process.env.POSTMARK_API_KEY
   ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
   : null;
 
-// In-memory token store (use Redis in production)
+// Magic-link tokens are short-lived (15 min) and kept in memory. Founder
+// sessions, by contrast, are persisted in the DB (founder_sessions) so a login
+// survives server restarts and deploys — an in-memory session map logs every
+// founder out on every deploy.
 const tokens = new Map<string, { founderId: number; expires: Date }>();
-const sessions = new Map<string, { founderId: number; expires: Date }>();
+
+// How long a founder stays logged in (4 weeks).
+const SESSION_TTL_MS = 28 * 24 * 60 * 60 * 1000;
+
+// Sweep expired founder sessions hourly.
+setInterval(async () => {
+  try {
+    await db.delete(founderSessions).where(lt(founderSessions.expiresAt, new Date().toISOString()));
+  } catch (err) {
+    console.error('[auth] founder_sessions cleanup failed:', err);
+  }
+}, 60 * 60 * 1000);
 
 // Request magic link
 app.post('/magic-link', async (c) => {
@@ -101,11 +115,15 @@ app.post('/verify', async (c) => {
     return c.json({ error: 'Token expired' }, 401);
   }
 
-  // Create session
+  // Create a persisted session (survives restarts/deploys), valid for 4 weeks.
   const sessionId = crypto.randomBytes(32).toString('hex');
-  const sessionExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-  sessions.set(sessionId, { founderId: tokenData.founderId, expires: sessionExpires });
+  const nowIso = new Date().toISOString();
+  await db.insert(founderSessions).values({
+    id: sessionId,
+    founderId: tokenData.founderId,
+    expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+    createdAt: nowIso,
+  });
   tokens.delete(parsed.data.token);
 
   const founder = await db.query.founders.findFirst({
@@ -132,10 +150,12 @@ app.get('/session', async (c) => {
     return c.json({ error: 'No session' }, 401);
   }
 
-  const session = sessions.get(sessionId);
+  const session = await db.query.founderSessions.findFirst({
+    where: eq(founderSessions.id, sessionId),
+  });
 
-  if (!session || new Date() > session.expires) {
-    if (session) sessions.delete(sessionId);
+  if (!session || new Date() > new Date(session.expiresAt)) {
+    if (session) await db.delete(founderSessions).where(eq(founderSessions.id, sessionId));
     return c.json({ error: 'Session expired' }, 401);
   }
 
@@ -163,7 +183,7 @@ app.get('/session', async (c) => {
 app.post('/logout', async (c) => {
   const sessionId = c.req.header('X-Session-Id');
   if (sessionId) {
-    sessions.delete(sessionId);
+    await db.delete(founderSessions).where(eq(founderSessions.id, sessionId));
   }
   return c.json({ success: true });
 });
@@ -239,11 +259,13 @@ app.post('/admin/generate-link/:founderId', async (c) => {
 });
 
 // Helper to validate session (for use in other routes)
-export function getSessionFounderId(sessionId: string | undefined): number | null {
+export async function getSessionFounderId(sessionId: string | undefined): Promise<number | null> {
   if (!sessionId) return null;
-  const session = sessions.get(sessionId);
-  if (!session || new Date() > session.expires) {
-    if (session) sessions.delete(sessionId);
+  const session = await db.query.founderSessions.findFirst({
+    where: eq(founderSessions.id, sessionId),
+  });
+  if (!session || new Date() > new Date(session.expiresAt)) {
+    if (session) await db.delete(founderSessions).where(eq(founderSessions.id, sessionId));
     return null;
   }
   return session.founderId;

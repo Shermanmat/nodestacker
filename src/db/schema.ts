@@ -508,6 +508,18 @@ export const adminSessions = sqliteTable('admin_sessions', {
 export type AdminSession = typeof adminSessions.$inferSelect;
 export type NewAdminSession = typeof adminSessions.$inferInsert;
 
+// Founder portal sessions. Persisted (not in-memory) so logins survive server
+// restarts and deploys — otherwise every deploy logs every founder out.
+export const founderSessions = sqliteTable('founder_sessions', {
+  id: text('id').primaryKey(),
+  founderId: integer('founder_id').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type FounderSession = typeof founderSessions.$inferSelect;
+export type NewFounderSession = typeof founderSessions.$inferInsert;
+
 // Inbound Intro Logs Table (BCC email logging for intro tracking)
 export const InboundIntroLogStatus = {
   PENDING: 'pending',

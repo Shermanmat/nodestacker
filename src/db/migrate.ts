@@ -436,6 +436,15 @@ try {
 // Auto-reply-to-pass kill switch (agent_settings).
 safeAddColumn('agent_settings', 'auto_reply_to_pass', 'integer NOT NULL DEFAULT 0');
 
+// Founder portal sessions — persisted so logins survive restarts/deploys.
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_sessions\` (
+  \`id\` text PRIMARY KEY NOT NULL,
+  \`founder_id\` integer NOT NULL,
+  \`expires_at\` text NOT NULL,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+console.log('  Ensured founder_sessions table exists');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

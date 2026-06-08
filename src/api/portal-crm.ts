@@ -22,7 +22,7 @@ const app = new Hono<{ Variables: Variables }>();
 // path reads any of these endpoints — the founder CRM is private.
 app.use('*', async (c, next) => {
   const sessionId = c.req.header('X-Session-Id');
-  const founderId = getSessionFounderId(sessionId);
+  const founderId = await getSessionFounderId(sessionId);
   if (!founderId) return c.json({ error: 'Unauthorized' }, 401);
   c.set('founderId', founderId);
 

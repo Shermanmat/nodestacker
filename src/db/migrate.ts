@@ -433,6 +433,8 @@ try {
 } catch (e: any) {
   if (!e.message?.includes('already exists')) throw e;
 }
+// Auto-reply-to-pass kill switch (agent_settings).
+safeAddColumn('agent_settings', 'auto_reply_to_pass', 'integer NOT NULL DEFAULT 0');
 
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });

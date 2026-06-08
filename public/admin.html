@@ -1536,6 +1536,15 @@
               </label>
             </div>
           </div>
+          <div class="flex items-start gap-4 flex-wrap mt-3 pt-3 border-t">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" v-model="agentSettingsState.autoReplyToPass" @change="saveAgentSettings" class="mt-1">
+              <div>
+                <div class="text-sm font-medium">Auto-reply + archive on a pass</div>
+                <div class="text-xs text-gray-500">When the classifier sees a high-confidence pass (clean "no" only), MatCap replies "All good, thanks for letting me know!" to the investor and labels + archives the thread. Uses the same min-confidence floor above.</div>
+              </div>
+            </label>
+          </div>
         </div>
 
         <!-- Replies needing you — investors replied but the classifier
@@ -6332,12 +6341,17 @@
             agentSettingsState.value.autoSendHandoff = false;
             return;
           }
+          if (s.autoReplyToPass && !confirm('Turn ON auto-reply + archive on passes? When the classifier sees a high-confidence pass, MatCap will SEND "All good, thanks for letting me know!" to the investor and archive the thread automatically.')) {
+            agentSettingsState.value.autoReplyToPass = false;
+            return;
+          }
           savingAgentSettings.value = true;
           try {
             const body = {
               autoSendHandoff: !!s.autoSendHandoff,
               autoSendHandoffMinConfidence: Number(s.autoSendHandoffMinConfidence) || 0.9,
               autoSendHandoffMaxReplyChars: Number(s.autoSendHandoffMaxReplyChars) || 400,
+              autoReplyToPass: !!s.autoReplyToPass,
             };
             agentSettingsState.value = await api('/agent/settings', { method: 'PUT', body });
           } catch (e) {

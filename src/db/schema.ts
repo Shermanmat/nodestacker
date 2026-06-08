@@ -1240,6 +1240,9 @@ export const agentSettings = sqliteTable('agent_settings', {
   autoSendHandoff: integer('auto_send_handoff', { mode: 'boolean' }).notNull().default(false),
   autoSendHandoffMinConfidence: text('auto_send_handoff_min_confidence').notNull().default('0.9'),
   autoSendHandoffMaxReplyChars: integer('auto_send_handoff_max_reply_chars').notNull().default(400),
+  // Kill switch: auto-reply "all good, thanks!" to a high-confidence pass and
+  // label+archive the thread. Gated on the same min-confidence floor as handoff.
+  autoReplyToPass: integer('auto_reply_to_pass', { mode: 'boolean' }).notNull().default(false),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

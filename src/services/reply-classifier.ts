@@ -15,7 +15,7 @@
 
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
-import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail } from './gmail.js';
+import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail, sendThreadReply, labelAndArchiveThread } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
 
 // Read the singleton agent_settings row. Falls back to safe defaults if the
@@ -24,12 +24,14 @@ async function loadAgentSettings(): Promise<{
   autoSendHandoff: boolean;
   autoSendHandoffMinConfidence: number;
   autoSendHandoffMaxReplyChars: number;
+  autoReplyToPass: boolean;
 }> {
   const row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
   return {
     autoSendHandoff: row?.autoSendHandoff ?? false,
     autoSendHandoffMinConfidence: row?.autoSendHandoffMinConfidence ? Number(row.autoSendHandoffMinConfidence) : 0.9,
     autoSendHandoffMaxReplyChars: row?.autoSendHandoffMaxReplyChars ?? 400,
+    autoReplyToPass: row?.autoReplyToPass ?? false,
   };
 }
 
@@ -210,6 +212,28 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
         updates.status = 'passed';
         updates.datePassed = now.split('T')[0];
         updates.passReason = result.reason || 'pass';
+
+        // Optionally acknowledge a CLEAN, high-confidence pass and get it out of
+        // the inbox. Gated behind the kill switch + the same confidence floor as
+        // the handoff. Reply goes to the investor only, in-thread; the thread is
+        // labeled "Passed" and archived (still findable). Only the 'no' class —
+        // not_now/needs_human/etc. are deliberately left for a human.
+        if (settings.autoReplyToPass && result.confidence >= settings.autoSendHandoffMinConfidence) {
+          try {
+            await sendThreadReply({
+              threadId: intro.gmailThreadId!,
+              to: investor.email!,
+              subject: `Re: ${founder.companyName || founder.name}`,
+              body: `All good, thanks for letting me know!\n\n- Mat`,
+              asDraft: false,
+            });
+            await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
+            console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
+          } catch (e: any) {
+            // Non-fatal — the pass status is already recorded.
+            console.error('[reply-classifier] pass auto-reply/archive failed:', e);
+          }
+        }
         break;
       }
       case 'not_now': {

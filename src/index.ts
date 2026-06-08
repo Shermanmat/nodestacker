@@ -305,6 +305,7 @@ app.put('/api/agent/settings', async (c) => {
   if (typeof body.autoSendHandoffMaxReplyChars === 'number') {
     patch.autoSendHandoffMaxReplyChars = Math.max(50, Math.min(2000, Math.floor(body.autoSendHandoffMaxReplyChars)));
   }
+  if (typeof body.autoReplyToPass === 'boolean') patch.autoReplyToPass = body.autoReplyToPass;
   // Upsert (id=1 singleton)
   const existing = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
   if (existing) {

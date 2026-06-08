@@ -320,6 +320,30 @@ export async function createDraft(input: DraftInput): Promise<DraftResult> {
   };
 }
 
+// Apply a label to a thread and remove it from the inbox ("archive, but
+// findable"). Finds the label by name, creating it if it doesn't exist. Needs
+// the gmail.modify scope (which we have).
+export async function labelAndArchiveThread(threadId: string, labelName: string): Promise<void> {
+  const client = await getAuthedClient();
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+
+  const list = await gmail.users.labels.list({ userId: 'me' });
+  let label = list.data.labels?.find((l) => l.name === labelName);
+  if (!label) {
+    const created = await gmail.users.labels.create({
+      userId: 'me',
+      requestBody: { name: labelName, labelListVisibility: 'labelShow', messageListVisibility: 'show' },
+    });
+    label = created.data;
+  }
+
+  await gmail.users.threads.modify({
+    userId: 'me',
+    id: threadId,
+    requestBody: { addLabelIds: label.id ? [label.id] : [], removeLabelIds: ['INBOX'] },
+  });
+}
+
 // Send the email directly (skipping drafts). gmail.compose scope is sufficient
 // for messages.send per Google's OAuth docs. Returns the sent message's id +
 // thread id for future reference (e.g. follow-up agent linking).

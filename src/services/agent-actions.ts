@@ -16,6 +16,11 @@
 
 import { eq, desc, and } from 'drizzle-orm';
 import { db, agentActions, type AgentAction } from '../db/index.js';
+import { sendEmail } from './email.js';
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 
 export type ActionStatus = 'logged' | 'proposed' | 'approved' | 'rejected' | 'executed' | 'failed';
 
@@ -193,4 +198,36 @@ export async function getScorecard(): Promise<{
     byAgent,
     approvalRate: decided > 0 ? Math.round((accepted / decided) * 100) : null,
   };
+}
+
+/**
+ * "The system needs you" digest — emails the admin a summary of every agent
+ * action awaiting a human decision (status 'proposed'). Sent on a 2x/day cron.
+ * No-ops (no email) when nothing is pending, so a quiet day stays quiet.
+ */
+export async function sendNeedsYouDigest(): Promise<{ sent: boolean; count: number }> {
+  const pending = await listActions({ status: 'proposed', limit: 100 });
+  if (pending.length === 0) return { sent: false, count: 0 };
+
+  const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+  const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+  const n = pending.length;
+
+  const items = pending.map((a) =>
+    `<li style="margin-bottom:6px"><strong>${escapeHtml(a.summary)}</strong>` +
+    (a.reasoning ? `<br><span style="color:#666;font-size:13px">${escapeHtml(a.reasoning)}</span>` : '') +
+    `</li>`).join('');
+  const html =
+    `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;color:#1a1a1a">` +
+    `<h2 style="margin:0 0 4px">${n} thing${n === 1 ? '' : 's'} need your call</h2>` +
+    `<p style="color:#555;margin:0 0 16px">Your AI agents flagged these and are waiting on you:</p>` +
+    `<ul style="padding-left:18px">${items}</ul>` +
+    `<p style="margin-top:20px"><a href="${baseUrl}/admin" style="background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;display:inline-block">Open the AI Agent tab →</a></p>` +
+    `</div>`;
+  const text = `${n} thing${n === 1 ? '' : 's'} need your call:\n\n` +
+    pending.map((a) => `- ${a.summary}${a.reasoning ? ` (${a.reasoning})` : ''}`).join('\n') +
+    `\n\nOpen: ${baseUrl}/admin`;
+
+  await sendEmail({ to: adminEmail, subject: `MatCap: ${n} item${n === 1 ? '' : 's'} need you`, html, text });
+  return { sent: true, count: n };
 }

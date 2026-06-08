@@ -997,6 +997,23 @@ cron.schedule('0 16 * * 1,4', async () => {
 
 console.log('[CRON] Shadow agent scheduled for Mon + Thu 16:00 UTC (9am Arizona)');
 
+// "The system needs you" digest — 2x/day (9am + 5pm Arizona = 16:00 + 00:00 UTC).
+// Emails the admin everything in the agent ledger awaiting a human decision
+// (status 'proposed'); no email when nothing is pending.
+cron.schedule('0 0,16 * * *', async () => {
+  console.log('[CRON] Running agent needs-you digest...');
+  try {
+    const { sendNeedsYouDigest } = await import('./services/agent-actions.js');
+    const result = await withCronRun('agent_needs_you_digest', () => sendNeedsYouDigest());
+    console.log('[CRON] Needs-you digest:', result);
+  } catch (err) {
+    console.error('[CRON] Needs-you digest failed:', err);
+  }
+}, {
+  timezone: 'UTC'
+});
+console.log('[CRON] Agent needs-you digest scheduled for 00:00 + 16:00 UTC (5pm + 9am Arizona)');
+
 // Auto-draft tick — picks ONE high-score pending suggestion per day and creates
 // a Gmail draft. Status stays pending_suggestion. Admin reviews + sends from
 // Gmail, then clicks "Mark as sent" in admin.

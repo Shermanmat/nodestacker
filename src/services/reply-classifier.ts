@@ -17,6 +17,7 @@ import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
 import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail, sendThreadReply, labelAndArchiveThread } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
+import { recordAction, proposeAction } from './agent-actions.js';
 
 // Read the singleton agent_settings row. Falls back to safe defaults if the
 // row is missing for some reason.
@@ -143,6 +144,7 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
 
     let draftedHandoff = false;
     let autoSentHandoff = false;
+    let autoRepliedPass = false;
 
     switch (result.classification) {
       case 'yes': {
@@ -228,6 +230,7 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
               asDraft: false,
             });
             await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
+            autoRepliedPass = true;
             console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
           } catch (e: any) {
             // Non-fatal — the pass status is already recorded.
@@ -237,13 +240,12 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
         break;
       }
       case 'not_now': {
-        // User's call: this is still a pass, with the reason flagged.
+        // A soft pass — treated as a pass. We keep the reason for analytics, but
+        // deliberately DON'T track a follow-up date: "not now" is statistically a
+        // no, and a circle-back date just manufactures false hope for everyone.
         updates.status = 'passed';
         updates.datePassed = now.split('T')[0];
         updates.passReason = result.reason ? `not now: ${result.reason}` : 'not now';
-        if (result.suggestedFollowupDate) {
-          updates.nextFollowupDate = result.suggestedFollowupDate;
-        }
         break;
       }
       case 'out_of_office': {
@@ -262,6 +264,46 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
 
     await db.update(introRequests).set(updates).where(eq(introRequests.id, intro.id));
     classified++;
+
+    // Everything the classifier does flows through the agent_actions ledger so
+    // it shows in the AI Agent tab: work it DID -> recordAction (audit); work it
+    // NEEDS YOU for -> proposeAction (awaiting-you, drives the digest email).
+    const who = `${investor.name} → ${founder.name}`;
+    try {
+      if (result.classification === 'needs_human' || result.classification === 'wrong_person') {
+        await proposeAction({
+          agent: 'reply-classifier',
+          actionType: `reply_${result.classification}`,
+          summary: `Investor reply needs you: ${who} (${result.classification})`,
+          reasoning: result.reason || undefined,
+          entityType: 'intro_request',
+          entityId: intro.id,
+          payload: { classification: result.classification, confidence: result.confidence, snippet },
+        });
+      } else {
+        const did =
+          result.classification === 'yes'
+            ? (autoSentHandoff ? 'Auto-sent handoff intro' : draftedHandoff ? 'Drafted handoff intro' : 'Marked introduced')
+            : result.classification === 'no'
+              ? (autoRepliedPass ? 'Auto-replied + archived pass' : 'Marked passed')
+              : result.classification === 'not_now'
+                ? 'Marked passed (soft "not now")'
+                : 'Logged out-of-office';
+        await recordAction({
+          agent: 'reply-classifier',
+          actionType: `reply_${result.classification}`,
+          summary: `${did}: ${who}`,
+          reasoning: result.reason || undefined,
+          entityType: 'intro_request',
+          entityId: intro.id,
+          payload: { classification: result.classification, confidence: result.confidence },
+          status: 'executed',
+        });
+      }
+    } catch (e) {
+      console.error('[reply-classifier] ledger log failed:', e);
+    }
+
     rows.push({
       introId: intro.id,
       founderName: founder.name,

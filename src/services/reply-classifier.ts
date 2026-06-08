@@ -170,7 +170,9 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
           const investorDesc = investor.firm
             ? `investor at ${investor.firm} who wanted to learn more`
             : 'investor who wanted to learn more';
-          const subject = `Intro: ${founder.companyName || founder.name} <> ${investor.name}`;
+          // Subject is "<Founder> x <Investor>" — the founder's name, not the
+          // company (the company shows in the body).
+          const subject = `${founder.name} x ${investor.name}`;
           const handoffBody =
             `Hi All,\n\n` +
             `Wanted to make the intro here:\n\n` +

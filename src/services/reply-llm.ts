@@ -27,8 +27,8 @@ const SYSTEM = `You classify the reply an investor sent in response to a warm in
 Categories:
 - "yes"            → investor wants the meeting / is interested
 - "no"             → investor declines, not a fit
-- "not_now"        → investor wants to circle back later (raising fund, busy season, between funds, focused elsewhere). Functionally also a pass, but the reason matters.
-- "needs_human"    → reply has specific questions, is conditional, or otherwise nuanced and needs a real human response — don't try to handle automatically.
+- "not_now"        → a soft / non-committal pass. Includes: wants to circle back later (raising fund, busy season, focused elsewhere) AND non-committal acknowledgments that forward internally or stall without committing to a meeting — e.g. "sent it to the team, will let you know if there's interest", "we'll take a look", "thanks, we'll dive in", "passing it along". These almost never convert — treat them as a pass. (If the investor later comes back wanting the intro, the admin flips the status manually.)
+- "needs_human"    → reply has SPECIFIC questions, a concrete condition, or genuine nuance that needs a real human response. NOT for polite non-committal "we'll look at it" replies — those are not_now.
 - "out_of_office"  → auto-reply / OOO message / not a real response
 - "wrong_person"   → investor says they left the firm / wrong contact / forwards to colleague / not the right person
 
@@ -39,6 +39,7 @@ Guidance on "reason":
 
 Confidence calibration:
 - 0.9+ for clearly-worded yes/no
+- 0.9+ for a clear non-committal forward/pass ("sent to the team, will let you know", "we'll take a look") — these are unambiguous soft passes, rate them confidently
 - 0.7-0.9 for clear but slightly hedged
 - below 0.7 → return "needs_human" instead — better to escalate than misclassify.
 

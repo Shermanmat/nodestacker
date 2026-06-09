@@ -250,11 +250,17 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       result.confidence >= settings.autoSendHandoffMinConfidence
     ) {
       try {
+        // A hard "no" explicitly passed → acknowledge the pass. A soft "not now"
+        // ("we'll look / sent it to the team") hasn't actually said no, so a bare
+        // "Thanks!" is right — we still mark it passed internally either way.
+        const replyBody = result.classification === 'no'
+          ? `All good, thanks for letting me know!\n\n- Mat`
+          : `Thanks!\n\n- Mat`;
         await sendThreadReply({
           threadId: intro.gmailThreadId!,
           to: investor.email!,
           subject: `Re: ${founder.companyName || founder.name}`,
-          body: `All good, thanks for letting me know!\n\n- Mat`,
+          body: replyBody,
           asDraft: false,
         });
         await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');

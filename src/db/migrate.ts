@@ -445,6 +445,35 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_sessions\` (
 )`);
 console.log('  Ensured founder_sessions table exists');
 
+// Meeting transcripts (Granola ingest) — matched + scored per founder.
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`meeting_transcripts\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`founder_id\` integer NOT NULL,
+  \`source\` text NOT NULL DEFAULT 'granola',
+  \`meeting_title\` text,
+  \`transcript\` text NOT NULL,
+  \`share_link\` text,
+  \`matched_pipeline_id\` text,
+  \`matched_investor_name\` text,
+  \`match_status\` text NOT NULL DEFAULT 'pending',
+  \`match_confidence\` text,
+  \`meeting_type\` text,
+  \`outcome\` text,
+  \`summary\` text,
+  \`next_step_text\` text,
+  \`next_step_date\` text,
+  \`score_comms_quality\` integer,
+  \`score_investor_sentiment\` integer,
+  \`score_follow_through\` integer,
+  \`score_json\` text,
+  \`status\` text NOT NULL DEFAULT 'received',
+  \`applied_at\` text,
+  \`error_message\` text,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  \`processed_at\` text
+)`);
+console.log('  Ensured meeting_transcripts table exists');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

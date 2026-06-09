@@ -520,6 +520,43 @@ export const founderSessions = sqliteTable('founder_sessions', {
 export type FounderSession = typeof founderSessions.$inferSelect;
 export type NewFounderSession = typeof founderSessions.$inferInsert;
 
+// Meeting transcripts (Granola etc.), ingested per-founder via the founder's own
+// token, matched to a pipeline item and scored by an LLM. The transcript is the
+// founder's data — we only ever ingest what they forward us.
+export const meetingTranscripts = sqliteTable('meeting_transcripts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull(),
+  source: text('source').notNull().default('granola'),
+  meetingTitle: text('meeting_title'),
+  transcript: text('transcript').notNull(),
+  shareLink: text('share_link'),
+  // Matching → which pipeline item (composite id "<kind>:<id>") this is about.
+  matchedPipelineId: text('matched_pipeline_id'),
+  matchedInvestorName: text('matched_investor_name'),
+  matchStatus: text('match_status').notNull().default('pending'), // matched | unmatched | not_investor_meeting
+  matchConfidence: text('match_confidence'),
+  // Objective scoring
+  meetingType: text('meeting_type'),     // first_meeting | follow_up | partner | diligence
+  outcome: text('outcome'),              // advancing | soft_pass | hard_pass | wants_follow_up
+  summary: text('summary'),
+  nextStepText: text('next_step_text'),
+  nextStepDate: text('next_step_date'),
+  // Subjective scoring (1-5, advisory — never auto-decides)
+  scoreCommsQuality: integer('score_comms_quality'),
+  scoreInvestorSentiment: integer('score_investor_sentiment'),
+  scoreFollowThrough: integer('score_follow_through'),
+  scoreJson: text('score_json'),         // full LLM output, for audit
+  // Lifecycle
+  status: text('status').notNull().default('received'), // received | processed | needs_review | error
+  appliedAt: text('applied_at'),
+  errorMessage: text('error_message'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  processedAt: text('processed_at'),
+});
+
+export type MeetingTranscript = typeof meetingTranscripts.$inferSelect;
+export type NewMeetingTranscript = typeof meetingTranscripts.$inferInsert;
+
 // Inbound Intro Logs Table (BCC email logging for intro tracking)
 export const InboundIntroLogStatus = {
   PENDING: 'pending',

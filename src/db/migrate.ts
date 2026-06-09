@@ -436,6 +436,13 @@ try {
 // Auto-reply-to-pass kill switch (agent_settings).
 safeAddColumn('agent_settings', 'auto_reply_to_pass', 'integer NOT NULL DEFAULT 0');
 
+// Shadow AI application scorer fields + admin decision reason.
+safeAddColumn('public_companies', 'ai_score', 'integer');
+safeAddColumn('public_companies', 'ai_recommendation', 'text');
+safeAddColumn('public_companies', 'ai_reasoning', 'text');
+safeAddColumn('public_companies', 'ai_scored_at', 'text');
+safeAddColumn('public_companies', 'decision_reason', 'text');
+
 // Founder portal sessions — persisted so logins survive restarts/deploys.
 sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_sessions\` (
   \`id\` text PRIMARY KEY NOT NULL,

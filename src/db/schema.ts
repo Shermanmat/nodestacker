@@ -920,6 +920,13 @@ export const publicCompanies = sqliteTable('public_companies', {
   sector: text('sector'),
   applicationStatus: text('application_status'), // null, 'applied', 'approved', 'declined'
   appliedAt: text('applied_at'),
+  // Shadow AI application scorer — advisory only, never auto-decides.
+  aiScore: integer('ai_score'),                  // 1-10
+  aiRecommendation: text('ai_recommendation'),   // 'let_in' | 'meeting' | 'pass'
+  aiReasoning: text('ai_reasoning'),
+  aiScoredAt: text('ai_scored_at'),
+  // The admin's own one-line reason for their decision — the gold training signal.
+  decisionReason: text('decision_reason'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

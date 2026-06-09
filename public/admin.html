@@ -3094,10 +3094,13 @@
         <!-- Applications (front and center) -->
         <div class="flex justify-between items-center mb-6">
           <h2 class="text-xl font-semibold">Applications</h2>
-          <label class="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
-            <input type="checkbox" v-model="hideDeclinedApps" class="rounded border-gray-300">
-            Hide declined
-          </label>
+          <div class="flex items-center gap-4">
+            <button @click="scorePending" class="text-sm text-gray-500 hover:text-gray-800">🤖 Score pending</button>
+            <label class="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
+              <input type="checkbox" v-model="hideDeclinedApps" class="rounded border-gray-300">
+              Hide declined
+            </label>
+          </div>
         </div>
         <div class="bg-white rounded-lg shadow overflow-hidden">
           <table class="w-full text-sm" v-if="portfolioApplications.length">
@@ -3129,6 +3132,17 @@
                     <summary class="text-xs text-cyan-600 cursor-pointer hover:underline">✨ Investor blurb</summary>
                     <div class="mt-1 text-xs text-gray-600 bg-cyan-50 border border-cyan-100 rounded p-2 max-w-xs whitespace-pre-line">{{ app.blurb.investorBlurb }}</div>
                   </details>
+                  <!-- Shadow AI score (advisory only) -->
+                  <div v-if="app.aiScore" class="mt-1.5 text-xs">
+                    <span :class="{
+                      'bg-green-100 text-green-700': app.aiRecommendation === 'let_in',
+                      'bg-amber-100 text-amber-700': app.aiRecommendation === 'meeting',
+                      'bg-gray-100 text-gray-500': app.aiRecommendation === 'pass',
+                    }" class="px-1.5 py-0.5 rounded font-medium">🤖 {{ app.aiScore }}/10 · {{ app.aiRecommendation }}</span>
+                    <span class="text-gray-500 ml-1">{{ app.aiReasoning }}</span>
+                  </div>
+                  <button v-else @click="scoreApp(app.id)" class="mt-1.5 text-xs text-gray-400 hover:text-gray-700">🤖 Score with AI</button>
+                  <div v-if="app.decisionReason" class="mt-1 text-xs text-gray-400 italic">your note: {{ app.decisionReason }}</div>
                 </td>
                 <td class="px-4 py-3">
                   <span class="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded">{{ app.sector }}</span>
@@ -4933,8 +4947,28 @@
           } catch (e) { console.error('Interview data load failed:', e); }
         }
 
+        async function scoreApp(companyId) {
+          try { await api(`/signups/applications/${companyId}/score`, { method: 'POST', body: {} }); await loadSignups(); }
+          catch (e) { /* handled by api() */ }
+        }
+        async function scorePending() {
+          if (!confirm('Score all unscored pending applications with AI? Advisory only — it never decides.')) return;
+          try {
+            const r = await api('/signups/applications/score-pending', { method: 'POST', body: {} });
+            await loadSignups();
+            alert('Scored ' + (r?.scored || 0) + (r?.remaining ? ' — ' + r.remaining + ' more, run again' : ''));
+          } catch (e) { /* handled by api() */ }
+        }
+        // Save the admin's own one-line reason — the gold training signal for the scorer.
+        async function saveDecisionReason(companyId, reason) {
+          if (!reason || !reason.trim()) return;
+          try { await api(`/signups/applications/${companyId}/decision-reason`, { method: 'POST', body: { reason: reason.trim() } }); } catch (e) {}
+        }
+
         async function approveApplication(companyId) {
           if (!confirm('Approve this application? This will create a founder, portfolio company, and start the onboarding workflow.')) return;
+          const why = prompt("Quick note on why you're letting them in? (optional — trains the AI scorer)", '');
+          await saveDecisionReason(companyId, why);
           try {
             const result = await api(`/signups/applications/${companyId}/approve`, { method: 'POST' });
             await loadSignups();
@@ -4961,6 +4995,7 @@
           );
           // prompt returns null if cancelled
           if (reason === null) return;
+          await saveDecisionReason(companyId, reason);  // doubles as training signal
           try {
             await api(`/signups/applications/${companyId}/decline`, {
               method: 'POST',
@@ -8616,6 +8651,7 @@
           loadSignups, updateSignupStatus, convertSignup,
           portfolioApplications, filteredPortfolioApplications, hideDeclinedApps, showSignupsList,
           approveApplication, declineApplication, sendTrial, startTrialForApplicant, requestMeeting,
+          scoreApp, scorePending,
           sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer, audioProxyUrl,
         };
       }

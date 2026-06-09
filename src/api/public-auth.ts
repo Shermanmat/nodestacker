@@ -107,6 +107,11 @@ app.post('/signup', async (c) => {
 
   console.log(`\n🎉 New founder application: ${user.firstName} ${user.lastName} (${user.email}) — ${company.companyName}\n`);
 
+  // Shadow AI score (advisory) — fire-and-forget so it never slows the signup.
+  import('../services/application-scorer.js')
+    .then(m => m.scoreApplication(company.id))
+    .catch(err => console.error('[app-scorer] new-application scoring failed:', err));
+
   // Notify admin of new application (no welcome email to user)
   if (postmarkClient) {
     try {

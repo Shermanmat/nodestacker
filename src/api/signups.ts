@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
-import { eq, isNotNull } from 'drizzle-orm';
+import { eq, isNotNull, and, isNull } from 'drizzle-orm';
 import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, founderLeads, trials, ensureDefaultNodeRelationship } from '../db/index.js';
+import { scoreApplication } from '../services/application-scorer.js';
 import { z } from 'zod';
 import * as postmark from 'postmark';
 
@@ -292,6 +293,39 @@ app.post('/applications/:id/trial', async (c) => {
 
   console.log(`[TRIAL] Sent trial invite to ${user.firstName} ${user.lastName} (${user.email}) for ${company.companyName}`);
 
+  return c.json({ success: true });
+});
+
+// Shadow AI scorer: score (or re-score) one application. Advisory only.
+app.post('/applications/:id/score', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  try {
+    const score = await scoreApplication(id);
+    if (!score) return c.json({ error: 'Could not score (missing app or API key)' }, 400);
+    return c.json({ success: true, score });
+  } catch (err) {
+    console.error('[score] failed:', err);
+    return c.json({ error: err instanceof Error ? err.message : 'Score failed' }, 500);
+  }
+});
+
+// Bulk-score every pending application that hasn't been scored yet (day-1 catch-up).
+app.post('/applications/score-pending', async (c) => {
+  const pending = await db.select().from(publicCompanies)
+    .where(and(eq(publicCompanies.applicationStatus, 'applied'), isNull(publicCompanies.aiScore)));
+  let scored = 0;
+  for (const p of pending.slice(0, 25)) {
+    try { if (await scoreApplication(p.id)) scored++; } catch (e) { console.error('[score-pending]', p.id, e); }
+  }
+  return c.json({ success: true, scored, remaining: Math.max(0, pending.length - 25) });
+});
+
+// Capture the admin's own reason for a decision — the gold training signal.
+app.post('/applications/:id/decision-reason', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const body = await c.req.json().catch(() => ({}));
+  const reason = typeof body.reason === 'string' ? body.reason.slice(0, 300) : '';
+  await db.update(publicCompanies).set({ decisionReason: reason }).where(eq(publicCompanies.id, id));
   return c.json({ success: true });
 });
 

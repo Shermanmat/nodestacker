@@ -19,18 +19,26 @@ import { Hono } from 'hono';
 import { eq, desc } from 'drizzle-orm';
 import { db, meetingTranscripts, trials, founders } from '../db/index.js';
 import { verifyToken } from '../services/mcp-tokens.js';
+import { getSessionFounderId } from './auth.js';
 import { listInvestors, logTouch, updateInvestor, type PipelineItem } from '../services/pipeline-dao.js';
 import { matchAndScoreMeeting } from '../services/meeting-scorer.js';
 
 type Variables = { founderId: number };
 const app = new Hono<{ Variables: Variables }>();
 
-// Bearer MCP token → founderId on every route.
+// Auth → founderId. Accepts EITHER a founder MCP token (Zapier/automation) OR a
+// logged-in portal session (the paste-a-transcript box in the founder portal),
+// so a founder can use this with or without setting up an integration.
 app.use('*', async (c, next) => {
+  let founderId: number | null = null;
   const header = c.req.header('Authorization') || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const founderId = await verifyToken(token);
-  if (!founderId) return c.json({ error: 'Invalid or expired token' }, 401);
+  if (header.startsWith('Bearer ')) {
+    founderId = await verifyToken(header.slice(7).trim());
+  }
+  if (!founderId) {
+    founderId = await getSessionFounderId(c.req.header('X-Session-Id'));
+  }
+  if (!founderId) return c.json({ error: 'Unauthorized' }, 401);
   c.set('founderId', founderId);
   await next();
 });

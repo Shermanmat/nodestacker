@@ -214,29 +214,6 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
         updates.status = 'passed';
         updates.datePassed = now.split('T')[0];
         updates.passReason = result.reason || 'pass';
-
-        // Optionally acknowledge a CLEAN, high-confidence pass and get it out of
-        // the inbox. Gated behind the kill switch + the same confidence floor as
-        // the handoff. Reply goes to the investor only, in-thread; the thread is
-        // labeled "Passed" and archived (still findable). Only the 'no' class —
-        // not_now/needs_human/etc. are deliberately left for a human.
-        if (settings.autoReplyToPass && result.confidence >= settings.autoSendHandoffMinConfidence) {
-          try {
-            await sendThreadReply({
-              threadId: intro.gmailThreadId!,
-              to: investor.email!,
-              subject: `Re: ${founder.companyName || founder.name}`,
-              body: `All good, thanks for letting me know!\n\n- Mat`,
-              asDraft: false,
-            });
-            await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
-            autoRepliedPass = true;
-            console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
-          } catch (e: any) {
-            // Non-fatal — the pass status is already recorded.
-            console.error('[reply-classifier] pass auto-reply/archive failed:', e);
-          }
-        }
         break;
       }
       case 'not_now': {
@@ -259,6 +236,33 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       case 'wrong_person': {
         // No status change — admin will handle from the new panel.
         break;
+      }
+    }
+
+    // Acknowledge + archive a high-confidence pass. Covers BOTH a clean "no" and
+    // a soft "not now" — both are passes (a "not now" is statistically a no, and
+    // a verbose/hedged pass often lands as not_now). Behind the kill switch + the
+    // same confidence floor as the handoff. Reply is investor-only, in-thread;
+    // the thread is labeled "Passed" and archived (still findable).
+    if (
+      (result.classification === 'no' || result.classification === 'not_now') &&
+      settings.autoReplyToPass &&
+      result.confidence >= settings.autoSendHandoffMinConfidence
+    ) {
+      try {
+        await sendThreadReply({
+          threadId: intro.gmailThreadId!,
+          to: investor.email!,
+          subject: `Re: ${founder.companyName || founder.name}`,
+          body: `All good, thanks for letting me know!\n\n- Mat`,
+          asDraft: false,
+        });
+        await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
+        autoRepliedPass = true;
+        console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
+      } catch (e: any) {
+        // Non-fatal — the pass status is already recorded.
+        console.error('[reply-classifier] pass auto-reply/archive failed:', e);
       }
     }
 
@@ -287,7 +291,7 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
             : result.classification === 'no'
               ? (autoRepliedPass ? 'Auto-replied + archived pass' : 'Marked passed')
               : result.classification === 'not_now'
-                ? 'Marked passed (soft "not now")'
+                ? (autoRepliedPass ? 'Auto-replied + archived pass (soft "not now")' : 'Marked passed (soft "not now")')
                 : 'Logged out-of-office';
         await recordAction({
           agent: 'reply-classifier',

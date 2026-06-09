@@ -66,6 +66,7 @@ app.post('/ingest', async (c) => {
       founderName: founder?.name ?? 'the founder',
       companyName: founder?.companyName ?? null,
       title, transcript, candidates,
+      today: new Date().toISOString().slice(0, 10),
     });
 
     // Decide what to do with it.

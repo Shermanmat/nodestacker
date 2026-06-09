@@ -84,6 +84,7 @@ export async function matchAndScoreMeeting(opts: {
   title: string | null;
   transcript: string;
   candidates: MeetingCandidate[];
+  today?: string;            // YYYY-MM-DD, so relative dates ("next Tuesday") resolve correctly
 }): Promise<MeetingScore> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured');
@@ -92,7 +93,9 @@ export async function matchAndScoreMeeting(opts: {
     ? opts.candidates.map((c) => `- ${c.pipelineId}: ${c.name ?? '(no name)'}${c.firm ? ' @ ' + c.firm : ''}`).join('\n')
     : '(no investors in pipeline yet)';
 
-  const userPrompt = `Founder: ${opts.founderName}${opts.companyName ? ' (' + opts.companyName + ')' : ''}
+  const userPrompt = `Today's date is ${opts.today || 'unknown'}. Resolve any relative dates in the meeting (e.g. "next Tuesday at 2pm") against today and output nextStep.date as an ISO date (YYYY-MM-DD). If no date can be determined, use null.
+
+Founder: ${opts.founderName}${opts.companyName ? ' (' + opts.companyName + ')' : ''}
 
 Candidate investors in this founder's pipeline (match against these; return the pipelineId):
 ${candidateList}

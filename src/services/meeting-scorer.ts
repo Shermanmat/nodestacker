@@ -42,7 +42,7 @@ You do TWO things and return ONE JSON object.
 1) MATCH — decide which investor from the provided candidate list this meeting is with.
    - Match on names (incl. first-name-only), firm names, and context in the transcript/title.
    - Return the candidate's pipelineId, or null if none clearly match.
-   - If the transcript is clearly NOT an investor meeting (a customer call, internal sync, etc.), set isInvestorMeeting=false and matchedPipelineId=null.
+   - Default isInvestorMeeting to TRUE whenever a founder is pitching their company to someone evaluating it for investment — even if it ends in a pass. Only set it false for a clearly different context (a customer/sales call, internal team sync, personal chat).
 
 2) SCORE — extract objective signals and rate the meeting.
    - meetingType: first_meeting | follow_up | partner | diligence | unknown
@@ -115,7 +115,7 @@ Match and score. Return the JSON.`;
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 900,
+      max_tokens: 1600,
       system: SYSTEM,
       messages: [{ role: 'user', content: userPrompt }],
     }),
@@ -127,13 +127,21 @@ Match and score. Return the JSON.`;
   }
   const data = await response.json();
   const raw = data.content?.[0]?.text || '';
-  const cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  const stopReason = data.stop_reason;
+
+  // Robustly extract the JSON object: strip code fences, then take the
+  // outermost { ... } so trailing prose or a missing closing fence don't break us.
+  let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
+  const start = cleaned.indexOf('{');
+  const end = cleaned.lastIndexOf('}');
+  if (start !== -1 && end > start) cleaned = cleaned.slice(start, end + 1);
 
   let p: any;
   try {
     p = JSON.parse(cleaned);
   } catch {
-    throw new Error(`Claude returned non-JSON: ${raw.slice(0, 200)}`);
+    const hint = stopReason === 'max_tokens' ? ' (response hit max_tokens — truncated)' : '';
+    throw new Error(`Claude returned non-JSON${hint}: ${raw.slice(0, 200)}`);
   }
 
   const clampScore = (v: any) => {

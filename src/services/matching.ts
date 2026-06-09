@@ -371,7 +371,11 @@ export function computeFitScore(
   const strengthPoints = connectionStrength === 'strong' ? 30
     : connectionStrength === 'medium' ? 15
     : 5;
-  const sectorPoints = fit.sector === 'exact' ? 25 : fit.sector === 'generalist' ? 10 : 0;
+  // Generalist sector fit raised 10 -> 18 so good generalists become "next in
+  // line" after a fresh sector specialist, instead of permanently buried 15 pts
+  // behind every founder's specialist (which left ~half our generalists at zero
+  // intros). Exact match still wins when a fresh specialist exists.
+  const sectorPoints = fit.sector === 'exact' ? 25 : fit.sector === 'generalist' ? 18 : 0;
   const stagePoints = fit.stage === 'exact' ? 10 : 0;
   const personaPoints = fit.persona === 'exact' ? 5 : 0;
   const recency = Math.max(0, Math.min(30, recencyBonus));

@@ -459,15 +459,45 @@ export async function sendThreadReply(input: {
   const client = await getAuthedClient();
   const stored = await loadStoredCredentials();
   const from = stored?.email || 'me';
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+
+  // CRITICAL for cross-client threading: Gmail's `threadId` only threads the
+  // message in OUR mailbox. For the recipient's client to thread it under the
+  // original conversation, the message MUST carry RFC In-Reply-To/References
+  // headers pointing at the prior message's Message-ID, and a matching subject.
+  // Auto-derive all three from the thread when the caller didn't supply them —
+  // otherwise replies land as brand-new email chains on the investor's side.
+  let inReplyTo = input.inReplyTo;
+  let references = input.references;
+  let subject = input.subject;
+  try {
+    const thread = await gmail.users.threads.get({
+      userId: 'me', id: input.threadId, format: 'metadata',
+      metadataHeaders: ['Message-ID', 'References', 'Subject'],
+    });
+    const msgs = thread.data.messages || [];
+    const last = msgs[msgs.length - 1];
+    const hdr = (name: string) =>
+      last?.payload?.headers?.find(h => h.name?.toLowerCase() === name.toLowerCase())?.value || '';
+    const lastMsgId = hdr('message-id');
+    const lastRefs = hdr('references');
+    const lastSubject = hdr('subject');
+    if (!inReplyTo && lastMsgId) inReplyTo = lastMsgId;
+    if (!references && lastMsgId) references = (lastRefs ? lastRefs + ' ' : '') + lastMsgId;
+    if (lastSubject) subject = /^re:/i.test(lastSubject.trim()) ? lastSubject : `Re: ${lastSubject}`;
+  } catch (e) {
+    // Fall back to caller-supplied values; the message still threads on our side.
+    console.error('[gmail] could not derive thread reply headers:', e);
+  }
 
   // Build MIME with In-Reply-To headers
   const rawLines: string[] = [];
   rawLines.push(`From: ${from}`);
   rawLines.push(`To: ${input.to}`);
   if (input.cc) rawLines.push(`Cc: ${input.cc}`);
-  rawLines.push(`Subject: ${input.subject}`);
-  if (input.inReplyTo) rawLines.push(`In-Reply-To: ${input.inReplyTo}`);
-  if (input.references) rawLines.push(`References: ${input.references}`);
+  rawLines.push(`Subject: ${subject}`);
+  if (inReplyTo) rawLines.push(`In-Reply-To: ${inReplyTo}`);
+  if (references) rawLines.push(`References: ${references}`);
   rawLines.push('MIME-Version: 1.0');
   rawLines.push('Content-Type: text/plain; charset="UTF-8"');
   rawLines.push('Content-Transfer-Encoding: 7bit');
@@ -475,7 +505,6 @@ export async function sendThreadReply(input: {
   rawLines.push(input.body);
   const raw = Buffer.from(rawLines.join('\r\n')).toString('base64url');
 
-  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
   if (input.asDraft) {
     const res = await gmail.users.drafts.create({
       userId: 'me',

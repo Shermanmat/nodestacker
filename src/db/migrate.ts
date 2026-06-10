@@ -488,10 +488,12 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`comms_change_requests\` (
   \`kind\` text NOT NULL,
   \`note\` text,
   \`proposed_deck_file\` text,
+  \`approve_token\` text,
   \`status\` text NOT NULL DEFAULT 'pending',
   \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
   \`resolved_at\` text
 )`);
+safeAddColumn('comms_change_requests', 'approve_token', 'text');
 console.log('  Ensured comms_change_requests table exists');
 
 console.log(`Running migrations from ${migrationsFolder}...`);

@@ -567,6 +567,7 @@ export const commsChangeRequests = sqliteTable('comms_change_requests', {
   kind: text('kind').notNull(),                  // 'blurb' | 'deck'
   note: text('note'),                            // founder's context / requested change
   proposedDeckFile: text('proposed_deck_file'),  // staged deck filename (deck requests)
+  approveToken: text('approve_token'),           // tokenized one-click approve link (emailed to admin)
   status: text('status').notNull().default('pending'), // pending | approved | rejected
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   resolvedAt: text('resolved_at'),

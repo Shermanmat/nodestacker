@@ -1545,6 +1545,15 @@
               </div>
             </label>
           </div>
+          <div class="flex items-start gap-4 flex-wrap mt-3 pt-3 border-t">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" v-model="agentSettingsState.autoSendFollowups" @change="saveAgentSettings" class="mt-1">
+              <div>
+                <div class="text-sm font-medium">Auto-send follow-up bumps</div>
+                <div class="text-xs text-gray-500">Send the templated follow-up bumps automatically instead of leaving them as Gmail drafts. Same rails apply: max 2 bumps, 7-day cooldown, and only when the investor hasn't replied.</div>
+              </div>
+            </label>
+          </div>
         </div>
 
         <!-- Replies needing you — investors replied but the classifier
@@ -6380,6 +6389,10 @@
             agentSettingsState.value.autoReplyToPass = false;
             return;
           }
+          if (s.autoSendFollowups && !confirm('Turn ON auto-send for follow-up bumps? MatCap will SEND the templated follow-ups to investors automatically (instead of drafting them) — capped at 2 per intro, 7-day cooldown, only when no reply.')) {
+            agentSettingsState.value.autoSendFollowups = false;
+            return;
+          }
           savingAgentSettings.value = true;
           try {
             const body = {
@@ -6387,6 +6400,7 @@
               autoSendHandoffMinConfidence: Number(s.autoSendHandoffMinConfidence) || 0.9,
               autoSendHandoffMaxReplyChars: Number(s.autoSendHandoffMaxReplyChars) || 400,
               autoReplyToPass: !!s.autoReplyToPass,
+              autoSendFollowups: !!s.autoSendFollowups,
             };
             agentSettingsState.value = await api('/agent/settings', { method: 'PUT', body });
           } catch (e) {

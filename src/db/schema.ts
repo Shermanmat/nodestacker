@@ -1318,6 +1318,9 @@ export const agentSettings = sqliteTable('agent_settings', {
   // Kill switch: auto-reply "all good, thanks!" to a high-confidence pass and
   // label+archive the thread. Gated on the same min-confidence floor as handoff.
   autoReplyToPass: integer('auto_reply_to_pass', { mode: 'boolean' }).notNull().default(false),
+  // Kill switch: auto-SEND the templated follow-up bumps instead of leaving them
+  // as Gmail drafts. Same cap/cooldown/no-reply rails apply either way.
+  autoSendFollowups: integer('auto_send_followups', { mode: 'boolean' }).notNull().default(false),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 

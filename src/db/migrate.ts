@@ -435,6 +435,7 @@ try {
 }
 // Auto-reply-to-pass kill switch (agent_settings).
 safeAddColumn('agent_settings', 'auto_reply_to_pass', 'integer NOT NULL DEFAULT 0');
+safeAddColumn('agent_settings', 'auto_send_followups', 'integer NOT NULL DEFAULT 0');
 
 // Shadow AI application scorer fields + admin decision reason.
 safeAddColumn('public_companies', 'ai_score', 'integer');

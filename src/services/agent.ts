@@ -1,5 +1,5 @@
 import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
-import { db, founders, investors, nodes, matchSuggestions, introRequests, type MatchSuggestion } from '../db/index.js';
+import { db, founders, investors, nodes, matchSuggestions, introRequests, agentSettings, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
 import { sendEmail } from './email.js';
 import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
@@ -508,7 +508,7 @@ export async function runFollowupTick(): Promise<{
     introId: number;
     founderName: string;
     investorName: string;
-    action: 'drafted' | 'reply-detected' | 'skipped';
+    action: 'drafted' | 'sent' | 'reply-detected' | 'skipped';
     detail?: string;
   }>;
 }> {
@@ -516,6 +516,11 @@ export async function runFollowupTick(): Promise<{
   if (!gmail.connected) {
     return { checked: 0, drafted: 0, repliesDetected: 0, results: [] };
   }
+
+  // When auto-send is on, the templated bumps go out directly instead of sitting
+  // as Gmail drafts. Same cap/cooldown/no-reply rails apply either way.
+  const settings = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
+  const autoSend = settings?.autoSendFollowups ?? false;
 
   const cutoff = new Date(Date.now() - FOLLOWUP_GAP_DAYS * 86400 * 1000).toISOString();
   const candidates = await db.select().from(introRequests)
@@ -574,7 +579,7 @@ export async function runFollowupTick(): Promise<{
         to: investor.email,
         subject,
         body,
-        asDraft: true,
+        asDraft: !autoSend,
       });
       const now = new Date().toISOString();
       await db.update(introRequests)
@@ -585,9 +590,9 @@ export async function runFollowupTick(): Promise<{
         })
         .where(eq(introRequests.id, intro.id));
       drafted++;
-      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'drafted' });
+      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: autoSend ? 'sent' : 'drafted' });
     } catch (e: any) {
-      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: `draft failed: ${e.message || e}` });
+      results.push({ introId: intro.id, founderName: founder.name, investorName: investor.name, action: 'skipped', detail: `${autoSend ? 'send' : 'draft'} failed: ${e.message || e}` });
     }
   }
 
@@ -595,17 +600,17 @@ export async function runFollowupTick(): Promise<{
   if (drafted > 0 || repliesDetected > 0) {
     const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
     const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
-    const draftedRows = results.filter(r => r.action === 'drafted')
+    const draftedRows = results.filter(r => r.action === 'drafted' || r.action === 'sent')
       .map(r => `  • ${r.founderName} → ${r.investorName}`).join('\n');
     const repliedRows = results.filter(r => r.action === 'reply-detected')
       .map(r => `  • ${r.founderName} → ${r.investorName}`).join('\n');
     try {
       await sendEmail({
         to: adminEmail,
-        subject: `Follow-up agent: ${drafted} drafts, ${repliesDetected} replies`,
+        subject: `Follow-up agent: ${drafted} ${autoSend ? 'sent' : 'drafts'}, ${repliesDetected} replies`,
         html: `<div style="font-family:Inter,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#222">
           <h2 style="margin:0 0 8px 0">Follow-up agent run</h2>
-          ${drafted > 0 ? `<p><strong>${drafted} bump draft${drafted === 1 ? '' : 's'}</strong> in Gmail Drafts, ready to send:</p><pre style="background:#f6f7f8;padding:12px;border-radius:6px;font-size:13px">${draftedRows}</pre>` : ''}
+          ${drafted > 0 ? `<p><strong>${drafted} bump${drafted === 1 ? '' : 's'}</strong> ${autoSend ? 'sent automatically' : 'in Gmail Drafts, ready to send'}:</p><pre style="background:#f6f7f8;padding:12px;border-radius:6px;font-size:13px">${draftedRows}</pre>` : ''}
           ${repliesDetected > 0 ? `<p><strong>${repliesDetected} repl${repliesDetected === 1 ? 'y' : 'ies'} detected</strong> — these are off the follow-up rotation now:</p><pre style="background:#eafbe6;padding:12px;border-radius:6px;font-size:13px">${repliedRows}</pre>` : ''}
           <p style="margin-top:16px"><a href="${baseUrl}/admin#intros">Open admin → intros</a></p>
         </div>`,

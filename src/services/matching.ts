@@ -13,6 +13,7 @@ import {
   investorCategories,
   personaHotnessTiers,
   matchSuggestions,
+  investorInteractions,
   type IntroRequest,
   type MatchSuggestion,
 } from '../db/index.js';
@@ -696,6 +697,7 @@ interface FounderLiquidity {
   blockedByVipNode: number;
   blockedByGeo: number;
   blockedByCategory: number;
+  blockedByRejectRate: number;
   generated: number;
   status: 'healthy' | 'tight' | 'dry';
   targetSource: 'dynamic' | 'manual';
@@ -852,6 +854,65 @@ export async function generateMatchSuggestions(
     investorWeeksSinceContact.set(inv.id, Math.max(0, weeks));
   }
 
+  // ── Learned reject-rate suppression ─────────────────────────────────────────
+  // Investors (and whole firms) the admin reviews and rejects at a high rate
+  // across multiple founders are systematic misfits (wrong stage/thesis). Drop
+  // them from future suggestions. Uses ONLY admin-reviewed rows (reviewedAt set)
+  // so auto-expired stale pendings don't pollute the signal.
+  const REJECT_MIN_REVIEWED = 4;
+  const REJECT_RATE_THRESHOLD = 0.8;
+  const REJECT_MIN_DISTINCT_FOUNDERS = 2;
+  const FIRM_MIN_REVIEWED = 6;
+  const FIRM_RATE_THRESHOLD = 0.85;
+  const reviewedRows = await db.select({
+    investorId: matchSuggestions.investorId,
+    founderId: matchSuggestions.founderId,
+    status: matchSuggestions.status,
+  }).from(matchSuggestions).where(sql`${matchSuggestions.reviewedAt} IS NOT NULL`);
+  const invRejectStat = new Map<number, { reviewed: number; rejected: number; founders: Set<number> }>();
+  const firmRejectStat = new Map<string, { reviewed: number; rejected: number }>();
+  for (const r of reviewedRows) {
+    const isRej = r.status === 'rejected';
+    let s = invRejectStat.get(r.investorId);
+    if (!s) { s = { reviewed: 0, rejected: 0, founders: new Set() }; invRejectStat.set(r.investorId, s); }
+    s.reviewed++;
+    if (isRej) { s.rejected++; s.founders.add(r.founderId); }
+    const firm = investorFirmMap.get(r.investorId);
+    if (firm) {
+      let f = firmRejectStat.get(firm);
+      if (!f) { f = { reviewed: 0, rejected: 0 }; firmRejectStat.set(firm, f); }
+      f.reviewed++;
+      if (isRej) f.rejected++;
+    }
+  }
+  const suppressedFirms = new Set<string>();
+  for (const [firm, f] of firmRejectStat) {
+    if (f.reviewed >= FIRM_MIN_REVIEWED && f.rejected / f.reviewed >= FIRM_RATE_THRESHOLD) suppressedFirms.add(firm);
+  }
+  const suppressedInvestorIds = new Set<number>();
+  for (const [invId, s] of invRejectStat) {
+    if (s.reviewed >= REJECT_MIN_REVIEWED && s.rejected / s.reviewed >= REJECT_RATE_THRESHOLD && s.founders.size >= REJECT_MIN_DISTINCT_FOUNDERS) {
+      suppressedInvestorIds.add(invId);
+    }
+  }
+
+  // ── "Already met" dedup beyond intro_requests ───────────────────────────────
+  // Exclude investors a founder has a logged interaction with (e.g. a meeting
+  // logged via the CRM / Granola). These aren't always in intro_requests, but
+  // the founder has clearly already met them — don't re-suggest.
+  const metByFounder = new Map<number, Set<number>>();
+  const loggedInteractions = await db.select({
+    founderId: investorInteractions.founderId,
+    investorId: investorInteractions.investorId,
+  }).from(investorInteractions).where(sql`${investorInteractions.investorId} IS NOT NULL`);
+  for (const it of loggedInteractions) {
+    if (it.investorId == null) continue;
+    let s = metByFounder.get(it.founderId);
+    if (!s) { s = new Set(); metByFounder.set(it.founderId, s); }
+    s.add(it.investorId);
+  }
+  console.log(`[matching] reject-rate suppression: ${suppressedInvestorIds.size} investors, ${suppressedFirms.size} firms`);
+
   const suggestions: GeneratedSuggestion[] = [];
   const liquidityStats: FounderLiquidity[] = [];
 
@@ -859,6 +920,9 @@ export async function generateMatchSuggestions(
     const founderCats = data.founderCatMap.get(founder.id) || [];
     const founderIntros = data.founderIntroMap.get(founder.id) || [];
     const alreadyIntrodInvestorIds = new Set(founderIntros.map(ir => ir.investorId));
+    // Fold in investors the founder has a logged meeting/interaction with.
+    const metInv = metByFounder.get(founder.id);
+    if (metInv) for (const id of metInv) alreadyIntrodInvestorIds.add(id);
 
     // Firm-level dedup: if any investor at a firm has been intro'd for this founder, block the whole firm
     const blockedFirms = new Set<string>();
@@ -909,6 +973,7 @@ export async function generateMatchSuggestions(
     let blockedByVipNode = 0;
     let blockedByGeo = 0;
     let blockedByCategory = 0;
+    let blockedByRejectRate = 0;
     let availableCount = 0;
 
     for (const fnRel of founderNodes) {
@@ -928,6 +993,9 @@ export async function generateMatchSuggestions(
         // Skip investors at a firm that already has an intro for this founder
         const investorFirm = investorFirmMap.get(investorId);
         if (investorFirm && blockedFirms.has(investorFirm)) { blockedByFirm++; continue; }
+
+        // Learned suppression: investor / firm the admin rejects systematically
+        if (suppressedInvestorIds.has(investorId) || (investorFirm && suppressedFirms.has(investorFirm))) { blockedByRejectRate++; continue; }
 
         // Skip investors on cooldown
         const cooldown = investorCooldowns.get(investorId);
@@ -1034,6 +1102,7 @@ export async function generateMatchSuggestions(
       blockedByVipNode,
       blockedByGeo,
       blockedByCategory,
+      blockedByRejectRate,
       generated: 0, // filled after filtering
       status: weeksOfRunway >= 4 ? 'healthy' : weeksOfRunway >= 2 ? 'tight' : 'dry',
       targetSource,

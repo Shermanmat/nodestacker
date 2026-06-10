@@ -1019,6 +1019,55 @@
           </div>
         </div>
 
+        <!-- Investor Comms — production blurb + deck, change-by-request -->
+        <div v-if="activeTab === 'comms'">
+          <div class="mb-4">
+            <h2 class="text-xl font-semibold">Investor Comms</h2>
+            <p class="text-sm text-gray-500">This is what MatCap actually sends to investors on your behalf. Request changes here — nothing goes live until we review it.</p>
+          </div>
+
+          <div v-if="commsLoading" class="text-gray-500 text-sm">Loading…</div>
+
+          <div v-else class="space-y-6">
+            <!-- Blurb -->
+            <div class="bg-white rounded-lg shadow p-5">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="font-semibold text-gray-900">Your blurb</h3>
+                <span v-if="commsPending.some(p => p.kind==='blurb')" class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Change requested</span>
+              </div>
+              <pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded p-3 border mb-3" style="font-family:inherit">{{ comms.blurb || 'No blurb set yet.' }}</pre>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Request a change</label>
+              <textarea v-model="blurbNote" rows="3" placeholder="What should change? New metrics, a clarification, a different angle…" class="w-full border rounded px-3 py-2 text-sm mb-2"></textarea>
+              <div class="flex items-center gap-3">
+                <button @click="submitBlurbRequest" :disabled="blurbSubmitting || blurbNote.trim().length < 3" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">{{ blurbSubmitting ? 'Sending…' : 'Request blurb change' }}</button>
+                <span v-if="blurbMsg" class="text-sm text-green-600">{{ blurbMsg }}</span>
+                <span v-if="blurbErr" class="text-sm text-red-600">{{ blurbErr }}</span>
+              </div>
+            </div>
+
+            <!-- Deck -->
+            <div class="bg-white rounded-lg shadow p-5">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="font-semibold text-gray-900">Your deck</h3>
+                <span v-if="commsPending.some(p => p.kind==='deck')" class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">New deck pending review</span>
+              </div>
+              <p class="text-sm mb-3">
+                <a v-if="comms.deckServePath" :href="comms.deckServePath" target="_blank" class="text-blue-600 hover:underline">View current deck (PDF)</a>
+                <span v-else class="text-gray-500">No deck on file yet.</span>
+              </p>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Propose a new deck (PDF)</label>
+              <input type="file" accept="application/pdf,.pdf" @change="onDeckFilePick" class="block text-sm mb-2" />
+              <textarea v-model="deckNote" rows="2" placeholder="Anything we should know about the update? (optional)" class="w-full border rounded px-3 py-2 text-sm mb-2"></textarea>
+              <div class="flex items-center gap-3">
+                <button @click="submitDeckRequest" :disabled="deckSubmitting || !deckFile" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">{{ deckSubmitting ? 'Uploading…' : 'Submit deck for review' }}</button>
+                <span v-if="deckMsg" class="text-sm text-green-600">{{ deckMsg }}</span>
+                <span v-if="deckErr" class="text-sm text-red-600">{{ deckErr }}</span>
+              </div>
+              <p class="text-xs text-gray-400 mt-2">Your live deck stays in place until we approve the new one.</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Connect AI — MCP token management -->
         <div v-if="activeTab === 'connect'">
           <div class="mb-6">
@@ -1144,16 +1193,21 @@
 
     createApp({
       setup() {
-        const tabs = [
-          { id: 'pipeline', label: 'Pipeline' },
-          { id: 'dashboard', label: 'Dashboard' },
-          { id: 'onboarding', label: 'Onboarding' },
-          { id: 'tasks', label: 'Tasks' },
-          { id: 'intros', label: 'My Intros' },
-          { id: 'nodes', label: 'Nodes' },
-          { id: 'network', label: 'Network' },
-          { id: 'connect', label: 'Connect AI' },
-        ];
+        // Founder-facing nav is intentionally minimal: the CRM is the home, with
+        // Blurb + Connect AI alongside, and Onboarding only once an offer exists.
+        // (Dashboard / Tasks / My Intros / Nodes / Network were retired — the CRM
+        // covers the investor side.)
+        const tabs = computed(() => {
+          const t = [
+            { id: 'pipeline', label: 'Pipeline' },
+            { id: 'comms', label: 'Investor Comms' },
+            { id: 'connect', label: 'Connect AI' },
+          ];
+          if (onboarding.value.hasOnboarding && onboarding.value.workflow?.status !== 'completed') {
+            t.splice(1, 0, { id: 'onboarding', label: 'Onboarding' });
+          }
+          return t;
+        });
 
         const activeTab = ref('pipeline');
         const session = ref(null);
@@ -1383,6 +1437,59 @@
           }
         };
 
+        // Investor Comms: live blurb + deck, change-by-request.
+        const comms = ref({ blurb: '', deckServePath: null, deckFile: null });
+        const commsLoading = ref(false);
+        const commsPending = ref([]);
+        const blurbNote = ref('');
+        const blurbSubmitting = ref(false);
+        const blurbMsg = ref('');
+        const blurbErr = ref('');
+        const deckFile = ref(null);
+        const deckNote = ref('');
+        const deckSubmitting = ref(false);
+        const deckMsg = ref('');
+        const deckErr = ref('');
+        const loadComms = async () => {
+          if (!session.value) return;
+          commsLoading.value = true;
+          try {
+            const res = await api('/portal/comms');
+            if (res) { comms.value = res; commsPending.value = res.pending || []; }
+          } catch (e) { /* ignore */ } finally { commsLoading.value = false; }
+        };
+        const submitBlurbRequest = async () => {
+          blurbMsg.value = ''; blurbErr.value = '';
+          if (blurbNote.value.trim().length < 3) { blurbErr.value = 'Add a bit more detail.'; return; }
+          blurbSubmitting.value = true;
+          try {
+            const res = await api('/portal/comms/blurb-request', { method: 'POST', body: { note: blurbNote.value } });
+            if (res && res.success) { blurbMsg.value = "Sent — we'll review it."; blurbNote.value = ''; await loadComms(); }
+            else if (res && res.error) { blurbErr.value = res.error; }
+          } catch (e) { blurbErr.value = e.message || 'Something went wrong'; }
+          finally { blurbSubmitting.value = false; }
+        };
+        const onDeckFilePick = (e) => { deckFile.value = (e.target.files && e.target.files[0]) || null; deckMsg.value = ''; deckErr.value = ''; };
+        const submitDeckRequest = async () => {
+          deckMsg.value = ''; deckErr.value = '';
+          if (!deckFile.value) { deckErr.value = 'Choose a PDF first.'; return; }
+          deckSubmitting.value = true;
+          try {
+            const fd = new FormData();
+            fd.append('file', deckFile.value);
+            fd.append('note', deckNote.value || '');
+            const res = await fetch('/api/portal/comms/deck-request', {
+              method: 'POST',
+              headers: { ...(getSessionId() ? { 'X-Session-Id': getSessionId() } : {}) },
+              body: fd,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success) { deckMsg.value = 'Submitted for review.'; deckFile.value = null; deckNote.value = ''; await loadComms(); }
+            else { deckErr.value = data.error || 'Upload failed'; }
+          } catch (e) { deckErr.value = e.message || 'Upload failed'; }
+          finally { deckSubmitting.value = false; }
+        };
+
         const loadCrm = async () => {
           if (!session.value) return;
           crmLoading.value = true;
@@ -1566,6 +1673,7 @@
         // Load CRM whenever Pipeline tab becomes active (or on first session load).
         watch(activeTab, (t) => {
           if (t === 'pipeline') loadCrm();
+          if (t === 'comms') loadComms();
           if (t === 'connect') loadMcpTokens();
         });
 
@@ -2072,6 +2180,9 @@
           showIntroDetail, submitIntroUpdate, showTaskAction,
           toggleFounderFilter, clearFounderFilters, toggleResearchExpand,
           truncateText, extractFounderPrefs,
+          // Investor Comms
+          comms, commsLoading, commsPending, blurbNote, blurbSubmitting, blurbMsg, blurbErr,
+          deckFile, deckNote, deckSubmitting, deckMsg, deckErr, loadComms, submitBlurbRequest, submitDeckRequest, onDeckFilePick,
           // Pipeline / CRM
           showMeetingPaste, meetingTitle, meetingTranscript, meetingSubmitting, meetingResult, meetingError, submitMeetingNotes,
           crmRows, crmLoading, crmSearch, crmStatusFilter, crmSourceFilter, crmNeedsAttentionOnly,

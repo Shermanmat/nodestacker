@@ -481,6 +481,19 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`meeting_transcripts\` (
 )`);
 console.log('  Ensured meeting_transcripts table exists');
 
+// Founder change-requests for production investor materials (blurb + deck).
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`comms_change_requests\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`founder_id\` integer NOT NULL,
+  \`kind\` text NOT NULL,
+  \`note\` text,
+  \`proposed_deck_file\` text,
+  \`status\` text NOT NULL DEFAULT 'pending',
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  \`resolved_at\` text
+)`);
+console.log('  Ensured comms_change_requests table exists');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

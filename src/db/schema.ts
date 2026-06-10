@@ -557,6 +557,24 @@ export const meetingTranscripts = sqliteTable('meeting_transcripts', {
 export type MeetingTranscript = typeof meetingTranscripts.$inferSelect;
 export type NewMeetingTranscript = typeof meetingTranscripts.$inferInsert;
 
+// Founder-requested changes to the production investor materials (blurb + deck).
+// Founders never overwrite the live assets — they file a request here that the
+// admin reviews and approves. Deck uploads are staged (proposedDeckFile) until
+// approved.
+export const commsChangeRequests = sqliteTable('comms_change_requests', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').notNull(),
+  kind: text('kind').notNull(),                  // 'blurb' | 'deck'
+  note: text('note'),                            // founder's context / requested change
+  proposedDeckFile: text('proposed_deck_file'),  // staged deck filename (deck requests)
+  status: text('status').notNull().default('pending'), // pending | approved | rejected
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  resolvedAt: text('resolved_at'),
+});
+
+export type CommsChangeRequest = typeof commsChangeRequests.$inferSelect;
+export type NewCommsChangeRequest = typeof commsChangeRequests.$inferInsert;
+
 // Inbound Intro Logs Table (BCC email logging for intro tracking)
 export const InboundIntroLogStatus = {
   PENDING: 'pending',

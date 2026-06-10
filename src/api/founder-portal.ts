@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { eq, and, inArray, notInArray, desc, sql } from 'drizzle-orm';
-import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
+import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, commsChangeRequests, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
+import { sendEmail } from '../services/email.js';
 import { z } from 'zod';
 import * as onboardingEmails from '../services/onboarding-emails.js';
 import * as esign from '../services/esign.js';
@@ -24,6 +25,83 @@ app.use('*', async (c, next) => {
 
   c.set('founderId', founderId);
   await next();
+});
+
+// ── Investor comms: the production blurb + deck, with founder change-requests ──
+// Founders view the LIVE assets and file change requests; nothing goes live until
+// the admin approves. Deck uploads are staged as proposed_<token>.pdf.
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com';
+function decksDirPath() {
+  // mirrors src/api/founders.ts deck storage
+  return (process.env.DATA_DIR || (process.env.NODE_ENV === 'production' ? '/app/data' : '.')) + '/decks';
+}
+
+app.get('/comms', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+  const pending = await db.query.commsChangeRequests.findMany({
+    where: and(eq(commsChangeRequests.founderId, founderId), eq(commsChangeRequests.status, 'pending')),
+    orderBy: [desc(commsChangeRequests.createdAt)],
+  });
+  return c.json({
+    blurb: founder.blurb || '',
+    deckFile: founder.deckFile || null,
+    deckUrl: founder.deckUrl || null,
+    deckServePath: founder.deckFile ? `/decks/${founder.deckFile}` : null,
+    pending: pending.map((r) => ({ id: r.id, kind: r.kind, note: r.note, createdAt: r.createdAt })),
+  });
+});
+
+app.post('/comms/blurb-request', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const body = await c.req.json().catch(() => ({} as any));
+  const note = typeof body.note === 'string' ? body.note.trim() : '';
+  if (note.length < 3) return c.json({ error: 'Add a note describing the change' }, 400);
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  const [row] = await db.insert(commsChangeRequests).values({
+    founderId, kind: 'blurb', note, status: 'pending', createdAt: new Date().toISOString(),
+  }).returning();
+  sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `Blurb change request — ${founder?.name || 'founder #' + founderId}`,
+    html: `<p><b>${founder?.name || 'Founder #' + founderId}</b> (${founder?.companyName || ''}) requested a blurb change:</p><blockquote>${note.replace(/</g, '&lt;')}</blockquote>`,
+    text: `${founder?.name || 'Founder #' + founderId} (${founder?.companyName || ''}) requested a blurb change:\n\n${note}`,
+  }).catch((e) => console.error('[comms] blurb-request email failed:', e));
+  return c.json({ success: true, id: row.id });
+});
+
+app.post('/comms/deck-request', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+
+  const body = await c.req.parseBody();
+  const file = body.file as unknown as File | undefined;
+  const note = typeof body.note === 'string' ? body.note : '';
+  if (!file || typeof (file as any).arrayBuffer !== 'function') return c.json({ error: 'No file uploaded' }, 400);
+  if (file.size > 30 * 1024 * 1024) return c.json({ error: 'File too large (max 30 MB)' }, 413);
+  const mime = (file as any).type || '';
+  if (!mime.includes('pdf') && !file.name.toLowerCase().endsWith('.pdf')) return c.json({ error: 'Only PDF files are supported' }, 400);
+
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const crypto = await import('crypto');
+  const decksDir = decksDirPath();
+  await fs.mkdir(decksDir, { recursive: true });
+  const filename = `proposed_${crypto.randomBytes(16).toString('hex')}.pdf`;
+  await fs.writeFile(path.join(decksDir, filename), Buffer.from(await file.arrayBuffer()));
+
+  const [row] = await db.insert(commsChangeRequests).values({
+    founderId, kind: 'deck', note: note || null, proposedDeckFile: filename, status: 'pending', createdAt: new Date().toISOString(),
+  }).returning();
+  sendEmail({
+    to: ADMIN_EMAIL,
+    subject: `Deck change request — ${founder.name}`,
+    html: `<p><b>${founder.name}</b> (${founder.companyName}) proposed a new deck.${note ? ' Note: ' + note.replace(/</g, '&lt;') : ''}</p><p>Proposed deck: <a href="https://matcap.vc/decks/${filename}">view PDF</a> — review &amp; approve in admin.</p>`,
+    text: `${founder.name} (${founder.companyName}) proposed a new deck.${note ? ' Note: ' + note : ''}\nProposed deck: https://matcap.vc/decks/${filename}\nReview & approve in admin.`,
+  }).catch((e) => console.error('[comms] deck-request email failed:', e));
+  return c.json({ success: true, id: row.id });
 });
 
 // Get founder's dashboard

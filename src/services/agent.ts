@@ -536,7 +536,7 @@ export async function runFollowupTick(): Promise<{
       ),
     ));
 
-  const results: Array<{ introId: number; founderName: string; investorName: string; action: 'drafted' | 'reply-detected' | 'skipped'; detail?: string }> = [];
+  const results: Array<{ introId: number; founderName: string; investorName: string; action: 'drafted' | 'sent' | 'reply-detected' | 'skipped'; detail?: string }> = [];
   let drafted = 0;
   let repliesDetected = 0;
 

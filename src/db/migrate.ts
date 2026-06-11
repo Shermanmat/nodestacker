@@ -497,6 +497,28 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`comms_change_requests\` (
 safeAddColumn('comms_change_requests', 'approve_token', 'text');
 console.log('  Ensured comms_change_requests table exists');
 
+// Structured reject taxonomy on match_suggestions + one-time backfill from the
+// legacy free-text rejection_reason (only fills nulls).
+safeAddColumn('match_suggestions', 'rejection_category', 'text');
+try {
+  const reasonMap = [
+    ['%already met%', 'already_met'], ['%already intro%', 'already_met'],
+    ['%vip%', 'vip'],
+    ['%wrong sector%', 'wrong_sector'], ['%sector%', 'wrong_sector'],
+    ['%wrong stage%', 'wrong_stage'], ['%stage%', 'wrong_stage'],
+    ['%pre-revenue%', 'too_early'], ['%pre revenue%', 'too_early'], ['%too early%', 'too_early'],
+    ['%dropout%', 'thesis_mismatch'], ['%degree%', 'thesis_mismatch'], ['%technical%', 'thesis_mismatch'], ['%immigrant%', 'thesis_mismatch'], ['%thesis%', 'thesis_mismatch'],
+    ['%geo%', 'wrong_geo'],
+    ['%not a fit%', 'not_a_fit'], ['%not fit%', 'not_a_fit'],
+  ];
+  for (const [pat, cat] of reasonMap) {
+    sqlite.prepare("UPDATE match_suggestions SET rejection_category=? WHERE rejection_category IS NULL AND status='rejected' AND lower(rejection_reason) LIKE ?").run(cat, pat);
+  }
+  // Any remaining reviewed reject with a reason but no category → 'other'.
+  sqlite.prepare("UPDATE match_suggestions SET rejection_category='other' WHERE rejection_category IS NULL AND status='rejected' AND rejection_reason IS NOT NULL AND rejection_reason != ''").run();
+  console.log('  Backfilled match_suggestions.rejection_category');
+} catch (e: any) { if (!e.message?.includes('no such column')) throw e; }
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

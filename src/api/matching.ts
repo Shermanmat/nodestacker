@@ -231,7 +231,7 @@ app.put('/reject-intro/:id', async (c) => {
   // Mark linked match suggestion as rejected (must happen before deleting intro request due to FK)
   const now = new Date().toISOString();
   await db.update(matchSuggestions)
-    .set({ status: 'rejected', reviewedAt: now, rejectionReason: body.reason || null, introRequestId: null })
+    .set({ status: 'rejected', reviewedAt: now, rejectionReason: body.reason || null, rejectionCategory: body.category || null, introRequestId: null })
     .where(eq(matchSuggestions.introRequestId, id));
 
   // Delete the intro request (it was never sent)

@@ -864,14 +864,21 @@ export async function generateMatchSuggestions(
   const REJECT_MIN_DISTINCT_FOUNDERS = 2;
   const FIRM_MIN_REVIEWED = 6;
   const FIRM_RATE_THRESHOLD = 0.85;
+  // Mechanical rejects (founder already met them, VIP handled manually, dup) say
+  // nothing about whether the investor is a good match — ignore them entirely so
+  // they neither penalize nor dilute an investor's reject rate.
+  const MECHANICAL_REJECTS = new Set(['already_met', 'vip', 'duplicate']);
   const reviewedRows = await db.select({
     investorId: matchSuggestions.investorId,
     founderId: matchSuggestions.founderId,
     status: matchSuggestions.status,
+    rejectionCategory: matchSuggestions.rejectionCategory,
   }).from(matchSuggestions).where(sql`${matchSuggestions.reviewedAt} IS NOT NULL`);
   const invRejectStat = new Map<number, { reviewed: number; rejected: number; founders: Set<number> }>();
   const firmRejectStat = new Map<string, { reviewed: number; rejected: number }>();
   for (const r of reviewedRows) {
+    // Skip mechanical rejects — they're neutral for learning.
+    if (r.status === 'rejected' && r.rejectionCategory && MECHANICAL_REJECTS.has(r.rejectionCategory)) continue;
     const isRej = r.status === 'rejected';
     let s = invRejectStat.get(r.investorId);
     if (!s) { s = { reviewed: 0, rejected: 0, founders: new Set() }; invRejectStat.set(r.investorId, s); }

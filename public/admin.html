@@ -3705,13 +3705,13 @@
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
         <h3 class="text-lg font-semibold mb-1">Why reject this intro?</h3>
         <p class="text-xs text-gray-500 mb-4">Captured for pattern-spotting later. Required.</p>
-        <div class="space-y-2 mb-4">
-          <label v-for="opt in rejectReasonOptions" :key="opt" class="flex items-center gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
-            <input type="radio" v-model="rejectReasonChoice" :value="opt" class="rounded">
-            <span class="text-sm">{{ opt }}</span>
+        <div class="space-y-1 mb-4">
+          <label v-for="opt in rejectReasonOptions" :key="opt.label" class="flex items-start gap-2 cursor-pointer hover:bg-gray-50 px-2 py-1 rounded">
+            <input type="radio" v-model="rejectReasonChoice" :value="opt" class="mt-1 rounded">
+            <span class="text-sm">{{ opt.label }}<span v-if="opt.hint" class="text-xs text-gray-400"> — {{ opt.hint }}</span></span>
           </label>
         </div>
-        <div v-if="rejectReasonChoice === 'Other'" class="mb-4">
+        <div v-if="rejectReasonChoice && rejectReasonChoice.category === 'other'" class="mb-4">
           <input type="text" v-model="rejectReasonOther" placeholder="Brief reason..." class="w-full border rounded px-3 py-2 text-sm" autofocus>
         </div>
         <div class="flex justify-end gap-2">
@@ -6949,13 +6949,22 @@
         const rejectingIntroId = ref(null);
         const rejectReasonChoice = ref('');
         const rejectReasonOther = ref('');
+        // Structured reject taxonomy. `category` drives the matcher's learned
+        // suppression: 'misfit' + founder-specific reasons count against the
+        // investor; mechanical ones (already_met / vip / duplicate) are ignored
+        // so we don't penalize an investor for a reason that isn't about them.
         const rejectReasonOptions = [
-          'Wrong sector',
-          'Wrong stage',
-          'Not a fit (gut)',
-          'Already met',
-          'Pre-revenue',
-          'Other',
+          { label: 'Wrong stage', category: 'wrong_stage', hint: 'invests at a different stage' },
+          { label: 'Wrong sector', category: 'wrong_sector' },
+          { label: 'Thesis mismatch', category: 'thesis_mismatch', hint: 'e.g. dropouts-only, technical-only' },
+          { label: 'Wrong geography', category: 'wrong_geo' },
+          { label: 'Not actively investing', category: 'not_investing', hint: 'fund closed / raising' },
+          { label: 'Not a fit (gut)', category: 'not_a_fit' },
+          { label: 'Too early for them', category: 'too_early' },
+          { label: 'Already met / introduced', category: 'already_met', hint: "won't penalize the investor" },
+          { label: 'VIP — handle manually', category: 'vip', hint: "won't penalize the investor" },
+          { label: 'Duplicate', category: 'duplicate', hint: "won't penalize the investor" },
+          { label: 'Other', category: 'other' },
         ];
 
         const rejectSuggestion = (id) => {
@@ -6966,14 +6975,15 @@
         };
 
         const submitRejectSuggestion = async () => {
-          if (!rejectingIntroId.value) return;
-          const reason = rejectReasonChoice.value === 'Other'
-            ? (rejectReasonOther.value || '').trim() || 'Other'
-            : rejectReasonChoice.value || null;
+          if (!rejectingIntroId.value || !rejectReasonChoice.value) return;
+          const choice = rejectReasonChoice.value;
+          const reason = choice.category === 'other'
+            ? ((rejectReasonOther.value || '').trim() || 'Other')
+            : choice.label;
           try {
             await api(`/matching/reject-intro/${rejectingIntroId.value}`, {
               method: 'PUT',
-              body: { reason },
+              body: { reason, category: choice.category },
             });
             showRejectModal.value = false;
             rejectingIntroId.value = null;

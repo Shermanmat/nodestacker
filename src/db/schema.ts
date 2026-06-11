@@ -1073,7 +1073,8 @@ export const matchSuggestions = sqliteTable('match_suggestions', {
   matchReasoning: text('match_reasoning'), // JSON
   status: text('status').notNull().default('pending'),
   reviewedAt: text('reviewed_at'),
-  rejectionReason: text('rejection_reason'),
+  rejectionReason: text('rejection_reason'),       // human-readable label / note
+  rejectionCategory: text('rejection_category'),   // structured taxonomy code (drives learned suppression)
   introRequestId: integer('intro_request_id').references(() => introRequests.id),
   batchId: text('batch_id'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),

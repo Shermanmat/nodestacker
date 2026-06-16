@@ -3181,18 +3181,19 @@
                 <td class="px-4 py-3">
                   <div class="flex gap-2 flex-wrap">
                     <template v-if="app.applicationStatus === 'applied'">
+                      <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
                       <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="requestMeeting(app.id)" class="text-xs text-cyan-600 hover:underline font-medium">Request meeting</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
-                    <template v-else-if="app.applicationStatus === 'meeting_requested'">
-                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
+                    <template v-else-if="app.applicationStatus === 'meeting_requested' || app.applicationStatus === 'interview_sent'">
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
+                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
                     <template v-else-if="app.applicationStatus === 'trial_sent'">
-                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
+                      <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
                       <button @click="declineApplication(app.id)" class="text-xs text-red-600 hover:underline">Reject</button>
                     </template>
                     <template v-else>

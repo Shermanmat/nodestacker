@@ -64,7 +64,7 @@ app.post('/applications/:id/approve', async (c) => {
     where: eq(publicCompanies.id, companyId),
   });
   if (!company) return c.json({ error: 'Company not found' }, 404);
-  if (!['applied', 'interview_sent', 'trial_sent'].includes(company.applicationStatus || '')) return c.json({ error: 'Not a pending application' }, 400);
+  if (!['applied', 'meeting_requested', 'interview_sent', 'trial_sent'].includes(company.applicationStatus || '')) return c.json({ error: 'Not a pending application' }, 400);
 
   const user = await db.query.publicUsers.findFirst({
     where: eq(publicUsers.id, company.userId),

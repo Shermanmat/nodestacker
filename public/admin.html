@@ -3112,7 +3112,8 @@
           </div>
         </div>
         <div class="bg-white rounded-lg shadow overflow-hidden">
-          <table class="w-full text-sm" v-if="portfolioApplications.length">
+          <div class="overflow-x-auto" v-if="portfolioApplications.length">
+          <table class="w-full text-sm">
             <thead class="bg-gray-50 border-b">
               <tr>
                 <th class="text-left px-4 py-3 font-medium text-gray-700">Founder</th>
@@ -3134,7 +3135,7 @@
                 </td>
                 <td class="px-4 py-3">
                   <div class="font-medium">{{ app.companyName }}</div>
-                  <div class="text-xs text-gray-500">{{ app.oneLiner }}</div>
+                  <div class="text-xs text-gray-500 max-w-sm">{{ app.oneLiner }}</div>
                   <a v-if="app.url" :href="app.url" target="_blank" class="text-xs text-blue-500 hover:underline">{{ app.url }}</a>
                   <!-- Investor blurb the applicant built as the post-apply next step -->
                   <details v-if="app.blurb" class="mt-1.5">
@@ -3224,7 +3225,8 @@
               </template>
             </tbody>
           </table>
-          <div v-else class="px-4 py-8 text-center text-gray-400">No portfolio applications yet.</div>
+          </div>
+          <div v-if="!portfolioApplications.length" class="px-4 py-8 text-center text-gray-400">No portfolio applications yet.</div>
         </div>
 
         <!-- Signups List (collapsible) -->

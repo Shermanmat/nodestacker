@@ -1708,7 +1708,7 @@
                     <template v-if="req.gmailDraftId">
                       <a :href="'https://mail.google.com/mail/u/0/#drafts/' + req.gmailDraftId" target="_blank" class="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 mr-1 inline-block">📧 Open draft</a>
                       <button @click="markIntroSent(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1">Mark sent</button>
-                      <button @click="discardIntroDraft(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Discard</button>
+                      <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50" title="Reject with a reason — deletes the draft and feeds the matcher.">Reject</button>
                     </template>
                     <template v-else>
                       <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Approve this intro request. The draft modal opens after — close it and the approval still stands.">Approve</button>

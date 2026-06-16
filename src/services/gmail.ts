@@ -320,6 +320,18 @@ export async function createDraft(input: DraftInput): Promise<DraftResult> {
   };
 }
 
+// Delete a Gmail draft (used when an admin rejects an already-drafted intro so
+// the unsent draft doesn't linger). Best-effort — never throws.
+export async function deleteDraft(draftId: string): Promise<void> {
+  try {
+    const client = await getAuthedClient();
+    const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+    await gmail.users.drafts.delete({ userId: 'me', id: draftId });
+  } catch (e) {
+    console.error('[gmail] deleteDraft failed:', e instanceof Error ? e.message : e);
+  }
+}
+
 // Apply a label to a thread and remove it from the inbox ("archive, but
 // findable"). Finds the label by name, creating it if it doesn't exist. Needs
 // the gmail.modify scope (which we have).

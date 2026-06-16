@@ -16,6 +16,7 @@ import {
   computeAllFounderScores,
   computeAllInvestorScores,
 } from '../services/matching.js';
+import { deleteDraft } from '../services/gmail.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -233,6 +234,12 @@ app.put('/reject-intro/:id', async (c) => {
   await db.update(matchSuggestions)
     .set({ status: 'rejected', reviewedAt: now, rejectionReason: body.reason || null, rejectionCategory: body.category || null, introRequestId: null })
     .where(eq(matchSuggestions.introRequestId, id));
+
+  // If the auto-draft agent already drafted this in Gmail, delete that draft so
+  // a rejected intro doesn't leave an orphaned draft to accidentally send.
+  if (introRequest.gmailDraftId) {
+    await deleteDraft(introRequest.gmailDraftId);
+  }
 
   // Delete the intro request (it was never sent)
   await db.delete(introRequests).where(eq(introRequests.id, id));

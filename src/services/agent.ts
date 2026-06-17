@@ -1,7 +1,6 @@
 import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, agentSettings, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
-import { sendEmail } from './email.js';
 import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 import { recordAction } from './agent-actions.js';
 
@@ -182,13 +181,11 @@ export async function runAgentTick(): Promise<{
         }).join('\n')
       }\n\nApprove: ${baseUrl}/admin#matching\n\nBatch: ${batchId}`;
 
-  let emailSent = false;
-  try {
-    await sendEmail({ to: adminEmail, subject, html, text });
-    emailSent = true;
-  } catch (e) {
-    console.error('Agent: failed to send digest email', e);
-  }
+  // Digest email removed — admin found it noisy. Suggestions still land in the
+  // matching tab and this run is logged to the agent_actions ledger (AI Agent tab),
+  // so the queue is still reviewable without an inbox ping.
+  const emailSent = false;
+  void subject; void html; void text;
 
   // Record this tick in the agent ledger (audit trail + scorecard input).
   // Append-only and after-the-fact — does not change the shadow-agent behavior;
@@ -413,32 +410,8 @@ export async function runAutoDraftTick(): Promise<{
         })
         .where(eq(introRequests.id, intro.id));
 
-      // Notify admin
-      const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
-      const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
-      const subjectLine = `Agent: draft ready — ${founder.name} → ${investor.name}${investor.firm ? ` (${investor.firm})` : ''}`;
-      const reviewUrl = `${baseUrl}/admin#intros`;
-      try {
-        await sendEmail({
-          to: adminEmail,
-          subject: subjectLine,
-          html: `<div style="font-family:Inter,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#222">
-            <h2 style="margin:0 0 8px 0">Agent drafted a Gmail intro</h2>
-            <p style="color:#555;margin:0 0 16px 0">Score <strong>${c.matchScore}</strong>. Draft is in your Gmail Drafts (and Superhuman). Review and send, or discard.</p>
-            <table style="border-collapse:collapse;font-size:14px">
-              <tr><td style="padding:4px 12px;color:#888">Founder</td><td style="padding:4px 12px;font-weight:600">${founder.name} (${founder.companyName})</td></tr>
-              <tr><td style="padding:4px 12px;color:#888">Investor</td><td style="padding:4px 12px">${investor.name}${investor.firm ? ' @ ' + investor.firm : ''}</td></tr>
-              <tr><td style="padding:4px 12px;color:#888">To</td><td style="padding:4px 12px">${investor.email}</td></tr>
-              <tr><td style="padding:4px 12px;color:#888">Attachment</td><td style="padding:4px 12px">${attachmentPath ? '📎 ' + (attachmentName || 'deck.pdf') : 'none'}</td></tr>
-            </table>
-            <p style="margin-top:20px">
-              <a href="${draftResult.gmailUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none;margin-right:8px">Open draft in Gmail →</a>
-              <a href="${reviewUrl}" style="display:inline-block;color:#2563eb;text-decoration:underline">Admin: intro requests</a>
-            </p>
-          </div>`,
-          text: `Agent drafted a Gmail intro\n\nFounder: ${founder.name} (${founder.companyName})\nInvestor: ${investor.name}${investor.firm ? ' @ ' + investor.firm : ''}\nTo: ${investor.email}\nScore: ${c.matchScore}\n\nOpen draft: ${draftResult.gmailUrl}\nAdmin: ${reviewUrl}`,
-        });
-      } catch (e) { console.error('[AUTO-DRAFT] Failed to notify admin', e); }
+      // No per-draft notification email — admin found these noisy. The draft is
+      // already visible in Gmail Drafts, and the run is logged to the ledger.
 
       results.push({
         draftId: draftResult.draftId,
@@ -597,27 +570,8 @@ export async function runFollowupTick(): Promise<{
   }
 
   // Notify admin if anything happened
-  if (drafted > 0 || repliesDetected > 0) {
-    const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
-    const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
-    const draftedRows = results.filter(r => r.action === 'drafted' || r.action === 'sent')
-      .map(r => `  • ${r.founderName} → ${r.investorName}`).join('\n');
-    const repliedRows = results.filter(r => r.action === 'reply-detected')
-      .map(r => `  • ${r.founderName} → ${r.investorName}`).join('\n');
-    try {
-      await sendEmail({
-        to: adminEmail,
-        subject: `Follow-up agent: ${drafted} ${autoSend ? 'sent' : 'drafts'}, ${repliesDetected} replies`,
-        html: `<div style="font-family:Inter,system-ui,sans-serif;max-width:640px;margin:0 auto;color:#222">
-          <h2 style="margin:0 0 8px 0">Follow-up agent run</h2>
-          ${drafted > 0 ? `<p><strong>${drafted} bump${drafted === 1 ? '' : 's'}</strong> ${autoSend ? 'sent automatically' : 'in Gmail Drafts, ready to send'}:</p><pre style="background:#f6f7f8;padding:12px;border-radius:6px;font-size:13px">${draftedRows}</pre>` : ''}
-          ${repliesDetected > 0 ? `<p><strong>${repliesDetected} repl${repliesDetected === 1 ? 'y' : 'ies'} detected</strong> — these are off the follow-up rotation now:</p><pre style="background:#eafbe6;padding:12px;border-radius:6px;font-size:13px">${repliedRows}</pre>` : ''}
-          <p style="margin-top:16px"><a href="${baseUrl}/admin#intros">Open admin → intros</a></p>
-        </div>`,
-        text: `Follow-up agent run\nDrafts: ${drafted}\nReplies detected: ${repliesDetected}\n\n${baseUrl}/admin#intros`,
-      });
-    } catch (e) { console.error('Follow-up notify failed', e); }
-  }
+  // No follow-up summary email — admin found agent notifications noisy. Bumps
+  // sit in Gmail Drafts; reply detection updates the intro state directly.
 
   return { checked: candidates.length, drafted, repliesDetected, results };
 }

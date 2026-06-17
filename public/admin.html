@@ -1594,9 +1594,14 @@
                   </div>
                   <div v-if="r.snippet" class="text-xs text-gray-700 mt-2 italic whitespace-pre-line">{{ r.snippet.length > 280 ? r.snippet.slice(0, 280) + '…' : r.snippet }}</div>
                 </div>
-                <div class="flex-shrink-0 flex flex-col gap-1">
+                <div class="flex-shrink-0 flex flex-col gap-1 items-end">
                   <a v-if="r.gmailThreadId" :href="'https://mail.google.com/mail/u/0/#inbox/' + r.gmailThreadId" target="_blank"
                     class="text-xs text-blue-600 hover:underline">Open in Gmail →</a>
+                  <select @change="setReplyStatus(r.introId, $event.target.value); $event.target.value = ''"
+                    class="text-xs border rounded px-1.5 py-0.5 text-gray-700 bg-white">
+                    <option value="">Set status…</option>
+                    <option v-for="s in introStatuses" :key="s" :value="s">{{ s.replace(/_/g, ' ') }}</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -6333,6 +6338,17 @@
           }
         };
 
+        // Set an intro's status directly from the "Replies needing you" panel,
+        // so you can resolve a nuanced reply without opening Gmail. Reloads the
+        // panel after, so the resolved reply drops off the list.
+        const setReplyStatus = async (introId, status) => {
+          if (!status) return;
+          try {
+            await api(`/intro-requests/${introId}`, { method: 'PUT', body: { status } });
+            await loadRepliesNeedingHuman();
+          } catch (e) { /* handled by api() */ }
+        };
+
         const classifyRepliesNow = async () => {
           if (!confirm('Run the reply classifier now? Reads every replied-but-unclassified intro, calls the LLM, and applies status transitions (yes → introduced + handoff draft, no → passed, etc.).')) return;
           classifyingNow.value = true;
@@ -8587,7 +8603,7 @@
           pendingRepliesFiltered, pendingBucketLabel, pendingBucketClass,
           togglePendingShowFresh, loadPendingReplies, draftPendingBump,
           repliesNeedingHuman, loadingNeedsHuman, classifyingNow,
-          loadRepliesNeedingHuman, classifyRepliesNow, formatRelative,
+          loadRepliesNeedingHuman, setReplyStatus, classifyRepliesNow, formatRelative,
           acceptRateClass,
           agentSettingsState, loadingAgentSettings, savingAgentSettings,
           loadAgentSettings, saveAgentSettings,

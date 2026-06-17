@@ -15,7 +15,7 @@ import { db, publicCompanies, publicUsers, founderLeads } from '../db/index.js';
 import { recordAction } from './agent-actions.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = 'claude-sonnet-4-6';
 
 // applicationStatus values that mean "the admin engaged positively" vs "passed".
 const LET_IN = ['approved', 'trial_sent', 'meeting_requested', 'interview_sent'];

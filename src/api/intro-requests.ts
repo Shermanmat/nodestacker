@@ -838,6 +838,88 @@ app.post('/:id/bump-investor', async (c) => {
   return c.json({ success: true, bumpCount: newBumpCount });
 });
 
+// Hand off an intro to another partner at the same firm (the VC passed the deal
+// to a colleague who's taking the meeting). Reassigns the intro to that partner,
+// records who it came from, and keeps the thread + history. The target partner
+// is an existing investor (by id) or a new one (created at the original's firm;
+// deduped by name+firm so we don't pile up duplicates).
+const handoffSchema = z.object({
+  investorId: z.number().int().positive().optional(),
+  newPartner: z.object({
+    name: z.string().min(1).max(160),
+    email: z.string().email().nullish(),
+    role: z.string().max(160).nullish(),
+  }).optional(),
+  status: z.string().optional(),
+}).refine((d) => d.investorId || d.newPartner, { message: 'Provide investorId or newPartner' });
+
+app.post('/:id/handoff-partner', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const parsed = handoffSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
+
+  const intro = await db.query.introRequests.findFirst({
+    where: eq(introRequests.id, id),
+    with: { founder: true, investor: true },
+  });
+  if (!intro) return c.json({ error: 'Intro request not found' }, 404);
+
+  const originalInvestorId = intro.investorId;
+  const firm = intro.investor?.firm ?? null;
+
+  // Resolve the target partner.
+  let targetId: number;
+  if (parsed.data.investorId) {
+    const inv = await db.query.investors.findFirst({ where: eq(investors.id, parsed.data.investorId) });
+    if (!inv) return c.json({ error: 'Target investor not found' }, 404);
+    targetId = inv.id;
+  } else {
+    const np = parsed.data.newPartner!;
+    // Find-or-create at the same firm so a repeat handoff doesn't duplicate.
+    const existing = firm
+      ? await db.query.investors.findFirst({ where: and(eq(investors.name, np.name), eq(investors.firm, firm)) })
+      : await db.query.investors.findFirst({ where: eq(investors.name, np.name) });
+    if (existing) {
+      targetId = existing.id;
+      if (np.email && !existing.email) await db.update(investors).set({ email: np.email }).where(eq(investors.id, existing.id));
+    } else {
+      const [created] = await db.insert(investors).values({
+        name: np.name, firm, role: np.role ?? null, email: np.email ?? null, active: true,
+      }).returning();
+      targetId = created.id;
+    }
+  }
+  if (targetId === originalInvestorId) return c.json({ error: 'That partner is already on this intro' }, 400);
+
+  const now = new Date().toISOString();
+  const newStatus = parsed.data.status && introStatusValues.includes(parsed.data.status as any)
+    ? parsed.data.status
+    : intro.status;
+
+  await db.update(introRequests).set({
+    investorId: targetId,
+    handedOffFromInvestorId: originalInvestorId,
+    handedOffAt: now,
+    status: newStatus,
+    // Resolve the original reply so it leaves the needs-human panel and the
+    // classifier won't re-process the old partner's forward in a loop.
+    replyClassification: intro.replyClassification ? 'handed_off' : intro.replyClassification,
+    updatedAt: now,
+  }).where(eq(introRequests.id, id));
+
+  const targetInv = await db.query.investors.findFirst({ where: eq(investors.id, targetId) });
+  await db.insert(followupLogs).values({
+    introRequestId: id,
+    followupType: 'node_update',
+    completedBy: 'admin',
+    completedAt: now,
+    notes: `Handed off from ${intro.investor?.name ?? 'investor #' + originalInvestorId} to ${targetInv?.name ?? 'investor #' + targetId}${firm ? ' at ' + firm : ''} re: ${intro.founder?.name ?? ''}`,
+    nextAction: 'Continue the conversation with the new partner',
+  });
+
+  return c.json({ success: true, investorId: targetId, investorName: targetInv?.name, handedOffFromInvestorId: originalInvestorId, status: newStatus });
+});
+
 // Admin/Node Tasks - tasks for the node (person making intros)
 // Timeline: Day 5 = "bump investor", Day 7 after bump = "bump again" or auto-ignore
 // Only intros after May 2025

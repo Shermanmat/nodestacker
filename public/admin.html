@@ -1602,6 +1602,7 @@
                     <option value="">Set status…</option>
                     <option v-for="s in introStatuses" :key="s" :value="s">{{ s.replace(/_/g, ' ') }}</option>
                   </select>
+                  <button @click="openHandoffModal(r)" class="text-xs text-purple-600 hover:underline" title="The VC passed this to a colleague who's taking the meeting">Hand off to partner →</button>
                 </div>
               </div>
             </div>
@@ -3705,6 +3706,30 @@
             <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Hand-off-to-partner Modal -->
+    <div v-if="showHandoffModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+        <h3 class="text-lg font-semibold mb-1">Hand off to another partner</h3>
+        <p class="text-xs text-gray-500 mb-4">Reassign this intro to a colleague at <b>{{ handoffFirm || 'the firm' }}</b> who's taking the meeting. Keeps the Gmail thread + history, recorded as handed off from <b>{{ handoffFromName }}</b>.</p>
+        <label class="block text-sm font-medium mb-1">Partner name *</label>
+        <input v-model="handoffName" type="text" placeholder="e.g. Dana Lewis" class="w-full border rounded px-3 py-2 text-sm mb-2">
+        <div class="flex gap-2 mb-2">
+          <input v-model="handoffEmail" type="email" placeholder="email (optional)" class="flex-1 border rounded px-3 py-2 text-sm">
+          <input v-model="handoffRole" type="text" placeholder="role (optional)" class="flex-1 border rounded px-3 py-2 text-sm">
+        </div>
+        <label class="block text-sm font-medium mb-1">New status (optional)</label>
+        <select v-model="handoffStatus" class="w-full border rounded px-3 py-2 text-sm mb-4">
+          <option value="">Keep current status</option>
+          <option v-for="s in introStatuses" :key="s" :value="s">{{ s.replace(/_/g, ' ') }}</option>
+        </select>
+        <div class="flex justify-end gap-2">
+          <button @click="showHandoffModal=false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Cancel</button>
+          <button @click="submitHandoff" :disabled="handoffSubmitting || !handoffName.trim()" class="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">{{ handoffSubmitting ? 'Saving…' : 'Hand off' }}</button>
+        </div>
+        <div v-if="handoffErr" class="text-sm text-red-600 mt-2">{{ handoffErr }}</div>
       </div>
     </div>
 
@@ -6326,6 +6351,46 @@
         const loadingNeedsHuman = ref(false);
         const classifyingNow = ref(false);
 
+        // Hand-off-to-partner state
+        const showHandoffModal = ref(false);
+        const handoffIntroId = ref(null);
+        const handoffFirm = ref('');
+        const handoffFromName = ref('');
+        const handoffName = ref('');
+        const handoffEmail = ref('');
+        const handoffRole = ref('');
+        const handoffStatus = ref('');
+        const handoffSubmitting = ref(false);
+        const handoffErr = ref('');
+        const openHandoffModal = (r) => {
+          handoffIntroId.value = r.introId;
+          handoffFirm.value = r.investorFirm || '';
+          handoffFromName.value = r.investorName || '';
+          handoffName.value = ''; handoffEmail.value = ''; handoffRole.value = ''; handoffStatus.value = '';
+          handoffErr.value = '';
+          showHandoffModal.value = true;
+        };
+        const submitHandoff = async () => {
+          if (!handoffIntroId.value || !handoffName.value.trim()) return;
+          handoffSubmitting.value = true; handoffErr.value = '';
+          try {
+            const res = await api(`/intro-requests/${handoffIntroId.value}/handoff-partner`, {
+              method: 'POST',
+              body: {
+                newPartner: { name: handoffName.value.trim(), email: handoffEmail.value || null, role: handoffRole.value || null },
+                status: handoffStatus.value || undefined,
+              },
+            });
+            if (res && res.success) {
+              showHandoffModal.value = false;
+              loadRepliesNeedingHuman();
+            } else {
+              handoffErr.value = (res && typeof res.error === 'string') ? res.error : 'Failed to hand off';
+            }
+          } catch (e) { handoffErr.value = e.message || 'Failed to hand off'; }
+          finally { handoffSubmitting.value = false; }
+        };
+
         const loadRepliesNeedingHuman = async () => {
           loadingNeedsHuman.value = true;
           try {
@@ -8604,6 +8669,7 @@
           togglePendingShowFresh, loadPendingReplies, draftPendingBump,
           repliesNeedingHuman, loadingNeedsHuman, classifyingNow,
           loadRepliesNeedingHuman, setReplyStatus, classifyRepliesNow, formatRelative,
+          showHandoffModal, handoffFirm, handoffFromName, handoffName, handoffEmail, handoffRole, handoffStatus, handoffSubmitting, handoffErr, openHandoffModal, submitHandoff,
           acceptRateClass,
           agentSettingsState, loadingAgentSettings, savingAgentSettings,
           loadAgentSettings, saveAgentSettings,

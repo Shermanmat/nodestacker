@@ -151,6 +151,11 @@ export const introRequests = sqliteTable('intro_requests', {
   followupOwner: text('followup_owner').default('founder'),
   datePassed: text('date_passed'),
   passReason: text('pass_reason'),
+  // Partner handoff: when a VC passes the deal to a colleague who takes the
+  // meeting, the intro is reassigned to that colleague (investorId) and the
+  // original partner is recorded here so we keep "handed off from X".
+  handedOffFromInvestorId: integer('handed_off_from_investor_id').references(() => investors.id),
+  handedOffAt: text('handed_off_at'),
   investorBumpCount: integer('investor_bump_count').notNull().default(0),
   lastInvestorBumpAt: text('last_investor_bump_at'),
   // Gmail draft id created by the auto-draft agent. Presence = draft exists

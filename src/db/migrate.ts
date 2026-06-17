@@ -132,6 +132,9 @@ try {
 }
 // intro request date tracking
 safeAddColumn('intro_requests', 'date_passed', 'text');
+// Partner handoff (deal passed to a colleague who takes the meeting)
+safeAddColumn('intro_requests', 'handed_off_from_investor_id', 'integer');
+safeAddColumn('intro_requests', 'handed_off_at', 'text');
 // Auto-draft agent: track Gmail draft id created for a pending suggestion.
 // Status stays pending_suggestion until user marks it sent.
 safeAddColumn('intro_requests', 'gmail_draft_id', 'text');

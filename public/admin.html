@@ -3709,6 +3709,35 @@
       </div>
     </div>
 
+    <!-- Send intro requests (after starting a trial) Modal -->
+    <div v-if="showIntroSelect" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-lg max-h-[85vh] overflow-auto">
+        <h3 class="text-lg font-semibold mb-1">Send intro requests<span v-if="introSelectFounderName"> for {{ introSelectFounderName }}</span></h3>
+        <p class="text-xs text-gray-500 mb-4">Matched investors for this founder, best first. Uncheck any you don't want, then send.</p>
+        <div v-if="introSelectLoading" class="text-sm text-gray-500 py-8 text-center">Finding matches…</div>
+        <div v-else-if="introCandidates.length === 0" class="text-sm text-gray-500 py-8 text-center">No matches available right now — you can generate intros later from the pipeline.</div>
+        <div v-else class="space-y-1 mb-4">
+          <label class="flex items-center gap-2 text-xs text-gray-500 pb-2 border-b mb-1">
+            <input type="checkbox" :checked="introCandidates.every(c => c.selected)" @change="introCandidates.forEach(c => c.selected = $event.target.checked)">
+            Select all ({{ introCandidates.length }})
+          </label>
+          <label v-for="c in introCandidates" :key="c.introRequestId" class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox" v-model="c.selected">
+            <span class="text-sm flex-1 min-w-0">{{ c.investorName }}<span v-if="c.firm" class="text-gray-500"> · {{ c.firm }}</span></span>
+            <span class="text-xs text-gray-400 flex-shrink-0">score {{ c.matchScore }}</span>
+          </label>
+        </div>
+        <div class="flex justify-end gap-2 items-center">
+          <span v-if="introSelectErr" class="text-sm text-red-600 mr-auto">{{ introSelectErr }}</span>
+          <button @click="showIntroSelect = false" class="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm">Later</button>
+          <button @click="sendSelectedIntros" :disabled="introSelectSending || introCandidates.filter(c => c.selected).length === 0"
+            class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed">
+            {{ introSelectSending ? 'Sending…' : 'Send ' + introCandidates.filter(c => c.selected).length + ' intro request' + (introCandidates.filter(c => c.selected).length === 1 ? '' : 's') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Hand-off-to-partner Modal -->
     <div v-if="showHandoffModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
@@ -5078,7 +5107,10 @@
           if (!confirm(`Start a 2-week trial for ${who}? This converts them to a founder and turns on their intro cadence now.`)) return;
           try {
             const r = await api(`/signups/applications/${app.id}/start-trial`, { method: 'POST' });
-            if (r) await loadSignups();
+            if (r) {
+              await loadSignups();
+              if (r.founderId) openIntroSelectForFounder(r.founderId, who);
+            }
           } catch (e) { /* handled by api() */ }
         }
 
@@ -6350,6 +6382,39 @@
         const repliesNeedingHuman = ref([]);
         const loadingNeedsHuman = ref(false);
         const classifyingNow = ref(false);
+
+        // Send-intro-requests-after-trial state
+        const showIntroSelect = ref(false);
+        const introSelectFounderId = ref(null);
+        const introSelectFounderName = ref('');
+        const introCandidates = ref([]);
+        const introSelectLoading = ref(false);
+        const introSelectSending = ref(false);
+        const introSelectErr = ref('');
+        const openIntroSelectForFounder = async (founderId, name) => {
+          if (!founderId) return;
+          introSelectFounderId.value = founderId;
+          introSelectFounderName.value = name || '';
+          introCandidates.value = [];
+          introSelectErr.value = '';
+          introSelectLoading.value = true;
+          showIntroSelect.value = true;
+          try {
+            const res = await api(`/matching/generate-for-trial/${founderId}`, { method: 'POST' });
+            introCandidates.value = ((res && res.candidates) || []).map(c => ({ ...c, selected: true }));
+          } catch (e) { introSelectErr.value = e.message || 'Could not load matches'; }
+          finally { introSelectLoading.value = false; }
+        };
+        const sendSelectedIntros = async () => {
+          const ids = introCandidates.value.filter(c => c.selected).map(c => c.introRequestId);
+          if (ids.length === 0) return;
+          introSelectSending.value = true; introSelectErr.value = '';
+          try {
+            await api('/matching/bulk-approve-intros', { method: 'POST', body: { introRequestIds: ids } });
+            showIntroSelect.value = false;
+          } catch (e) { introSelectErr.value = e.message || 'Failed to send'; }
+          finally { introSelectSending.value = false; }
+        };
 
         // Hand-off-to-partner state
         const showHandoffModal = ref(false);
@@ -8670,6 +8735,7 @@
           repliesNeedingHuman, loadingNeedsHuman, classifyingNow,
           loadRepliesNeedingHuman, setReplyStatus, classifyRepliesNow, formatRelative,
           showHandoffModal, handoffFirm, handoffFromName, handoffName, handoffEmail, handoffRole, handoffStatus, handoffSubmitting, handoffErr, openHandoffModal, submitHandoff,
+          showIntroSelect, introSelectFounderName, introCandidates, introSelectLoading, introSelectSending, introSelectErr, sendSelectedIntros,
           acceptRateClass,
           agentSettingsState, loadingAgentSettings, savingAgentSettings,
           loadAgentSettings, saveAgentSettings,

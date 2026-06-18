@@ -10,6 +10,7 @@ import {
   founderNodeRelationships,
   nodeInvestorConnections,
   founders,
+  investors,
 } from '../db/index.js';
 import {
   generateMatchSuggestions,
@@ -181,6 +182,45 @@ app.post('/generate', async (c) => {
       : 0,
     liquidity,
   });
+});
+
+// Generate suggestions for ONE founder (used right after starting a trial) and
+// return an enriched, selectable candidate list for the "send intro requests"
+// modal. Persists pending_suggestion intros exactly like /generate does.
+app.post('/generate-for-trial/:founderId', async (c) => {
+  const founderId = parseInt(c.req.param('founderId'));
+  if (!founderId) return c.json({ error: 'Invalid founderId' }, 400);
+
+  const { suggestions, rampUps } = await generateMatchSuggestions(founderId);
+  for (const ramp of rampUps) {
+    await db.update(founders).set({ introTargetPerWeek: ramp.newTarget }).where(eq(founders.id, ramp.founderId));
+  }
+
+  const now = new Date().toISOString();
+  const candidates: Array<{ introRequestId: number; investorId: number; investorName: string | null; firm: string | null; matchScore: number; reasoning: string }> = [];
+  for (const s of suggestions) {
+    if (s.founderId !== founderId) continue;
+    const reasoning = JSON.parse(s.matchReasoning);
+    const [ir] = await db.insert(introRequests).values({
+      founderId: s.founderId, nodeId: s.nodeId, investorId: s.investorId,
+      status: 'pending_suggestion', notes: `Match Score: ${s.matchScore} | ${reasoning.logic}`,
+      createdAt: now, updatedAt: now,
+    }).returning();
+    await db.insert(matchSuggestions).values({
+      founderId: s.founderId, nodeId: s.nodeId, investorId: s.investorId,
+      founderHeatScore: s.founderHeatScore, investorReliabilityScore: s.investorReliabilityScore,
+      matchScore: s.matchScore, matchReasoning: s.matchReasoning, batchId: s.batchId,
+      status: 'pending', introRequestId: ir.id, createdAt: now,
+    });
+    const inv = await db.query.investors.findFirst({ where: eq(investors.id, s.investorId) });
+    candidates.push({
+      introRequestId: ir.id, investorId: s.investorId,
+      investorName: inv?.name ?? null, firm: inv?.firm ?? null,
+      matchScore: s.matchScore, reasoning: reasoning.logic,
+    });
+  }
+  candidates.sort((a, b) => b.matchScore - a.matchScore);
+  return c.json({ founderId, candidates });
 });
 
 // --- Pending Suggestion Management ---

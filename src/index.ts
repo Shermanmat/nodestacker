@@ -58,6 +58,11 @@ import { desc } from 'drizzle-orm';
 
 const app = new Hono();
 
+// Liveness/readiness probe — fast, no DB, no auth. Fly's health check hits this
+// so the proxy only routes once the app is actually listening (and waits for it
+// on deploy), instead of blindly retrying a not-yet-bound instance.
+app.get('/health', (c) => c.text('ok'));
+
 // Middleware
 app.use('*', logger());
 app.use('/api/*', cors());

@@ -500,6 +500,26 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`comms_change_requests\` (
 safeAddColumn('comms_change_requests', 'approve_token', 'text');
 console.log('  Ensured comms_change_requests table exists');
 
+// Investor-discovery agent candidates (pending admin review).
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`investor_candidates\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`name\` text NOT NULL,
+  \`firm\` text,
+  \`role\` text,
+  \`stage\` text,
+  \`check_size\` text,
+  \`thesis\` text,
+  \`geo\` text,
+  \`links\` text,
+  \`source_url\` text,
+  \`confidence\` text,
+  \`status\` text NOT NULL DEFAULT 'pending',
+  \`investor_id\` integer,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  \`reviewed_at\` text
+)`);
+console.log('  Ensured investor_candidates table exists');
+
 // Structured reject taxonomy on match_suggestions + one-time backfill from the
 // legacy free-text rejection_reason (only fills nulls).
 safeAddColumn('match_suggestions', 'rejection_category', 'text');

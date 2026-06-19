@@ -581,6 +581,29 @@ export const commsChangeRequests = sqliteTable('comms_change_requests', {
 export type CommsChangeRequest = typeof commsChangeRequests.$inferSelect;
 export type NewCommsChangeRequest = typeof commsChangeRequests.$inferInsert;
 
+// Investor-discovery agent: candidates found on the open web (via Claude web
+// search), pending admin review. Approve → creates an investors row.
+export const investorCandidates = sqliteTable('investor_candidates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  firm: text('firm'),
+  role: text('role'),
+  stage: text('stage'),
+  checkSize: text('check_size'),
+  thesis: text('thesis'),
+  geo: text('geo'),
+  links: text('links'),              // JSON array of urls
+  sourceUrl: text('source_url'),
+  confidence: text('confidence'),    // 0-1 as string (sqlite REAL gotchas)
+  status: text('status').notNull().default('pending'), // pending | approved | rejected
+  investorId: integer('investor_id'), // set when approved → the created investor
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  reviewedAt: text('reviewed_at'),
+});
+
+export type InvestorCandidate = typeof investorCandidates.$inferSelect;
+export type NewInvestorCandidate = typeof investorCandidates.$inferInsert;
+
 // Inbound Intro Logs Table (BCC email logging for intro tracking)
 export const InboundIntroLogStatus = {
   PENDING: 'pending',

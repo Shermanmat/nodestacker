@@ -29,6 +29,7 @@ import onboardingChatRoutes from './api/onboarding-chat.js';
 import webhooksRoutes from './api/webhooks.js';
 import granolaRoutes from './api/granola.js';
 import commsApproveRoutes from './api/comms-approve.js';
+import investorCandidatesRoutes from './api/investor-candidates.js';
 import weeklyDigestRoutes from './api/weekly-digest.js';
 import publicAuthRoutes from './api/public-auth.js';
 import publicProfileRoutes from './api/public-profile.js';
@@ -119,6 +120,8 @@ app.use('/api/categories', adminGuard);
 app.use('/api/categories/*', adminGuard);
 app.use('/api/investors', adminGuard);
 app.use('/api/investors/*', adminGuard);
+app.use('/api/investor-candidates', adminGuard);
+app.use('/api/investor-candidates/*', adminGuard);
 app.use('/api/intro-requests', adminGuard);
 app.use('/api/intro-requests/*', adminGuard);
 app.use('/api/relationships', adminGuard);
@@ -192,6 +195,7 @@ app.route('/api/webhooks', webhooksRoutes);
 app.route('/api/granola', granolaRoutes);
 app.route('/comms/approve', commsApproveRoutes);
 app.route('/api/matching', matchingRoutes);
+app.route('/api/investor-candidates', investorCandidatesRoutes);
 app.route('/api/marketplace-health', marketplaceHealthRoutes);
 app.route('/api/signups', signupsRoutes);
 app.route('/api/weekly-digest', weeklyDigestRoutes);
@@ -1091,8 +1095,23 @@ cron.schedule('15 * * * *', async () => {
   timezone: 'UTC'
 });
 
+// Investor discovery — once a day, find a small batch of active pre-seed/seed
+// first-check investors via web search and queue them for admin review.
+cron.schedule('0 15 * * *', async () => {
+  console.log('[CRON] Running investor discovery tick...');
+  try {
+    const { runInvestorDiscoveryTick } = await import('./services/investor-discovery.js');
+    const { withCronRun } = await import('./services/cron-log.js');
+    const result = await withCronRun('investor_discovery', () => runInvestorDiscoveryTick(15));
+    console.log('[CRON] Investor discovery result:', result);
+  } catch (err) {
+    console.error('[CRON] Investor discovery failed:', err);
+  }
+}, { timezone: 'UTC' });
+
 console.log('[CRON] Trial decision nudge scheduled for daily 16:30 UTC (9:30am Arizona)');
 console.log('[CRON] Reply classifier scheduled hourly at :15');
+console.log('[CRON] Investor discovery scheduled daily at 15:00 UTC');
 
 serve({
   fetch: app.fetch,

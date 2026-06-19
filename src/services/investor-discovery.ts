@@ -51,29 +51,42 @@ export async function discoverInvestors(opts: {
   const userPrompt = `Find about ${opts.count} active pre-seed/seed first-check investors${opts.angle ? ' (bias toward: ' + opts.angle + ')' : ''}.
 
 EXCLUDE these — already in our network, don't return them:
-${opts.excludeNames.slice(0, 400).join(', ') || '(none yet)'}
+${opts.excludeNames.slice(0, 50).join(', ') || '(none yet)'}
 
 Research with web search, then return the JSON.`;
 
   const messages: any[] = [{ role: 'user', content: userPrompt }];
   let finalText = '';
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   // The web_search server tool runs an internal loop; stop_reason 'pause_turn'
-  // means "resume" — re-send the accumulated messages. Cap rounds + searches.
-  for (let round = 0; round < 6; round++) {
-    const res = await fetch(ANTHROPIC_API_URL, {
-      method: 'POST',
-      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 4096,
-        system: SYSTEM,
-        tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
-        messages,
-      }),
-    });
-    if (!res.ok) throw new Error(`Claude API error: ${res.status} - ${(await res.text()).slice(0, 300)}`);
-    const data = await res.json();
+  // means "resume" — re-send the accumulated messages. Keep rounds + searches
+  // low: web search pulls large page content into context, which compounds
+  // across rounds and can blow past a tight input-tokens/min rate limit.
+  for (let round = 0; round < 4; round++) {
+    let data: any;
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await fetch(ANTHROPIC_API_URL, {
+        method: 'POST',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 3500,
+          system: SYSTEM,
+          tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }],
+          messages,
+        }),
+      });
+      if (res.status === 429) {
+        const retryAfter = parseInt(res.headers.get('retry-after') || '') || 5 * (attempt + 1);
+        await sleep(Math.min(60, retryAfter) * 1000); // respect rate limit, then retry same request
+        continue;
+      }
+      if (!res.ok) throw new Error(`Claude API error: ${res.status} - ${(await res.text()).slice(0, 300)}`);
+      data = await res.json();
+      break;
+    }
+    if (!data) throw new Error('Claude API rate-limited (429) after retries — try again shortly or raise your org rate limit');
     messages.push({ role: 'assistant', content: data.content });
     for (const b of data.content || []) if (b.type === 'text') finalText += b.text;
     if (data.stop_reason !== 'pause_turn') break;
@@ -119,7 +132,7 @@ export async function runInvestorDiscoveryTick(count = 15): Promise<{ found: num
 
   const excludeNames = existingInvestors
     .map((r) => (r.firm ? `${r.name} @ ${r.firm}` : r.name))
-    .slice(0, 400);
+    .slice(0, 50);
 
   const discovered = await discoverInvestors({ count, excludeNames });
 

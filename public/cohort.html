@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MatCap Cohort #1 — Come to Arizona. Leave raise-ready.</title>
+  <meta name="description" content="MatCap Cohort #1 is a hands-on retreat in Phoenix. Join MatCap, learn how we work, bond with other founders, and fly home ready to raise your venture round. Part of MatCap's standard 1% deal — never cash, never more equity.">
+  <meta property="og:title" content="MatCap Cohort #1 — Come to Arizona. Leave raise-ready.">
+  <meta property="og:description" content="A hands-on retreat in Phoenix with MatCap. Join, learn how we work, bond with the cohort, leave ready to raise.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="/favicon.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      --bg:#FFFFFF;
+      --bg-alt:#F5F5F5;
+      --bg-alt2:#FAFAFA;
+      --text:#000000;
+      --muted:#555555;
+      --accent:#00C2E0;
+      --accent-dim:rgba(0,194,224,0.12);
+      --accent-ghost:rgba(0,194,224,0.07);
+      --rule:#e5e5e5;
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{
+      background:var(--bg);
+      color:var(--text);
+      font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+      font-size:17px;
+      line-height:1.55;
+      -webkit-font-smoothing:antialiased;
+      overflow-x:hidden;
+    }
+    a{color:inherit}
+    em{font-style:italic}
+
+    /* ========== Nav ========== */
+    nav.topnav{
+      position:fixed;top:0;left:0;right:0;z-index:100;
+      background:#fff;color:#000;
+      padding:10px 24px;
+      display:flex;align-items:center;justify-content:space-between;
+      border-bottom:1px solid var(--rule);
+    }
+    nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
+    nav.topnav img{height:34px;width:auto;display:block}
+    nav.topnav .tag{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:15px;letter-spacing:3px;color:var(--accent);
+      border-left:1px solid var(--rule);padding-left:14px;
+    }
+    nav.topnav .links{display:flex;gap:28px;align-items:center}
+    nav.topnav .links a{
+      color:#000;text-decoration:none;font-weight:600;font-size:13px;
+      text-transform:uppercase;letter-spacing:1.5px;
+    }
+    nav.topnav .links a:hover{color:var(--accent)}
+    nav.topnav .links a.btn{
+      background:#000;color:#fff;padding:10px 16px;
+    }
+    nav.topnav .links a.btn:hover{background:var(--accent);color:#000}
+    @media(max-width:640px){
+      nav.topnav .links a.nav-link{display:none}
+    }
+
+    /* ========== Shared ========== */
+    section{position:relative;overflow:hidden}
+    .inner{max-width:1100px;margin:0 auto;padding:0 24px;position:relative;z-index:2}
+    .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
+    .reveal.in{opacity:1;transform:translateY(0)}
+    .kicker{
+      font-family:'Bebas Neue',sans-serif;
+      letter-spacing:4px;font-size:14px;
+      color:var(--accent);margin-bottom:14px;
+    }
+
+    /* ========== Hero ========== */
+    .hero{
+      min-height:calc(100vh - 60px);
+      display:flex;align-items:center;justify-content:center;
+      padding:120px 0 80px;
+      border-bottom:1px solid var(--rule);
+      text-align:center;
+      background:#000 url('/images/hero/cohort-pool.jpg') center 38%/cover no-repeat;
+    }
+    .hero::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.5) 0%,rgba(0,0,0,.38) 45%,rgba(0,0,0,.74) 100%);z-index:1}
+    .hero .inner{max-width:1100px;position:relative;z-index:2}
+    .hero .kicker{margin-bottom:18px}
+    .hero h1{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(64px,11vw,168px);
+      line-height:.95;letter-spacing:3px;
+      margin-bottom:28px;color:#fff;
+      text-shadow:0 2px 30px rgba(0,0,0,.4);
+    }
+    .hero h1 .accent{color:var(--accent)}
+    .hero-tag{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(20px,2.6vw,32px);letter-spacing:2.5px;
+      text-transform:uppercase;color:var(--accent);margin:0 auto 16px;
+    }
+    .hero-sub{
+      font-size:clamp(18px,1.8vw,23px);
+      font-weight:500;max-width:680px;
+      color:#f0f0f0;margin:0 auto 36px;
+    }
+    .hero-cta{
+      display:inline-block;background:var(--accent);color:#000;
+      padding:18px 44px;font-weight:800;font-size:15px;
+      text-transform:uppercase;letter-spacing:2.5px;
+      text-decoration:none;border:2px solid var(--accent);
+      transition:all .2s;
+    }
+    .hero-cta:hover{background:transparent;color:var(--accent)}
+    .hero-meta{
+      margin-top:26px;font-size:13px;font-weight:600;letter-spacing:1.5px;
+      text-transform:uppercase;color:#dcdcdc;
+      display:flex;gap:14px;justify-content:center;flex-wrap:wrap;
+    }
+    .hero-meta span{display:inline-flex;align-items:center;gap:14px}
+    .hero-meta span::after{content:"·";color:var(--accent)}
+    .hero-meta span:last-child::after{content:""}
+
+    /* ========== Manifesto (black band) ========== */
+    .manifesto{background:#000;color:#fff;padding:110px 0}
+    .manifesto .inner{max-width:900px}
+    .manifesto .kicker{color:var(--accent)}
+    .manifesto h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(36px,6vw,64px);
+      letter-spacing:2px;line-height:1.02;margin-bottom:32px;
+    }
+    .manifesto h2 .accent{color:var(--accent)}
+    .manifesto p{font-size:clamp(17px,1.6vw,21px);color:#cfcfcf;max-width:760px;margin-bottom:20px}
+    .manifesto p strong{color:#fff;font-weight:700}
+
+    /* ========== Steps ========== */
+    .steps{padding:110px 0;background:var(--bg)}
+    .steps .head{text-align:center;margin-bottom:64px}
+    .steps h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(40px,6vw,72px);letter-spacing:2px;line-height:1;
+    }
+    .steps .head p{color:var(--muted);margin-top:14px;font-size:18px}
+    .step-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:2px;background:var(--rule);border:1px solid var(--rule)}
+    .step{background:#fff;padding:44px 38px}
+    .step .num{
+      font-family:'Bebas Neue',sans-serif;font-size:40px;letter-spacing:2px;
+      color:var(--accent);line-height:1;margin-bottom:14px;
+    }
+    .step h3{
+      font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1.5px;
+      margin-bottom:12px;line-height:1;
+    }
+    .step p{color:var(--muted);font-size:16px;line-height:1.6}
+    @media(max-width:760px){.step-grid{grid-template-columns:1fr}}
+
+    /* ========== Engine (post-retreat flow) ========== */
+    .engine{padding:110px 0;background:var(--bg-alt2)}
+    .engine .head{text-align:center;margin-bottom:56px}
+    .engine .head .kicker{color:var(--accent)}
+    .engine h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);letter-spacing:2px;line-height:1}
+    .engine .head p{color:var(--muted);margin-top:14px;font-size:18px;max-width:640px;margin-left:auto;margin-right:auto}
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:52px}
+    .flow .stage{background:#fff;border:1px solid var(--rule);border-top:3px solid var(--accent);padding:30px 24px;position:relative}
+    .flow .stage::after{content:"\2192";position:absolute;top:50%;right:-19px;transform:translateY(-50%);color:var(--accent);font-weight:800;font-size:20px;z-index:3}
+    .flow .stage:last-child::after{display:none}
+    .flow .stage .s-num{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;color:var(--accent);margin-bottom:13px}
+    .flow .stage h3{font-family:'Bebas Neue',sans-serif;font-size:25px;letter-spacing:1px;line-height:1.02;margin-bottom:11px}
+    .flow .stage p{font-size:14px;color:var(--muted);line-height:1.55}
+    .engine-stats{display:flex;flex-wrap:wrap;justify-content:center;gap:28px 48px;border-top:1px solid var(--rule);padding-top:42px}
+    .engine-stat{text-align:center}
+    .engine-stat .n{font-family:'Bebas Neue',sans-serif;font-size:46px;letter-spacing:1px;line-height:1;color:#000}
+    .engine-stat .n span{color:var(--accent)}
+    .engine-stat .l{font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-top:7px}
+    .engine-link{text-align:center;margin-top:40px}
+    .engine-link a{color:#000;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;text-decoration:none;border-bottom:2px solid var(--accent);padding-bottom:3px}
+    .engine-link a:hover{color:var(--accent)}
+    @media(max-width:860px){
+      .flow{grid-template-columns:1fr;gap:30px}
+      .flow .stage::after{content:"\2193";right:50%;top:auto;bottom:-27px;transform:translateX(50%)}
+    }
+
+    /* ========== Case studies ========== */
+    .cases{padding:110px 0;background:var(--bg)}
+    .cases .head{text-align:center;margin-bottom:54px}
+    .cases .head .kicker{color:var(--accent)}
+    .cases h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);letter-spacing:2px;line-height:1}
+    .cases .head p{color:var(--muted);margin-top:14px;font-size:18px}
+    .case-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+    .case{background:#fff;border:1px solid var(--rule);border-top:3px solid var(--accent);padding:34px 30px;display:flex;flex-direction:column;text-decoration:none;color:inherit;transition:transform .2s,box-shadow .2s}
+    .case:hover{transform:translateY(-4px);box-shadow:0 12px 30px rgba(0,0,0,.08)}
+    .case .more{margin-top:16px;font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent)}
+    .case .amt{font-family:'Bebas Neue',sans-serif;font-size:clamp(46px,5vw,62px);letter-spacing:1px;line-height:1;color:#000;margin-bottom:4px}
+    .case .co{font-family:'Bebas Neue',sans-serif;font-size:24px;letter-spacing:1.5px;color:var(--accent);margin-bottom:12px}
+    .case .desc{font-size:15px;color:#222;line-height:1.5;margin-bottom:18px}
+    .case .proof{font-size:13px;color:var(--muted);line-height:1.55;margin-top:auto;border-top:1px solid var(--rule);padding-top:14px}
+    @media(max-width:860px){.case-grid{grid-template-columns:1fr}}
+
+    /* ========== Gallery (full-bleed mosaic) ========== */
+    .gallery{padding:110px 0;background:#000}
+    .gallery .head{text-align:center;margin-bottom:54px}
+    .gallery .head .kicker{color:var(--accent)}
+    .gallery h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);letter-spacing:2px;color:#fff;line-height:1}
+    .gallery .head p{color:#aaa;margin-top:12px;font-size:18px}
+    .mosaic{max-width:1280px;margin:0 auto;padding:0 16px;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:200px;grid-auto-flow:dense;gap:12px}
+    .mosaic figure{overflow:hidden;background:#111;position:relative}
+    .mosaic img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .5s ease}
+    .mosaic figure:hover img{transform:scale(1.06)}
+    .mosaic .big{grid-column:span 2;grid-row:span 2}
+    .mosaic .wide{grid-column:span 2}
+    .mosaic .tall{grid-row:span 2}
+    @media(max-width:760px){
+      .mosaic{grid-template-columns:repeat(2,1fr);grid-auto-rows:150px;gap:8px}
+      .mosaic .big{grid-column:span 2;grid-row:span 2}
+      .mosaic .wide{grid-column:span 2}
+      .mosaic .tall{grid-row:span 1}
+    }
+
+    /* ========== Cohort 0 (compact list) ========== */
+    .cohort0{padding:84px 0;background:var(--bg)}
+    .cohort0 .head{text-align:center;margin-bottom:38px}
+    .cohort0 .head .kicker{color:var(--accent)}
+    .cohort0 h3{font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,3.4vw,40px);letter-spacing:1.5px;line-height:1.05;max-width:640px;margin:0 auto}
+    .cohort0 .head p{color:var(--muted);margin-top:12px;font-size:15px}
+    .c0-list{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:0 56px}
+    .c0-row{display:flex;gap:8px;align-items:baseline;padding:12px 0;border-bottom:1px solid var(--rule)}
+    .c0-row .c0-co{font-weight:700;color:#000;white-space:nowrap}
+    .c0-row .c0-ol{color:var(--muted);font-size:14px;line-height:1.4}
+    @media(max-width:760px){.c0-list{grid-template-columns:1fr;gap:0}}
+
+    /* ========== Itinerary (timeline) ========== */
+    .itin{padding:110px 0;background:var(--bg-alt2)}
+    .itin .head{text-align:center;margin-bottom:60px}
+    .itin .head .kicker{color:var(--accent)}
+    .itin h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,72px);letter-spacing:2px;line-height:1}
+    .itin .head p{color:var(--muted);margin-top:14px;font-size:18px}
+    .timeline{max-width:760px;margin:0 auto;position:relative}
+    .timeline::before{content:"";position:absolute;left:7px;top:6px;bottom:6px;width:2px;background:var(--rule)}
+    .tl-item{position:relative;padding:0 0 44px 40px}
+    .tl-item:last-child{padding-bottom:0}
+    .tl-item::before{content:"";position:absolute;left:0;top:3px;width:16px;height:16px;border-radius:50%;background:var(--accent);border:3px solid var(--bg-alt2)}
+    .tl-day{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:2px;color:var(--accent);margin-bottom:6px}
+    .tl-item h3{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:1px;line-height:1;margin-bottom:10px}
+    .tl-item p{font-size:16px;color:var(--muted);line-height:1.6}
+
+    /* ========== Details (one-sheet) ========== */
+    .facts{padding:110px 0;background:var(--bg-alt)}
+    .facts .head{text-align:center;margin-bottom:48px}
+    .facts .head .kicker{color:var(--accent)}
+    .facts h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,6vw,68px);letter-spacing:2px;line-height:1}
+    .spec{max-width:840px;margin:0 auto;background:#fff;border:1px solid var(--rule);border-top:4px solid var(--accent);padding:6px 40px}
+    .spec-row{display:flex;align-items:baseline;justify-content:space-between;gap:24px;padding:24px 0;border-bottom:1px solid var(--rule)}
+    .spec-row:last-child{border-bottom:none}
+    .spec-row .k{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:21px;color:#000;flex:0 0 190px}
+    .spec-row .v{font-size:17px;color:var(--muted);text-align:right;line-height:1.5}
+    @media(max-width:620px){
+      .spec{padding:6px 24px}
+      .spec-row{flex-direction:column;gap:6px;align-items:flex-start}
+      .spec-row .k{flex:none;color:var(--accent);font-size:18px}
+      .spec-row .v{text-align:left}
+    }
+
+    /* ========== Apply (black) ========== */
+    .apply{padding:120px 0;background:#000;color:#fff;position:relative;text-align:center}
+    .apply .inner{max-width:760px}
+    .apply .kicker{color:var(--accent)}
+    .apply h2{
+      font-family:'Bebas Neue',sans-serif;
+      font-size:clamp(44px,7vw,84px);letter-spacing:2px;line-height:1;margin-bottom:22px;
+    }
+    .apply h2 .accent{color:var(--accent)}
+    .apply-sub{font-size:19px;color:#cfcfcf;max-width:560px;margin:0 auto 38px}
+    .apply-cta{
+      display:inline-block;background:var(--accent);color:#000;
+      padding:20px 52px;font-weight:800;font-size:16px;
+      text-transform:uppercase;letter-spacing:2.5px;
+      text-decoration:none;border:2px solid var(--accent);transition:all .2s;
+    }
+    .apply-cta:hover{background:transparent;color:var(--accent)}
+    .apply-note{margin-top:24px;font-size:14px;color:#888}
+    .apply-note a{color:var(--accent);text-decoration:none}
+
+    /* ========== Footer ========== */
+    footer{background:#000;color:#999;border-top:2px solid var(--accent);padding:64px 0 24px}
+    footer .inner{max-width:1100px;margin:0 auto;padding:0 24px}
+    footer .top{display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:40px;padding-bottom:48px;border-bottom:1px solid #222}
+    footer .brand img{height:32px;width:auto;margin-bottom:14px;display:block}
+    footer .brand p{font-size:13px;line-height:1.6;color:#888;max-width:280px}
+    footer .col h4{font-family:'Bebas Neue',sans-serif;letter-spacing:2px;font-size:15px;color:#fff;margin-bottom:16px}
+    footer .col a{display:block;color:#999;text-decoration:none;font-size:14px;margin-bottom:10px}
+    footer .col a:hover{color:var(--accent)}
+    footer .bottom{display:flex;justify-content:space-between;align-items:center;padding-top:24px;font-size:13px;color:#777}
+    footer .bottom a{color:var(--accent);text-decoration:none}
+    @media(max-width:760px){
+      footer .top{grid-template-columns:1fr;gap:32px;padding-bottom:32px}
+      footer .bottom{flex-direction:column;text-align:center;gap:8px}
+    }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="https://matcap.vc">
+    <img src="/downloads/matcap-logo.png" alt="MatCap">
+    <span class="tag">COHORT #1</span>
+  </a>
+  <div class="links">
+    <a class="nav-link" href="/community">Community</a>
+    <a class="nav-link" href="/intros">Intro Metrics</a>
+    <a class="btn" href="/signup">Apply</a>
+  </div>
+</nav>
+
+<!-- ========== HERO ========== -->
+<section class="hero" id="top">
+  <div class="inner">
+    <div class="kicker reveal">APPLICATIONS OPEN · COHORT #1</div>
+    <h1 class="reveal">Come to Arizona.<br>Leave <span class="accent">raise-ready.</span></h1>
+    <p class="hero-tag reveal">Fly in a builder. Fly out a founder.</p>
+    <p class="hero-sub reveal">MatCap Cohort #1 is a hands-on retreat in Phoenix. Join MatCap, learn exactly how we work together, bond with founders chasing the same kind of outcome, and fly home ready to run your venture round.</p>
+    <a class="hero-cta reveal" href="/signup">Apply to Cohort #1 →</a>
+    <div class="hero-meta reveal">
+      <span>Phoenix, AZ</span>
+      <span>Sun night → Tue AM</span>
+      <span>Just 1% — never cash, never more</span>
+    </div>
+  </div>
+</section>
+
+<!-- ========== MANIFESTO ========== -->
+<section class="manifesto">
+  <div class="inner">
+    <div class="kicker reveal">THE IDEA</div>
+    <h2 class="reveal">Raising is lonely, slow, and full of <span class="accent">avoidable mistakes.</span></h2>
+    <p class="reveal">We're fixing that — in person. A small group of founders. A few days in Arizona. You'll leave knowing <strong>how to work with MatCap</strong>, who's in your corner, and <strong>exactly how to run the round in front of you</strong> — backed by a network that's already opening doors.</p>
+    <p class="reveal">This is how Cohort #1 begins.</p>
+  </div>
+</section>
+
+<!-- ========== ENGINE (after the weekend) ========== -->
+<section class="engine">
+  <div class="inner">
+    <div class="head reveal">
+      <div class="kicker">AFTER THE WEEKEND</div>
+      <h2>Then the MatCap intro engine kicks in.</h2>
+      <p>The retreat is day one. From there, MatCap goes to work every week — opening doors to the right investors and keeping every conversation moving until you close.</p>
+    </div>
+    <div class="flow">
+      <div class="stage reveal"><div class="s-num">01</div><h3>We match you</h3><p>The investors Mat Sherman knows personally — AI-matched to your sector, stage, and story.</p></div>
+      <div class="stage reveal"><div class="s-num">02</div><h3>We open the door</h3><p>Warm intros through people who actually know the investor. Never cold forwards — both sides opt in.</p></div>
+      <div class="stage reveal"><div class="s-num">03</div><h3>AI works 24/7</h3><p>Research, follow-ups, and tracking run in the background so no conversation goes cold.</p></div>
+      <div class="stage reveal"><div class="s-num">04</div><h3>You close</h3><p>You own the room and the relationship. We're your point guard, not your quarterback.</p></div>
+    </div>
+    <div class="engine-stats reveal">
+      <div class="engine-stat"><div class="n">250<span>+</span></div><div class="l">Investors Mat knows</div></div>
+      <div class="engine-stat"><div class="n">89</div><div class="l">Firms engaged in 2026</div></div>
+      <div class="engine-stat"><div class="n">0</div><div class="l">Cold forwards, ever</div></div>
+      <div class="engine-stat"><div class="n">24/7</div><div class="l">AI doing the legwork</div></div>
+    </div>
+    <div class="engine-link reveal"><a href="/intros">See the live intro metrics →</a></div>
+  </div>
+</section>
+
+<!-- ========== CASE STUDIES ========== -->
+<section class="cases">
+  <div class="inner">
+    <div class="head reveal">
+      <div class="kicker">PROOF</div>
+      <h2>Real founders. Real rounds.</h2>
+      <p>A few of the raises the MatCap intro engine has helped close.</p>
+    </div>
+    <div class="case-grid">
+      <a class="case reveal" href="/case-studies/legix">
+        <div class="amt">$1.5M</div>
+        <div class="co">Legix</div>
+        <div class="desc">AI agents for high-volume accountants.</div>
+        <div class="proof">67 intros sent · 25% accept rate · 3 checks wired · round led by Untapped VC.</div>
+        <div class="more">Read the breakdown →</div>
+      </a>
+      <a class="case reveal" href="/case-studies/notary-everyday">
+        <div class="amt">$600K</div>
+        <div class="co">Notary Everyday</div>
+        <div class="desc">Workflow automation for notaries and title companies.</div>
+        <div class="proof">105 intros sent · 28% accept rate · 6 checks wired · first check from Elizabeth Yin (Hustle Fund); also Jack Selby & Josh Constine.</div>
+        <div class="more">Read the breakdown →</div>
+      </a>
+      <a class="case reveal" href="/case-studies/ryniant">
+        <div class="amt">$300K</div>
+        <div class="co">Ryniant</div>
+        <div class="desc">The fastest path from molecule to best synthesis plan.</div>
+        <div class="proof">Pre-seed led by Niko Bonatsos (Verdict Capital) · closed in under 4 weeks · 51 intros, 14 firms engaged.</div>
+        <div class="more">Read the breakdown →</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== GALLERY ========== -->
+<section class="gallery">
+  <div class="inner">
+    <div class="head reveal">
+      <div class="kicker">IN PERSON</div>
+      <h2>This is what it looks like.</h2>
+      <p>Founders, in the same room, doing the work.</p>
+    </div>
+  </div>
+  <div class="mosaic reveal">
+    <figure class="big"><img src="/events/irl-2.png" alt="MatCap founders gathered at the house" loading="lazy"></figure>
+    <figure class="wide"><img src="/images/community/workshops.jpg" alt="Founders working through fundraising together" loading="lazy"></figure>
+    <figure><img src="/events/irl-1.png" alt="MatCap founders at the house" loading="lazy"></figure>
+    <figure class="wide"><img src="/images/community/retreat-1.jpg" alt="Late-night working session on the patio" loading="lazy"></figure>
+    <figure><img src="/images/community/socials.jpg" alt="MatCap founder group in Arizona" loading="lazy"></figure>
+    <figure class="wide"><img src="/images/community/retreat-2.jpg" alt="Group session in the retreat house" loading="lazy"></figure>
+    <figure><img src="/images/community/conference.jpg" alt="MatCap founder event" loading="lazy"></figure>
+  </div>
+</section>
+
+<!-- ========== COHORT 0 ========== -->
+<section class="cohort0">
+  <div class="inner">
+    <div class="head reveal">
+      <div class="kicker">COHORT 0</div>
+      <h3>You'd be joining the founders already building with MatCap.</h3>
+      <p>The companies in the room today:</p>
+    </div>
+    <div class="c0-list reveal">
+      <div class="c0-row"><span class="c0-co">Legix</span><span class="c0-ol">— AI agents for high-volume accountants.</span></div>
+      <div class="c0-row"><span class="c0-co">Notary Everyday</span><span class="c0-ol">— marketplace between notaries and title companies.</span></div>
+      <div class="c0-row"><span class="c0-co">Covenant</span><span class="c0-ol">— secure, encrypted, open-source AI model cloud.</span></div>
+      <div class="c0-row"><span class="c0-co">ISA</span><span class="c0-ol">— a quantum power generator.</span></div>
+      <div class="c0-row"><span class="c0-co">ProPlaintiff</span><span class="c0-ol">— an AI-native law firm.</span></div>
+      <div class="c0-row"><span class="c0-co">Arkinet</span><span class="c0-ol">— AI agents that attack synthetic identity fraud.</span></div>
+      <div class="c0-row"><span class="c0-co">FileFlo</span><span class="c0-ol">— Vanta for construction, aviation & heavy industries.</span></div>
+      <div class="c0-row"><span class="c0-co">GitHired</span><span class="c0-ol">— hire 10x AI engineers using the new tools.</span></div>
+      <div class="c0-row"><span class="c0-co">Nav Robotics</span><span class="c0-ol">— the least expensive autonomous robots you can hack on.</span></div>
+      <div class="c0-row"><span class="c0-co">Anthropoid</span><span class="c0-ol">— NVIDIA Blackwell-class chips at one-fifth the cost.</span></div>
+      <div class="c0-row"><span class="c0-co">Sail</span><span class="c0-ol">— helps employees find hidden HSA savings.</span></div>
+      <div class="c0-row"><span class="c0-co">Ryniant</span><span class="c0-ol">— fastest path from molecule to best synthesis plan.</span></div>
+      <div class="c0-row"><span class="c0-co">Kashu</span><span class="c0-ol">— access and move your available credit, all in one place.</span></div>
+      <div class="c0-row"><span class="c0-co">Rodor</span><span class="c0-ol">— detect every drone type without emitting a signal.</span></div>
+      <div class="c0-row"><span class="c0-co">Gentle Weapons</span><span class="c0-ol">— control-plane infrastructure for edge AI in defense.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== ITINERARY ========== -->
+<section class="itin">
+  <div class="inner">
+    <div class="head reveal">
+      <div class="kicker">THE ITINERARY</div>
+      <h2>The agenda.</h2>
+      <p>Arrive Sunday night. Monday, we go to work.</p>
+    </div>
+    <div class="timeline">
+      <div class="tl-item reveal"><div class="tl-day">SUNDAY EVENING</div><h3>Arrive & meet the cohort</h3><p>Get into Phoenix, settle in, and meet the other founders over dinner.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 9:00 AM</div><h3>Make your blurb</h3><p>Craft the one-liner that makes an investor lean in.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 9:30 AM</div><h3>Mock pitches</h3><p>Pitch the room, get live feedback, tighten the story.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 10:15 AM</div><h3>Hear from funded founders</h3><p>Real raise stories from founders who've already done it.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 11:00 AM</div><h3>The Mentor Draft</h3><p>Fantasy-draft style: every founder drafts their mentors off the MatCap bench — then a 1:1 call with each one.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 12:00 PM</div><h3>Lunch</h3><p>Break and refuel with the group.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 1:00 PM</div><h3>Raising scenarios & lessons learned</h3><p>Work through real fundraise situations — and the mistakes to skip.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 2:00 PM</div><h3>How to use MatCap</h3><p>The platform, the intro engine, and the AI working for you 24/7.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 4:00 PM</div><h3>Bonding game</h3><p>The fun part. Leave with a crew, not just contacts.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">MON · 5:00 PM</div><h3>Dinner</h3><p>Wind down together and set what comes next.</p></div>
+      <div class="tl-item reveal"><div class="tl-day">TUESDAY AM</div><h3>Fly home</h3><p>Wheels up — and the MatCap intro engine goes to work on your raise.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== DETAILS (one-sheet) ========== -->
+<section class="facts">
+  <div class="inner">
+    <div class="head reveal">
+      <div class="kicker">THE DETAILS</div>
+      <h2>The one-sheet.</h2>
+    </div>
+    <div class="spec reveal">
+      <div class="spec-row"><div class="k">Location</div><div class="v">Phoenix, Arizona — built here, expanding everywhere.</div></div>
+      <div class="spec-row"><div class="k">Format</div><div class="v">Fly in Sunday night, fly out Tuesday morning — sessions all day Monday.</div></div>
+      <div class="spec-row"><div class="k">Cost</div><div class="v">The retreat — and lifetime access to MatCap — is part of our standard deal: 1% of your company. Never any cash. Never more equity. Just 1%.</div></div>
+      <div class="spec-row"><div class="k">Travel</div><div class="v">Get yourself to Phoenix — we cover the house, the food, and the programming.</div></div>
+      <div class="spec-row"><div class="k">Who it's for</div><div class="v">Anyone serious about working with MatCap and raising a venture round.</div></div>
+      <div class="spec-row"><div class="k">Mentors</div><div class="v">Draft your own at the retreat — then a 1:1 call with every mentor you pick.</div></div>
+      <div class="spec-row"><div class="k">Dates</div><div class="v">Announced on acceptance — apply now to hold your place.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== APPLY ========== -->
+<section class="apply" id="apply">
+  <div class="inner">
+    <div class="kicker reveal">APPLY</div>
+    <h2 class="reveal">Ready to <span class="accent">go big?</span></h2>
+    <p class="apply-sub reveal">Cohort #1 is small, and we read every application. Interested in working with MatCap in any capacity? Start here.</p>
+    <a class="apply-cta reveal" href="/signup">Apply now →</a>
+    <div class="apply-note reveal">Questions? <a href="mailto:mat@matsherman.com?subject=MatCap%20Cohort%20%231">mat@matsherman.com</a></div>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer>
+  <div class="inner">
+    <div class="top">
+      <div class="brand">
+        <img src="/downloads/matcap-logo.png" alt="MatCap">
+        <p>MatCap helps swing-big founders find investor capital and the peer group to grow alongside.</p>
+      </div>
+      <div class="col">
+        <h4>COHORT #1</h4>
+        <a href="/signup">Apply</a>
+        <a href="#top">The weekend</a>
+        <a href="/community">The community</a>
+      </div>
+      <div class="col">
+        <h4>EVIDENCE</h4>
+        <a href="/intros">Intro metrics</a>
+        <a href="/investors">Investors</a>
+      </div>
+      <div class="col">
+        <h4>CONTACT</h4>
+        <a href="mailto:mat@matsherman.com">mat@matsherman.com</a>
+        <a href="https://matcap.vc">matcap.vc</a>
+      </div>
+    </div>
+    <div class="bottom">
+      <div>&copy; 2026 MatCap. All rights reserved.</div>
+      <div>Built in Arizona. Expanding everywhere.</div>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>

@@ -217,6 +217,7 @@ app.post('/applications/:id/request-meeting', async (c) => {
     try {
       const noteHtml = note ? `<p>${note.replace(/\n/g, '<br>')}</p>` : '';
       const noteText = note ? `\n${note}\n` : '';
+      const INTERVIEW_BOOKING_URL = 'https://cal.com/matsherman/interview';
       await postmarkClient.sendEmail({
         From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
         To: user.email,
@@ -225,13 +226,15 @@ app.post('/applications/:id/request-meeting', async (c) => {
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
             <p>Hi ${user.firstName},</p>
             <p>Thanks for applying to MatCap. I'd love to learn more about ${company.companyName} and explore whether we'd be a good fit to work together.</p>
-            <p>Reply with a few times that work this week or next — happy to do a call, or grab coffee if you're in Phoenix.</p>
+            <p>Grab whatever time works best for you here:</p>
+            <p><a href="${INTERVIEW_BOOKING_URL}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Book a time →</a></p>
+            <p style="color:#666;font-size:14px;">Or if you'd rather grab coffee in Phoenix, just reply.</p>
             ${noteHtml}
             <p>Looking forward to it.</p>
             <p>Mat Sherman<br>Founder, MatCap</p>
           </div>
         `,
-        TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap. I'd love to learn more about ${company.companyName} and explore whether we'd be a good fit to work together.\n\nReply with a few times that work this week or next — happy to do a call, or grab coffee if you're in Phoenix.${noteText}\n\nLooking forward to it.\n\nMat Sherman\nFounder, MatCap`,
+        TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap. I'd love to learn more about ${company.companyName} and explore whether we'd be a good fit to work together.\n\nGrab whatever time works best for you here: ${INTERVIEW_BOOKING_URL}\n\nOr if you'd rather grab coffee in Phoenix, just reply.${noteText}\n\nLooking forward to it.\n\nMat Sherman\nFounder, MatCap`,
       });
     } catch (err) {
       console.error('Failed to send meeting-request email:', err);

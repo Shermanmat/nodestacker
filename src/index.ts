@@ -911,6 +911,7 @@ app.get('/how-it-works', (c) => c.redirect('/trial', 301));
 app.get('/founders', (c) => c.redirect('/signup', 302));
 app.get('/investors', serveStatic({ path: './public/investors.html' }));
 app.get('/crm', serveStatic({ path: './public/crm.html' }));
+app.get('/grant-pools', serveStatic({ path: './public/grant-pools.html' }));
 app.get('/nodes', serveStatic({ path: './public/nodes.html' }));
 app.get('/angel-club', (c) => c.redirect('/investors', 302));
 app.get('/yc', serveStatic({ path: './public/yc.html' }));

@@ -449,7 +449,7 @@
                   <td class="px-4">{{ company.investmentDate || '-' }}</td>
                   <td class="px-4">{{ company.equityPercent ? company.equityPercent + '%' : '-' }}</td>
                   <td class="px-4">{{ formatCurrency(company.currentValuation) }}</td>
-                  <td class="px-4"><span :class="markupClass(company)" :title="company.entryValuation ? 'Entry ' + formatCurrency(company.entryValuation) + ' → ' + formatCurrency(company.currentValuation) : 'Set an entry valuation (Edit) or add a round to track markup'">{{ markupLabel(company) }}</span></td>
+                  <td class="px-4"><span :class="markupClass(company)" :title="'Entry ' + formatCurrency(company.entryValuation || 3000000) + (company.entryValuation ? '' : ' (base)') + ' → ' + formatCurrency(company.currentValuation || 3000000)">{{ markupLabel(company) }}</span></td>
                   <td class="px-4 font-medium text-green-600">{{ formatCurrency(calculatePaperValue(company)) }}</td>
                   <td class="px-4">
                     <div class="flex items-center gap-1">
@@ -3769,8 +3769,8 @@
           <button @click="showRoundsModal=false" class="text-gray-400 hover:text-gray-600">✕</button>
         </div>
         <div class="flex gap-8 mb-4 text-sm">
-          <div><div class="text-gray-400 text-xs uppercase">Entry val</div><div class="font-medium">{{ formatCurrency(roundsCompany.entryValuation) || '—' }}</div></div>
-          <div><div class="text-gray-400 text-xs uppercase">Current val</div><div class="font-medium">{{ formatCurrency(roundsCompany.currentValuation) || '—' }}</div></div>
+          <div><div class="text-gray-400 text-xs uppercase">Entry val</div><div class="font-medium">{{ formatCurrency(roundsCompany.entryValuation || 3000000) }}<span v-if="!roundsCompany.entryValuation" class="text-gray-400 text-xs"> base</span></div></div>
+          <div><div class="text-gray-400 text-xs uppercase">Current val</div><div class="font-medium">{{ formatCurrency(roundsCompany.currentValuation || 3000000) }}</div></div>
           <div><div class="text-gray-400 text-xs uppercase">Markup</div><div class="font-bold text-lg" :class="markupClass(roundsCompany)">{{ markupLabel(roundsCompany) }}</div></div>
         </div>
         <div class="bg-gray-50 rounded-lg p-3 mb-4 grid grid-cols-2 gap-2">
@@ -6489,14 +6489,17 @@
         const addingRound = ref(false);
         const roundsErr = ref('');
         const roundForm = reactive({ investorName: '', roundName: '', valuation: null, amountInvested: null, roundDate: '' });
+        // Every portfolio company is assumed to start at $3M post-money — our base
+        // price. Markup is computed against $3M unless an entry valuation is set.
+        const DEFAULT_ENTRY_VAL = 3000000;
         const markupLabel = (co) => {
-          if (!co || !co.entryValuation || !co.currentValuation) return '—';
-          const m = co.currentValuation / co.entryValuation;
+          if (!co) return '—';
+          const m = (co.currentValuation || DEFAULT_ENTRY_VAL) / (co.entryValuation || DEFAULT_ENTRY_VAL);
           return (m >= 10 ? m.toFixed(0) : m.toFixed(1)) + '×';
         };
         const markupClass = (co) => {
-          if (!co || !co.entryValuation || !co.currentValuation) return 'text-gray-400';
-          const m = co.currentValuation / co.entryValuation;
+          if (!co) return 'text-gray-400';
+          const m = (co.currentValuation || DEFAULT_ENTRY_VAL) / (co.entryValuation || DEFAULT_ENTRY_VAL);
           return m > 1.001 ? 'text-green-600 font-medium' : (m < 0.999 ? 'text-red-600 font-medium' : 'text-gray-500');
         };
         const resetRoundForm = () => Object.assign(roundForm, { investorName: '', roundName: '', valuation: null, amountInvested: null, roundDate: '' });

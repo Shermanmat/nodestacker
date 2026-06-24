@@ -184,7 +184,8 @@ app.post('/:id/rounds', async (c) => {
   if (withVal.length) {
     const sorted = [...withVal].sort((a, b) => (a.roundDate || '').localeCompare(b.roundDate || ''));
     patch.currentValuation = sorted[sorted.length - 1].valuation;
-    if (company.entryValuation == null) patch.entryValuation = company.currentValuation ?? sorted[0].valuation;
+    // Base price: every portfolio company is assumed to start at $3M post-money.
+    if (company.entryValuation == null) patch.entryValuation = 3000000;
   }
   await db.update(portfolioCompanies).set(patch).where(eq(portfolioCompanies.id, id));
 

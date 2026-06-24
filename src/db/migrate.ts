@@ -520,6 +520,21 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`investor_candidates\` (
 )`);
 console.log('  Ensured investor_candidates table exists');
 
+// Portfolio markup tracking: entry-valuation baseline + per-round funding events.
+safeAddColumn('portfolio_companies', 'entry_valuation', 'integer');
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`portfolio_rounds\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`portfolio_company_id\` integer NOT NULL,
+  \`round_date\` text,
+  \`round_name\` text,
+  \`investor_name\` text,
+  \`amount_invested\` integer,
+  \`valuation\` integer,
+  \`notes\` text,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+console.log('  Ensured portfolio_rounds table exists');
+
 // Structured reject taxonomy on match_suggestions + one-time backfill from the
 // legacy free-text rejection_reason (only fills nulls).
 safeAddColumn('match_suggestions', 'rejection_category', 'text');

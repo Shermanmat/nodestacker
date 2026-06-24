@@ -337,7 +337,8 @@ export const portfolioCompanies = sqliteTable('portfolio_companies', {
   oneLiner: text('one_liner'), // brief description of the company
   investmentDate: text('investment_date'),
   equityPercent: text('equity_percent'), // stored as text to handle decimals like "0.5%"
-  currentValuation: integer('current_valuation'), // in dollars
+  currentValuation: integer('current_valuation'), // in dollars (latest known)
+  entryValuation: integer('entry_valuation'), // valuation MatCap got its equity at — markup baseline
   advisorySigned: integer('advisory_signed', { mode: 'boolean' }).notNull().default(false),
   equitySigned: integer('equity_signed', { mode: 'boolean' }).notNull().default(false),
   sharesPaid: integer('shares_paid', { mode: 'boolean' }).notNull().default(false),
@@ -353,6 +354,23 @@ export const portfolioCompaniesRelations = relations(portfolioCompanies, ({ one 
     references: [founders.id],
   }),
 }));
+
+// Funding events on a portfolio company — each time an investor invests at a
+// valuation. Drives the markup (latest valuation vs. MatCap's entry valuation).
+export const portfolioRounds = sqliteTable('portfolio_rounds', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  portfolioCompanyId: integer('portfolio_company_id').notNull().references(() => portfolioCompanies.id),
+  roundDate: text('round_date'),          // ISO date
+  roundName: text('round_name'),          // e.g. "Seed", "Pre-seed extension"
+  investorName: text('investor_name'),    // lead/notable investor
+  amountInvested: integer('amount_invested'), // dollars raised (optional)
+  valuation: integer('valuation'),        // post-money valuation in dollars
+  notes: text('notes'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type PortfolioRound = typeof portfolioRounds.$inferSelect;
+export type NewPortfolioRound = typeof portfolioRounds.$inferInsert;
 
 // Trials — the 2-week, no-equity audition between "applied" and "portfolio".
 // MatCap makes 5–15 intros, then decides offer (1%) or pass; the founder then

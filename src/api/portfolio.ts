@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
-import { db, portfolioCompanies, founders } from '../db/index.js';
+import { eq, desc } from 'drizzle-orm';
+import { db, portfolioCompanies, portfolioRounds, founders } from '../db/index.js';
 import { z } from 'zod';
 
 const app = new Hono();
@@ -11,6 +11,7 @@ const portfolioSchema = z.object({
   investmentDate: z.string().nullable().optional(),
   equityPercent: z.string().nullable().optional(),
   currentValuation: z.number().nullable().optional(),
+  entryValuation: z.number().nullable().optional(),
   advisorySigned: z.boolean().optional(),
   equitySigned: z.boolean().optional(),
   sharesPaid: z.boolean().optional(),
@@ -133,6 +134,66 @@ app.delete('/:id', async (c) => {
   if (result.length === 0) {
     return c.json({ error: 'Portfolio company not found' }, 404);
   }
+  return c.json({ success: true });
+});
+
+// ── Funding rounds (markup tracking) ─────────────────────────────────────────
+const roundSchema = z.object({
+  roundDate: z.string().nullable().optional(),
+  roundName: z.string().nullable().optional(),
+  investorName: z.string().nullable().optional(),
+  amountInvested: z.number().nullable().optional(),
+  valuation: z.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+// List rounds for a company (newest first).
+app.get('/:id/rounds', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const rows = await db.select().from(portfolioRounds)
+    .where(eq(portfolioRounds.portfolioCompanyId, id))
+    .orderBy(desc(portfolioRounds.roundDate), desc(portfolioRounds.id));
+  return c.json({ rounds: rows });
+});
+
+// Add a round → bump currentValuation to the latest-dated valuation, and seed
+// entryValuation (markup baseline) from the prior value if it isn't set yet.
+app.post('/:id/rounds', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const parsed = roundSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: parsed.error.issues }, 400);
+
+  const company = await db.query.portfolioCompanies.findFirst({ where: eq(portfolioCompanies.id, id) });
+  if (!company) return c.json({ error: 'Portfolio company not found' }, 404);
+
+  const now = new Date().toISOString();
+  const [round] = await db.insert(portfolioRounds).values({
+    portfolioCompanyId: id,
+    roundDate: parsed.data.roundDate ?? now.split('T')[0],
+    roundName: parsed.data.roundName ?? null,
+    investorName: parsed.data.investorName ?? null,
+    amountInvested: parsed.data.amountInvested ?? null,
+    valuation: parsed.data.valuation ?? null,
+    notes: parsed.data.notes ?? null,
+    createdAt: now,
+  }).returning();
+
+  const all = await db.select().from(portfolioRounds).where(eq(portfolioRounds.portfolioCompanyId, id));
+  const withVal = all.filter((r) => r.valuation != null);
+  const patch: Record<string, unknown> = { updatedAt: now };
+  if (withVal.length) {
+    const sorted = [...withVal].sort((a, b) => (a.roundDate || '').localeCompare(b.roundDate || ''));
+    patch.currentValuation = sorted[sorted.length - 1].valuation;
+    if (company.entryValuation == null) patch.entryValuation = company.currentValuation ?? sorted[0].valuation;
+  }
+  await db.update(portfolioCompanies).set(patch).where(eq(portfolioCompanies.id, id));
+
+  return c.json({ success: true, round });
+});
+
+app.delete('/:id/rounds/:roundId', async (c) => {
+  const roundId = parseInt(c.req.param('roundId'));
+  await db.delete(portfolioRounds).where(eq(portfolioRounds.id, roundId));
   return c.json({ success: true });
 });
 

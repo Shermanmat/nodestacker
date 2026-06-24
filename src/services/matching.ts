@@ -867,7 +867,9 @@ export async function generateMatchSuggestions(
   // Mechanical rejects (founder already met them, VIP handled manually, dup) say
   // nothing about whether the investor is a good match — ignore them entirely so
   // they neither penalize nor dilute an investor's reject rate.
-  const MECHANICAL_REJECTS = new Set(['already_met', 'vip', 'duplicate']);
+  // founder_timing = the founder isn't ready for intros; it's about the founder,
+  // not the investor, so it must not count against the investor's match score.
+  const MECHANICAL_REJECTS = new Set(['already_met', 'vip', 'duplicate', 'founder_timing']);
   const reviewedRows = await db.select({
     investorId: matchSuggestions.investorId,
     founderId: matchSuggestions.founderId,

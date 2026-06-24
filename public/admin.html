@@ -6513,7 +6513,7 @@
         // anywhere. Everything uses the $3M base where an explicit value isn't set,
         // matching what's shown on screen.
         const exportPortfolioCsv = () => {
-          const cos = portfolio.companies || [];
+          const cos = (portfolio.value && portfolio.value.companies) || [];
           if (!cos.length) return;
           const esc = (v) => {
             const s = v == null ? '' : String(v);

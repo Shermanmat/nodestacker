@@ -247,7 +247,11 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
     if (
       (result.classification === 'no' || result.classification === 'not_now') &&
       settings.autoReplyToPass &&
-      result.confidence >= settings.autoSendHandoffMinConfidence
+      result.confidence >= settings.autoSendHandoffMinConfidence &&
+      // Only auto-ack SHORT passes. A long, multi-paragraph "pass" usually
+      // carries nuance (interest in another deal, a question, a request) that
+      // deserves a real reply — never silently thank-and-archive those.
+      msg.body.trim().length <= settings.autoSendHandoffMaxReplyChars
     ) {
       try {
         // A hard "no" explicitly passed → acknowledge the pass. A soft "not now"

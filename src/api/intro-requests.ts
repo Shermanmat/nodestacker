@@ -814,6 +814,11 @@ app.post('/:id/bump-investor', async (c) => {
     return c.json({ error: 'Can only bump intros in intro_request_sent status' }, 400);
   }
 
+  // Hard rule: only ever one follow-up bump per intro. Never two.
+  if ((intro.investorBumpCount || 0) >= 1) {
+    return c.json({ error: 'This intro has already been bumped once. Only one follow-up is allowed.' }, 400);
+  }
+
   const now = new Date().toISOString();
   const newBumpCount = (intro.investorBumpCount || 0) + 1;
 
@@ -832,7 +837,7 @@ app.post('/:id/bump-investor', async (c) => {
     completedBy: 'admin',
     completedAt: now,
     notes: `Bump #${newBumpCount} to ${intro.investor.name} re: ${intro.founder.name}`,
-    nextAction: newBumpCount >= 2 ? 'Auto-ignore in 7 days if no response' : 'Follow up again if no response',
+    nextAction: 'Auto-ignore in 7 days if no response (only one follow-up allowed)',
   });
 
   return c.json({ success: true, bumpCount: newBumpCount });
@@ -921,7 +926,7 @@ app.post('/:id/handoff-partner', async (c) => {
 });
 
 // Admin/Node Tasks - tasks for the node (person making intros)
-// Timeline: Day 5 = "bump investor", Day 7 after bump = "bump again" or auto-ignore
+// Timeline: Day 5 = "bump investor" (the one allowed follow-up), Day 7 after bump = auto-ignore
 // Only intros after May 2025
 app.get('/tasks/node/:nodeId', async (c) => {
   const nodeId = parseInt(c.req.param('nodeId'));
@@ -958,10 +963,10 @@ app.get('/tasks/node/:nodeId', async (c) => {
     if (intro.status === 'intro_request_sent') {
       const requestDate = intro.dateRequested || intro.createdAt;
       const bumpCount = intro.investorBumpCount || 0;
-      const lastBump = intro.lastInvestorBumpAt;
       const fiveDaysAgo = new Date(now - 5 * 24 * 60 * 60 * 1000).toISOString();
-      const sevenDaysAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+      // Hard rule: only one follow-up bump ever. Prompt the single bump at day 5;
+      // once it's been sent, auto-ignore handles the rest — never a 2nd bump.
       if (bumpCount === 0 && requestDate < fiveDaysAgo) {
         tasks.push({
           type: 'bump_investor',
@@ -969,15 +974,8 @@ app.get('/tasks/node/:nodeId', async (c) => {
           intro,
           message: `Bump ${intro.investor.name} re: ${intro.founder.name} (no response)`,
         });
-      } else if (bumpCount === 1 && lastBump && lastBump < sevenDaysAgo) {
-        tasks.push({
-          type: 'bump_investor',
-          priority: 'high',
-          intro,
-          message: `2nd bump to ${intro.investor.name} re: ${intro.founder.name} (still no response)`,
-        });
       }
-      // bumpCount >= 2: auto-ignore will handle it
+      // bumpCount >= 1: auto-ignore will handle it
       continue;
     }
 
@@ -1109,7 +1107,7 @@ app.get('/tasks/node/:nodeId', async (c) => {
 
 // Auto-ignore stale intro requests
 // - intro_request_sent: unchanged for 3 weeks
-// - introduced with 2+ bumps: 7 days after last bump with no response
+// - intro_request_sent with the one allowed bump: 7 days after that bump with no response
 // Runs every hour
 setInterval(async () => {
   try {
@@ -1128,14 +1126,15 @@ setInterval(async () => {
         )
       );
 
-    // 2. Intro requested with 2+ bumps, last bump 7+ days ago (investor ghosted after follow-ups)
+    // 2. Intro requested, bumped (the one allowed follow-up), last bump 7+ days ago
+    //    with no response — investor ghosted after the single follow-up.
     const ghostedRequests = await db
       .select({ id: introRequests.id })
       .from(introRequests)
       .where(
         and(
           eq(introRequests.status, 'intro_request_sent'),
-          sql`${introRequests.investorBumpCount} >= 2`,
+          sql`${introRequests.investorBumpCount} >= 1`,
           lt(introRequests.lastInvestorBumpAt, sevenDaysAgo)
         )
       );
@@ -1159,7 +1158,7 @@ setInterval(async () => {
         console.log(`Auto-ignored ${staleRequests.length} stale intro requests`);
       }
       if (ghostedRequests.length > 0) {
-        console.log(`Auto-ignored ${ghostedRequests.length} ghosted intros (2 bumps, no response)`);
+        console.log(`Auto-ignored ${ghostedRequests.length} ghosted intros (one bump, no response)`);
       }
     }
   } catch (err) {

@@ -15,7 +15,7 @@
 
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
-import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail, sendThreadReply, labelAndArchiveThread } from './gmail.js';
+import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail, sendThreadReply, labelAndArchiveThread, stripQuotedReply } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
 import { recordAction, proposeAction } from './agent-actions.js';
 
@@ -26,6 +26,7 @@ async function loadAgentSettings(): Promise<{
   autoSendHandoffMinConfidence: number;
   autoSendHandoffMaxReplyChars: number;
   autoReplyToPass: boolean;
+  autoReplyToPassMaxReplyChars: number;
 }> {
   const row = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });
   return {
@@ -33,6 +34,7 @@ async function loadAgentSettings(): Promise<{
     autoSendHandoffMinConfidence: row?.autoSendHandoffMinConfidence ? Number(row.autoSendHandoffMinConfidence) : 0.9,
     autoSendHandoffMaxReplyChars: row?.autoSendHandoffMaxReplyChars ?? 400,
     autoReplyToPass: row?.autoReplyToPass ?? false,
+    autoReplyToPassMaxReplyChars: row?.autoReplyToPassMaxReplyChars ?? 1500,
   };
 }
 
@@ -116,10 +118,14 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       }).where(eq(introRequests.id, intro.id));
     }
 
+    // Strip the quoted original + signature so length checks and the classifier
+    // see only what the investor actually typed (Gmail appends the whole thread).
+    const cleanBody = stripQuotedReply(msg.body);
+
     // 2. Classify
     let result;
     try {
-      result = await classifyReply(msg.body, {
+      result = await classifyReply(cleanBody, {
         founderName: founder.name,
         companyName: founder.companyName,
         investorName: investor.name,
@@ -133,7 +139,7 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
 
     // 3. Persist classification fields + apply status transition
     const now = new Date().toISOString();
-    const snippet = msg.body.trim().slice(0, 500);
+    const snippet = cleanBody.trim().slice(0, 500);
     const updates: Record<string, unknown> = {
       replyClassification: result.classification,
       replyClassificationAt: now,
@@ -250,8 +256,9 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       result.confidence >= settings.autoSendHandoffMinConfidence &&
       // Only auto-ack SHORT passes. A long, multi-paragraph "pass" usually
       // carries nuance (interest in another deal, a question, a request) that
-      // deserves a real reply — never silently thank-and-archive those.
-      msg.body.trim().length <= settings.autoSendHandoffMaxReplyChars
+      // deserves a real reply — never silently thank-and-archive those. Measure
+      // the cleaned reply (quoted thread stripped), not the raw body.
+      cleanBody.trim().length <= settings.autoReplyToPassMaxReplyChars
     ) {
       try {
         // A hard "no" explicitly passed → acknowledge the pass. A soft "not now"
@@ -268,6 +275,7 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
           asDraft: false,
         });
         await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
+        updates.passAutoRepliedAt = now;
         autoRepliedPass = true;
         console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
       } catch (e: any) {
@@ -332,6 +340,100 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
   }
 
   return { checked: candidates.length, classified, drafted, autoSent, skipped, rows };
+}
+
+/**
+ * One-shot backfill: acknowledge passes that were classified BEFORE the
+ * quote-stripping fix and so never got an auto-reply (the raw body looked too
+ * long). Idempotent — only touches passes with pass_auto_replied_at still null,
+ * and re-applies the same gate (toggle on, confidence floor, cleaned length).
+ */
+export async function runPassAckBackfill(sinceDays = 7): Promise<{
+  eligible: number;
+  acked: number;
+  skipped: number;
+  rows: Array<{ introId: number; investorName: string; result: string }>;
+}> {
+  const out: Array<{ introId: number; investorName: string; result: string }> = [];
+  const gmail = await getGmailStatus();
+  if (!gmail.connected) return { eligible: 0, acked: 0, skipped: 0, rows: [{ introId: 0, investorName: '', result: 'gmail not connected' }] };
+
+  const settings = await loadAgentSettings();
+  if (!settings.autoReplyToPass) {
+    return { eligible: 0, acked: 0, skipped: 0, rows: [{ introId: 0, investorName: '', result: 'auto-reply-to-pass is OFF' }] };
+  }
+
+  // Passes that were marked passed by the classifier but never auto-acked. Scoped
+  // to the recent window so we never surprise-reply to a weeks-old pass.
+  const cutoff = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+  const candidates = await db.select().from(introRequests).where(and(
+    eq(introRequests.status, 'passed'),
+    sql`${introRequests.replyClassification} IN ('no','not_now')`,
+    isNull(introRequests.passAutoRepliedAt),
+    sql`${introRequests.datePassed} >= ${cutoff}`,
+    sql`${introRequests.gmailThreadId} IS NOT NULL AND ${introRequests.gmailThreadId} != ''`,
+  ));
+
+  let acked = 0;
+  let skipped = 0;
+  for (const intro of candidates) {
+    const investor = await db.query.investors.findFirst({ where: eq(investors.id, intro.investorId) });
+    const founder = await db.query.founders.findFirst({ where: eq(founders.id, intro.founderId) });
+    if (!investor?.email || !founder || !intro.gmailThreadId) { skipped++; continue; }
+
+    const conf = intro.replyClassificationConfidence ? Number(intro.replyClassificationConfidence) : 0;
+    if (conf < settings.autoSendHandoffMinConfidence) {
+      skipped++;
+      out.push({ introId: intro.id, investorName: investor.name, result: `skip: confidence ${conf} < ${settings.autoSendHandoffMinConfidence}` });
+      continue;
+    }
+
+    let msg;
+    try {
+      msg = await getLatestMessageFromSender(intro.gmailThreadId, investor.email);
+    } catch (e: any) {
+      skipped++; out.push({ introId: intro.id, investorName: investor.name, result: `skip: gmail ${e.message || e}` });
+      continue;
+    }
+    if (!msg) { skipped++; out.push({ introId: intro.id, investorName: investor.name, result: 'skip: reply not found' }); continue; }
+
+    const cleanBody = stripQuotedReply(msg.body);
+    if (cleanBody.trim().length > settings.autoReplyToPassMaxReplyChars) {
+      skipped++;
+      out.push({ introId: intro.id, investorName: investor.name, result: `skip: ${cleanBody.trim().length} chars > ${settings.autoReplyToPassMaxReplyChars}` });
+      continue;
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const replyBody = intro.replyClassification === 'no'
+        ? `All good, thanks for letting me know!\n\n- Mat`
+        : `Thanks!\n\n- Mat`;
+      await sendThreadReply({
+        threadId: intro.gmailThreadId,
+        to: investor.email,
+        subject: `Re: ${founder.companyName || founder.name}`,
+        body: replyBody,
+        asDraft: false,
+      });
+      await labelAndArchiveThread(intro.gmailThreadId, 'Passed');
+      await db.update(introRequests).set({ passAutoRepliedAt: now, updatedAt: now }).where(eq(introRequests.id, intro.id));
+      acked++;
+      out.push({ introId: intro.id, investorName: investor.name, result: 'acked' });
+      try {
+        await recordAction({
+          agent: 'reply-classifier', actionType: 'reply_pass_backfill',
+          summary: `Auto-replied + archived pass (backfill): ${investor.name} → ${founder.name}`,
+          entityType: 'intro_request', entityId: intro.id, status: 'executed',
+        });
+      } catch { /* ledger best-effort */ }
+    } catch (e: any) {
+      skipped++;
+      out.push({ introId: intro.id, investorName: investor.name, result: `error: ${e.message || e}` });
+    }
+  }
+
+  return { eligible: candidates.length, acked, skipped, rows: out };
 }
 
 // Read helper: the rows the new "Replies needing you" panel displays.

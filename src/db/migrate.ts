@@ -155,6 +155,9 @@ safeAddColumn('intro_requests', 'intro_handoff_draft_created_at', 'text');
 safeAddColumn('intro_requests', 'intro_handoff_sent_at', 'text');
 safeAddColumn('intro_requests', 'intro_handoff_auto_sent', 'integer NOT NULL DEFAULT 0');
 safeAddColumn('intro_requests', 'intro_handoff_message_id', 'text');
+safeAddColumn('intro_requests', 'pass_auto_replied_at', 'text');
+// Decoupled pass-ack length cap (handoff cap was too tight for real passes)
+safeAddColumn('agent_settings', 'auto_reply_to_pass_max_reply_chars', 'integer NOT NULL DEFAULT 1500');
 // blurb builder columns
 safeAddColumn('founder_leads', 'source', "text DEFAULT 'onboarding_chat'");
 safeAddColumn('founder_leads', 'signal_categories', 'text');

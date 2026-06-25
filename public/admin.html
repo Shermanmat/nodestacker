@@ -410,18 +410,43 @@
         <!-- Admin View -->
         <template v-if="portfolioView === 'admin'">
           <!-- Portfolio Summary -->
-          <div class="grid grid-cols-3 gap-4 mb-6">
+          <div class="grid grid-cols-4 gap-4 mb-6">
             <div class="bg-white rounded-lg shadow p-4">
               <div class="text-sm text-gray-500">Total Companies</div>
               <div class="text-2xl font-bold">{{ portfolio.summary?.totalCompanies || 0 }}</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4">
-              <div class="text-sm text-gray-500">Portfolio Value (Paper)</div>
-              <div class="text-2xl font-bold text-green-600">{{ formatCurrency(portfolio.summary?.totalPortfolioValue) }}</div>
+              <div class="flex items-center justify-between mb-1">
+                <div class="text-sm text-gray-500">Portfolio Value (Paper)</div>
+                <div class="flex rounded overflow-hidden border border-gray-200 text-xs">
+                  <button @click="portfolioValueBasis = 'agreement'" :class="portfolioValueBasis === 'agreement' ? 'bg-gray-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'" class="px-2 py-0.5" title="All companies we have an agreement with (advisory signed)">Agreement</button>
+                  <button @click="portfolioValueBasis = 'equity'" :class="portfolioValueBasis === 'equity' ? 'bg-gray-800 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'" class="px-2 py-0.5" title="Only companies we have an equity agreement with (equity signed)">Equity</button>
+                </div>
+              </div>
+              <div class="text-2xl font-bold text-green-600">{{ formatCurrency(portfolioStats().paper) }}</div>
+              <div class="text-xs text-gray-400">{{ portfolioStats().count }} {{ portfolioValueBasis === 'equity' ? 'with equity agreement' : 'with an agreement' }}</div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-4">
+              <div class="text-sm text-gray-500">TVPI <span class="text-xs text-gray-400">(paper)</span></div>
+              <div class="text-2xl font-bold text-blue-600">{{ portfolioStats().tvpi != null ? portfolioStats().tvpi.toFixed(2) + 'x' : '–' }}</div>
+              <div class="text-xs text-gray-400">current vs entry value</div>
             </div>
             <div class="bg-white rounded-lg shadow p-4">
               <div class="text-sm text-gray-500">Fully Completed</div>
               <div class="text-2xl font-bold">{{ portfolio.summary?.fullyCompleted || 0 }} / {{ portfolio.summary?.totalCompanies || 0 }}</div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-x-6 gap-y-2 mb-6 -mt-2 text-sm">
+            <label class="flex items-center gap-1.5 cursor-pointer select-none text-gray-600">
+              <input type="checkbox" v-model="excludeISA">
+              Exclude ISA (outlier) from value &amp; TVPI
+            </label>
+            <div v-if="portfolioStats().topName" class="text-gray-600">
+              <span class="text-gray-400 uppercase text-xs tracking-wide mr-1">Concentration</span>
+              top position <span class="font-semibold">{{ portfolioStats().topName }}</span>
+              <span class="font-semibold text-orange-600">{{ Math.round(portfolioStats().topShare * 100) }}%</span> of paper value
+              <span class="text-gray-300 mx-1">·</span> top 3 <span class="font-semibold text-orange-600">{{ Math.round(portfolioStats().top3Share * 100) }}%</span>
             </div>
           </div>
 
@@ -1596,9 +1621,16 @@
               <input type="checkbox" v-model="agentSettingsState.autoReplyToPass" @change="saveAgentSettings" class="mt-1">
               <div>
                 <div class="text-sm font-medium">Auto-reply + archive on a pass</div>
-                <div class="text-xs text-gray-500">When the classifier sees a high-confidence pass (clean "no" only), MatCap replies "All good, thanks for letting me know!" to the investor and labels + archives the thread. Uses the same min-confidence floor above.</div>
+                <div class="text-xs text-gray-500">When the classifier sees a high-confidence pass, MatCap replies "All good, thanks for letting me know!" to the investor and labels + archives the thread. The reply length is measured on the investor's actual text (quoted thread stripped). Uses the min-confidence floor above.</div>
               </div>
             </label>
+            <div class="flex items-center gap-2 text-xs text-gray-600 ml-auto">
+              <label class="flex items-center gap-1">
+                Max reply chars
+                <input type="number" min="100" max="5000" step="100" v-model.number="agentSettingsState.autoReplyToPassMaxReplyChars" @change="saveAgentSettings" class="w-20 border rounded px-2 py-0.5">
+              </label>
+              <button @click="ackPassesNow" :disabled="ackingPasses" class="px-2 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50">{{ ackingPasses ? 'Replying…' : 'Reply to stuck passes' }}</button>
+            </div>
           </div>
           <div class="flex items-start gap-4 flex-wrap mt-3 pt-3 border-t">
             <label class="flex items-start gap-2 cursor-pointer">
@@ -5273,6 +5305,13 @@
         const showPortfolioModal = ref(false);
         const editingPortfolio = ref(null);
         const portfolioView = ref('admin'); // 'admin' or 'share'
+        // Which subset drives the Portfolio Value (Paper) + TVPI cards:
+        //   'agreement' = every company we have an agreement with (advisory signed)
+        //   'equity'    = only companies we have an equity agreement with (equity signed)
+        const portfolioValueBasis = ref('agreement');
+        // ISA (quantum power generator) is a huge outlier — toggle it out to see
+        // the portfolio value + TVPI without it skewing the numbers.
+        const excludeISA = ref(false);
         const portfolioForm = reactive({
           founderId: '',
           oneLiner: '',
@@ -6800,6 +6839,7 @@
               autoSendHandoffMinConfidence: Number(s.autoSendHandoffMinConfidence) || 0.9,
               autoSendHandoffMaxReplyChars: Number(s.autoSendHandoffMaxReplyChars) || 400,
               autoReplyToPass: !!s.autoReplyToPass,
+              autoReplyToPassMaxReplyChars: Number(s.autoReplyToPassMaxReplyChars) || 1500,
               autoSendFollowups: !!s.autoSendFollowups,
             };
             agentSettingsState.value = await api('/agent/settings', { method: 'PUT', body });
@@ -6807,6 +6847,20 @@
             alert('Failed to save: ' + (e.message || e));
           } finally {
             savingAgentSettings.value = false;
+          }
+        };
+
+        const ackingPasses = ref(false);
+        const ackPassesNow = async () => {
+          if (!confirm('Reply "thanks!" + archive every high-confidence pass that hasn\'t been acknowledged yet?')) return;
+          ackingPasses.value = true;
+          try {
+            const r = await api('/agent/ack-passes-now', { method: 'POST' });
+            alert(`Acked ${r.acked} pass${r.acked === 1 ? '' : 'es'} (of ${r.eligible} pending, ${r.skipped} skipped).`);
+          } catch (e) {
+            alert('Failed: ' + (e.message || e));
+          } finally {
+            ackingPasses.value = false;
           }
         };
 
@@ -8301,6 +8355,43 @@
           return items.filter(Boolean).length;
         };
 
+        // Toggle-aware portfolio stats. Filters companies by the selected basis
+        // (agreement = advisorySigned, equity = equitySigned), then totals the
+        // paper value and computes a paper TVPI = current paper value / entry
+        // paper value (entry valuation x equity %). No distributions yet, so
+        // TVPI here is the portfolio's mark-to-entry multiple.
+        const portfolioStats = () => {
+          const cos = (portfolio.value.companies || []).filter(c => {
+            const inBasis = portfolioValueBasis.value === 'equity' ? c.equitySigned : c.advisorySigned;
+            if (!inBasis) return false;
+            if (excludeISA.value && (c.founder?.companyName || '').trim().toUpperCase() === 'ISA') return false;
+            return true;
+          });
+          let paper = 0;
+          let entry = 0;
+          const positions = [];
+          for (const co of cos) {
+            const pv = calculatePaperValue(co); // current paper value, or null
+            if (pv != null) {
+              paper += pv;
+              const eq = parseFloat(co.equityPercent) / 100;
+              entry += (co.entryValuation || DEFAULT_ENTRY_VAL) * eq;
+              positions.push({ name: co.founder?.companyName || '?', value: pv });
+            }
+          }
+          positions.sort((a, b) => b.value - a.value);
+          const top = positions[0] || null;
+          const top3 = positions.slice(0, 3).reduce((s, p) => s + p.value, 0);
+          return {
+            count: cos.length,
+            paper: Math.round(paper),
+            tvpi: entry > 0 ? paper / entry : null,
+            topName: top ? top.name : null,
+            topShare: (top && paper > 0) ? top.value / paper : null,
+            top3Share: paper > 0 ? top3 / paper : null,
+          };
+        };
+
         const trendArrow = (direction, inverted = false) => {
           if (inverted) {
             return direction === 'up' ? '▼' : direction === 'down' ? '▲' : '–';
@@ -8942,7 +9033,7 @@
           inboundLogs, inboundFilterStatus, pendingInboundCount,
           showFounderModal, showNodeModal, showInvestorModal, showIntroModal, showFollowupModal, showFNRelModal, showNIConnModal,
           showLoginLinkModal, loginLinkData, linkCopied,
-          showPortfolioModal, editingPortfolio, portfolioView, portfolioForm,
+          showPortfolioModal, editingPortfolio, portfolioView, portfolioValueBasis, excludeISA, portfolioStats, portfolioForm,
           savePortfolio, editPortfolioCompany, deletePortfolioCompany, closePortfolioModal,
           broadcast, broadcastForm, broadcastSending, broadcastResult,
           loadBroadcastRecipients, sendBroadcast, sendBroadcastTest,
@@ -8991,7 +9082,7 @@
           showRoundsModal, roundsCompany, roundsCompanyName, rounds, roundsLoading, addingRound, roundsErr, roundForm, markupLabel, markupClass, exportPortfolioCsv, openRoundsModal, addRound, deleteRound,
           acceptRateClass,
           agentSettingsState, loadingAgentSettings, savingAgentSettings,
-          loadAgentSettings, saveAgentSettings,
+          loadAgentSettings, saveAgentSettings, ackingPasses, ackPassesNow,
           rescoring, rescorePending,
           clearing, clearPending,
           backfilling, backfillEmails,

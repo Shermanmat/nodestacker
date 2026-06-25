@@ -293,6 +293,14 @@ app.get('/api/agent/replies-needing-human', async (c) => {
   return c.json(result);
 });
 
+// Backfill: auto-reply + archive passes that were classified before the
+// quote-stripping fix and so never got an acknowledgement.
+app.post('/api/agent/ack-passes-now', async (c) => {
+  const { runPassAckBackfill } = await import('./services/reply-classifier.js');
+  const result = await runPassAckBackfill();
+  return c.json(result);
+});
+
 // Agent settings — kill switches + thresholds for autonomous behaviors.
 // Today exposes the handoff auto-send flag; future autonomous flags go here.
 app.get('/api/agent/settings', async (c) => {
@@ -320,6 +328,9 @@ app.put('/api/agent/settings', async (c) => {
     patch.autoSendHandoffMaxReplyChars = Math.max(50, Math.min(2000, Math.floor(body.autoSendHandoffMaxReplyChars)));
   }
   if (typeof body.autoReplyToPass === 'boolean') patch.autoReplyToPass = body.autoReplyToPass;
+  if (typeof body.autoReplyToPassMaxReplyChars === 'number') {
+    patch.autoReplyToPassMaxReplyChars = Math.max(100, Math.min(5000, Math.floor(body.autoReplyToPassMaxReplyChars)));
+  }
   if (typeof body.autoSendFollowups === 'boolean') patch.autoSendFollowups = body.autoSendFollowups;
   // Upsert (id=1 singleton)
   const existing = await db.query.agentSettings.findFirst({ where: eq(agentSettings.id, 1) });

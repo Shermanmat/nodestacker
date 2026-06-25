@@ -188,6 +188,9 @@ export const introRequests = sqliteTable('intro_requests', {
   introHandoffSentAt: text('intro_handoff_sent_at'),
   introHandoffAutoSent: integer('intro_handoff_auto_sent', { mode: 'boolean' }).default(false),
   introHandoffMessageId: text('intro_handoff_message_id'),
+  // When MatCap auto-replied "thanks!" + archived a pass. Lets the backfill skip
+  // passes already acknowledged (idempotent re-runs).
+  passAutoRepliedAt: text('pass_auto_replied_at'),
   // Follow-up tracking
   followupCount: integer('followup_count').notNull().default(0),
   lastFollowupAt: text('last_followup_at'),
@@ -1365,6 +1368,10 @@ export const agentSettings = sqliteTable('agent_settings', {
   // Kill switch: auto-reply "all good, thanks!" to a high-confidence pass and
   // label+archive the thread. Gated on the same min-confidence floor as handoff.
   autoReplyToPass: integer('auto_reply_to_pass', { mode: 'boolean' }).notNull().default(false),
+  // Pass-ack gets its OWN length cap (decoupled from the handoff cap). Real pass
+  // emails are often a few sentences, so the 400-char handoff cap was too tight
+  // and silently skipped most passes. Default generous; raise/lower to taste.
+  autoReplyToPassMaxReplyChars: integer('auto_reply_to_pass_max_reply_chars').notNull().default(1500),
   // Kill switch: auto-SEND the templated follow-up bumps instead of leaving them
   // as Gmail drafts. Same cap/cooldown/no-reply rails apply either way.
   autoSendFollowups: integer('auto_send_followups', { mode: 'boolean' }).notNull().default(false),

@@ -541,6 +541,38 @@ export async function sendThreadReply(input: {
 // Fetch the most recent message body in `threadId` from `fromEmail`. Used by
 // the reply classifier to grab the investor's actual reply text (not just the
 // "did anyone reply" flag).
+/**
+ * Strip quoted reply history + common signatures from a plain-text email body,
+ * leaving just the sender's newly written text. Gmail/Outlook append the entire
+ * original message below a reply ("On <date> … wrote:", ">" quote lines, etc.),
+ * which made the raw body length useless as a "how long is this reply" signal.
+ */
+export function stripQuotedReply(raw: string): string {
+  if (!raw) return '';
+  const lines = raw.replace(/\r\n/g, '\n').split('\n');
+  // Markers that begin quoted/forwarded history or a trailing signature block.
+  const cutMarkers: RegExp[] = [
+    /^On\s.+\bwrote:\s*$/i,             // Gmail "On Mon, Jun 23, 2026 … wrote:"
+    /^-{2,}\s*Original Message\s*-{2,}/i,
+    /^-{2,}\s*Forwarded message\s*-{2,}/i,
+    /^_{5,}\s*$/,                        // Outlook horizontal rule
+    /^From:\s.+@.+/i,                    // Outlook header block
+    /^Sent from my\b/i,
+    /^Get Outlook for\b/i,
+  ];
+  const out: string[] = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith('>')) break;                       // quoted line
+    if (cutMarkers.some((re) => re.test(t))) break;     // header/sig marker
+    out.push(line);
+  }
+  const cleaned = out.join('\n').trim();
+  // If stripping ate everything (unusual layout), fall back to the raw text so we
+  // never classify/measure an empty string.
+  return cleaned || raw.trim();
+}
+
 export async function getLatestMessageFromSender(
   threadId: string,
   fromEmail: string,

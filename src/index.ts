@@ -232,10 +232,11 @@ app.post('/api/agent/run-now', async (c) => {
   return c.json(result);
 });
 
-// Auto-draft tick — picks one high-score pending suggestion + creates Gmail draft
-app.post('/api/agent/auto-draft-now', async (c) => {
-  const { runAutoDraftTick } = await import('./services/agent.js');
-  const result = await runAutoDraftTick();
+// Pending-review digest — email the admin the count of intro requests awaiting
+// approve/reject in the dashboard (no Gmail drafts).
+app.post('/api/agent/pending-digest-now', async (c) => {
+  const { runPendingDigestTick } = await import('./services/agent.js');
+  const result = await runPendingDigestTick();
   return c.json(result);
 });
 
@@ -1033,25 +1034,25 @@ cron.schedule('0 0,16 * * *', async () => {
 });
 console.log('[CRON] Agent needs-you digest scheduled for 00:00 + 16:00 UTC (5pm + 9am Arizona)');
 
-// Auto-draft tick — picks ONE high-score pending suggestion per day and creates
-// a Gmail draft. Status stays pending_suggestion. Admin reviews + sends from
-// Gmail, then clicks "Mark as sent" in admin.
+// Pending-review digest — emails the admin "N intro requests are loaded into your
+// dashboard" with a button to approve/reject. No Gmail drafts; approving in the
+// dashboard sends the ask through the app (Postmark).
 // 10am Arizona = 17:00 UTC. After the shadow-agent's 9am suggestion run so the
 // queue is fresh.
 cron.schedule('0 17 * * *', async () => {
-  console.log('[CRON] Running auto-draft tick...');
+  console.log('[CRON] Running pending-review digest...');
   try {
-    const { runAutoDraftTick } = await import('./services/agent.js');
-    const result = await runAutoDraftTick();
-    console.log('[CRON] Auto-draft tick result:', result);
+    const { runPendingDigestTick } = await import('./services/agent.js');
+    const result = await runPendingDigestTick();
+    console.log('[CRON] Pending-review digest result:', result);
   } catch (err) {
-    console.error('[CRON] Auto-draft tick failed:', err);
+    console.error('[CRON] Pending-review digest failed:', err);
   }
 }, {
   timezone: 'UTC'
 });
 
-console.log('[CRON] Auto-draft scheduled for daily 17:00 UTC (10am Arizona)');
+console.log('[CRON] Pending-review digest scheduled for daily 17:00 UTC (10am Arizona)');
 
 // Follow-up agent — runs daily at 18:00 UTC (11am AZ), an hour after auto-draft.
 cron.schedule('0 18 * * *', async () => {

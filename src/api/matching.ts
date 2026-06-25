@@ -225,7 +225,9 @@ app.post('/generate-for-trial/:founderId', async (c) => {
 
 // --- Pending Suggestion Management ---
 
-// Approve a pending suggestion → changes intro request to intro_request_sent
+// Approve a pending suggestion → SEND the stage-1 ask to the investor through the
+// app (Postmark), then flip the intro request to intro_request_sent. All comms run
+// through MatCap — no Gmail draft is involved.
 app.put('/approve-intro/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
 
@@ -236,6 +238,13 @@ app.put('/approve-intro/:id', async (c) => {
   if (!introRequest) return c.json({ error: 'Intro request not found' }, 404);
   if (introRequest.status !== 'pending_suggestion') {
     return c.json({ error: `Not a pending suggestion (status: ${introRequest.status})` }, 400);
+  }
+
+  // Send the ask first; only advance status if it actually went out.
+  const { sendIntroAsk } = await import('../services/intro-send.js');
+  const send = await sendIntroAsk(id);
+  if (!send.sent) {
+    return c.json({ error: send.reason || 'Could not send the intro email' }, 400);
   }
 
   const now = new Date().toISOString();
@@ -252,7 +261,7 @@ app.put('/approve-intro/:id', async (c) => {
     .set({ status: 'approved', reviewedAt: now })
     .where(eq(matchSuggestions.introRequestId, id));
 
-  return c.json({ success: true, introRequestId: id });
+  return c.json({ success: true, introRequestId: id, sentTo: send.to });
 });
 
 // Reject a pending suggestion → removes the intro request
@@ -301,6 +310,7 @@ app.post('/bulk-approve-intros', async (c) => {
 
   const now = new Date().toISOString();
   const results: { id: number; error?: string }[] = [];
+  const { sendIntroAsk } = await import('../services/intro-send.js');
 
   for (const id of parsed.data.introRequestIds) {
     const ir = await db.query.introRequests.findFirst({
@@ -309,6 +319,13 @@ app.post('/bulk-approve-intros', async (c) => {
 
     if (!ir || ir.status !== 'pending_suggestion') {
       results.push({ id, error: ir ? `Status: ${ir.status}` : 'Not found' });
+      continue;
+    }
+
+    // Send the ask through the app; skip the status change if it didn't go out.
+    const send = await sendIntroAsk(id);
+    if (!send.sent) {
+      results.push({ id, error: send.reason || 'Send failed' });
       continue;
     }
 

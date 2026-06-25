@@ -1772,7 +1772,7 @@
                       <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50" title="Reject with a reason — deletes the draft and feeds the matcher.">Reject</button>
                     </template>
                     <template v-else>
-                      <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Approve this intro request. The draft modal opens after — close it and the approval still stands.">Approve</button>
+                      <button @click="approveSuggestion(req.id)" class="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 mr-1" title="Approve & send the intro ask to the investor through MatCap (no Gmail draft).">Approve</button>
                       <button @click="rejectSuggestion(req.id)" class="px-2 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Reject</button>
                     </template>
                   </template>
@@ -7325,21 +7325,17 @@
         });
 
         const approveSuggestion = async (id) => {
-          if (!confirm('Approve this match? It will become an active intro request.')) return;
+          if (!confirm('Approve and send this intro ask now? The email goes to the investor through MatCap.')) return;
           try {
-            await api(`/matching/approve-intro/${id}`, { method: 'PUT' });
-            // Find the approved request in the (just-loaded) list so we can pre-draft
-            const approved = introRequests.value.find(r => r.id === id);
+            const res = await api(`/matching/approve-intro/${id}`, { method: 'PUT' });
             await loadIntroRequests();
             if (activeTab.value === 'marketplace') {
               loadThroughput();
               loadStaleOpen();
             }
-            // Offer the intro draft immediately after approval
-            const refreshed = (introRequests.value || []).find(r => r.id === id) || approved;
-            if (refreshed) openIntroDraft(refreshed);
+            alert('Intro ask sent' + (res && res.sentTo ? ' to ' + res.sentTo : '') + '.');
           } catch (e) {
-            alert('Failed to approve: ' + e.message);
+            alert('Failed to send: ' + e.message);
           }
         };
         // Reject flow: open a small modal asking for a quick-pick reason +

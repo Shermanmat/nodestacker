@@ -441,6 +441,85 @@ export async function runAutoDraftTick(): Promise<{
   return { drafted: results.length, results, skippedBreakdown: skipped };
 }
 
+/**
+ * Pending-review digest: instead of staging Gmail drafts, email the admin a
+ * single note — "N intro requests are loaded into your dashboard" — with one
+ * button into the admin matches tab to approve/reject. Approving there sends the
+ * ask through the app (Postmark); nothing is drafted in a personal inbox.
+ */
+export async function runPendingDigestTick(): Promise<{ pending: number; emailSent: boolean; recipient: string }> {
+  const { sendEmail } = await import('./email.js');
+  const recipient = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+  const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+  const dashUrl = `${baseUrl}/admin`;
+
+  // Pending suggestions awaiting an approve/reject decision in the dashboard.
+  const rows = await db.select({
+    founderId: matchSuggestions.founderId,
+    investorId: matchSuggestions.investorId,
+  })
+    .from(matchSuggestions)
+    .where(and(eq(matchSuggestions.status, 'pending'), sql`${matchSuggestions.introRequestId} IS NOT NULL`));
+
+  const pending = rows.length;
+  if (pending === 0) {
+    return { pending: 0, emailSent: false, recipient };
+  }
+
+  // A short preview of who's queued, for context in the email.
+  const founderNames = new Map<number, string>();
+  const investorNames = new Map<number, string>();
+  for (const r of rows) {
+    if (!founderNames.has(r.founderId)) {
+      const f = await db.query.founders.findFirst({ where: eq(founders.id, r.founderId) });
+      founderNames.set(r.founderId, f?.companyName || f?.name || `Founder ${r.founderId}`);
+    }
+    if (!investorNames.has(r.investorId)) {
+      const inv = await db.query.investors.findFirst({ where: eq(investors.id, r.investorId) });
+      investorNames.set(r.investorId, inv?.name || `Investor ${r.investorId}`);
+    }
+  }
+  const previewLines = rows.slice(0, 8).map((r) =>
+    `${founderNames.get(r.founderId)} → ${investorNames.get(r.investorId)}`);
+  const more = pending > previewLines.length ? `+ ${pending - previewLines.length} more` : '';
+
+  const ACCENT = '#00C2E0';
+  const noun = pending === 1 ? 'intro request is' : 'intro requests are';
+  const previewHtml = previewLines.length
+    ? `<ul style="margin:0 0 22px;padding-left:18px;font-size:14px;line-height:1.7;color:#444">
+         ${previewLines.map((l) => `<li>${l.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`).join('')}
+         ${more ? `<li style="color:#999;list-style:none;margin-left:-18px">${more}</li>` : ''}
+       </ul>`
+    : '';
+
+  const html = `
+<!DOCTYPE html><html><head><meta charset="UTF-8"></head>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f7fa;margin:0;padding:32px 16px;color:#1a1a1a">
+  <div style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:32px 28px">
+    <p style="margin:0 0 8px;font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:${ACCENT}">MatCap</p>
+    <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3">${pending} ${noun} ready for review</h1>
+    <p style="margin:0 0 18px;font-size:15px;line-height:1.6;color:#444">
+      They're loaded into your dashboard. Approve to send the ask through MatCap, or reject — no drafts in your inbox.
+    </p>
+    ${previewHtml}
+    <a href="${dashUrl}" style="display:inline-block;background:${ACCENT};color:#fff;text-decoration:none;font-weight:700;font-size:15px;padding:13px 26px;border-radius:8px">Review &amp; approve →</a>
+  </div>
+</body></html>`;
+
+  const text = `${pending} ${noun} ready for review in your dashboard.\n\n`
+    + previewLines.join('\n') + (more ? `\n${more}` : '')
+    + `\n\nApprove to send the ask through MatCap (no Gmail drafts): ${dashUrl}`;
+
+  const result = await sendEmail({
+    to: recipient,
+    subject: `${pending} intro ${pending === 1 ? 'request' : 'requests'} to review`,
+    html,
+    text,
+  });
+
+  return { pending, emailSent: result.success, recipient };
+}
+
 // --- Follow-up Agent (Phase 1) ---
 //
 // For every sent intro that hasn't gotten a reply in 7+ days and hasn't already

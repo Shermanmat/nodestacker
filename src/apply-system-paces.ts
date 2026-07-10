@@ -9,19 +9,22 @@
  * Bands (src/services/treadmill.ts): >=30% -> 5, >=25% -> 4, >=15% -> 2, <15% -> 1;
  * fewer than 4 decided requests -> 2 (neutral, insufficient signal).
  *
- * DRY RUN by default — prints the plan and changes nothing.
- *   npx tsx src/scripts/apply-system-paces.ts
- * Pass --apply to actually write:
- *   npx tsx src/scripts/apply-system-paces.ts --apply
+ * Lives at src/ (not src/scripts, which tsconfig excludes from the build) so it
+ * compiles into dist/ and can run in the production image.
  *
- * Against PRODUCTION, run it on the Fly machine (writes the live DB):
- *   fly ssh console --app nodestacker -C "node dist/scripts/apply-system-paces.js --apply"
- * (deploy first so dist/ is current; omit --apply for a dry run).
+ * DRY RUN by default — prints the plan and changes nothing:
+ *   node dist/apply-system-paces.js
+ * Pass --apply to actually write:
+ *   node dist/apply-system-paces.js --apply
+ *
+ * Against PRODUCTION (runs on the Fly machine, writes the live DB — deploy first):
+ *   fly ssh console --app nodestacker -C "node dist/apply-system-paces.js"
+ *   fly ssh console --app nodestacker -C "node dist/apply-system-paces.js --apply"
  */
 
 import { eq, isNotNull } from 'drizzle-orm';
-import { db, founders, introRequests } from '../db/index.js';
-import { acceptRateOf, speedFromAcceptRate } from '../services/treadmill.js';
+import { db, founders, introRequests } from './db/index.js';
+import { acceptRateOf, speedFromAcceptRate } from './services/treadmill.js';
 
 const APPLY = process.argv.includes('--apply');
 

@@ -140,14 +140,14 @@
                 <p class="text-xs text-gray-500 mt-1">Your live pitch assets</p>
               </button>
 
-              <button @click="activeTab='treadmill'" class="text-left bg-white border rounded-lg p-5 hover:border-blue-300 transition">
+              <a href="/gym.html" class="block text-left bg-white border rounded-lg p-5 hover:border-blue-300 transition">
                 <div class="flex items-center justify-between">
                   <span class="text-xs uppercase tracking-wide text-gray-400">Pitch Gym</span>
-                  <span class="text-xs text-blue-600 font-medium">Train →</span>
+                  <span class="text-xs text-blue-600 font-medium">Practice →</span>
                 </div>
-                <p class="mt-2 text-2xl font-bold text-gray-900">{{ gym ? gym.repsRemaining : '—' }}</p>
-                <p class="text-xs text-gray-500">rep{{ gym && gym.repsRemaining === 1 ? '' : 's' }} available</p>
-              </button>
+                <p class="mt-2 text-2xl font-bold text-gray-900">{{ treadmill ? treadmill.gymRepsRemaining : '—' }}</p>
+                <p class="text-xs text-gray-500">rep{{ treadmill && treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week</p>
+              </a>
             </div>
 
             <!-- Needs attention -->
@@ -1288,63 +1288,49 @@
               <p class="mt-2 text-[11px] text-gray-400">Gym reps can take you up to 5 / week. More ways to build momentum are coming.</p>
             </div>
 
-            <!-- Next unlock (once calibrated) -->
-            <div v-if="!treadmill.calibrating && treadmill.nextUnlock" class="bg-blue-50 border border-blue-200 rounded-lg p-5">
-              <p class="text-sm font-medium text-blue-900">
-                {{ treadmill.nextUnlock.action }} → <span class="text-blue-700">{{ treadmill.nextUnlock.reward }}</span>
+            <!-- Why this pace + how to raise it -->
+            <div v-if="!treadmill.calibrating && treadmill.explainer" class="bg-white border rounded-lg p-5">
+              <span class="text-xs uppercase tracking-wide text-gray-400">Why this pace</span>
+              <p class="mt-2 text-sm text-gray-700">
+                <template v-if="treadmill.explainer.acceptRatePct !== null">
+                  Investors are accepting about <strong>{{ treadmill.explainer.acceptRatePct }}%</strong> of your intro requests — a
+                  <strong>{{ treadmill.explainer.bracket }}</strong> response, which supports roughly <strong>{{ treadmill.explainer.bracketSupports }} / week</strong>.
+                </template>
+                <template v-else>
+                  We don't have enough investor responses yet to read your acceptance rate — your pace will adjust as they come in.
+                </template>
+                <span v-if="treadmill.explainer.hint" class="block text-gray-500 mt-1">{{ treadmill.explainer.hint }}</span>
               </p>
-              <p class="text-xs text-blue-700/80 mt-1">
-                You've completed {{ treadmill.gymRepsDone }} gym {{ treadmill.gymRepsDone === 1 ? 'session' : 'sessions' }} so far.
+
+              <template v-if="treadmill.requestsPerWeek < 5 || treadmill.explainer.acceptRatePct === null || treadmill.explainer.acceptRatePct < 30">
+                <p class="mt-4 text-xs uppercase tracking-wide text-gray-400">Ways to pick up the pace</p>
+                <ul class="mt-2 space-y-1.5 text-sm text-gray-700">
+                  <li v-if="treadmill.requestsPerWeek < 5" class="flex items-start gap-2">
+                    <span class="text-blue-600 mt-px">•</span>
+                    <span><strong>Practice in the gym</strong> — each finished session adds <strong>+1 / week</strong> (up to 5).</span>
+                  </li>
+                  <li v-if="treadmill.explainer.acceptRatePct === null || treadmill.explainer.acceptRatePct < 30" class="flex items-start gap-2">
+                    <span class="text-blue-600 mt-px">•</span>
+                    <span><strong>Get more investors to say yes</strong> — reach <strong>30% acceptance</strong> and you're at the top pace (5 / week).</span>
+                  </li>
+                </ul>
+              </template>
+              <p v-else class="mt-4 text-sm font-medium text-green-700">🔥 You're at the top pace — investors love your requests and you're maxed out. Keep it rolling.</p>
+            </div>
+
+            <!-- Pitch Gym — practice your pitch (single gym surface lives at /gym.html) -->
+            <a href="/gym.html" class="block bg-white border rounded-lg p-5 hover:border-blue-300 transition">
+              <div class="flex items-center justify-between">
+                <h3 class="font-medium text-gray-900">🏋️ Pitch Gym</h3>
+                <span class="text-xs text-blue-600 font-medium">Practice →</span>
+              </div>
+              <p class="text-sm text-gray-500 mt-1">
+                Practice your pitch against an AI VC.
+                <template v-if="treadmill.gymRepsRemaining > 0">You have <strong>{{ treadmill.gymRepsRemaining }}</strong> rep{{ treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week</template>
+                <template v-else>Your rep resets Monday</template>
+                — each finished session adds +1 / week.
               </p>
-            </div>
-            <div v-else-if="!treadmill.calibrating" class="bg-green-50 border border-green-200 rounded-lg p-5">
-              <p class="text-sm font-medium text-green-900">You're at full pace from gym reps. 🔥</p>
-            </div>
-
-            <!-- Pitch Gym: practice against an AI VC -->
-            <div class="bg-white border rounded-lg p-5">
-              <div class="flex items-center justify-between mb-1">
-                <h3 class="font-medium text-gray-900">Pitch Gym</h3>
-                <span class="text-xs text-gray-500">{{ gym ? gym.repsRemaining : '—' }} rep{{ gym && gym.repsRemaining === 1 ? '' : 's' }} left</span>
-              </div>
-              <p class="text-sm text-gray-500 mb-4">Run a practice pitch call against an AI VC. Finishing one builds your momentum.</p>
-
-              <div v-if="gymError" class="text-sm text-red-600 mb-3">{{ gymError }}</div>
-
-              <!-- No active call -->
-              <div v-if="gym && !gymCall">
-                <button v-if="gym.repsRemaining > 0 && gym.personas.length"
-                        @click="startGymRep(gym.personas[0].key)" :disabled="gymBusy"
-                        class="bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50">
-                  {{ gymBusy ? 'Starting…' : 'Start a practice call' }}
-                </button>
-                <p v-else-if="gym.repsRemaining <= 0" class="text-sm text-gray-400">No reps remaining — ask Mat for more.</p>
-              </div>
-
-              <!-- Active call -->
-              <div v-if="gymCall" class="space-y-3">
-                <a :href="gymCall.conversationUrl" target="_blank" rel="noopener"
-                   class="inline-block bg-gray-900 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-gray-800">
-                  Open the call ↗
-                </a>
-                <p class="text-xs text-gray-500">When you've wrapped the call, come back and score your rep.</p>
-                <button @click="completeGymRep" :disabled="gymBusy"
-                        class="block bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-md hover:bg-green-700 disabled:opacity-50">
-                  {{ gymBusy ? 'Scoring…' : 'I finished — score my rep' }}
-                </button>
-              </div>
-
-              <!-- Rep history -->
-              <div v-if="gym && gym.reps && gym.reps.length" class="mt-5 border-t pt-4">
-                <p class="text-xs uppercase tracking-wide text-gray-400 mb-2">Past reps</p>
-                <div v-for="r in gym.reps" :key="r.id" class="flex items-center justify-between text-sm py-1">
-                  <span class="text-gray-600">{{ (r.createdAt || '').slice(0,10) }}</span>
-                  <span class="font-medium" :class="r.overallScore >= 7 ? 'text-green-600' : r.overallScore >= 4 ? 'text-amber-600' : 'text-red-600'">
-                    {{ r.overallScore != null ? r.overallScore + '/10' : '—' }}
-                  </span>
-                </div>
-              </div>
-            </div>
+            </a>
           </div>
         </div>
       </main>
@@ -1939,66 +1925,23 @@
           try { await navigator.clipboard.writeText(text); copied.value = true; setTimeout(() => copied.value = false, 1500); } catch {}
         };
 
-        // --- Treadmill (weekly intro-request allowance) + Pitch Gym ---
+        // --- Momentum (weekly intro-request pace) ---
+        // The gym itself lives at /gym.html (single surface); we only read the
+        // momentum reading here, which already includes gym reps remaining.
         const treadmill = ref(null);
         const treadmillLoading = ref(false);
         const treadmillError = ref('');
-        const gym = ref(null);
-        const gymCall = ref(null);        // { conversationId, conversationUrl } while a rep is in progress
-        const gymBusy = ref(false);
-        const gymError = ref('');
 
         const loadTreadmill = async () => {
           treadmillLoading.value = true;
           treadmillError.value = '';
           try {
-            const [t, g] = await Promise.all([api('/portal/treadmill'), api('/gym')]);
+            const t = await api('/portal/treadmill');
             if (t) treadmill.value = t;
-            if (g) gym.value = g;
           } catch (e) {
-            treadmillError.value = e.message || 'Failed to load treadmill';
+            treadmillError.value = e.message || 'Failed to load momentum';
           } finally {
             treadmillLoading.value = false;
-          }
-        };
-
-        const startGymRep = async (persona) => {
-          gymBusy.value = true; gymError.value = '';
-          try {
-            const data = await api('/gym/conversations', { method: 'POST', body: { persona } });
-            if (data) {
-              gymCall.value = { conversationId: data.conversationId, conversationUrl: data.conversationUrl };
-              window.open(data.conversationUrl, '_blank', 'noopener');
-            }
-          } catch (e) {
-            gymError.value = e.message || 'Could not start the call';
-          } finally {
-            gymBusy.value = false;
-          }
-        };
-
-        const completeGymRep = async () => {
-          if (!gymCall.value) return;
-          gymBusy.value = true; gymError.value = '';
-          try {
-            // The transcript may not be ready the instant the call ends — the API
-            // returns { status: 'processing' } (HTTP 202); retry a few times.
-            let done = false;
-            for (let attempt = 0; attempt < 5 && !done; attempt++) {
-              const data = await api('/gym/reps/complete', { method: 'POST', body: { conversationId: gymCall.value.conversationId } });
-              if (data && data.status === 'processing') {
-                await new Promise(r => setTimeout(r, 3000));
-              } else {
-                done = true;
-              }
-            }
-            if (!done) { gymError.value = 'Still processing your transcript — try again in a moment.'; return; }
-            gymCall.value = null;
-            await loadTreadmill();   // belt should tick up
-          } catch (e) {
-            gymError.value = e.message || 'Could not score the rep';
-          } finally {
-            gymBusy.value = false;
           }
         };
 
@@ -2118,7 +2061,7 @@
           myIntros.value = await api('/portal/my-intros') || [];
           nodesData.value = await api('/portal/nodes') || { workingWith: [], available: [] };
           loadCrm();
-          loadTreadmill();   // momentum + gym — powers the Overview hero/cards
+          loadTreadmill();   // momentum reading (incl. gym reps remaining) — powers the Overview
           loadComms();       // blurb/deck status for the Overview
           loadOnboarding(true); // Set tab to onboarding if active
         };
@@ -2449,9 +2392,8 @@
           loadMcpTokens, createMcpToken, revokeMcpToken, copyText,
           // Overview (command center)
           loadOverview,
-          // Momentum + Pitch Gym
-          treadmill, treadmillLoading, treadmillError, gym, gymCall, gymBusy, gymError,
-          loadTreadmill, startGymRep, completeGymRep,
+          // Momentum
+          treadmill, treadmillLoading, treadmillError, loadTreadmill,
           loginEmail, loggingIn, loginError, magicLinkSent,
           dashboard, tasks, myNodes, availableInvestors, myIntros, nodesData,
           investorSearch, introStatusFilter,

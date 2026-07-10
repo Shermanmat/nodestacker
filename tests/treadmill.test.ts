@@ -115,7 +115,9 @@ test('getTreadmillReading: surfaces the next unlock (calibrated founder)', async
 
 test('speedFromAcceptRate: data-calibrated bands', () => {
   const { speedFromAcceptRate } = treadmill;
-  assert.equal(speedFromAcceptRate(0.40), 4);  // vibing
+  assert.equal(speedFromAcceptRate(0.40), 5);  // exceptional (top bracket)
+  assert.equal(speedFromAcceptRate(0.30), 5);  // top bracket threshold
+  assert.equal(speedFromAcceptRate(0.29), 4);  // strong
   assert.equal(speedFromAcceptRate(0.25), 4);  // healthy line
   assert.equal(speedFromAcceptRate(0.20), 2);  // normal pack
   assert.equal(speedFromAcceptRate(0.15), 2);  // floor of normal
@@ -145,14 +147,14 @@ test('calibrationView: phases', () => {
   assert.equal(wait.phase, 'waiting');
   assert.equal(wait.ready, false);
 
-  // 10 sent, 8 decided (3 accepted, 5 passed) → ready, rate 3/8=0.375 → target 4
+  // 10 sent, 8 decided (3 accepted, 5 passed) → ready, rate 3/8=0.375 → target 5
   const ready = calibrationView([
     sent('introduced'), sent('introduced'), sent('introduced'),
     sent('passed'), sent('passed'), sent('passed'), sent('passed'), sent('passed'),
     sent('intro_request_sent'), sent('intro_request_sent'),
   ]);
   assert.equal(ready.phase, 'ready');
-  assert.equal(ready.recommendedTarget, 4);
+  assert.equal(ready.recommendedTarget, 5);
   assert.equal(ready.messagingConcern, false);
 
   // low accept (1/10) → target 1 + messaging concern
@@ -183,15 +185,15 @@ async function addIntro(founderId: number, status: string) {
 
 test('finalizeCalibrationIfReady: sets speed from accept rate and stamps', async () => {
   const id = await makeFounder(1);   // calibrated_at null, cadence active
-  // 3 accepted, 5 passed, 2 pending → decided 8, rate 3/8 → target 4
+  // 3 accepted, 5 passed, 2 pending → decided 8, rate 3/8=0.375 → target 5
   for (const s of ['introduced', 'introduced', 'introduced', 'passed', 'passed', 'passed', 'passed', 'passed', 'intro_request_sent', 'intro_request_sent']) {
     await addIntro(id, s);
   }
   const view = await treadmill.finalizeCalibrationIfReady(id);
   assert.ok(view, 'should finalize');
-  assert.equal(view.recommendedTarget, 4);
+  assert.equal(view.recommendedTarget, 5);
   const f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
-  assert.equal(f.introTargetPerWeek, 4);
+  assert.equal(f.introTargetPerWeek, 5);
   assert.ok(f.calibratedAt, 'calibratedAt stamped');
 
   // Idempotent: already calibrated → no-op

@@ -82,6 +82,89 @@
 
       <!-- Content -->
       <main :class="activeTab === 'pipeline' ? 'max-w-7xl mx-auto px-4 py-6' : 'max-w-5xl mx-auto px-4 py-6'">
+        <!-- Overview — command center: where you stand + what to do next -->
+        <div v-if="activeTab === 'overview'">
+          <div class="mb-6">
+            <h2 class="text-xl font-semibold text-gray-900">Overview</h2>
+            <p class="text-sm text-gray-500 mt-1">Where you stand, and what to do next.</p>
+          </div>
+
+          <div class="space-y-5">
+            <!-- Momentum hero -->
+            <button @click="activeTab = 'treadmill'"
+                    class="w-full text-left bg-white border rounded-lg p-6 hover:border-blue-300 transition">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wide text-gray-400">Your Momentum</span>
+                <span class="text-xs text-blue-600 font-medium">Open →</span>
+              </div>
+              <template v-if="treadmill && treadmill.calibrating">
+                <p class="mt-1 text-lg font-semibold text-gray-900">Calibrating your pace</p>
+                <p class="text-sm text-gray-500">{{ treadmill.calibration.sentCount }} / {{ treadmill.calibration.target }} intro requests sent — we're learning what lands.</p>
+                <div class="mt-3 h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-blue-600 rounded-full" :style="{ width: Math.round(100*treadmill.calibration.sentCount/treadmill.calibration.target)+'%' }"></div>
+                </div>
+              </template>
+              <template v-else-if="treadmill">
+                <div class="mt-1">
+                  <span class="text-3xl font-bold text-gray-900">{{ treadmill.requestsPerWeek }}</span>
+                  <span class="text-sm text-gray-500 ml-1">intro requests / week</span>
+                  <span v-if="!treadmill.cadenceActive" class="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded align-middle">Paused</span>
+                </div>
+                <div class="mt-3 flex gap-1.5">
+                  <div v-for="n in 5" :key="n" class="h-2 flex-1 rounded-full" :class="n <= treadmill.requestsPerWeek ? 'bg-blue-600' : 'bg-gray-200'"></div>
+                </div>
+                <p v-if="treadmill.nextUnlock" class="mt-2 text-sm text-blue-700">↑ {{ treadmill.nextUnlock.action }} → {{ treadmill.nextUnlock.reward }}</p>
+                <p v-else class="mt-2 text-sm text-gray-400">Sending your intro requests on schedule.</p>
+              </template>
+              <p v-else class="mt-2 text-sm text-gray-400">Loading…</p>
+            </button>
+
+            <!-- Section cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <button @click="activeTab='pipeline'" class="text-left bg-white border rounded-lg p-5 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs uppercase tracking-wide text-gray-400">Pipeline</span>
+                  <span class="text-xs text-blue-600 font-medium">Open →</span>
+                </div>
+                <p class="mt-2 text-2xl font-bold text-gray-900">{{ crmStats.active }}</p>
+                <p class="text-xs text-gray-500">active investors</p>
+                <p v-if="crmStats.dueSoon" class="mt-1 text-xs text-amber-600 font-medium">{{ crmStats.dueSoon }} need follow-up</p>
+              </button>
+
+              <button @click="activeTab='comms'" class="text-left bg-white border rounded-lg p-5 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs uppercase tracking-wide text-gray-400">Investor Comms</span>
+                  <span class="text-xs text-blue-600 font-medium">Open →</span>
+                </div>
+                <p class="mt-2 text-sm text-gray-700">Blurb {{ comms.blurb ? '✓' : '—' }} · Deck {{ comms.deckFile ? '✓' : '—' }}</p>
+                <p class="text-xs text-gray-500 mt-1">Your live pitch assets</p>
+              </button>
+
+              <button @click="activeTab='treadmill'" class="text-left bg-white border rounded-lg p-5 hover:border-blue-300 transition">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs uppercase tracking-wide text-gray-400">Pitch Gym</span>
+                  <span class="text-xs text-blue-600 font-medium">Train →</span>
+                </div>
+                <p class="mt-2 text-2xl font-bold text-gray-900">{{ gym ? gym.repsRemaining : '—' }}</p>
+                <p class="text-xs text-gray-500">rep{{ gym && gym.repsRemaining === 1 ? '' : 's' }} available</p>
+              </button>
+            </div>
+
+            <!-- Needs attention -->
+            <div class="bg-white border rounded-lg p-5">
+              <span class="text-xs uppercase tracking-wide text-gray-400">Needs your attention</span>
+              <div v-if="tasks.length" class="mt-3 space-y-1">
+                <button v-for="(t, i) in tasks.slice(0, 5)" :key="i" @click="activeTab='pipeline'"
+                        class="w-full text-left flex items-start gap-2 text-sm hover:bg-gray-50 rounded p-1.5 -mx-1.5">
+                  <span class="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0" :class="t.priority === 'high' ? 'bg-red-500' : 'bg-amber-400'"></span>
+                  <span class="text-gray-700">{{ t.message }}</span>
+                </button>
+              </div>
+              <p v-else class="mt-2 text-sm text-gray-400">You're all caught up. 🎉</p>
+            </div>
+          </div>
+        </div>
+
         <!-- Pipeline (Investor CRM) -->
         <div v-if="activeTab === 'pipeline'">
           <!-- Header + Add -->
@@ -1149,13 +1232,13 @@
           </div>
         </div>
 
-        <!-- Treadmill: weekly intro-request allowance + how to grow it -->
+        <!-- Momentum: weekly intro-request pace + how to grow it -->
         <div v-if="activeTab === 'treadmill'">
           <div class="mb-6">
-            <h2 class="text-xl font-semibold text-gray-900">Your Treadmill</h2>
+            <h2 class="text-xl font-semibold text-gray-900">Your Momentum</h2>
             <p class="text-sm text-gray-500 mt-1 max-w-2xl">
               This is how many <strong>intro requests</strong> we send on your behalf each week. Do the
-              work — sharpen your pitch in the gym — and the belt speeds up.
+              work — sharpen your pitch in the gym — and your pace picks up.
             </p>
           </div>
 
@@ -1182,27 +1265,27 @@
               <div v-else>
                 <p class="mt-1 text-lg font-semibold text-gray-900">Reading the results</p>
                 <p class="text-sm text-gray-500 mt-1">
-                  Your first intro requests are out. As investors respond, your ongoing pace locks in — the more they lean in, the faster the belt.
+                  Your first intro requests are out. As investors respond, your ongoing pace locks in — the more they lean in, the more momentum you build.
                 </p>
               </div>
             </div>
 
-            <!-- Belt speed meter (once calibrated) -->
+            <!-- Momentum meter (once calibrated) -->
             <div v-if="!treadmill.calibrating" class="bg-white border rounded-lg p-6">
               <div class="flex items-baseline justify-between">
-                <span class="text-xs uppercase tracking-wide text-gray-400">Belt speed</span>
+                <span class="text-xs uppercase tracking-wide text-gray-400">Current pace</span>
                 <span v-if="!treadmill.cadenceActive" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Paused</span>
               </div>
               <div class="mt-1">
                 <span class="text-4xl font-bold text-gray-900">{{ treadmill.requestsPerWeek }}</span>
                 <span class="text-sm text-gray-500 ml-1">intro requests / week</span>
               </div>
-              <!-- 1..5 belt -->
+              <!-- 1..5 pace meter -->
               <div class="mt-4 flex gap-1.5">
                 <div v-for="n in 5" :key="n" class="h-2.5 flex-1 rounded-full"
                      :class="n <= treadmill.requestsPerWeek ? 'bg-blue-600' : 'bg-gray-200'"></div>
               </div>
-              <p class="mt-2 text-[11px] text-gray-400">Gym reps can take you up to 5 / week. More ways to speed up are coming.</p>
+              <p class="mt-2 text-[11px] text-gray-400">Gym reps can take you up to 5 / week. More ways to build momentum are coming.</p>
             </div>
 
             <!-- Next unlock (once calibrated) -->
@@ -1215,7 +1298,7 @@
               </p>
             </div>
             <div v-else-if="!treadmill.calibrating" class="bg-green-50 border border-green-200 rounded-lg p-5">
-              <p class="text-sm font-medium text-green-900">You're at full belt speed from gym reps. 🔥</p>
+              <p class="text-sm font-medium text-green-900">You're at full pace from gym reps. 🔥</p>
             </div>
 
             <!-- Pitch Gym: practice against an AI VC -->
@@ -1224,7 +1307,7 @@
                 <h3 class="font-medium text-gray-900">Pitch Gym</h3>
                 <span class="text-xs text-gray-500">{{ gym ? gym.repsRemaining : '—' }} rep{{ gym && gym.repsRemaining === 1 ? '' : 's' }} left</span>
               </div>
-              <p class="text-sm text-gray-500 mb-4">Run a practice pitch call against an AI VC. Finishing one speeds up your belt.</p>
+              <p class="text-sm text-gray-500 mb-4">Run a practice pitch call against an AI VC. Finishing one builds your momentum.</p>
 
               <div v-if="gymError" class="text-sm text-red-600 mb-3">{{ gymError }}</div>
 
@@ -1316,8 +1399,9 @@
         // covers the investor side.)
         const tabs = computed(() => {
           const t = [
+            { id: 'overview', label: 'Overview' },
             { id: 'pipeline', label: 'Pipeline' },
-            { id: 'treadmill', label: 'Treadmill' },
+            { id: 'treadmill', label: 'Momentum' },
             { id: 'comms', label: 'Investor Comms' },
             { id: 'connect', label: 'Connect AI' },
           ];
@@ -1327,7 +1411,7 @@
           return t;
         });
 
-        const activeTab = ref('pipeline');
+        const activeTab = ref('overview');
         const session = ref(null);
         const loginEmail = ref('');
         const loggingIn = ref(false);
@@ -1790,6 +1874,7 @@
 
         // Load CRM whenever Pipeline tab becomes active (or on first session load).
         watch(activeTab, (t) => {
+          if (t === 'overview') loadOverview();
           if (t === 'pipeline') loadCrm();
           if (t === 'treadmill') loadTreadmill();
           if (t === 'comms') loadComms();
@@ -2033,7 +2118,19 @@
           myIntros.value = await api('/portal/my-intros') || [];
           nodesData.value = await api('/portal/nodes') || { workingWith: [], available: [] };
           loadCrm();
+          loadTreadmill();   // momentum + gym — powers the Overview hero/cards
+          loadComms();       // blurb/deck status for the Overview
           loadOnboarding(true); // Set tab to onboarding if active
+        };
+
+        // Overview refresh (on tab revisit) — pulls the latest of everything it shows.
+        const loadOverview = async () => {
+          await Promise.all([
+            loadTreadmill(),
+            loadCrm(),
+            loadComms(),
+            (async () => { tasks.value = await api('/portal/tasks') || []; })(),
+          ]);
         };
 
         const loadOnboarding = async (setTab = false) => {
@@ -2350,7 +2447,9 @@
           tabs, activeTab, session,
           mcpTokens, newToken, tokenName, tokenExpiry, tokenLoading, tokenError, copied, nowIso, configSnippet, claudeDesktopSnippet,
           loadMcpTokens, createMcpToken, revokeMcpToken, copyText,
-          // Treadmill + Pitch Gym
+          // Overview (command center)
+          loadOverview,
+          // Momentum + Pitch Gym
           treadmill, treadmillLoading, treadmillError, gym, gymCall, gymBusy, gymError,
           loadTreadmill, startGymRep, completeGymRep,
           loginEmail, loggingIn, loginError, magicLinkSent,

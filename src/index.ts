@@ -930,8 +930,10 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 app.get('/trial', serveStatic({ path: './public/trial.html' }));
 app.get('/how-it-works', (c) => c.redirect('/trial', 301));
-// Founder-facing explainer: the Treadmill model of how MatCap works.
-app.get('/treadmill', serveStatic({ path: './public/treadmill.html' }));
+// Founder-facing explainer: how MatCap works (the Momentum model).
+app.get('/momentum', serveStatic({ path: './public/momentum.html' }));
+app.get('/treadmill', (c) => c.redirect('/momentum', 302)); // old URL → new
+
 
 // Marketing site
 app.get('/founders', (c) => c.redirect('/signup', 302));

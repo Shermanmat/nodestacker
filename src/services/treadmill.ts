@@ -1,64 +1,66 @@
 /**
- * Founder Treadmill — v1.
+ * Founder Momentum.
  *
- * Each founder's "belt speed" is their weekly INTRO-REQUEST allowance
- * (founders.introTargetPerWeek — the number the match generator fills toward).
- * Note the wording: we promise intro *requests* (the outreach we control), never
- * intros (the investor's acceptance, which we don't).
+ * Each founder's weekly INTRO-REQUEST pace (founders.introTargetPerWeek — the
+ * number the match generator fills toward). We promise intro *requests* (the
+ * outreach we control), never intros (the investor's acceptance).
  *
- * v1 has exactly one trigger: completing a gym session (an AI pitch-practice rep)
- * ratchets the allowance up by 1. First rep takes a founder from 1 → 2/week.
- * More triggers (loop-closing, CRM growth, the messaging-diagnostic states, the
- * manual win-sprint) are designed in the plan but intentionally not built yet.
+ * Core rule: **the weekly pace is ONLY a function of the founder's intro-request
+ * acceptance rate.** Nothing else moves it. `recomputePaceForAll` keeps
+ * introTargetPerWeek tracking acceptance each cycle. New founders are set by the
+ * calibration burst; after that, acceptance drives the number continuously.
+ *
+ * (Bonus one-off "shots on goal" from carrots, and the win-blitz, are separate
+ * mechanics layered on top — not part of the weekly pace.)
  */
 
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, isNotNull } from 'drizzle-orm';
 import { db, founders, introRequests } from '../db/index.js';
-import { countGymReps, getGymStatus } from './gym.js';
+import { getGymStatus } from './gym.js';
 
-/** Max intro-requests/week reachable via gym reps alone (matches DYNAMIC_MAX). */
-export const GYM_BUMP_CAP = 5;
-
-/** Base allowance a new founder starts at. */
+/** Base pace a founder falls back to with no signal. */
 export const BASE_TARGET = 1;
+/** Neutral pace when a founder has too little data to read acceptance. */
+export const NEUTRAL_TARGET = 2;
+/** Top of the accept-rate ladder. */
+export const MAX_PACE = 5;
 
-/**
- * Completing a gym session is worth +1 intro request/week — from wherever the
- * founder currently is — capped at GYM_BUMP_CAP. Never lowers: a target already
- * at/above the cap (e.g. a future manual sprint to 20) is returned unchanged.
- * Pure — unit-testable, no I/O. This "+1 per session" rule works for both new
- * founders (1→2) and existing ones defaulted to 2 (2→3).
- */
-export function bumpForRep(current: number): number {
-  return current < GYM_BUMP_CAP ? current + 1 : current;
+// ── Acceptance → pace ladder (the whole model) ───────────────────────────────
+// Smooth 5-4-3-2-1 ladder keyed to intro-request acceptance rate:
+//   ≥30% → 5 (exceptional) · 25–29% → 4 (strong) · 20–24% → 3 (solid)
+//   17–19% → 2 (slipping / ⚠️ warning) · <17% → 1 (at risk — fix the pitch)
+export const WARN_FLOOR = 0.17;   // below this → drop to 1
+export const WARN_CEIL = 0.20;    // [WARN_FLOOR, WARN_CEIL) → warning zone
+
+export function speedFromAcceptRate(rate: number): number {
+  if (rate >= 0.30) return 5;
+  if (rate >= 0.25) return 4;
+  if (rate >= 0.20) return 3;
+  if (rate >= WARN_FLOOR) return 2;   // 17–19% — slipping
+  return 1;                            // <17%
 }
 
-/**
- * Called once per newly-completed gym rep: ratchet introTargetPerWeek up by one.
- * Only ever raises. Safe on paused founders — the generator skips them, but the
- * unlock still accrues. Returns the resulting target.
- */
-export async function applyGymReward(founderId: number): Promise<number> {
-  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
-  const current = founder?.introTargetPerWeek ?? BASE_TARGET;
-  const next = bumpForRep(current);
-  if (next !== current) {
-    await db.update(founders).set({ introTargetPerWeek: next }).where(eq(founders.id, founderId));
-  }
-  return next;
+/** Which acceptance bracket a rate falls in, its label, and the pace it supports. */
+export function acceptBracket(rate: number): { label: string; supports: number } {
+  if (rate >= 0.30) return { label: 'exceptional', supports: 5 };
+  if (rate >= 0.25) return { label: 'strong', supports: 4 };
+  if (rate >= 0.20) return { label: 'solid', supports: 3 };
+  if (rate >= WARN_FLOOR) return { label: 'slipping', supports: 2 };
+  return { label: 'at risk', supports: 1 };
 }
 
-// ── Calibration ──────────────────────────────────────────────────────────────
-// A new founder's first CALIBRATION_TARGET intro requests go out as a burst (all
-// in week 1) so we can read their accept rate — you can't judge "heat" off 1-2
-// requests. Once enough have resolved, their ongoing weekly allowance is set from
-// that rate and founders.calibratedAt is stamped. Existing founders are
-// grandfathered (stamped) at migration time, so this only affects new signups.
+/** Pace from a possibly-null rate: too little data → a neutral 2. */
+export function paceFromRate(rate: number | null): number {
+  return rate === null ? NEUTRAL_TARGET : speedFromAcceptRate(rate);
+}
 
-export const CALIBRATION_TARGET = 10;       // total requests in the burst
-export const CALIBRATION_WEEKLY = 10;       // week-1 firehose rate (all 10 up front)
-export const CALIBRATION_MIN_DECIDED = 8;   // enough resolved outcomes to trust the rate
-export const CALIBRATION_BACKSTOP_DAYS = 28; // finalize anyway after this long
+/** True when a founder is in the "slipping" warning zone (17–19%). */
+export function isWarning(rate: number | null): boolean {
+  return rate !== null && rate >= WARN_FLOOR && rate < WARN_CEIL;
+}
+
+/** Minimum decided requests before we trust / show an acceptance rate. */
+export const ACCEPT_MIN_SAMPLE = 4;
 
 const ACCEPTED_STATUSES = new Set([
   'introduced', 'first_meeting_complete', 'second_meeting_complete',
@@ -67,21 +69,6 @@ const ACCEPTED_STATUSES = new Set([
 const DECIDED_STATUSES = new Set([...ACCEPTED_STATUSES, 'passed', 'ignored']);
 const isSent = (status: string) => status !== 'pending_suggestion';
 
-/**
- * Accept rate → starting weekly intro-request allowance. Data-calibrated from
- * 711 historical requests: population average ≈25%, with a clean gap below ~15%.
- * ≥25% (vibing) → 4; the normal 15-25% pack → 2; <15% (messaging problem) → 1.
- */
-export function speedFromAcceptRate(rate: number): number {
-  if (rate >= 0.30) return 5;   // exceptional — investors are all-in
-  if (rate >= 0.25) return 4;
-  if (rate >= 0.15) return 2;
-  return 1;
-}
-
-/** Minimum decided requests before we'll show a founder their acceptance bracket. */
-export const ACCEPT_MIN_SAMPLE = 4;
-
 /** A founder's intro-request acceptance rate over their decided requests. */
 export function acceptRateOf(intros: Array<{ status: string }>): { rate: number | null; decided: number } {
   const decided = intros.filter(i => DECIDED_STATUSES.has(i.status)).length;
@@ -89,13 +76,58 @@ export function acceptRateOf(intros: Array<{ status: string }>): { rate: number 
   return { rate: decided >= ACCEPT_MIN_SAMPLE ? accepted / decided : null, decided };
 }
 
-/** Which acceptance bracket a rate falls in, and the weekly pace it supports. */
-export function acceptBracket(rate: number): { label: string; supports: number } {
-  if (rate >= 0.30) return { label: 'exceptional', supports: 5 };
-  if (rate >= 0.25) return { label: 'strong', supports: 4 };
-  if (rate >= 0.15) return { label: 'solid', supports: 2 };
-  return { label: 'building', supports: 1 };
+async function loadIntros(founderId: number) {
+  return db.select({
+    status: introRequests.status,
+    dateRequested: introRequests.dateRequested,
+    createdAt: introRequests.createdAt,
+  }).from(introRequests).where(eq(introRequests.founderId, founderId));
 }
+
+// ── Continuous pace = acceptance ─────────────────────────────────────────────
+
+/**
+ * Recompute a single founder's weekly pace from their acceptance rate and write
+ * it to introTargetPerWeek. Only for calibrated + active founders (new founders
+ * are handled by the calibration burst; paused founders don't send). Returns the
+ * pace, or null if skipped.
+ */
+export async function recomputePace(founderId: number): Promise<number | null> {
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder || !founder.calibratedAt || !founder.introCadenceActive) return null;
+  const { rate } = acceptRateOf(await loadIntros(founderId));
+  const pace = paceFromRate(rate);
+  if (pace !== founder.introTargetPerWeek) {
+    await db.update(founders).set({ introTargetPerWeek: pace }).where(eq(founders.id, founderId));
+  }
+  return pace;
+}
+
+/** Recompute pace from acceptance for every calibrated + active founder (or one). */
+export async function recomputePaceForAll(founderId?: number): Promise<void> {
+  const candidates = await db.query.founders.findMany({
+    where: founderId
+      ? eq(founders.id, founderId)
+      : and(isNotNull(founders.calibratedAt), eq(founders.introCadenceActive, true)),
+    columns: { id: true },
+  });
+  for (const f of candidates) {
+    try { await recomputePace(f.id); }
+    catch (e) { console.error('[momentum] recomputePace failed for founder', f.id, e); }
+  }
+}
+
+// ── Calibration ──────────────────────────────────────────────────────────────
+// A new founder's first CALIBRATION_TARGET intro requests go out as a burst (all
+// in week 1) so we can read their accept rate — you can't judge acceptance off
+// 1-2 requests. Once enough resolve, the pace is set from that rate and
+// founders.calibratedAt is stamped. Existing founders were grandfathered at
+// migration time, so this only affects new signups.
+
+export const CALIBRATION_TARGET = 10;
+export const CALIBRATION_WEEKLY = 10;
+export const CALIBRATION_MIN_DECIDED = 8;
+export const CALIBRATION_BACKSTOP_DAYS = 28;
 
 export interface CalibrationView {
   phase: 'sending' | 'waiting' | 'ready';
@@ -103,14 +135,10 @@ export interface CalibrationView {
   decidedCount: number;
   acceptRate: number | null;
   ready: boolean;
-  recommendedTarget: number | null;   // set when ready
-  messagingConcern: boolean;           // ready & accept rate below the ~15% floor
+  recommendedTarget: number | null;
+  messagingConcern: boolean;   // ready & acceptance below the warning floor
 }
 
-/**
- * Pure calibration state for a not-yet-calibrated founder, given their intro
- * requests. Unit-testable, no I/O.
- */
 export function calibrationView(
   intros: Array<{ status: string; dateRequested?: string | null; createdAt?: string | null }>,
   now: Date = new Date(),
@@ -120,7 +148,6 @@ export function calibrationView(
   const accepted = sent.filter(i => ACCEPTED_STATUSES.has(i.status));
   const acceptRate = decided.length > 0 ? accepted.length / decided.length : null;
 
-  // Backstop: how long since the first request went out.
   let firstSentMs = Infinity;
   for (const i of sent) {
     const d = i.dateRequested || i.createdAt;
@@ -134,31 +161,14 @@ export function calibrationView(
   else phase = 'waiting';
 
   const ready = phase === 'ready';
-  // With too few decided (backstop with sparse outcomes), don't guess a rate —
-  // give a neutral speed of 2 rather than punish on no data.
   const recommendedTarget = ready
-    ? (decided.length >= 4 && acceptRate !== null ? speedFromAcceptRate(acceptRate) : 2)
+    ? (decided.length >= ACCEPT_MIN_SAMPLE && acceptRate !== null ? speedFromAcceptRate(acceptRate) : NEUTRAL_TARGET)
     : null;
-  const messagingConcern = ready && decided.length >= 4 && acceptRate !== null && acceptRate < 0.15;
+  const messagingConcern = ready && decided.length >= ACCEPT_MIN_SAMPLE && acceptRate !== null && acceptRate < WARN_FLOOR;
 
   return { phase, sentCount: sent.length, decidedCount: decided.length, acceptRate, ready, recommendedTarget, messagingConcern };
 }
 
-async function loadIntros(founderId: number) {
-  return db.select({
-    status: introRequests.status,
-    dateRequested: introRequests.dateRequested,
-    createdAt: introRequests.createdAt,
-  }).from(introRequests).where(eq(introRequests.founderId, founderId));
-}
-
-/**
- * If a founder's calibration burst has resolved enough, set their ongoing weekly
- * allowance from the measured accept rate and stamp calibratedAt. No-op if
- * already calibrated, paused, or still gathering signal. Returns the view when it
- * finalized, else null. Calibration is authoritative for the initial speed —
- * it SETS the target (gym/other triggers take over afterward).
- */
 export async function finalizeCalibrationIfReady(founderId: number): Promise<CalibrationView | null> {
   const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
   if (!founder || founder.calibratedAt || !founder.introCadenceActive) return null;
@@ -180,95 +190,75 @@ export async function finalizeCalibrationForAll(founderId?: number): Promise<voi
   });
   for (const f of candidates) {
     try { await finalizeCalibrationIfReady(f.id); }
-    catch (e) { console.error('[treadmill] finalizeCalibration failed for founder', f.id, e); }
+    catch (e) { console.error('[momentum] finalizeCalibration failed for founder', f.id, e); }
   }
 }
 
 /**
- * Is this founder still in the send phase of calibration? Used by the generator
- * to elevate their weekly target to the burst rate. Pure given the inputs.
+ * Still in the send phase of calibration? Used by the generator to elevate the
+ * weekly target to the burst rate. Pure given the inputs.
  */
 export function isCalibrationSending(calibratedAt: string | null | undefined, sentCount: number): boolean {
   return !calibratedAt && sentCount < CALIBRATION_TARGET;
 }
 
+// ── Founder-facing reading ───────────────────────────────────────────────────
+
 export interface TreadmillReading {
-  requestsPerWeek: number;       // current belt speed
-  gymRepsDone: number;
+  requestsPerWeek: number;       // current weekly pace
   cadenceActive: boolean;
-  nextUnlock: { action: string; reward: string } | null;
-  gymRepsRemaining: number;
+  gymRepsRemaining: number;      // gym reps available this week (practice)
   calibrating: boolean;
   calibration: { phase: 'sending' | 'waiting'; sentCount: number; target: number } | null;
-  // Why the pace is what it is, for the founder-facing explainer.
+  // Why the pace is what it is + how it moves.
   explainer: {
     acceptRatePct: number | null;   // rounded % of decided requests accepted (null = too few)
-    bracket: string | null;         // 'strong' | 'solid' | 'building'
-    bracketSupports: number | null; // weekly pace that response level supports
-    hint: string | null;            // one-line nudge on how to move up
+    bracket: string | null;         // exceptional | strong | solid | slipping | at risk
+    bracketSupports: number | null; // pace that response level supports
+    warning: boolean;               // in the 17–19% slipping zone
+    atTop: boolean;                  // at the top of the ladder (≥30%)
+    hint: string | null;
   } | null;
 }
 
-/**
- * Read-only view for the founder's Treadmill tab. Computes belt state without
- * mutating anything (writes only happen when a rep actually completes).
- */
 export async function getTreadmillReading(founderId: number): Promise<TreadmillReading> {
   const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
-  const reps = await countGymReps(founderId);
-  const requestsPerWeek = founder?.introTargetPerWeek ?? BASE_TARGET;
   const cadenceActive = Boolean(founder?.introCadenceActive);
-  // Gym reps actually available to this founder THIS WEEK — the unlock must
-  // reflect this, or it dangles a reward they can't act on (weekly rep used).
   const gymRepsRemaining = (await getGymStatus(founderId)).repsRemaining;
   const intros = await loadIntros(founderId);
 
-  // Calibrating (new founder, active, not yet stamped): show burst progress
-  // instead of a pace number.
+  // Calibrating (new founder, active, not yet stamped): show burst progress.
   if (!founder?.calibratedAt && cadenceActive) {
     const view = calibrationView(intros);
     if (view.phase !== 'ready') {
       return {
-        requestsPerWeek, gymRepsDone: reps, cadenceActive, nextUnlock: null, gymRepsRemaining,
+        requestsPerWeek: founder?.introTargetPerWeek ?? BASE_TARGET, cadenceActive, gymRepsRemaining,
         calibrating: true,
         calibration: { phase: view.phase, sentCount: view.sentCount, target: CALIBRATION_TARGET },
         explainer: null,
       };
     }
-    // phase === 'ready' but not yet finalized (finalize runs on the tick / on
-    // generation) — fall through to show the pace at its recommended speed.
   }
 
-  // Next unlock via the gym — only offer "complete a session" when a rep is
-  // actually available; otherwise point them to Mat (matches the Gym screen).
-  let nextUnlock: { action: string; reward: string } | null = null;
-  if (requestsPerWeek < GYM_BUMP_CAP) {
-    nextUnlock = gymRepsRemaining > 0
-      ? { action: 'Complete a gym session', reward: '+1 intro request / week' }
-      : { action: 'Ask Mat for a gym rep', reward: '+1 intro request / week' };
-  }
-
-  // Explainer: why the pace is what it is + how to raise it, from their
-  // intro-request acceptance rate and the bracket it falls in.
+  // Why this pace — from the founder's acceptance rate + the bracket it's in.
   const { rate } = acceptRateOf(intros);
+  // Show the LIVE acceptance-derived pace for calibrated founders so the number
+  // always matches the "why" (the stored introTargetPerWeek is synced to this on
+  // each generation tick, which is what the generator actually uses).
+  const requestsPerWeek = founder?.calibratedAt ? paceFromRate(rate) : (founder?.introTargetPerWeek ?? BASE_TARGET);
   const b = rate !== null ? acceptBracket(rate) : null;
   const explainer = {
     acceptRatePct: rate !== null ? Math.round(rate * 100) : null,
     bracket: b?.label ?? null,
     bracketSupports: b?.supports ?? null,
+    warning: isWarning(rate),
+    atTop: rate !== null && rate >= 0.30,
     hint: rate === null
       ? 'As more investors respond, your pace adjusts to match how your requests are landing.'
-      : (rate < 0.30 ? 'When investors accept more of your intro requests, your pace picks up.' : null),
+      : (rate < WARN_FLOOR
+          ? "Investors aren't biting yet — let's tighten the pitch together and get this back up."
+          : (rate < 0.30 ? 'When investors accept more of your intro requests, your pace picks up.' : null)),
   };
 
-  return {
-    requestsPerWeek,
-    gymRepsDone: reps,
-    cadenceActive,
-    nextUnlock,
-    gymRepsRemaining,
-    explainer,
-    calibrating: false,
-    calibration: null,
-  };
+  return { requestsPerWeek, cadenceActive, gymRepsRemaining, calibrating: false, calibration: null, explainer };
 }

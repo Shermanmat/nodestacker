@@ -113,7 +113,9 @@
                 <div class="mt-3 flex gap-1.5">
                   <div v-for="n in 5" :key="n" class="h-2 flex-1 rounded-full" :class="n <= treadmill.requestsPerWeek ? 'bg-blue-600' : 'bg-gray-200'"></div>
                 </div>
-                <p v-if="treadmill.nextUnlock" class="mt-2 text-sm text-blue-700">↑ {{ treadmill.nextUnlock.action }} → {{ treadmill.nextUnlock.reward }}</p>
+                <p v-if="treadmill.explainer && treadmill.explainer.warning" class="mt-2 text-sm text-amber-700">⚠️ Acceptance slipping — let's tighten the pitch.</p>
+                <p v-else-if="treadmill.explainer && treadmill.explainer.atTop" class="mt-2 text-sm text-green-700">🔥 Top pace — investors are loving it.</p>
+                <p v-else-if="treadmill.explainer && treadmill.explainer.acceptRatePct !== null" class="mt-2 text-sm text-gray-500">{{ treadmill.explainer.acceptRatePct }}% of requests accepted — get more yeses to speed up.</p>
                 <p v-else class="mt-2 text-sm text-gray-400">Sending your intro requests on schedule.</p>
               </template>
               <p v-else class="mt-2 text-sm text-gray-400">Loading…</p>
@@ -1270,11 +1272,13 @@
               </div>
             </div>
 
-            <!-- Momentum meter (once calibrated) -->
+            <!-- Pace meter (once calibrated) -->
             <div v-if="!treadmill.calibrating" class="bg-white border rounded-lg p-6">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs uppercase tracking-wide text-gray-400">Current pace</span>
                 <span v-if="!treadmill.cadenceActive" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Paused</span>
+                <span v-else-if="treadmill.explainer && treadmill.explainer.warning" class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded">⚠️ Slipping</span>
+                <span v-else-if="treadmill.explainer && treadmill.explainer.atTop" class="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">🔥 Top pace</span>
               </div>
               <div class="mt-1">
                 <span class="text-4xl font-bold text-gray-900">{{ treadmill.requestsPerWeek }}</span>
@@ -1283,52 +1287,48 @@
               <!-- 1..5 pace meter -->
               <div class="mt-4 flex gap-1.5">
                 <div v-for="n in 5" :key="n" class="h-2.5 flex-1 rounded-full"
-                     :class="n <= treadmill.requestsPerWeek ? 'bg-blue-600' : 'bg-gray-200'"></div>
+                     :class="n <= treadmill.requestsPerWeek ? (treadmill.explainer && treadmill.explainer.warning ? 'bg-amber-500' : 'bg-blue-600') : 'bg-gray-200'"></div>
               </div>
-              <p class="mt-2 text-[11px] text-gray-400">Gym reps can take you up to 5 / week. More ways to build momentum are coming.</p>
+              <p class="mt-2 text-[11px] text-gray-400">Your pace tracks how often investors say yes to your intro requests.</p>
             </div>
 
-            <!-- Why this pace + how to raise it -->
+            <!-- Why this pace + how it moves -->
             <div v-if="!treadmill.calibrating && treadmill.explainer" class="bg-white border rounded-lg p-5">
               <span class="text-xs uppercase tracking-wide text-gray-400">Why this pace</span>
               <p class="mt-2 text-sm text-gray-700">
                 <template v-if="treadmill.explainer.acceptRatePct !== null">
                   Investors are accepting about <strong>{{ treadmill.explainer.acceptRatePct }}%</strong> of your intro requests — a
-                  <strong>{{ treadmill.explainer.bracket }}</strong> response, which supports roughly <strong>{{ treadmill.explainer.bracketSupports }} / week</strong>.
+                  <strong>{{ treadmill.explainer.bracket }}</strong> response, which sets your pace at <strong>{{ treadmill.explainer.bracketSupports }} / week</strong>.
                 </template>
                 <template v-else>
-                  We don't have enough investor responses yet to read your acceptance rate — your pace will adjust as they come in.
+                  We don't have enough investor responses yet to read your acceptance rate — your pace settles in as they come back.
                 </template>
                 <span v-if="treadmill.explainer.hint" class="block text-gray-500 mt-1">{{ treadmill.explainer.hint }}</span>
               </p>
 
-              <template v-if="treadmill.requestsPerWeek < 5 || treadmill.explainer.acceptRatePct === null || treadmill.explainer.acceptRatePct < 30">
-                <p class="mt-4 text-xs uppercase tracking-wide text-gray-400">Ways to pick up the pace</p>
-                <ul class="mt-2 space-y-1.5 text-sm text-gray-700">
-                  <li v-if="treadmill.requestsPerWeek < 5" class="flex items-start gap-2">
-                    <span class="text-blue-600 mt-px">•</span>
-                    <span><strong>Practice in the gym</strong> — each finished session adds <strong>+1 / week</strong> (up to 5).</span>
-                  </li>
-                  <li v-if="treadmill.explainer.acceptRatePct === null || treadmill.explainer.acceptRatePct < 30" class="flex items-start gap-2">
-                    <span class="text-blue-600 mt-px">•</span>
-                    <span><strong>Get more investors to say yes</strong> — reach <strong>30% acceptance</strong> and you're at the top pace (5 / week).</span>
-                  </li>
-                </ul>
+              <!-- at the top → the blitz -->
+              <p v-if="treadmill.explainer.atTop" class="mt-4 text-sm font-medium text-green-700">🔥 Investors love your requests — you're at the top pace. Land a real lead and we blitz to close: we ramp hard to fill the round while you're hot.</p>
+              <!-- slipping / at risk → we fix it together -->
+              <div v-else-if="treadmill.explainer.warning || (treadmill.explainer.acceptRatePct !== null && treadmill.explainer.acceptRatePct < 17)" class="mt-4 rounded-md bg-amber-50 border border-amber-200 p-3">
+                <p class="text-sm text-amber-800">Acceptance is dipping — that's a messaging signal, not a demotion. <strong>Let's fix it together.</strong> Tighten the pitch (the gym helps) and the number climbs back.</p>
+              </div>
+              <!-- room to grow -->
+              <template v-else>
+                <p class="mt-4 text-xs uppercase tracking-wide text-gray-400">How to pick up the pace</p>
+                <p class="mt-1 text-sm text-gray-700">Your pace is set purely by how investors respond. Get more of them to say yes — a tighter pitch and warmer targeting move you up the ladder toward 5 / week.</p>
               </template>
-              <p v-else class="mt-4 text-sm font-medium text-green-700">🔥 You're at the top pace — investors love your requests and you're maxed out. Keep it rolling.</p>
             </div>
 
-            <!-- Pitch Gym — practice your pitch (single gym surface lives at /gym.html) -->
+            <!-- Pitch Gym — practice to lift your acceptance -->
             <a href="/gym.html" class="block bg-white border rounded-lg p-5 hover:border-blue-300 transition">
               <div class="flex items-center justify-between">
                 <h3 class="font-medium text-gray-900">🏋️ Pitch Gym</h3>
                 <span class="text-xs text-blue-600 font-medium">Practice →</span>
               </div>
               <p class="text-sm text-gray-500 mt-1">
-                Practice your pitch against an AI VC.
-                <template v-if="treadmill.gymRepsRemaining > 0">You have <strong>{{ treadmill.gymRepsRemaining }}</strong> rep{{ treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week</template>
-                <template v-else>Your rep resets Monday</template>
-                — each finished session adds +1 / week.
+                Sharpen your pitch against an AI VC — a better pitch means more yeses, which lifts your pace.
+                <template v-if="treadmill.gymRepsRemaining > 0"> You have <strong>{{ treadmill.gymRepsRemaining }}</strong> rep{{ treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week.</template>
+                <template v-else> Your rep resets Monday.</template>
               </p>
             </a>
           </div>

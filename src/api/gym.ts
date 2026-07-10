@@ -5,7 +5,6 @@ import { db, mockCallAnalyses } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
 import { enabledPersonas, personaPublic, getPersona } from '../services/gym-personas.js';
 import { getGymStatus } from '../services/gym.js';
-import { applyGymReward } from '../services/treadmill.js';
 import { analyzeMockCall } from '../services/mock-call-analyzer.js';
 import { createConversation, getConversation, formatTranscript } from '../services/tavus.js';
 
@@ -131,9 +130,9 @@ app.post('/reps/complete', async (c) => {
   try {
     const result = await analyzeMockCall({ transcript, founderId, persona, tavusConversationId: conversationId });
     if (!result) return c.json({ error: 'Analyzer unavailable (ANTHROPIC_API_KEY not set)' }, 503);
-    // Treadmill reward: completing a rep ratchets up the founder's weekly
-    // intro-request allowance. Never let a reward hiccup fail the rep response.
-    try { await applyGymReward(founderId); } catch (e) { console.error('[gym] treadmill reward failed:', e); }
+    // Gym no longer changes the weekly pace (pace = acceptance rate). Practice
+    // lifts the pitch, which lifts acceptance. Bonus "shot on goal" for a rep is
+    // wired separately (bonus-shots mechanic).
     const row = await db.query.mockCallAnalyses.findFirst({ where: eq(mockCallAnalyses.id, result.id) });
     return c.json(hydrate(row), 201);
   } catch (err) {
@@ -159,7 +158,7 @@ app.post('/reps', async (c) => {
   try {
     const result = await analyzeMockCall({ transcript: parsed.data.transcript, founderId, persona: parsed.data.persona });
     if (!result) return c.json({ error: 'Analyzer unavailable (ANTHROPIC_API_KEY not set)' }, 503);
-    try { await applyGymReward(founderId); } catch (e) { console.error('[gym] treadmill reward failed:', e); }
+    // Gym doesn't change the weekly pace (pace = acceptance rate).
     const row = await db.query.mockCallAnalyses.findFirst({ where: eq(mockCallAnalyses.id, result.id) });
     return c.json(hydrate(row), 201);
   } catch (err) {

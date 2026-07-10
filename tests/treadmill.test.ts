@@ -1,8 +1,8 @@
 /**
- * Treadmill v1 tests — the gym-session reward mechanic.
- *  - bumpForRep: +1 per session from current, capped at 5, never lowers
- *  - applyGymReward: ratchets founders.introTargetPerWeek up on rep completion,
- *    and never lowers a higher (manually-set) target.
+ * Momentum tests — pace = acceptance rate.
+ *  - speedFromAcceptRate / acceptBracket / isWarning: the 5-4-3-2-1 ladder
+ *  - recomputePace: writes introTargetPerWeek from a founder's acceptance rate
+ *  - calibration: new founders set from the burst
  * Runs against a throwaway SQLite DB — never touches dev/prod data.
  *
  * Run:  node --import tsx --test tests/treadmill.test.ts
@@ -15,11 +15,10 @@ import path from 'node:path';
 
 const TMP_DB = path.join(process.cwd(), `.tmp-treadmill-test-${Date.now()}.db`);
 
-let db: any, founders: any, mockCallAnalyses: any, introRequests: any, eq: any;
+let db: any, founders: any, introRequests: any, eq: any;
 let treadmill: typeof import('../src/services/treadmill.js');
 
 before(async () => {
-  // Copy DDL (no data) from the dev DB into a throwaway, then point the app at it.
   const srcPath = process.env.DATABASE_PATH || 'nodestacker.db';
   const src = new Database(srcPath, { readonly: true });
   const ddl = src.prepare(
@@ -33,121 +32,125 @@ before(async () => {
   process.env.DATABASE_PATH = TMP_DB;
 
   const dbMod = await import('../src/db/index.js');
-  db = dbMod.db; founders = dbMod.founders; mockCallAnalyses = dbMod.mockCallAnalyses;
-  introRequests = dbMod.introRequests;
+  db = dbMod.db; founders = dbMod.founders; introRequests = dbMod.introRequests;
   ({ eq } = await import('drizzle-orm'));
   treadmill = await import('../src/services/treadmill.js');
 });
 
-after(() => {
-  if (existsSync(TMP_DB)) rmSync(TMP_DB);
+after(() => { if (existsSync(TMP_DB)) rmSync(TMP_DB); });
+
+// ── The ladder ───────────────────────────────────────────────────────────────
+
+test('speedFromAcceptRate: 5-4-3-2-1 ladder', () => {
+  const { speedFromAcceptRate } = treadmill;
+  assert.equal(speedFromAcceptRate(0.40), 5);  // exceptional
+  assert.equal(speedFromAcceptRate(0.30), 5);  // top threshold
+  assert.equal(speedFromAcceptRate(0.29), 4);  // strong
+  assert.equal(speedFromAcceptRate(0.25), 4);
+  assert.equal(speedFromAcceptRate(0.24), 3);  // solid
+  assert.equal(speedFromAcceptRate(0.20), 3);
+  assert.equal(speedFromAcceptRate(0.19), 2);  // slipping
+  assert.equal(speedFromAcceptRate(0.17), 2);
+  assert.equal(speedFromAcceptRate(0.169), 1); // <17% → 1
+  assert.equal(speedFromAcceptRate(0.00), 1);
 });
 
-test('bumpForRep: +1 per session, capped, never lowers', () => {
-  const { bumpForRep } = treadmill;
-  assert.equal(bumpForRep(1), 2);
-  assert.equal(bumpForRep(2), 3);   // existing founders default to 2
-  assert.equal(bumpForRep(4), 5);
-  assert.equal(bumpForRep(5), 5);   // capped
-  assert.equal(bumpForRep(20), 20); // above cap (future sprint) — never lowered
+test('acceptBracket: labels + supported pace', () => {
+  const { acceptBracket } = treadmill;
+  assert.deepEqual(acceptBracket(0.35), { label: 'exceptional', supports: 5 });
+  assert.deepEqual(acceptBracket(0.27), { label: 'strong', supports: 4 });
+  assert.deepEqual(acceptBracket(0.22), { label: 'solid', supports: 3 });
+  assert.deepEqual(acceptBracket(0.18), { label: 'slipping', supports: 2 });
+  assert.deepEqual(acceptBracket(0.10), { label: 'at risk', supports: 1 });
 });
+
+test('isWarning: only the 17–19% zone', () => {
+  const { isWarning } = treadmill;
+  assert.equal(isWarning(0.18), true);
+  assert.equal(isWarning(0.17), true);
+  assert.equal(isWarning(0.20), false);  // solid, not warning
+  assert.equal(isWarning(0.169), false); // already dropped to 1
+  assert.equal(isWarning(null), false);
+});
+
+// ── Fixtures ─────────────────────────────────────────────────────────────────
 
 let seq = 0;
-async function makeFounder(target: number): Promise<number> {
+async function makeFounder(opts: { target?: number; calibrated?: boolean; active?: boolean } = {}): Promise<number> {
   const [f] = await db.insert(founders).values({
     name: 'Test Founder', email: `treadmill-test-${++seq}@example.com`,
     companyName: 'Test Co', companyStage: 'pre-seed',
-    introTargetPerWeek: target, introCadenceActive: true,
+    introTargetPerWeek: opts.target ?? 2,
+    introCadenceActive: opts.active ?? true,
+    calibratedAt: opts.calibrated ? new Date().toISOString() : null,
     createdAt: new Date().toISOString(),
   }).returning();
   return f.id;
 }
-async function addRep(founderId: number) {
-  await db.insert(mockCallAnalyses).values({
-    founderId, transcript: 'x', persona: 'gp', createdAt: new Date().toISOString(),
-  });
+let sharedNodeId = 0, sharedInvestorId = 0;
+async function ensureNodeInvestor() {
+  if (sharedNodeId) return;
+  const dbMod = await import('../src/db/index.js');
+  const [n] = await db.insert(dbMod.nodes).values({ name: 'Node', email: 'node@example.com' }).returning();
+  const [i] = await db.insert(dbMod.investors).values({ name: 'Investor' }).returning();
+  sharedNodeId = n.id; sharedInvestorId = i.id;
+}
+async function addIntros(founderId: number, statuses: string[]) {
+  await ensureNodeInvestor();
+  for (const status of statuses) {
+    await db.insert(introRequests).values({
+      founderId, nodeId: sharedNodeId, investorId: sharedInvestorId, status,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+  }
 }
 
-test('applyGymReward: first rep bumps 1 → 2, second → 3', async () => {
-  const id = await makeFounder(1);
-  await addRep(id);
-  assert.equal(await treadmill.applyGymReward(id), 2);
-  let f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
-  assert.equal(f.introTargetPerWeek, 2);
+// ── Continuous pace = acceptance ─────────────────────────────────────────────
 
-  await addRep(id);
-  assert.equal(await treadmill.applyGymReward(id), 3);
+test('recomputePace: writes pace from acceptance rate', async () => {
+  const id = await makeFounder({ target: 2, calibrated: true, active: true });
+  // 3 accepted / 8 decided = 37.5% → 5
+  await addIntros(id, ['introduced', 'introduced', 'introduced', 'passed', 'passed', 'passed', 'passed', 'passed']);
+  assert.equal(await treadmill.recomputePace(id), 5);
+  const f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  assert.equal(f.introTargetPerWeek, 5);
 });
 
-test('applyGymReward: existing founder at 2 → 3', async () => {
-  const id = await makeFounder(2);
-  await addRep(id);
-  assert.equal(await treadmill.applyGymReward(id), 3);
+test('recomputePace: 20% → 3 (solid)', async () => {
+  const id = await makeFounder({ target: 5, calibrated: true, active: true });
+  // 2 accepted / 10 decided = 20% → 3
+  await addIntros(id, ['introduced', 'introduced', ...Array(8).fill('passed')]);
+  assert.equal(await treadmill.recomputePace(id), 3);
 });
 
-test('applyGymReward: caps at 5 and never lowers a target above the cap', async () => {
-  const capped = await makeFounder(5);
-  await addRep(capped);
-  assert.equal(await treadmill.applyGymReward(capped), 5);   // stays at cap
+test('recomputePace: skips uncalibrated and paused founders', async () => {
+  const uncal = await makeFounder({ calibrated: false, active: true });
+  await addIntros(uncal, ['introduced', 'passed', 'passed', 'passed', 'passed']);
+  assert.equal(await treadmill.recomputePace(uncal), null);
 
-  const high = await makeFounder(20);       // future sprint could set this
-  await addRep(high);
-  assert.equal(await treadmill.applyGymReward(high), 20);    // never lowered
+  const paused = await makeFounder({ calibrated: true, active: false });
+  await addIntros(paused, ['introduced', 'passed', 'passed', 'passed', 'passed']);
+  assert.equal(await treadmill.recomputePace(paused), null);
 });
 
-test('getTreadmillReading: surfaces the next unlock (calibrated founder)', async () => {
-  const id = await makeFounder(1);
-  await db.update(founders).set({ calibratedAt: new Date().toISOString() }).where(eq(founders.id, id));
-  const r0 = await treadmill.getTreadmillReading(id);
-  assert.equal(r0.calibrating, false);
-  assert.equal(r0.requestsPerWeek, 1);
-  assert.equal(r0.gymRepsDone, 0);
-  assert.ok(r0.nextUnlock, 'should offer a next unlock at base');
-
-  await addRep(id);
-  await treadmill.applyGymReward(id);
-  const r1 = await treadmill.getTreadmillReading(id);
-  assert.equal(r1.requestsPerWeek, 2);
-  assert.equal(r1.gymRepsDone, 1);
+test('recomputePace: too little data → neutral 2', async () => {
+  const id = await makeFounder({ target: 4, calibrated: true, active: true });
+  await addIntros(id, ['introduced', 'passed']); // 2 decided < MIN_SAMPLE
+  assert.equal(await treadmill.recomputePace(id), 2);
 });
 
 // ── Calibration ──────────────────────────────────────────────────────────────
 
-test('speedFromAcceptRate: data-calibrated bands', () => {
-  const { speedFromAcceptRate } = treadmill;
-  assert.equal(speedFromAcceptRate(0.40), 5);  // exceptional (top bracket)
-  assert.equal(speedFromAcceptRate(0.30), 5);  // top bracket threshold
-  assert.equal(speedFromAcceptRate(0.29), 4);  // strong
-  assert.equal(speedFromAcceptRate(0.25), 4);  // healthy line
-  assert.equal(speedFromAcceptRate(0.20), 2);  // normal pack
-  assert.equal(speedFromAcceptRate(0.15), 2);  // floor of normal
-  assert.equal(speedFromAcceptRate(0.10), 1);  // messaging problem
-});
-
-test('isCalibrationSending: burst window', () => {
-  const { isCalibrationSending } = treadmill;
-  assert.equal(isCalibrationSending(null, 5), true);
-  assert.equal(isCalibrationSending(null, 10), false);   // burst filled
-  assert.equal(isCalibrationSending('2026-01-01', 3), false); // already calibrated
-});
-
-test('calibrationView: phases', () => {
+test('calibrationView: phases + recommended target', () => {
   const { calibrationView } = treadmill;
   const sent = (status: string) => ({ status, createdAt: new Date().toISOString() });
 
-  // < 10 sent → sending
-  const sending = calibrationView([...Array(4)].map(() => sent('intro_request_sent')));
-  assert.equal(sending.phase, 'sending');
+  assert.equal(calibrationView([...Array(4)].map(() => sent('intro_request_sent'))).phase, 'sending');
 
-  // 10 sent, only 2 decided, recent → waiting
-  const wait = calibrationView([
-    ...[...Array(8)].map(() => sent('intro_request_sent')),
-    sent('introduced'), sent('passed'),
-  ]);
+  const wait = calibrationView([...[...Array(8)].map(() => sent('intro_request_sent')), sent('introduced'), sent('passed')]);
   assert.equal(wait.phase, 'waiting');
-  assert.equal(wait.ready, false);
 
-  // 10 sent, 8 decided (3 accepted, 5 passed) → ready, rate 3/8=0.375 → target 5
+  // 3 accepted / 8 decided = 37.5% → 5
   const ready = calibrationView([
     sent('introduced'), sent('introduced'), sent('introduced'),
     sent('passed'), sent('passed'), sent('passed'), sent('passed'), sent('passed'),
@@ -155,65 +158,43 @@ test('calibrationView: phases', () => {
   ]);
   assert.equal(ready.phase, 'ready');
   assert.equal(ready.recommendedTarget, 5);
-  assert.equal(ready.messagingConcern, false);
 
-  // low accept (1/10) → target 1 + messaging concern
-  const weak = calibrationView([
-    sent('introduced'),
-    ...[...Array(9)].map(() => sent('passed')),
-  ]);
+  // 1 accepted / 10 → 10% → 1 + messaging concern
+  const weak = calibrationView([sent('introduced'), ...[...Array(9)].map(() => sent('passed'))]);
   assert.equal(weak.recommendedTarget, 1);
   assert.equal(weak.messagingConcern, true);
 });
 
-let sharedNodeId = 0, sharedInvestorId = 0;
-async function ensureNodeInvestor() {
-  if (sharedNodeId) return;
-  const nodesTbl = (await import('../src/db/index.js')).nodes;
-  const investorsTbl = (await import('../src/db/index.js')).investors;
-  const [n] = await db.insert(nodesTbl).values({ name: 'Node', email: 'node@example.com' }).returning();
-  const [i] = await db.insert(investorsTbl).values({ name: 'Investor' }).returning();
-  sharedNodeId = n.id; sharedInvestorId = i.id;
-}
-async function addIntro(founderId: number, status: string) {
-  await ensureNodeInvestor();
-  await db.insert(introRequests).values({
-    founderId, nodeId: sharedNodeId, investorId: sharedInvestorId, status,
-    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-  });
-}
-
-test('finalizeCalibrationIfReady: sets speed from accept rate and stamps', async () => {
-  const id = await makeFounder(1);   // calibrated_at null, cadence active
-  // 3 accepted, 5 passed, 2 pending → decided 8, rate 3/8=0.375 → target 5
-  for (const s of ['introduced', 'introduced', 'introduced', 'passed', 'passed', 'passed', 'passed', 'passed', 'intro_request_sent', 'intro_request_sent']) {
-    await addIntro(id, s);
-  }
+test('finalizeCalibrationIfReady: sets pace from accept rate and stamps', async () => {
+  const id = await makeFounder({ target: 1, calibrated: false, active: true });
+  await addIntros(id, ['introduced', 'introduced', 'introduced', 'passed', 'passed', 'passed', 'passed', 'passed', 'intro_request_sent', 'intro_request_sent']);
   const view = await treadmill.finalizeCalibrationIfReady(id);
   assert.ok(view, 'should finalize');
   assert.equal(view.recommendedTarget, 5);
   const f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
   assert.equal(f.introTargetPerWeek, 5);
-  assert.ok(f.calibratedAt, 'calibratedAt stamped');
-
-  // Idempotent: already calibrated → no-op
-  assert.equal(await treadmill.finalizeCalibrationIfReady(id), null);
+  assert.ok(f.calibratedAt);
+  assert.equal(await treadmill.finalizeCalibrationIfReady(id), null); // idempotent
 });
 
-test('finalizeCalibrationIfReady: still sending → no change', async () => {
-  const id = await makeFounder(1);
-  for (const s of ['intro_request_sent', 'introduced', 'passed']) await addIntro(id, s);
-  assert.equal(await treadmill.finalizeCalibrationIfReady(id), null);
-  const f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
-  assert.equal(f.calibratedAt, null);
-});
+// ── Reading ──────────────────────────────────────────────────────────────────
 
-test('getTreadmillReading: shows calibration state while sending', async () => {
-  const id = await makeFounder(1);   // calibrated_at null, active
-  for (const s of ['intro_request_sent', 'introduced', 'passed']) await addIntro(id, s);
+test('getTreadmillReading: calibrating state while sending', async () => {
+  const id = await makeFounder({ calibrated: false, active: true });
+  await addIntros(id, ['intro_request_sent', 'introduced', 'passed']);
   const r = await treadmill.getTreadmillReading(id);
   assert.equal(r.calibrating, true);
   assert.equal(r.calibration.phase, 'sending');
   assert.equal(r.calibration.sentCount, 3);
-  assert.equal(r.calibration.target, 10);
+});
+
+test('getTreadmillReading: explainer shows bracket + warning', async () => {
+  const id = await makeFounder({ target: 2, calibrated: true, active: true });
+  // 2 accepted / 11 decided ≈ 18% → slipping/warning
+  await addIntros(id, ['introduced', 'introduced', ...Array(9).fill('passed')]);
+  const r = await treadmill.getTreadmillReading(id);
+  assert.equal(r.calibrating, false);
+  assert.equal(r.explainer.bracket, 'slipping');
+  assert.equal(r.explainer.warning, true);
+  assert.equal(r.explainer.acceptRatePct, 18);
 });

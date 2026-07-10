@@ -6,17 +6,17 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
-  <title>MatCap — We help non-coastal founders build billion-dollar companies.</title>
-  <meta name="description" content="MatCap is the fundraise point guard for non-coastal founders. We open doors, sharpen the pitch, and help avoid costly mistakes — so founders can focus on building.">
-  <meta property="og:title" content="MatCap — We help non-coastal founders build billion-dollar companies.">
-  <meta property="og:description" content="The fundraise point guard for non-coastal founders.">
+  <title>MatCap — We help founders get access, faster.</title>
+  <meta name="description" content="MatCap is the intro engine for founders. Warm, double opt-in intros to the investors who fit your raise — plus a room of portfolio founders who help you make the most of every one.">
+  <meta property="og:title" content="MatCap — We help founders get access, faster.">
+  <meta property="og:description" content="The intro engine for founders. Warm intros to the right investors, plus a room of founders who help you close them.">
   <meta property="og:image" content="https://matcap.vc/downloads/astro.png">
   <meta property="og:image:alt" content="MatCap">
   <meta property="og:url" content="https://matcap.vc">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MatCap — We help non-coastal founders build billion-dollar companies.">
-  <meta name="twitter:description" content="The fundraise point guard for non-coastal founders.">
+  <meta name="twitter:title" content="MatCap — We help founders get access, faster.">
+  <meta name="twitter:description" content="The intro engine for founders. Warm intros to the right investors, plus a room of founders who help you close them.">
   <meta name="twitter:image" content="https://matcap.vc/downloads/astro.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -51,66 +51,71 @@
     </div>
     
     <a href="/investors">Investors</a>
+    <a href="/dashboard" data-auth-link>Log In</a>
     <a class="btn" href="/signup">Apply</a>
   </div>
 </nav>
 
+<script>
+// Founder auth-aware nav: if a valid session exists, turn "Log In" into "Dashboard".
+(function(){
+  var link = document.querySelector('[data-auth-link]');
+  if(!link) return;
+  var s = localStorage.getItem('public_session');
+  if(!s) return;
+  fetch('/api/public/session', { headers: { 'X-Public-Session': s } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ if(d && d.user){ link.textContent = 'Dashboard'; } })
+    .catch(function(){});
+})();
+</script>
+
 <!-- ============ HERO (centered) ============ -->
 <section class="hero-centered">
   <div class="inner">
-    <h1 class="reveal">We help non&#8209;coastal founders build <span class="accent">billion&#8209;dollar</span> companies.</h1>
-    <p class="lede reveal">Get access to a Bay Area grounded network, community, and mindset. <strong>Don't uproot your life to get it.</strong></p>
+    <h1 class="reveal">We help founders get <span class="accent">access</span>, faster.</h1>
+    <p class="lede reveal">Warm intros to the investors who actually fit your raise — and a room of same-stage founders, all vetted, all sharp, all going for the same thing, helping each other get there.<br><strong>The network you'd move to the coast for</strong> (without moving).</p>
     <div class="cta-stack reveal">
       <a href="/signup" class="btn-primary">Apply as a Founder</a>
-      <a href="/investors" class="btn-secondary">Invest with Us</a>
+      <a href="#engine" class="btn-secondary">See how it works</a>
     </div>
   </div>
 </section>
 
-<!-- ============ HOW WE WORK ============ -->
-<section class="section-centered bg-alt">
+<!-- ============ THE INTRO ENGINE (Here's how) ============ -->
+<section id="engine" class="section-centered bg-alt">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">How we work</span></div>
-    <h2 class="h-section reveal">Your fundraise <span class="accent">point guard.</span></h2>
-    <p class="section-lede reveal">You're the front man — you pitch, you own the raise. We're behind the scenes making it easier. <strong>We don't run your raise. We make you better at it.</strong></p>
+    <div class="reveal"><span class="eyebrow">The intro engine</span></div>
+    <h2 class="h-section reveal">Access is the hard part. <span class="accent">Here's how we get you it.</span></h2>
+    <p class="section-lede reveal">Most founders don't lose because the company is weak. They lose because they can't get in the room. The intro engine is the same playbook, run for every founder we work with.</p>
 
-    <div class="card-grid">
-      <div class="feature-card reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M11 17h2"/></svg>
+    <ol class="numbered-list reveal" style="margin:8px auto 0;text-align:left">
+      <li>
+        <span class="num">01</span>
+        <div>
+          <div class="head">Draft the blurb.</div>
+          <p>We sharpen your one-paragraph pitch until it's tight and forwardable — the thing an investor reads in ten seconds and says "send them over."</p>
         </div>
-        <h3>Open doors.</h3>
-        <p>Warm intros to the right local angels and coastal VCs — the ones we've already built trust with. You walk in already vouched for.</p>
-      </div>
-
-      <div class="feature-card reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+      </li>
+      <li>
+        <span class="num">02</span>
+        <div>
+          <div class="head">Send it to the right investor. If they accept, we make the intro.</div>
+          <p>We send your blurb to the investors who actually fit your stage, sector, and check size. Once they opt in, we make the intro for you two to get to know each other — warm and vouched for, never a cold email.</p>
         </div>
-        <h3>Sharpen the pitch.</h3>
-        <p>Narrative, deck, run-of-show. We make sure what you walk into the room with is tight before you ever take a meeting.</p>
-      </div>
-
-      <div class="feature-card reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      </li>
+      <li>
+        <span class="num">03</span>
+        <div>
+          <div class="head">Coach through the raise.</div>
+          <p>Online sessions with your peers and one-on-one office hours with us. Deck, signaling, term sheets, when to push and when to walk — you don't learn the patterns on your own round.</p>
         </div>
-        <h3>Avoid mistakes.</h3>
-        <p>Term sheets, valuation, signaling, when to say yes and when to walk. We've seen the patterns. You shouldn't learn them on your own raise.</p>
-      </div>
-    </div>
-  </div>
-</section>
+      </li>
+    </ol>
 
-<!-- ============ PORTFOLIO ============ -->
-<section class="section-centered">
-  <div class="inner">
-    <div class="reveal"><span class="eyebrow">Portfolio</span></div>
-    <h2 class="h-section reveal">Companies we're <span class="accent">working with.</span></h2>
-    <p class="section-lede reveal">A few of the founders we've helped raise. Real intros, real outcomes.</p>
-
-    <div class="portfolio-grid dense reveal" data-portfolio-grid></div>
-    <div class="firm-empty reveal" data-portfolio-empty>Portfolio loading…</div>
+    <p class="section-lede reveal" style="margin:48px auto 0">
+      <a href="/intros" style="color:var(--accent);font-weight:700;text-decoration:none">See the intro engine by the numbers →</a>
+    </p>
   </div>
 </section>
 
@@ -133,28 +138,42 @@
   </div>
 </section>
 
-<!-- ============ COMMUNITY ============ -->
+<!-- ============ ONLINE SESSIONS (make the most of intros) ============ -->
 <section class="section-centered">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">Community</span></div>
-    <h2 class="h-section reveal">More than a fundraise.</h2>
-    <p class="section-lede reveal">Founders who work with us get a seat in every MatCap room: dinners, retreats, fireside chats with operators and investors who've been there. The people in the rooms come from everywhere.</p>
+    <div class="reveal"><span class="eyebrow">Online sessions</span></div>
+    <h2 class="h-section reveal">Raise in your own lane. <span class="accent">Never on your own.</span></h2>
+    <p class="section-lede reveal">The intros do the heavy lifting. The sessions are the augment — optional, always useful. Show up when you need them, get back to building when you don't.</p>
 
-    <div class="photo-grid reveal">
-      <div class="photo"><img src="/events/irl-1.png" alt=""></div>
-      <div class="photo"><img src="/events/irl-2.png" alt=""></div>
-      <div class="photo"><img src="/events/irl-3.png" alt=""></div>
-      <div class="photo"><img src="/events/irl-4.png" alt=""></div>
+    <div class="card-grid">
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <h3>Talk it out.</h3>
+        <p>Struggling to close? Get on with founders who've already done it and work through it together — same stage, all vetted, all going for the same thing.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+        </div>
+        <h3>Ask investors directly.</h3>
+        <p>Monthly AMAs with credible investors. Ask the question you actually want answered — no pitch, no pressure, no performance.</p>
+      </div>
+
+      <div class="feature-card reveal">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        </div>
+        <h3>We're behind the scenes.</h3>
+        <p>You own the raise and run it your way. We're in your corner the whole time — intros, strategy, gut-checks whenever you need them.</p>
+      </div>
     </div>
-  </div>
-</section>
 
-<!-- ============ SPEAKERS ============ -->
-<section class="section-centered bg-alt">
-  <div class="inner">
-    <div class="reveal"><span class="eyebrow">Past speakers &amp; guests</span></div>
-    <h2 class="h-section reveal">The people in the rooms.</h2>
-    <p class="section-lede reveal">Founders and investors who've shared time with the MatCap community.</p>
+    <div class="reveal" style="margin-top:72px"><span class="eyebrow">Special guests</span></div>
+    <h3 class="reveal" style="font-size:clamp(24px,3.2vw,34px);font-weight:800;letter-spacing:-0.5px;margin:18px auto 10px;max-width:700px">The investors and operators who show up for our founders.</h3>
+    <p class="section-lede reveal">A few of the people who've joined our sessions and AMAs to help the founders we work with.</p>
 
     <div class="speakers-grid-c speakers-5col reveal">
       <div class="speaker"><img src="/speakers/julian.png" alt="Julian Weisser"><div class="name">Julian Weisser</div><div class="role">Solo Founders</div></div>
@@ -173,17 +192,47 @@
       <div class="speaker"><img src="/speakers/speaker-blue.webp" alt="Niko Bonatsos"><div class="name">Niko Bonatsos</div><div class="role">Verdict Capital</div></div>
       <div class="speaker"><img src="/speakers/speaker-1.jpeg" alt="Shriya Nevatia"><div class="name">Shriya Nevatia</div><div class="role">Superhuman</div></div>
     </div>
+
+    <p class="pull-quote reveal" style="margin-top:64px">Learn online. Raise in your own lane. <span class="accent">Support from us behind the scenes.</span></p>
+  </div>
+</section>
+
+<!-- ============ PORTFOLIO ============ -->
+<section class="section-centered bg-alt">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">Portfolio</span></div>
+    <h2 class="h-section reveal">Companies we're <span class="accent">working with.</span></h2>
+    <p class="section-lede reveal">A few of the founders we've helped raise. Real intros, real outcomes.</p>
+
+    <div class="portfolio-grid dense reveal" data-portfolio-grid></div>
+    <div class="firm-empty reveal" data-portfolio-empty>Portfolio loading…</div>
+  </div>
+</section>
+
+<!-- ============ COMMUNITY ============ -->
+<section class="section-centered">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">Community</span></div>
+    <h2 class="h-section reveal">More than a fundraise.</h2>
+    <p class="section-lede reveal">Founders who work with us get a seat in every MatCap room: dinners, retreats, fireside chats with operators and investors who've been there. The people in the rooms come from everywhere.</p>
+
+    <div class="photo-grid reveal">
+      <div class="photo"><img src="/events/irl-1.png" alt=""></div>
+      <div class="photo"><img src="/events/irl-2.png" alt=""></div>
+      <div class="photo"><img src="/events/irl-3.png" alt=""></div>
+      <div class="photo"><img src="/events/irl-4.png" alt=""></div>
+    </div>
   </div>
 </section>
 
 <!-- ============ CASE STUDIES (stealth) ============ -->
-<section class="section-centered">
+<section class="section-centered bg-alt">
   <div class="inner">
     <div class="reveal"><span class="eyebrow">Case studies</span></div>
     <h2 class="h-section reveal">Outcomes we've helped <span class="accent">close.</span></h2>
-    <p class="section-lede reveal">Two recent stealth raises. Full story, founder names withheld.</p>
+    <p class="section-lede reveal">Three recent raises we helped close. Full breakdown on each.</p>
 
-    <div class="portfolio-grid reveal" style="grid-template-columns:repeat(2,1fr);max-width:880px">
+    <div class="portfolio-grid reveal" style="grid-template-columns:repeat(3,1fr);max-width:1100px">
       <a class="portfolio-card linkable" href="/case-studies/legix">
         <div class="p-stat">$1.5M</div>
         <div class="p-stat-sub">Round closed · names withheld</div>
@@ -198,6 +247,13 @@
         <div class="p-line">Workflow automation in a regulated real-estate services market.</div>
         <div class="p-read">Read story →</div>
       </a>
+      <a class="portfolio-card linkable" href="/case-studies/ryniant">
+        <div class="p-stat">$300K</div>
+        <div class="p-stat-sub">Pre-seed · led by Verdict Capital</div>
+        <div class="p-name">Ryniant</div>
+        <div class="p-line">The fastest path from molecule to best synthesis plan.</div>
+        <div class="p-read">Read story →</div>
+      </a>
     </div>
   </div>
 </section>
@@ -210,6 +266,7 @@
 
     <div class="pricing-display reveal">
       <div class="pricing-num">1%</div>
+      <div class="pricing-terms">24&#8209;month vesting · No cliff</div>
       <div class="pricing-label">Equity · Lifetime Partnership</div>
     </div>
 

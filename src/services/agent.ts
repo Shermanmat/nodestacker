@@ -1,6 +1,7 @@
 import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, agentSettings, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
+import { finalizeCalibrationForAll } from './treadmill.js';
 import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 import { recordAction } from './agent-actions.js';
 
@@ -45,6 +46,10 @@ export async function runAgentTick(): Promise<{
 }> {
   const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
   const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
+
+  // 0. Finalize any founder whose calibration burst has resolved — sets their
+  // ongoing weekly allowance from the measured accept rate before we generate.
+  await finalizeCalibrationForAll();
 
   // 1. Generate fresh suggestions across all eligible founders.
   const { suggestions, batchId, liquidity } = await generateMatchSuggestions();

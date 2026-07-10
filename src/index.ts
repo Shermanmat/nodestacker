@@ -14,6 +14,7 @@ import relationshipsRoutes from './api/relationships.js';
 import digestRoutes from './api/digest.js';
 import authRoutes from './api/auth.js';
 import founderPortalRoutes from './api/founder-portal.js';
+import docsOnboardingRoutes from './api/docs-onboarding.js';
 import portalCrmRoutes from './api/portal-crm.js';
 import peopleCapturesRoutes from './api/people-captures.js';
 import adminPeopleRoutes from './api/admin-people.js';
@@ -47,6 +48,8 @@ import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import agentActionsRoutes from './api/agent-actions.js';
+import mockCallAnalysisRoutes from './api/mock-call-analysis.js';
+import gymRoutes from './api/gym.js';
 import mcpRoutes from './api/mcp.js';
 import mcpTokensRoutes from './api/mcp-tokens-routes.js';
 import mcpRpcRoutes from './api/mcp-rpc.js';
@@ -72,6 +75,9 @@ app.use('/api/*', cors());
 app.route('/api/admin-auth', adminAuthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/portal', founderPortalRoutes);
+// Docs-first onboarding: already-incorporated companies upload formation docs
+// (AOC + bylaws + initial board consent), we extract variables, founder confirms.
+app.route('/api/portal/docs', docsOnboardingRoutes);
 // Founder-private CRM: investor pipeline + self-added records + interaction logs.
 // All routes scoped to the logged-in founder; no admin endpoint reads any of these.
 app.route('/api/portal/crm', portalCrmRoutes);
@@ -177,6 +183,9 @@ app.use('/api/agent/*', adminGuard);
 // Agent actions ledger / approval queue — admin-only
 app.use('/api/agent-actions', adminGuard);
 app.use('/api/agent-actions/*', adminGuard);
+// Mock VC call analyzer — admin-only (transcripts are sensitive founder prep)
+app.use('/api/mock-call-analysis', adminGuard);
+app.use('/api/mock-call-analysis/*', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -202,6 +211,9 @@ app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
 app.route('/api/brands', brandsRoutes);
 app.route('/api/agent-actions', agentActionsRoutes);
+app.route('/api/mock-call-analysis', mockCallAnalysisRoutes);
+// Pitch Gym — founder-facing (own session auth inside the route), not admin-guarded
+app.route('/api/gym', gymRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -918,6 +930,8 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 app.get('/trial', serveStatic({ path: './public/trial.html' }));
 app.get('/how-it-works', (c) => c.redirect('/trial', 301));
+// Founder-facing explainer: the Treadmill model of how MatCap works.
+app.get('/treadmill', serveStatic({ path: './public/treadmill.html' }));
 
 // Marketing site
 app.get('/founders', (c) => c.redirect('/signup', 302));

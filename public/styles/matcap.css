@@ -860,8 +860,13 @@ section{position:relative;overflow:hidden}
   line-height:.85;letter-spacing:1px;
   color:var(--accent);
 }
+.pricing-terms{
+  margin-top:16px;font-size:16px;
+  font-weight:600;letter-spacing:0.5px;
+  color:#ddd;
+}
 .pricing-label{
-  margin-top:14px;font-size:12px;
+  margin-top:8px;font-size:12px;
   font-weight:700;letter-spacing:3px;
   color:#888;text-transform:uppercase;
 }

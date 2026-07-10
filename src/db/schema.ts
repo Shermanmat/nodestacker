@@ -70,12 +70,20 @@ export const founders = sqliteTable('founders', {
   // institutional VCs of equivalent base score. VCs still get suggested.
   preferAnglesOnly: integer('prefer_angels_only', { mode: 'boolean' }).default(false),
   cadenceStartDate: text('cadence_start_date'),
+  // Treadmill calibration: a new founder's first ~10 intro requests go out as a
+  // burst to learn their accept rate ("heat"). Once enough have resolved, their
+  // ongoing weekly allowance is set from that rate and this is stamped. NULL =
+  // still calibrating; existing founders are grandfathered (stamped) on migrate.
+  calibratedAt: text('calibrated_at'),
   // Intro draft content — used by the agent + manual approve flow to assemble
   // a final-shaped intro email instead of a skeleton.
   blurb: text('blurb'),
   deckUrl: text('deck_url'),
   deckFile: text('deck_file'), // server-stored filename, e.g. '<token>.pdf' — used for Gmail attachments
   calendlyUrl: text('calendly_url'),
+  // Pitch Gym: how many practice reps this founder is allowed against the AI VC
+  // personas. Default 1; admin can raise it or reset a founder for another rep.
+  gymRepsAllowed: integer('gym_reps_allowed').notNull().default(1),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
@@ -668,6 +676,12 @@ export const OnboardingStatus = {
   OFFER_ACCEPTED: 'offer_accepted',
   PENDING_INCORPORATION: 'pending_incorporation',
   LIGHT_ENGAGEMENT: 'light_engagement',
+  // Docs-first track: already-incorporated companies upload formation docs
+  // (AOC + bylaws + initial board consent), we extract variables, founder
+  // confirms, then it rejoins the flow at ENTITY_INFO_RECEIVED.
+  DOCS_PENDING: 'docs_pending',
+  DOCS_UPLOADED: 'docs_uploaded',
+  DOCS_EXTRACTED: 'docs_extracted',
   ENTITY_INFO_PENDING: 'entity_info_pending',
   ENTITY_INFO_RECEIVED: 'entity_info_received',
   ADVISORY_AGREEMENT_SENT: 'advisory_agreement_sent',
@@ -715,6 +729,10 @@ export const OnboardingEventType = {
   REMINDER_SENT: 'reminder_sent',
   WEBHOOK_RECEIVED: 'webhook_received',
   DOCUMENT_UPLOADED: 'document_uploaded',
+  // Docs-first track
+  FORMATION_DOCS_UPLOADED: 'formation_docs_uploaded',
+  FORMATION_DOCS_EXTRACTED: 'formation_docs_extracted',
+  FORMATION_DOCS_CONFIRMED: 'formation_docs_confirmed',
 } as const;
 
 export const OnboardingActor = {
@@ -728,6 +746,18 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   portfolioCompanyId: integer('portfolio_company_id').notNull().references(() => portfolioCompanies.id).unique(),
   status: text('status').notNull().default('offer_pending'),
+
+  // Intake type: 'form_new' (default flow) or 'docs_first' (already
+  // incorporated — uploads formation docs we extract variables from).
+  intakeType: text('intake_type').default('form_new'),
+
+  // Docs-first intake: uploaded formation documents + AI extraction
+  bylawsUrl: text('bylaws_url'),
+  boardConsentUrl: text('board_consent_url'),
+  incorporationDate: text('incorporation_date'),
+  extractionRaw: text('extraction_raw'), // JSON: full Claude extraction result
+  extractedAt: text('extracted_at'),
+  docsConfirmedAt: text('docs_confirmed_at'),
 
   // Incorporation check
   incorporated: integer('incorporated', { mode: 'boolean' }),
@@ -824,6 +854,8 @@ export const boardMembers = sqliteTable('board_members', {
   email: text('email').notNull(),
   title: text('title'),
   isFounder: integer('is_founder', { mode: 'boolean' }).notNull().default(false),
+  // 'manual' (typed by founder) or 'extracted' (pulled from board consent doc)
+  source: text('source').default('manual'),
   approvedAt: text('approved_at'),
   approvalIp: text('approval_ip'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
@@ -1405,3 +1437,34 @@ export const mcpTokens = sqliteTable('mcp_tokens', {
 
 export type McpToken = typeof mcpTokens.$inferSelect;
 export type NewMcpToken = typeof mcpTokens.$inferInsert;
+
+// Mock VC call analyses. A founder does a practice pitch call (recorded, then
+// transcribed); we run the transcript through Claude playing an experienced
+// investor + coach and store a structured readout: an overall score, a
+// per-dimension scorecard, the founder's blind spots (where they hedged, dodged,
+// or didn't know their numbers), and the top coaching fixes before the real
+// raise. Advisory prep only — MatCap sharpens the pitch, the founder owns it.
+// Linked to whichever founder record we have: `founders` (portfolio) and/or
+// `publicCompanies` (applicant). The scorecard/blindSpots/coaching columns hold
+// JSON strings (parsed on read), same as other JSON-in-text columns here.
+export const mockCallAnalyses = sqliteTable('mock_call_analyses', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  founderId: integer('founder_id').references(() => founders.id),
+  publicCompanyId: integer('public_company_id').references(() => publicCompanies.id),
+  // Denormalized labels so an analysis is readable even if the source row moves.
+  founderName: text('founder_name'),
+  companyName: text('company_name'),
+  transcript: text('transcript').notNull(),
+  overallScore: integer('overall_score'),      // 1–10 headline
+  summary: text('summary'),                     // 2–3 sentence readout in Mat's voice
+  scorecard: text('scorecard'),                 // JSON: [{ dimension, score (1-5), note }]
+  blindSpots: text('blind_spots'),              // JSON: [{ moment, issue, whyItMatters }]
+  coaching: text('coaching'),                   // JSON: [{ fix, how }]
+  persona: text('persona'),                     // Gym persona key the founder practiced against (null = ad-hoc)
+  tavusConversationId: text('tavus_conversation_id'), // source Tavus conversation, for idempotency
+  model: text('model'),                         // model string used, for auditing
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type MockCallAnalysis = typeof mockCallAnalyses.$inferSelect;
+export type NewMockCallAnalysis = typeof mockCallAnalyses.$inferInsert;

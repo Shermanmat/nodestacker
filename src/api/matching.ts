@@ -17,6 +17,7 @@ import {
   computeAllFounderScores,
   computeAllInvestorScores,
 } from '../services/matching.js';
+import { finalizeCalibrationForAll } from '../services/treadmill.js';
 import { deleteDraft } from '../services/gmail.js';
 import { z } from 'zod';
 
@@ -125,6 +126,8 @@ app.post('/generate', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const founderId = body.founderId ? parseInt(body.founderId) : undefined;
 
+  // Finalize resolved calibrations first so generation uses fresh targets.
+  await finalizeCalibrationForAll(founderId);
   const { suggestions, batchId, rampUps, liquidity } = await generateMatchSuggestions(founderId);
 
   // Apply ramp-ups to founder intro targets

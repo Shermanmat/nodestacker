@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:studio": "drizzle-kit studio",
-    "test:mcp": "node --import tsx --test tests/mcp-pipeline.test.ts"
+    "test:mcp": "node --import tsx --test tests/mcp-pipeline.test.ts",
+    "test:treadmill": "node --import tsx --test tests/treadmill.test.ts"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.1",

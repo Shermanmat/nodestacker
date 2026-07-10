@@ -239,6 +239,34 @@
       "when": 1774900000000,
       "tag": "0035_node_vip",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1783550601192,
+      "tag": "0034_shocking_juggernaut",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1783623263930,
+      "tag": "0035_clear_impossible_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1783625193922,
+      "tag": "0036_lazy_alice",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "6",
+      "when": 1783633654700,
+      "tag": "0037_treadmill_calibration",
+      "breakpoints": true
     }
   ]
 }

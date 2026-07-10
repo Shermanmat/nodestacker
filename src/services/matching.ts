@@ -1,4 +1,5 @@
 import { eq, and, inArray, lt, sql } from 'drizzle-orm';
+import { isCalibrationSending, CALIBRATION_WEEKLY } from './treadmill.js';
 import {
   db,
   founders,
@@ -1082,7 +1083,12 @@ export async function generateMatchSuggestions(
       heatScore: founderHeat,
       manualBaseline,
     });
-    const target = dyn.target;
+    // Treadmill calibration: a new founder's first CALIBRATION_TARGET requests go
+    // out as a burst so we can read their accept rate. During that send phase the
+    // weekly allowance is elevated; once they've sent enough it falls back to the
+    // normal (finalized) target. (finalizeCalibration runs in the caller first.)
+    const sentSoFar = founderIntros.filter(ir => ir.status !== 'pending_suggestion').length;
+    const target = isCalibrationSending(founder.calibratedAt, sentSoFar) ? CALIBRATION_WEEKLY : dyn.target;
     effectiveTargets.set(founder.id, target);
     const targetSource: 'dynamic' | 'manual' = manualBaseline > 0 && manualBaseline >= dyn.supplyBased && manualBaseline >= dyn.heatBased ? 'manual' : 'dynamic';
     if (manualBaseline > 0 && target > manualBaseline) {

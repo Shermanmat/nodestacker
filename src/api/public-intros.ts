@@ -14,6 +14,10 @@ const INTRO_TAKEN_STATUSES = new Set([
 
 const WINDOW_DAYS = 30;
 
+// Individual angels carry a generic firm name. Collapse them into one
+// "Angel ×N" tile so the count of angel investors is visible.
+const ANGEL_FIRM_LABELS = new Set(['angel', 'angel investor', 'angel investors']);
+
 app.get('/recent-firms', async (c) => {
   const cutoff = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
@@ -33,6 +37,7 @@ app.get('/recent-firms', async (c) => {
   const firmById = new Map(investorRows.map((i) => [i.id, i.firm?.trim() || null]));
 
   const firmSet = new Set<string>();
+  const angelInvestorIds = new Set<(typeof rows)[number]['investorId']>();
   for (const r of rows) {
     if (!INTRO_TAKEN_STATUSES.has(r.status)) continue;
 
@@ -43,10 +48,18 @@ app.get('/recent-firms', async (c) => {
 
     const firm = firmById.get(r.investorId);
     if (!firm) continue;
-    firmSet.add(firm);
+    if (ANGEL_FIRM_LABELS.has(firm.toLowerCase())) {
+      angelInvestorIds.add(r.investorId);
+    } else {
+      firmSet.add(firm);
+    }
   }
 
   const firms = [...firmSet].sort((a, b) => a.localeCompare(b));
+  // Surface angels as a single tile up front so the volume reads clearly.
+  if (angelInvestorIds.size > 0) {
+    firms.unshift(`Angel ×${angelInvestorIds.size}`);
+  }
 
   c.header('Cache-Control', 'public, max-age=60');
   return c.json({

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import * as onboardingEmails from '../services/onboarding-emails.js';
 import * as esign from '../services/esign.js';
 import { checkFirmBlocked } from '../services/matching.js';
+import { getTreadmillReading } from '../services/treadmill.js';
 
 type Variables = {
   founderId: number;
@@ -53,6 +54,13 @@ app.get('/comms', async (c) => {
     deckServePath: founder.deckFile ? `/decks/${founder.deckFile}` : null,
     pending: pending.map((r) => ({ id: r.id, kind: r.kind, note: r.note, createdAt: r.createdAt })),
   });
+});
+
+// ── Treadmill: the founder's weekly intro-request allowance + how to grow it ──
+// v1: the belt speeds up when they complete a gym session. Read-only.
+app.get('/treadmill', async (c) => {
+  const founderId = c.get('founderId') as number;
+  return c.json(await getTreadmillReading(founderId));
 });
 
 app.post('/comms/blurb-request', async (c) => {
@@ -927,7 +935,7 @@ app.post('/onboarding/incorporation-answer', async (c) => {
 
   const schema = z.object({
     incorporated: z.boolean(),
-    path: z.enum(['partner', 'side_project']).optional(),
+    path: z.enum(['partner', 'side_project', 'docs_first']).optional(),
     incorporationPartner: z.string().optional(),
   });
 
@@ -959,7 +967,24 @@ app.post('/onboarding/incorporation-answer', async (c) => {
   const { incorporated, path, incorporationPartner } = parsed.data;
 
   if (incorporated) {
-    // Already incorporated → go straight to entity info
+    // Docs-first track: founder has prior formation docs and will upload them
+    // (AOC + bylaws + initial board consent) for us to extract variables from.
+    if (path === 'docs_first') {
+      await db.update(onboardingWorkflows)
+        .set({
+          status: OnboardingStatus.DOCS_PENDING,
+          incorporated: true,
+          intakeType: 'docs_first',
+          updatedAt: now,
+        })
+        .where(eq(onboardingWorkflows.id, workflow.id));
+
+      await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: true, intakeType: 'docs_first' });
+
+      return c.json({ success: true, docsFirst: true, message: 'Great! Upload your formation documents (Articles of Incorporation, bylaws, and initial board consent) and we\'ll fill in your company details automatically.' });
+    }
+
+    // Already incorporated → go straight to manual entity info
     await db.update(onboardingWorkflows)
       .set({
         status: OnboardingStatus.ENTITY_INFO_PENDING,

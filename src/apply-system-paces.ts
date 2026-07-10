@@ -29,16 +29,17 @@ import { acceptRateOf } from './services/treadmill.js';
 const APPLY = process.argv.includes('--apply');
 
 // NEW bands (preview of the "pace = acceptance only" model — computed inline here
-// so it doesn't change live behavior until we build the full model):
-//   >=30% -> 5, >=25% -> 4, >=20% -> 2, 17-19% -> 2 + WARNING, <17% -> 1.
+// so it doesn't change live behavior until we build the full model). Smooth
+// 5-4-3-2-1 ladder:
+//   >=30% -> 5, >=25% -> 4, >=20% -> 3, 17-19% -> 2 + WARNING, <17% -> 1.
 //   <4 decided -> 2 (neutral, insufficient signal).
 function paceFor(rate: number | null): { pace: number; warn: boolean } {
   if (rate === null) return { pace: 2, warn: false };
   if (rate >= 0.30) return { pace: 5, warn: false };
   if (rate >= 0.25) return { pace: 4, warn: false };
-  if (rate >= 0.20) return { pace: 2, warn: false };
-  if (rate >= 0.17) return { pace: 2, warn: true };   // warning zone
-  return { pace: 1, warn: false };                     // <17% → 1
+  if (rate >= 0.20) return { pace: 3, warn: false };   // solid
+  if (rate >= 0.17) return { pace: 2, warn: true };    // slipping — warning zone
+  return { pace: 1, warn: false };                      // <17% → 1
 }
 
 async function main() {

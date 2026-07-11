@@ -17,7 +17,7 @@ import {
   computeAllFounderScores,
   computeAllInvestorScores,
 } from '../services/matching.js';
-import { finalizeCalibrationForAll, recomputePaceForAll } from '../services/treadmill.js';
+import { finalizeCalibrationForAll, recomputePaceForAll, syncCarrotShotsForAll, consumeBonusShots } from '../services/treadmill.js';
 import { deleteDraft } from '../services/gmail.js';
 import { z } from 'zod';
 
@@ -130,7 +130,14 @@ app.post('/generate', async (c) => {
   // so generation uses fresh, acceptance-driven targets.
   await finalizeCalibrationForAll(founderId);
   await recomputePaceForAll(founderId);
+  await syncCarrotShotsForAll();
   const { suggestions, batchId, rampUps, liquidity } = await generateMatchSuggestions(founderId);
+
+  // Consume bonus shots actually generated (beyond the base weekly pace).
+  for (const l of liquidity) {
+    const bonusUsed = Math.max(0, l.generated - Math.max(0, l.paceBase - l.usedThisWeek));
+    if (bonusUsed > 0) await consumeBonusShots(l.founderId, bonusUsed);
+  }
 
   // Apply ramp-ups to founder intro targets
   for (const ramp of rampUps) {

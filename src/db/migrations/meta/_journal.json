@@ -267,6 +267,13 @@
       "when": 1783633654700,
       "tag": "0037_treadmill_calibration",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1783793436197,
+      "tag": "0038_bonus_shots_and_blitz",
+      "breakpoints": true
     }
   ]
 }

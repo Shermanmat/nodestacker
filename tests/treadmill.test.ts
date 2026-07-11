@@ -16,6 +16,7 @@ import path from 'node:path';
 const TMP_DB = path.join(process.cwd(), `.tmp-treadmill-test-${Date.now()}.db`);
 
 let db: any, founders: any, introRequests: any, eq: any;
+let mockCallAnalyses: any, followupLogs: any, founderInvestorRecords: any;
 let treadmill: typeof import('../src/services/treadmill.js');
 
 before(async () => {
@@ -33,6 +34,8 @@ before(async () => {
 
   const dbMod = await import('../src/db/index.js');
   db = dbMod.db; founders = dbMod.founders; introRequests = dbMod.introRequests;
+  mockCallAnalyses = dbMod.mockCallAnalyses; followupLogs = dbMod.followupLogs;
+  founderInvestorRecords = dbMod.founderInvestorRecords;
   ({ eq } = await import('drizzle-orm'));
   treadmill = await import('../src/services/treadmill.js');
 });
@@ -197,4 +200,105 @@ test('getTreadmillReading: explainer shows bracket + warning', async () => {
   assert.equal(r.explainer.bracket, 'slipping');
   assert.equal(r.explainer.warning, true);
   assert.equal(r.explainer.acceptRatePct, 18);
+});
+
+// ── Bonus shots ──────────────────────────────────────────────────────────────
+
+async function addGymReps(founderId: number, n: number) {
+  for (let i = 0; i < n; i++) {
+    await db.insert(mockCallAnalyses).values({ founderId, transcript: 'x', persona: 'gp', createdAt: new Date().toISOString() });
+  }
+}
+async function addMeetingUpdates(founderId: number, n: number) {
+  await ensureNodeInvestor();
+  for (let i = 0; i < n; i++) {
+    const [ir] = await db.insert(introRequests).values({
+      founderId, nodeId: sharedNodeId, investorId: sharedInvestorId, status: 'introduced',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    }).returning();
+    await db.insert(followupLogs).values({
+      introRequestId: ir.id, followupType: 'meeting_update', completedBy: 'founder', completedAt: new Date().toISOString(),
+    });
+  }
+}
+async function addInvestorRecords(founderId: number, n: number) {
+  for (let i = 0; i < n; i++) {
+    await db.insert(founderInvestorRecords).values({ founderId, name: `Angel ${i}`, createdAt: new Date().toISOString() });
+  }
+}
+// A founder converting at ~30% (eligible for shots).
+async function eligibleFounder(): Promise<number> {
+  const id = await makeFounder({ target: 5, calibrated: true, active: true });
+  await addIntros(id, ['introduced', 'introduced', 'introduced', ...Array(7).fill('passed')]); // 3/10 = 30%
+  return id;
+}
+
+test('syncCarrotShots: gym rep grants a shot when ≥20%, none below', async () => {
+  const ok = await eligibleFounder();
+  await addGymReps(ok, 1);
+  assert.equal(await treadmill.syncCarrotShots(ok), 1);
+
+  const low = await makeFounder({ calibrated: true, active: true });
+  await addIntros(low, ['introduced', ...Array(9).fill('passed')]); // 10%
+  await addGymReps(low, 1);
+  assert.equal(await treadmill.syncCarrotShots(low), 0);
+});
+
+test('syncCarrotShots: caps at BONUS_CAP and is idempotent', async () => {
+  const id = await eligibleFounder();
+  await addGymReps(id, 6);
+  assert.equal(await treadmill.syncCarrotShots(id), treadmill.BONUS_CAP);
+  assert.equal(await treadmill.syncCarrotShots(id), treadmill.BONUS_CAP); // idempotent
+});
+
+test('syncCarrotShots: meeting + investor milestones', async () => {
+  const id = await eligibleFounder();
+  await addMeetingUpdates(id, 3);      // → 1 shot
+  await addInvestorRecords(id, 5);     // → 1 shot
+  assert.equal(await treadmill.syncCarrotShots(id), 2);
+});
+
+test('consumeBonusShots: decrements and floors at 0', async () => {
+  const id = await eligibleFounder();
+  await addGymReps(id, 2);
+  await treadmill.syncCarrotShots(id);   // 2 shots
+  await treadmill.consumeBonusShots(id, 1);
+  let f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  assert.equal(f.bonusShots, 1);
+  await treadmill.consumeBonusShots(id, 5);
+  f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  assert.equal(f.bonusShots, 0);
+});
+
+// ── Win-blitz ────────────────────────────────────────────────────────────────
+
+test('blitz: sets pace, blocks recompute, then eases back', async () => {
+  const id = await eligibleFounder();   // acceptance pace = 5
+  await treadmill.startBlitz(id, 20, 21);
+  let f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  assert.equal(f.introTargetPerWeek, 20);
+  assert.equal(treadmill.isBlitzing(f), true);
+
+  // recompute must not touch a blitzing founder
+  assert.equal(await treadmill.recomputePace(id), null);
+  f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  assert.equal(f.introTargetPerWeek, 20);
+
+  // ending the blitz eases back to the acceptance pace (5)
+  await treadmill.endBlitz(id);
+  f = await db.query.founders.findFirst({ where: eq(founders.id, id) });
+  assert.equal(treadmill.isBlitzing(f), false);
+  assert.equal(f.introTargetPerWeek, 5);
+});
+
+test('getTreadmillReading: blitz shows the blitz target + bonus shots', async () => {
+  const id = await eligibleFounder();
+  await addGymReps(id, 1);
+  await treadmill.syncCarrotShots(id);
+  await treadmill.startBlitz(id, 20, 21);
+  const r = await treadmill.getTreadmillReading(id);
+  assert.equal(r.blitzing, true);
+  assert.equal(r.requestsPerWeek, 20);
+  assert.equal(r.bonus.shots, 1);
+  assert.equal(r.bonus.eligible, true);
 });

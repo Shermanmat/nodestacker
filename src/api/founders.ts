@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
 import { db, founders, founderNodeRelationships, nodes, founderCategoryAssignments, investorCategories, investorCategoryAssignments, introRequests, investors, nodeInvestorConnections, ensureDefaultNodeRelationship } from '../db/index.js';
 import { z } from 'zod';
+import { startBlitz, endBlitz, BLITZ_DEFAULT_TARGET, BLITZ_DEFAULT_DAYS } from '../services/treadmill.js';
 
 const app = new Hono();
 
@@ -650,6 +651,26 @@ app.post('/:id/nodes', async (c) => {
   }).returning();
 
   return c.json(result[0], 201);
+});
+
+// Win-blitz: flip a founder into a sprint to close the round after they land a
+// lead. Pace jumps to blitzTarget; acceptance recompute leaves them alone until
+// it expires. Admin only (mounted under adminGuard).
+app.post('/:id/blitz', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (!id) return c.json({ error: 'Invalid id' }, 400);
+  const body = await c.req.json().catch(() => ({} as any));
+  const target = Number.isFinite(body.target) ? Math.max(1, Math.round(body.target)) : BLITZ_DEFAULT_TARGET;
+  const days = Number.isFinite(body.days) ? Math.max(1, Math.round(body.days)) : BLITZ_DEFAULT_DAYS;
+  await startBlitz(id, target, days);
+  return c.json({ ok: true, target, days });
+});
+
+app.post('/:id/blitz/end', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (!id) return c.json({ error: 'Invalid id' }, 400);
+  await endBlitz(id);
+  return c.json({ ok: true });
 });
 
 export default app;

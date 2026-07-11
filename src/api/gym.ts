@@ -5,6 +5,7 @@ import { db, mockCallAnalyses } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
 import { enabledPersonas, personaPublic, getPersona } from '../services/gym-personas.js';
 import { getGymStatus } from '../services/gym.js';
+import { syncCarrotShots } from '../services/treadmill.js';
 import { analyzeMockCall } from '../services/mock-call-analyzer.js';
 import { createConversation, getConversation, formatTranscript } from '../services/tavus.js';
 
@@ -130,9 +131,10 @@ app.post('/reps/complete', async (c) => {
   try {
     const result = await analyzeMockCall({ transcript, founderId, persona, tavusConversationId: conversationId });
     if (!result) return c.json({ error: 'Analyzer unavailable (ANTHROPIC_API_KEY not set)' }, 503);
-    // Gym no longer changes the weekly pace (pace = acceptance rate). Practice
-    // lifts the pitch, which lifts acceptance. Bonus "shot on goal" for a rep is
-    // wired separately (bonus-shots mechanic).
+    // Gym doesn't change the weekly pace (pace = acceptance rate) — practice
+    // lifts the pitch. But a finished rep earns a one-off bonus "shot on goal"
+    // (if the founder is converting ≥20%).
+    try { await syncCarrotShots(founderId); } catch (e) { console.error('[gym] carrot sync failed:', e); }
     const row = await db.query.mockCallAnalyses.findFirst({ where: eq(mockCallAnalyses.id, result.id) });
     return c.json(hydrate(row), 201);
   } catch (err) {
@@ -158,7 +160,7 @@ app.post('/reps', async (c) => {
   try {
     const result = await analyzeMockCall({ transcript: parsed.data.transcript, founderId, persona: parsed.data.persona });
     if (!result) return c.json({ error: 'Analyzer unavailable (ANTHROPIC_API_KEY not set)' }, 503);
-    // Gym doesn't change the weekly pace (pace = acceptance rate).
+    try { await syncCarrotShots(founderId); } catch (e) { console.error('[gym] carrot sync failed:', e); }
     const row = await db.query.mockCallAnalyses.findFirst({ where: eq(mockCallAnalyses.id, result.id) });
     return c.json(hydrate(row), 201);
   } catch (err) {

@@ -75,6 +75,18 @@ export const founders = sqliteTable('founders', {
   // ongoing weekly allowance is set from that rate and this is stamped. NULL =
   // still calibrating; existing founders are grandfathered (stamped) on migrate.
   calibratedAt: text('calibrated_at'),
+  // Bonus "shots on goal" — one-off extra intro requests earned via carrots
+  // (gym session, updating meetings, adding outside investors), gated on ≥20%
+  // acceptance and capped. Consumed by the generator on top of the weekly pace.
+  bonusShots: integer('bonus_shots').notNull().default(0),
+  bonusGymGranted: integer('bonus_gym_granted').notNull().default(0),
+  bonusMeetingsGranted: integer('bonus_meetings_granted').notNull().default(0),
+  bonusInvestorsGranted: integer('bonus_investors_granted').notNull().default(0),
+  // Win-blitz: when a founder lands a lead, Mat flips them into a sprint to
+  // close the round. While blitzUntil is in the future, pace = blitzTarget and
+  // the acceptance-based recompute leaves them alone.
+  blitzUntil: text('blitz_until'),
+  blitzTarget: integer('blitz_target'),
   // Intro draft content — used by the agent + manual approve flow to assemble
   // a final-shaped intro email instead of a skeleton.
   blurb: text('blurb'),

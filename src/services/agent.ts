@@ -1,7 +1,7 @@
 import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, agentSettings, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
-import { finalizeCalibrationForAll, recomputePaceForAll } from './treadmill.js';
+import { finalizeCalibrationForAll, recomputePaceForAll, syncCarrotShotsForAll, consumeBonusShots } from './treadmill.js';
 import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 import { recordAction } from './agent-actions.js';
 
@@ -52,9 +52,18 @@ export async function runAgentTick(): Promise<{
   // recompute pace = acceptance for everyone already calibrated.
   await finalizeCalibrationForAll();
   await recomputePaceForAll();
+  await syncCarrotShotsForAll();   // grant any newly-earned bonus shots
 
   // 1. Generate fresh suggestions across all eligible founders.
   const { suggestions, batchId, liquidity } = await generateMatchSuggestions();
+
+  // Consume bonus shots that were actually generated (anything beyond the base
+  // weekly pace came from a founder's shot pool).
+  for (const l of liquidity) {
+    const baseRemaining = Math.max(0, l.paceBase - l.usedThisWeek);
+    const bonusUsed = Math.max(0, l.generated - baseRemaining);
+    if (bonusUsed > 0) await consumeBonusShots(l.founderId, bonusUsed);
+  }
 
   // 2. Persist each suggestion as a pending intro_request + linked match_suggestion.
   // generateMatchSuggestions only returns in-memory candidates — the /api/matching/generate

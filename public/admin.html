@@ -2002,6 +2002,7 @@
                 <th class="px-4 text-right">Ignored</th>
                 <th class="px-4 text-right">Pending</th>
                 <th class="px-4 text-right">Accept Rate</th>
+                <th class="px-4 text-right"></th>
               </tr>
             </thead>
             <tbody>
@@ -2017,6 +2018,9 @@
                 <td class="px-4 text-right text-gray-500">{{ row.pending }}</td>
                 <td class="px-4 text-right font-bold" :class="row.acceptRate >= 50 ? 'text-green-600' : row.acceptRate >= 25 ? 'text-amber-600' : 'text-red-600'">
                   {{ row.acceptRate }}%
+                </td>
+                <td class="px-4 text-right">
+                  <button @click="blitzFounder(row)" class="text-xs bg-orange-500 text-white px-2 py-0.5 rounded hover:bg-orange-600" title="Blitz to close the round">🚀 Blitz</button>
                 </td>
               </tr>
             </tbody>
@@ -7663,6 +7667,16 @@
           founderLeaderboard.value = data.data;
         };
 
+        // Win-blitz: flip a founder into a sprint to close the round after a lead.
+        const blitzFounder = async (row) => {
+          const t = prompt(`Blitz ${row.name} to how many intro requests/week (to close the round)?`, '20');
+          if (t === null) return;
+          const target = parseInt(t);
+          if (!Number.isFinite(target) || target < 1) return;
+          await api(`/founders/${row.founderId}/blitz`, { method: 'POST', body: { target } });
+          alert(`🚀 ${row.name} is blitzing at ${target}/week for the next 3 weeks.`);
+        };
+
         const loadPipelineHealth = async () => {
           const data = await api('/founders/pipeline-health');
           pipelineHealth.value = data;
@@ -9097,7 +9111,7 @@
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
           // Founder Leaderboard
-          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, loadFounderLeaderboard,
+          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, loadFounderLeaderboard, blitzFounder,
           // Pipeline Health
           pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
           updateFounderCadence, toggleFounderCadence,

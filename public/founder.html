@@ -1272,8 +1272,18 @@
               </div>
             </div>
 
-            <!-- Pace meter (once calibrated) -->
-            <div v-if="!treadmill.calibrating" class="bg-white border rounded-lg p-6">
+            <!-- Blitz banner (win-sprint to close the round) -->
+            <div v-if="!treadmill.calibrating && treadmill.blitzing" class="rounded-lg p-6 bg-gradient-to-r from-orange-500 to-red-500 text-white">
+              <div class="text-xs uppercase tracking-wide opacity-90">🚀 Blitz mode — closing the round</div>
+              <div class="mt-1">
+                <span class="text-4xl font-bold">{{ treadmill.requestsPerWeek }}</span>
+                <span class="text-sm opacity-90 ml-1">intro requests / week</span>
+              </div>
+              <p class="mt-2 text-sm opacity-90">You landed a lead — we're throwing fuel on the fire to pack your calendar and close the round while you're hot.</p>
+            </div>
+
+            <!-- Pace meter (once calibrated, not blitzing) -->
+            <div v-if="!treadmill.calibrating && !treadmill.blitzing" class="bg-white border rounded-lg p-6">
               <div class="flex items-baseline justify-between">
                 <span class="text-xs uppercase tracking-wide text-gray-400">Current pace</span>
                 <span v-if="!treadmill.cadenceActive" class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Paused</span>
@@ -1293,7 +1303,7 @@
             </div>
 
             <!-- Why this pace + how it moves -->
-            <div v-if="!treadmill.calibrating && treadmill.explainer" class="bg-white border rounded-lg p-5">
+            <div v-if="!treadmill.calibrating && !treadmill.blitzing && treadmill.explainer" class="bg-white border rounded-lg p-5">
               <span class="text-xs uppercase tracking-wide text-gray-400">Why this pace</span>
               <p class="mt-2 text-sm text-gray-700">
                 <template v-if="treadmill.explainer.acceptRatePct !== null">
@@ -1331,6 +1341,24 @@
                 <template v-else> Your rep resets Monday.</template>
               </p>
             </a>
+
+            <!-- Bonus shots on goal -->
+            <div v-if="!treadmill.calibrating && treadmill.bonus" class="bg-white border rounded-lg p-5">
+              <div class="flex items-center justify-between">
+                <span class="text-xs uppercase tracking-wide text-gray-400">🎯 Bonus shots on goal</span>
+                <span v-if="treadmill.bonus.shots > 0" class="text-sm font-bold text-blue-700">{{ treadmill.bonus.shots }} ready</span>
+              </div>
+              <template v-if="treadmill.bonus.eligible">
+                <p class="text-sm text-gray-500 mt-1">One-off extra intro requests we send on <strong>top</strong> of your pace. They don't change your weekly number — just more chances while you're hot. Earn more (up to 3):</p>
+                <ul class="mt-3 space-y-2">
+                  <li v-for="c in treadmill.bonus.carrots" :key="c.key" class="flex items-center justify-between text-sm">
+                    <span class="text-gray-700">{{ c.label }}</span>
+                    <span class="text-xs text-gray-400 whitespace-nowrap">{{ c.have }} / {{ c.per }} → shot</span>
+                  </li>
+                </ul>
+              </template>
+              <p v-else class="text-sm text-gray-500 mt-1">Get your acceptance to <strong>20%+</strong> to start earning bonus shots. Below that, let's focus on landing more yeses first — extra volume won't help until the pitch is landing.</p>
+            </div>
           </div>
         </div>
       </main>

@@ -14,9 +14,9 @@
  * mechanics layered on top — not part of the weekly pace.)
  */
 
-import { eq, and, isNull, isNotNull } from 'drizzle-orm';
-import { db, founders, introRequests } from '../db/index.js';
-import { getGymStatus } from './gym.js';
+import { eq, and, isNull, isNotNull, sql } from 'drizzle-orm';
+import { db, founders, introRequests, followupLogs, founderInvestorRecords } from '../db/index.js';
+import { getGymStatus, countGymReps } from './gym.js';
 
 /** Base pace a founder falls back to with no signal. */
 export const BASE_TARGET = 1;
@@ -95,6 +95,7 @@ async function loadIntros(founderId: number) {
 export async function recomputePace(founderId: number): Promise<number | null> {
   const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
   if (!founder || !founder.calibratedAt || !founder.introCadenceActive) return null;
+  if (isBlitzing(founder)) return null;   // a live blitz owns the pace — don't touch
   const { rate } = acceptRateOf(await loadIntros(founderId));
   const pace = paceFromRate(rate);
   if (pace !== founder.introTargetPerWeek) {
@@ -115,6 +116,119 @@ export async function recomputePaceForAll(founderId?: number): Promise<void> {
     try { await recomputePace(f.id); }
     catch (e) { console.error('[momentum] recomputePace failed for founder', f.id, e); }
   }
+}
+
+// ── Bonus "shots on goal" ────────────────────────────────────────────────────
+// One-off extra intro requests earned via carrots — gym session, every 3 meeting
+// updates, every 5 outside investors added — gated on ≥20% acceptance and capped.
+// They don't change the weekly pace; the generator sends them on TOP of it, once.
+
+export const BONUS_CAP = 3;             // max outstanding shots a founder can hold
+export const BONUS_MIN_ACCEPT = 0.20;   // only founders converting ≥20% earn shots
+export const MEETINGS_PER_SHOT = 3;
+export const INVESTORS_PER_SHOT = 5;
+
+async function countMeetingUpdates(founderId: number): Promise<number> {
+  const row = await db.select({ n: sql<number>`count(*)` })
+    .from(followupLogs)
+    .innerJoin(introRequests, eq(followupLogs.introRequestId, introRequests.id))
+    .where(and(eq(introRequests.founderId, founderId), eq(followupLogs.completedBy, 'founder')))
+    .get();
+  return row?.n ?? 0;
+}
+async function countExternalInvestors(founderId: number): Promise<number> {
+  const row = await db.select({ n: sql<number>`count(*)` })
+    .from(founderInvestorRecords)
+    .where(and(eq(founderInvestorRecords.founderId, founderId), isNull(founderInvestorRecords.archivedAt)))
+    .get();
+  return row?.n ?? 0;
+}
+
+/**
+ * Reconcile a founder's earned carrot shots with what's been granted, awarding
+ * one-off shots for completed milestones when they're converting (≥20%) and
+ * under the cap. Idempotent. Excess beyond the cap is not banked. Returns the
+ * resulting outstanding shot count.
+ */
+export async function syncCarrotShots(founderId: number): Promise<number> {
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder) return 0;
+  const { rate } = acceptRateOf(await loadIntros(founderId));
+  const eligible = rate !== null && rate >= BONUS_MIN_ACCEPT;
+
+  const earned = {
+    gym: await countGymReps(founderId),
+    meetings: Math.floor((await countMeetingUpdates(founderId)) / MEETINGS_PER_SHOT),
+    investors: Math.floor((await countExternalInvestors(founderId)) / INVESTORS_PER_SHOT),
+  };
+  let bonus = founder.bonusShots;
+  const granted = { gym: founder.bonusGymGranted, meetings: founder.bonusMeetingsGranted, investors: founder.bonusInvestorsGranted };
+
+  if (eligible) {
+    for (const k of ['gym', 'meetings', 'investors'] as const) {
+      const newGrants = earned[k] - granted[k];
+      if (newGrants > 0) {
+        const available = Math.max(0, BONUS_CAP - bonus);
+        bonus += Math.min(newGrants, available);
+        granted[k] = earned[k];   // advance fully — excess beyond the cap isn't banked
+      }
+    }
+  }
+  if (bonus !== founder.bonusShots || granted.gym !== founder.bonusGymGranted ||
+      granted.meetings !== founder.bonusMeetingsGranted || granted.investors !== founder.bonusInvestorsGranted) {
+    await db.update(founders).set({
+      bonusShots: bonus, bonusGymGranted: granted.gym,
+      bonusMeetingsGranted: granted.meetings, bonusInvestorsGranted: granted.investors,
+    }).where(eq(founders.id, founderId));
+  }
+  return bonus;
+}
+
+/** Sync carrot shots for every calibrated + active founder. */
+export async function syncCarrotShotsForAll(): Promise<void> {
+  const rows = await db.query.founders.findMany({
+    where: and(isNotNull(founders.calibratedAt), eq(founders.introCadenceActive, true)),
+    columns: { id: true },
+  });
+  for (const f of rows) {
+    try { await syncCarrotShots(f.id); }
+    catch (e) { console.error('[momentum] syncCarrotShots failed for founder', f.id, e); }
+  }
+}
+
+/** Consume N bonus shots after they've gone out as intros. */
+export async function consumeBonusShots(founderId: number, n: number): Promise<void> {
+  if (n <= 0) return;
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder) return;
+  const next = Math.max(0, founder.bonusShots - n);
+  if (next !== founder.bonusShots) {
+    await db.update(founders).set({ bonusShots: next }).where(eq(founders.id, founderId));
+  }
+}
+
+// ── Win-blitz ────────────────────────────────────────────────────────────────
+// When a founder lands a lead, Mat flips them into a sprint to close the round.
+// While the blitz is live, pace = blitzTarget and the acceptance recompute leaves
+// them alone; when it expires the pace eases back to their acceptance level.
+
+export const BLITZ_DEFAULT_TARGET = 20;
+export const BLITZ_DEFAULT_DAYS = 21;
+
+export function isBlitzing(founder: { blitzUntil?: string | null } | null | undefined, now: Date = new Date()): boolean {
+  return !!founder?.blitzUntil && new Date(founder.blitzUntil).getTime() > now.getTime();
+}
+
+export async function startBlitz(founderId: number, target = BLITZ_DEFAULT_TARGET, days = BLITZ_DEFAULT_DAYS): Promise<void> {
+  const until = new Date(Date.now() + days * 86_400_000).toISOString();
+  await db.update(founders)
+    .set({ blitzUntil: until, blitzTarget: target, introTargetPerWeek: target })
+    .where(eq(founders.id, founderId));
+}
+
+export async function endBlitz(founderId: number): Promise<void> {
+  await db.update(founders).set({ blitzUntil: null, blitzTarget: null }).where(eq(founders.id, founderId));
+  await recomputePace(founderId);   // ease back to the acceptance pace
 }
 
 // ── Calibration ──────────────────────────────────────────────────────────────
@@ -204,12 +318,26 @@ export function isCalibrationSending(calibratedAt: string | null | undefined, se
 
 // ── Founder-facing reading ───────────────────────────────────────────────────
 
+export interface CarrotProgress {
+  key: 'gym' | 'meetings' | 'investors';
+  label: string;
+  have: number;    // current count toward the next shot
+  per: number;     // count needed per shot
+}
+
 export interface TreadmillReading {
   requestsPerWeek: number;       // current weekly pace
   cadenceActive: boolean;
   gymRepsRemaining: number;      // gym reps available this week (practice)
   calibrating: boolean;
   calibration: { phase: 'sending' | 'waiting'; sentCount: number; target: number } | null;
+  blitzing: boolean;             // in a live win-blitz
+  // Bonus one-off "shots on goal".
+  bonus: {
+    shots: number;               // outstanding shots (sent on top of pace)
+    eligible: boolean;           // ≥20% acceptance → can earn shots
+    carrots: CarrotProgress[];   // progress toward the next shot per source
+  };
   // Why the pace is what it is + how it moves.
   explainer: {
     acceptRatePct: number | null;   // rounded % of decided requests accepted (null = too few)
@@ -226,6 +354,17 @@ export async function getTreadmillReading(founderId: number): Promise<TreadmillR
   const cadenceActive = Boolean(founder?.introCadenceActive);
   const gymRepsRemaining = (await getGymStatus(founderId)).repsRemaining;
   const intros = await loadIntros(founderId);
+  const blitzing = isBlitzing(founder);
+
+  // Bonus shots + carrot progress toward the next shot.
+  const { rate } = acceptRateOf(intros);
+  const bonusEligible = rate !== null && rate >= BONUS_MIN_ACCEPT;
+  const carrots: CarrotProgress[] = [
+    { key: 'gym', label: 'Practice in the Pitch Gym', have: await countGymReps(founderId), per: 1 },
+    { key: 'meetings', label: 'Update meetings in your CRM', have: (await countMeetingUpdates(founderId)) % MEETINGS_PER_SHOT, per: MEETINGS_PER_SHOT },
+    { key: 'investors', label: 'Add outside investors to your CRM', have: (await countExternalInvestors(founderId)) % INVESTORS_PER_SHOT, per: INVESTORS_PER_SHOT },
+  ];
+  const bonus = { shots: founder?.bonusShots ?? 0, eligible: bonusEligible, carrots };
 
   // Calibrating (new founder, active, not yet stamped): show burst progress.
   if (!founder?.calibratedAt && cadenceActive) {
@@ -235,17 +374,17 @@ export async function getTreadmillReading(founderId: number): Promise<TreadmillR
         requestsPerWeek: founder?.introTargetPerWeek ?? BASE_TARGET, cadenceActive, gymRepsRemaining,
         calibrating: true,
         calibration: { phase: view.phase, sentCount: view.sentCount, target: CALIBRATION_TARGET },
-        explainer: null,
+        blitzing, bonus, explainer: null,
       };
     }
   }
 
-  // Why this pace — from the founder's acceptance rate + the bracket it's in.
-  const { rate } = acceptRateOf(intros);
-  // Show the LIVE acceptance-derived pace for calibrated founders so the number
-  // always matches the "why" (the stored introTargetPerWeek is synced to this on
-  // each generation tick, which is what the generator actually uses).
-  const requestsPerWeek = founder?.calibratedAt ? paceFromRate(rate) : (founder?.introTargetPerWeek ?? BASE_TARGET);
+  // Pace: a live blitz shows the blitz target; otherwise the LIVE acceptance-
+  // derived pace (so the number always matches the "why").
+  const requestsPerWeek = blitzing
+    ? (founder?.blitzTarget ?? founder?.introTargetPerWeek ?? BASE_TARGET)
+    : (founder?.calibratedAt ? paceFromRate(rate) : (founder?.introTargetPerWeek ?? BASE_TARGET));
+
   const b = rate !== null ? acceptBracket(rate) : null;
   const explainer = {
     acceptRatePct: rate !== null ? Math.round(rate * 100) : null,
@@ -260,5 +399,5 @@ export async function getTreadmillReading(founderId: number): Promise<TreadmillR
           : (rate < 0.30 ? 'When investors accept more of your intro requests, your pace picks up.' : null)),
   };
 
-  return { requestsPerWeek, cadenceActive, gymRepsRemaining, calibrating: false, calibration: null, explainer };
+  return { requestsPerWeek, cadenceActive, gymRepsRemaining, calibrating: false, calibration: null, blitzing, bonus, explainer };
 }

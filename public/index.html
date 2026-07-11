@@ -6,23 +6,99 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
-  <title>MatCap — We help founders get access, faster.</title>
-  <meta name="description" content="MatCap is the intro engine for founders. Warm, double opt-in intros to the investors who fit your raise — plus a room of portfolio founders who help you make the most of every one.">
-  <meta property="og:title" content="MatCap — We help founders get access, faster.">
-  <meta property="og:description" content="The intro engine for founders. Warm intros to the right investors, plus a room of founders who help you close them.">
+  <title>MatCap — We build your fundraising momentum.</title>
+  <meta name="description" content="MatCap sends warm intro requests to investors on your behalf and runs a system that adapts to how they respond — so pre-seed founders are always moving toward their first check.">
+  <meta property="og:title" content="MatCap — We build your fundraising momentum.">
+  <meta property="og:description" content="Warm intro requests + a system that adapts to how investors respond. Do the work, earn more shots, and blitz to close when you land a lead.">
   <meta property="og:image" content="https://matcap.vc/downloads/astro.png">
   <meta property="og:image:alt" content="MatCap">
   <meta property="og:url" content="https://matcap.vc">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MatCap — We help founders get access, faster.">
-  <meta name="twitter:description" content="The intro engine for founders. Warm intros to the right investors, plus a room of founders who help you close them.">
+  <meta name="twitter:title" content="MatCap — We build your fundraising momentum.">
+  <meta name="twitter:description" content="Warm intro requests + a system that adapts to how investors respond. Momentum you build, not just momentum we hand you.">
   <meta name="twitter:image" content="https://matcap.vc/downloads/astro.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/matcap.css">
+
+  <!-- ===== Homepage-local "Momentum, in motion" design system ===== -->
+  <style>
+    :root{ --heat:#FF5A34; --ink:#0A0A0F; --grad:linear-gradient(96deg,var(--accent) 0%,#5FD0E6 30%,var(--heat) 100%); }
+    .mo-display{ font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:-0.025em; line-height:1.02; }
+    .mo-grad{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .mo-eyebrow{ font-family:'Space Grotesk',sans-serif; text-transform:uppercase; letter-spacing:3px; font-size:12px; font-weight:600; color:var(--accent); }
+
+    /* ---- Dark kinetic hero ---- */
+    .mo-hero{ position:relative; background:var(--ink); color:#fff; overflow:hidden; padding:160px 24px 96px; text-align:center; }
+    .mo-hero::before{ content:''; position:absolute; inset:0; z-index:1;
+      background:radial-gradient(55% 45% at 28% 18%, rgba(0,194,224,0.30), transparent 62%),
+                 radial-gradient(55% 55% at 78% 88%, rgba(255,90,52,0.24), transparent 60%); }
+    .mo-hero::after{ content:''; position:absolute; inset:0; z-index:1; opacity:.5;
+      background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+      background-size:44px 44px; -webkit-mask-image:radial-gradient(70% 60% at 50% 40%,#000,transparent 75%); mask-image:radial-gradient(70% 60% at 50% 40%,#000,transparent 75%); }
+    .mo-hero .inner{ position:relative; z-index:2; max-width:940px; margin:0 auto; }
+    .mo-hero h1{ font-size:clamp(46px,7.4vw,92px); }
+    .mo-hero .sub{ font-size:clamp(17px,2vw,21px); color:rgba(255,255,255,.72); max-width:660px; margin:24px auto 0; line-height:1.55; }
+    .mo-cta{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:38px; }
+    .mo-btn{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; padding:14px 28px; border-radius:8px; text-decoration:none; display:inline-block; transition:transform .15s ease, box-shadow .2s ease; }
+    .mo-btn-primary{ background:var(--grad); color:var(--ink); box-shadow:0 8px 30px rgba(255,90,52,.28); }
+    .mo-btn-primary:hover{ transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,194,224,.36); }
+    .mo-btn-ghost{ color:#fff; border:1px solid rgba(255,255,255,.28); }
+    .mo-btn-ghost:hover{ border-color:var(--accent); color:var(--accent); }
+
+    /* animated momentum meter */
+    .mo-meter{ display:flex; gap:7px; align-items:flex-end; height:70px; max-width:440px; margin:52px auto 0; }
+    .mo-meter span{ flex:1; border-radius:4px 4px 0 0; background:var(--grad); transform-origin:bottom; animation:moRise 1s cubic-bezier(.2,.7,.2,1) both; }
+    .mo-meter span:nth-child(1){height:18%;animation-delay:.04s}
+    .mo-meter span:nth-child(2){height:26%;animation-delay:.10s}
+    .mo-meter span:nth-child(3){height:22%;animation-delay:.16s}
+    .mo-meter span:nth-child(4){height:40%;animation-delay:.22s}
+    .mo-meter span:nth-child(5){height:52%;animation-delay:.28s}
+    .mo-meter span:nth-child(6){height:46%;animation-delay:.34s}
+    .mo-meter span:nth-child(7){height:70%;animation-delay:.40s}
+    .mo-meter span:nth-child(8){height:62%;animation-delay:.46s}
+    .mo-meter span:nth-child(9){height:88%;animation-delay:.52s}
+    .mo-meter span:nth-child(10){height:100%;animation-delay:.58s}
+    @keyframes moRise{ from{transform:scaleY(0);opacity:.2} to{transform:scaleY(1);opacity:1} }
+    .mo-scale{ display:flex; justify-content:space-between; max-width:440px; margin:14px auto 0; font-family:'Space Grotesk',sans-serif; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,.5); }
+    .mo-scale .hot{ color:var(--heat); }
+
+    /* ---- Sections ---- */
+    .mo-section{ padding:104px 24px; }
+    .mo-section .inner{ max-width:1100px; margin:0 auto; }
+    .mo-head{ text-align:center; max-width:760px; margin:0 auto 52px; }
+    .mo-head h2{ font-size:clamp(30px,4.4vw,52px); margin-top:14px; }
+    .mo-head p{ color:var(--muted); font-size:18px; margin-top:16px; line-height:1.55; }
+
+    /* the 4-step loop */
+    .mo-loop{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .mo-step{ border:1px solid var(--rule); border-radius:14px; padding:26px 22px; background:#fff; position:relative; overflow:hidden; }
+    .mo-step::before{ content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--grad); }
+    .mo-step .n{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; letter-spacing:2px; }
+    .mo-step h3{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; margin:10px 0 8px; letter-spacing:-.01em; }
+    .mo-step p{ font-size:14.5px; color:var(--muted); line-height:1.55; }
+
+    /* habits → rewards */
+    .mo-habits{ display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:820px; margin:0 auto; }
+    .mo-habit{ display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid var(--rule); border-radius:12px; padding:18px 22px; background:#fff; }
+    .mo-habit .lbl{ font-weight:600; font-size:15.5px; }
+    .mo-habit .rw{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; white-space:nowrap; color:var(--heat); }
+
+    /* gym split */
+    .mo-gym{ display:grid; grid-template-columns:1fr 1fr; gap:22px; max-width:1000px; margin:0 auto; }
+    .mo-gym .card{ border:1px solid var(--rule); border-radius:16px; padding:34px 30px; background:#fff; }
+    .mo-gym .card .ic{ font-size:30px; }
+    .mo-gym .card h3{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; margin:14px 0 10px; letter-spacing:-.01em; }
+    .mo-gym .card p{ color:var(--muted); font-size:15.5px; line-height:1.6; }
+    .mo-gym-note{ text-align:center; max-width:640px; margin:34px auto 0; font-size:17px; color:var(--muted); font-style:italic; }
+    .mo-gym-note strong{ color:var(--text); font-style:normal; }
+
+    @media (max-width:860px){ .mo-loop{grid-template-columns:1fr 1fr} .mo-gym,.mo-habits{grid-template-columns:1fr} }
+    @media (prefers-reduced-motion:reduce){ .mo-meter span{animation:none} .mo-btn{transition:none} }
+  </style>
 </head>
 <body>
 
@@ -70,52 +146,79 @@
 })();
 </script>
 
-<!-- ============ HERO (centered) ============ -->
-<section class="hero-centered">
+<!-- ============ HERO — dark, kinetic, momentum ============ -->
+<section class="mo-hero">
   <div class="inner">
-    <h1 class="reveal">We help founders get <span class="accent">access</span>, faster.</h1>
-    <p class="lede reveal">Warm intros to the investors who actually fit your raise — and a room of same-stage founders, all vetted, all sharp, all going for the same thing, helping each other get there.<br><strong>The network you'd move to the coast for</strong> (without moving).</p>
-    <div class="cta-stack reveal">
-      <a href="/signup" class="btn-primary">Apply as a Founder</a>
-      <a href="#engine" class="btn-secondary">See how it works</a>
+    <div class="mo-eyebrow reveal">Pre-seed fundraising, on a system</div>
+    <h1 class="mo-display reveal" style="margin-top:18px">We build your <span class="mo-grad">fundraising momentum.</span></h1>
+    <p class="sub reveal">MatCap sends warm intro requests to investors on your behalf — and runs a system that adapts to how they respond, so you're always moving toward your first check.</p>
+    <div class="mo-cta reveal">
+      <a href="/signup" class="mo-btn mo-btn-primary">Apply as a Founder</a>
+      <a href="#engine" class="mo-btn mo-btn-ghost">See how it works</a>
+    </div>
+    <div class="mo-meter" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="mo-scale reveal"><span>Start</span><span>Accelerate</span><span class="hot">Blitz</span></div>
+  </div>
+</section>
+
+<!-- ============ THE ENGINE — momentum loop ============ -->
+<section id="engine" class="mo-section" style="background:var(--bg-alt)">
+  <div class="inner">
+    <div class="mo-head reveal">
+      <span class="mo-eyebrow">The engine</span>
+      <h2 class="mo-display">One system, built to land your <span class="mo-grad">first believer.</span></h2>
+      <p>Pre-seed isn't about running an auction — it's about finding the one investor who believes. Everything here is built to get you that first check.</p>
+    </div>
+    <div class="mo-loop">
+      <div class="mo-step reveal"><div class="n mo-grad">01</div><h3>Warm intro requests</h3><p>We reach out to the right investors through our network. You don't chase — they come to you.</p></div>
+      <div class="mo-step reveal"><div class="n mo-grad">02</div><h3>A pace that adapts</h3><p>The more investors lean in, the more requests we send. When they don't, we ease off and sharpen the pitch with you. Your pace reflects your results.</p></div>
+      <div class="mo-step reveal"><div class="n mo-grad">03</div><h3>Habits that earn</h3><p>Stay on top of your raise and earn bonus intro requests on top of your pace — momentum you build, not just momentum we hand you.</p></div>
+      <div class="mo-step reveal"><div class="n mo-grad">04</div><h3>Blitz to close</h3><p>Land a real lead and we throw fuel on the fire — ramping hard to fill the round while you're hot.</p></div>
+    </div>
+    <p class="mo-gym-note reveal" style="font-style:normal"><a href="/intros" style="color:var(--accent);font-weight:600;text-decoration:none">See the engine by the numbers →</a></p>
+  </div>
+</section>
+
+<!-- ============ HABITS → REWARDS ============ -->
+<section class="mo-section">
+  <div class="inner">
+    <div class="mo-head reveal">
+      <span class="mo-eyebrow">Do the work</span>
+      <h2 class="mo-display">Good habits, <span class="mo-grad">more shots on goal.</span></h2>
+      <p>The founders who win stay on top of their raise — so we reward it. Do the work and earn one-off bonus intro requests, sent on top of your pace. Extra chances while you're hot.</p>
+    </div>
+    <div class="mo-habits reveal">
+      <div class="mo-habit"><span class="lbl">🗂️ Keep your pipeline current</span><span class="rw">+ a shot</span></div>
+      <div class="mo-habit"><span class="lbl">📝 Log your meeting notes</span><span class="rw">+ a shot</span></div>
+      <div class="mo-habit"><span class="lbl">🤝 Bring your own investor relationships in</span><span class="rw">+ a shot</span></div>
+      <div class="mo-habit"><span class="lbl">🏋️ Sharpen your pitch in the Gym</span><span class="rw">+ a shot</span></div>
     </div>
   </div>
 </section>
 
-<!-- ============ THE INTRO ENGINE (Here's how) ============ -->
-<section id="engine" class="section-centered bg-alt">
+<!-- ============ THE GYM + COACHING ============ -->
+<section class="mo-section" style="background:var(--bg-alt)">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">The intro engine</span></div>
-    <h2 class="h-section reveal">Access is the hard part. <span class="accent">Here's how we get you it.</span></h2>
-    <p class="section-lede reveal">Most founders don't lose because the company is weak. They lose because they can't get in the room. The intro engine is the same playbook, run for every founder we work with.</p>
-
-    <ol class="numbered-list reveal" style="margin:8px auto 0;text-align:left">
-      <li>
-        <span class="num">01</span>
-        <div>
-          <div class="head">Draft the blurb.</div>
-          <p>We sharpen your one-paragraph pitch until it's tight and forwardable — the thing an investor reads in ten seconds and says "send them over."</p>
-        </div>
-      </li>
-      <li>
-        <span class="num">02</span>
-        <div>
-          <div class="head">Send it to the right investor. If they accept, we make the intro.</div>
-          <p>We send your blurb to the investors who actually fit your stage, sector, and check size. Once they opt in, we make the intro for you two to get to know each other — warm and vouched for, never a cold email.</p>
-        </div>
-      </li>
-      <li>
-        <span class="num">03</span>
-        <div>
-          <div class="head">Coach through the raise.</div>
-          <p>Online sessions with your peers and one-on-one office hours with us. Deck, signaling, term sheets, when to push and when to walk — you don't learn the patterns on your own round.</p>
-        </div>
-      </li>
-    </ol>
-
-    <p class="section-lede reveal" style="margin:48px auto 0">
-      <a href="/intros" style="color:var(--accent);font-weight:700;text-decoration:none">See the intro engine by the numbers →</a>
-    </p>
+    <div class="mo-head reveal">
+      <span class="mo-eyebrow">Know how to run the room</span>
+      <h2 class="mo-display">Getting the meeting is half the battle. <span class="mo-grad">Running it is the other half.</span></h2>
+      <p>So we train you for both.</p>
+    </div>
+    <div class="mo-gym reveal">
+      <div class="card">
+        <div class="ic">🎭</div>
+        <h3>Practice against realistic AI VCs</h3>
+        <p>Step into the Pitch Gym and pitch lifelike investor personas — sharp, skeptical, exactly like the real thing. Reps any time, with a blunt readout on what landed and what didn't.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🎧</div>
+        <h3>Coaching on your real meetings</h3>
+        <p>We get you set up on Granola so every investor call is captured. After each one, we review the transcript and send you specific coaching — exactly what to tighten before the next.</p>
+      </div>
+    </div>
+    <p class="mo-gym-note reveal">The better you get in the room, the more investors say yes — <strong>and the more your pace climbs.</strong></p>
   </div>
 </section>
 
@@ -142,8 +245,8 @@
 <section class="section-centered">
   <div class="inner">
     <div class="reveal"><span class="eyebrow">Online sessions</span></div>
-    <h2 class="h-section reveal">Raise in your own lane. <span class="accent">Never on your own.</span></h2>
-    <p class="section-lede reveal">The intros do the heavy lifting. The sessions are the augment — optional, always useful. Show up when you need them, get back to building when you don't.</p>
+    <h2 class="h-section reveal">A system, <span class="accent">with a team behind it.</span></h2>
+    <p class="section-lede reveal">The intro requests do the heavy lifting. The sessions are the augment — optional, always useful. Show up when you need them, get back to building when you don't.</p>
 
     <div class="card-grid">
       <div class="feature-card reveal">
@@ -166,8 +269,8 @@
         <div class="feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
-        <h3>We're behind the scenes.</h3>
-        <p>You own the raise and run it your way. We're in your corner the whole time — intros, strategy, gut-checks whenever you need them.</p>
+        <h3>A team behind the system.</h3>
+        <p>The system runs your pace; we're in it with you the whole time — intro requests, strategy, gut-checks, and coaching whenever you need them.</p>
       </div>
     </div>
 
@@ -193,7 +296,7 @@
       <div class="speaker"><img src="/speakers/speaker-1.jpeg" alt="Shriya Nevatia"><div class="name">Shriya Nevatia</div><div class="role">Superhuman</div></div>
     </div>
 
-    <p class="pull-quote reveal" style="margin-top:64px">Learn online. Raise in your own lane. <span class="accent">Support from us behind the scenes.</span></p>
+    <p class="pull-quote reveal" style="margin-top:64px">Learn online. Raise on a system. <span class="accent">We're in it with you.</span></p>
   </div>
 </section>
 

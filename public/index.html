@@ -26,9 +26,12 @@
 
   <!-- ===== Homepage-local "Momentum, in motion" design system ===== -->
   <style>
-    :root{ --heat:#FF5A34; --ink:#0A0A0F; --grad:linear-gradient(96deg,var(--accent) 0%,#5FD0E6 30%,var(--heat) 100%); }
+    :root{ --heat:#FF5A34; --ink:#0A0A0F;
+      --grad:linear-gradient(96deg,var(--accent) 0%,#5FD0E6 30%,var(--heat) 100%);
+      /* softer, mostly-cyan gradient for headline text — just a hint of heat */
+      --grad-text:linear-gradient(96deg,var(--accent) 5%,#5EC2D8 60%,#E08A5E 135%); }
     .mo-display{ font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:-0.025em; line-height:1.02; }
-    .mo-grad{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .mo-grad{ background:var(--grad-text); -webkit-background-clip:text; background-clip:text; color:transparent; }
     .mo-eyebrow{ font-family:'Space Grotesk',sans-serif; text-transform:uppercase; letter-spacing:3px; font-size:12px; font-weight:600; color:var(--accent); }
 
     /* ---- Dark kinetic hero ---- */
@@ -96,6 +99,48 @@
     .mo-gym-note{ text-align:center; max-width:640px; margin:34px auto 0; font-size:17px; color:var(--muted); font-style:italic; }
     .mo-gym-note strong{ color:var(--text); font-style:normal; }
 
+    /* ---- Pricing (dark, tasteful) ---- */
+    .mo-dark{ background:var(--ink); color:#fff; position:relative; overflow:hidden; }
+    .mo-dark::after{ content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+      background:radial-gradient(46% 42% at 26% 16%, rgba(0,194,224,.20), transparent 62%),
+                 radial-gradient(46% 46% at 78% 90%, rgba(255,90,52,.16), transparent 60%); }
+    .mo-dark > .inner{ position:relative; z-index:2; }
+    .mo-price{ text-align:center; margin-top:44px; }
+    .mo-price-num{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(96px,17vw,210px); line-height:.86; letter-spacing:-.04em; }
+    .mo-price-num .pct{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .mo-price-of{ font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,.5); margin-top:10px; }
+    .mo-price-terms{ margin-top:24px; display:inline-block; font-size:13.5px; letter-spacing:.5px; color:rgba(255,255,255,.72); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:9px 20px; }
+    .mo-price-principles{ display:grid; grid-template-columns:repeat(3,1fr); max-width:860px; margin:60px auto 0; border-top:1px solid rgba(255,255,255,.14); text-align:left; }
+    .mo-price-principles > div{ padding:30px 26px; border-right:1px solid rgba(255,255,255,.14); }
+    .mo-price-principles > div:last-child{ border-right:none; }
+    .mo-price-principles .no{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; letter-spacing:-.01em; }
+    .mo-price-principles .no .x{ color:var(--heat); margin-right:4px; }
+    .mo-price-principles p{ font-size:13.5px; color:rgba(255,255,255,.6); margin-top:10px; line-height:1.6; }
+    .mo-price-close{ margin:44px auto 0; max-width:620px; text-align:center; font-size:17px; color:rgba(255,255,255,.8); line-height:1.6; }
+    .mo-price-close strong{ color:#fff; }
+    @media (max-width:720px){ .mo-price-principles{ grid-template-columns:1fr; border-top:none } .mo-price-principles > div{ border-right:none; border-top:1px solid rgba(255,255,255,.14) } }
+
+    /* ---- Firms logo cloud ---- */
+    .mo-firms{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 12px; max-width:960px; margin:44px auto 0; }
+    .mo-firms span{ display:inline-flex; align-items:center; gap:9px; font-family:'Space Grotesk',sans-serif; font-size:14px; color:rgba(255,255,255,.85); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:8px 16px 8px 9px; transition:border-color .2s,color .2s; }
+    .mo-firms span:hover{ border-color:var(--accent); color:#fff; }
+    .mo-firms span img{ width:20px; height:20px; border-radius:5px; background:#fff; object-fit:contain; flex-shrink:0; }
+    .mo-firms-note{ text-align:center; margin-top:28px; font-size:13px; color:rgba(255,255,255,.5); }
+
+    /* ---- Roll the type voice through the rest of the page (shared classes) ---- */
+    .h-section{ font-family:'Space Grotesk',sans-serif !important; font-weight:700; letter-spacing:-.02em; }
+    .eyebrow{ font-family:'Space Grotesk',sans-serif; text-transform:uppercase; letter-spacing:3px; font-weight:600; }
+    .feature-card h3, .cta-card h3, .p-name, .p-stat, .pricing-num, .pricing-label,
+    .receipts-counter, .speakers-grid-c .name, .pull-quote{ font-family:'Space Grotesk',sans-serif; }
+    .feature-card h3, .cta-card h3{ letter-spacing:-.01em; }
+    .pricing-num{ letter-spacing:-.02em; }
+    /* dark sections pick up the signature glow + grid so it feels like one system */
+    .section-centered.bg-dark{ position:relative; overflow:hidden; }
+    .section-centered.bg-dark > .inner{ position:relative; z-index:2; }
+    .section-centered.bg-dark::before{ content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+      background:radial-gradient(50% 45% at 20% 15%, rgba(0,194,224,0.18), transparent 60%),
+                 radial-gradient(50% 50% at 82% 90%, rgba(255,90,52,0.14), transparent 60%); }
+
     @media (max-width:860px){ .mo-loop{grid-template-columns:1fr 1fr} .mo-gym,.mo-habits{grid-template-columns:1fr} }
     @media (prefers-reduced-motion:reduce){ .mo-meter span{animation:none} .mo-btn{transition:none} }
   </style>
@@ -119,6 +164,7 @@
     <div class="cs-dd">
       <a href="#" class="cs-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Case Studies</a>
       <div class="cs-menu">
+        <a href="/case-studies/autolane"><span>Autolane</span><span class="raise">$7.4M</span></a>
         <a href="/case-studies/legix"><span>Legix</span><span class="raise">$1.5M</span></a>
         <a href="/case-studies/notary-everyday"><span>Notary Everyday</span><span class="raise">$600K</span></a>
         <a href="/case-studies/ryniant"><span>Ryniant</span><span class="raise">$300K</span></a>
@@ -151,7 +197,7 @@
   <div class="inner">
     <div class="mo-eyebrow reveal">Pre-seed fundraising, on a system</div>
     <h1 class="mo-display reveal" style="margin-top:18px">We build your <span class="mo-grad">fundraising momentum.</span></h1>
-    <p class="sub reveal">MatCap sends warm intro requests to investors on your behalf — and runs a system that adapts to how they respond, so you're always moving toward your first check.</p>
+    <p class="sub reveal">MatCap sends warm intro requests to investors on your behalf — and runs a system that adapts to how they respond, so you're always moving from your first check to a closed round.</p>
     <div class="mo-cta reveal">
       <a href="/signup" class="mo-btn mo-btn-primary">Apply as a Founder</a>
       <a href="#engine" class="mo-btn mo-btn-ghost">See how it works</a>
@@ -186,14 +232,14 @@
   <div class="inner">
     <div class="mo-head reveal">
       <span class="mo-eyebrow">Do the work</span>
-      <h2 class="mo-display">Good habits, <span class="mo-grad">more shots on goal.</span></h2>
-      <p>The founders who win stay on top of their raise — so we reward it. Do the work and earn one-off bonus intro requests, sent on top of your pace. Extra chances while you're hot.</p>
+      <h2 class="mo-display">Good habits, <span class="mo-grad">extra intro requests.</span></h2>
+      <p>The founders who win stay on top of their raise — so we reward it. Do the work and earn extra intro requests, sent on <strong>top</strong> of your pace. Earned extras you bank and spend to ramp up the raise.</p>
     </div>
     <div class="mo-habits reveal">
-      <div class="mo-habit"><span class="lbl">🗂️ Keep your pipeline current</span><span class="rw">+ a shot</span></div>
-      <div class="mo-habit"><span class="lbl">📝 Log your meeting notes</span><span class="rw">+ a shot</span></div>
-      <div class="mo-habit"><span class="lbl">🤝 Bring your own investor relationships in</span><span class="rw">+ a shot</span></div>
-      <div class="mo-habit"><span class="lbl">🏋️ Sharpen your pitch in the Gym</span><span class="rw">+ a shot</span></div>
+      <div class="mo-habit"><span class="lbl">🗂️ Keep your pipeline current</span><span class="rw">+ 1 request</span></div>
+      <div class="mo-habit"><span class="lbl">📝 Log your meeting notes</span><span class="rw">+ 1 request</span></div>
+      <div class="mo-habit"><span class="lbl">🤝 Bring your own investor relationships in</span><span class="rw">+ 1 request</span></div>
+      <div class="mo-habit"><span class="lbl">🏋️ Sharpen your pitch in the Gym</span><span class="rw">+ 1 request</span></div>
     </div>
   </div>
 </section>
@@ -210,7 +256,7 @@
       <div class="card">
         <div class="ic">🎭</div>
         <h3>Practice against realistic AI VCs</h3>
-        <p>Step into the Pitch Gym and pitch lifelike investor personas — sharp, skeptical, exactly like the real thing. Reps any time, with a blunt readout on what landed and what didn't.</p>
+        <p>Step into the Pitch Gym and pitch a range of lifelike investor personas — a fund GP, a junior associate at a small fund, a check-writer at a big hedge fund, an angel. Each reacts differently, just like the real thing. Reps any time, with a blunt readout on what landed and what didn't.</p>
       </div>
       <div class="card">
         <div class="ic">🎧</div>
@@ -222,22 +268,41 @@
   </div>
 </section>
 
-<!-- ============ THE RECEIPTS (LIVE) ============ -->
-<section class="section-centered bg-dark">
+<!-- ============ FIRMS INTRODUCED — 2026 ============ -->
+<section class="mo-section mo-dark">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">Live · last 30 days</span></div>
-    <h2 class="h-section reveal">Firms we've gotten founders <span class="accent">in front of.</span></h2>
-    <p class="section-lede reveal">Pulled live from our database. Founder &amp; investor names omitted to respect stealth raises.</p>
-
-    <div class="receipts-card dark reveal">
-      <div class="receipts-counter" data-firm-count>—</div>
-      <div class="receipts-counter-label">unique firms · last 30 days</div>
-
-      <div class="firm-grid" data-firm-grid style="margin-top:32px"></div>
-      <div class="firm-empty" data-firm-empty>
-        No intros in the last 30 days. Check back soon.
-      </div>
+    <div class="mo-head reveal" style="color:#fff;margin-bottom:0">
+      <span class="mo-eyebrow">2026</span>
+      <h2 class="mo-display" style="color:#fff">Firms we've introduced a founder to <span class="mo-grad">this year.</span></h2>
     </div>
+    <div class="mo-firms reveal">
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=a16z.com" alt="">a16z</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=menlovc.com" alt="">Menlo Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=firstround.com" alt="">First Round</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=precursorvc.com" alt="">Precursor Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=signalfire.com" alt="">SignalFire</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=gradient.com" alt="">Gradient Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=rre.com" alt="">RRE Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=fpvventures.com" alt="">FPV Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=pear.vc" alt="">Pear VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=compound.vc" alt="">Compound VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=collaborativefund.com" alt="">Collaborative Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=foundercollective.com" alt="">Founder Collective</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=chapterone.com" alt="">Chapter One Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=southparkcommons.com" alt="">South Park Commons</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=hustlefund.vc" alt="">Hustle Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=weekend.fund" alt="">Weekend Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=socialleverage.com" alt="">Social Leverage</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=race.capital" alt="">Race Capital</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=boost.vc" alt="">Boost VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=afore.vc" alt="">Afore VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=activecapital.com" alt="">Active Capital</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=1517fund.com" alt="">1517 Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=hf0.com" alt="">HF0</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=zettavp.com" alt="">Zetta Venture Partners</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=verdictcap.com" alt="">Verdict Capital</span>
+    </div>
+    <p class="mo-firms-note">A sample of the firms we've made warm intros to on founders' behalf in 2026.</p>
   </div>
 </section>
 
@@ -335,7 +400,14 @@
     <h2 class="h-section reveal">Outcomes we've helped <span class="accent">close.</span></h2>
     <p class="section-lede reveal">Three recent raises we helped close. Full breakdown on each.</p>
 
-    <div class="portfolio-grid reveal" style="grid-template-columns:repeat(3,1fr);max-width:1100px">
+    <div class="portfolio-grid reveal" style="grid-template-columns:repeat(2,1fr);max-width:840px">
+      <a class="portfolio-card linkable" href="/case-studies/autolane">
+        <div class="p-stat">$7.4M</div>
+        <div class="p-stat-sub">Seed · Draper &amp; Hyperplane · early believer</div>
+        <div class="p-name">Autolane</div>
+        <div class="p-line">The OS for autonomous commerce. We backed it early and made the VC intros — before Ben raised $7.4M.</div>
+        <div class="p-read">Read story →</div>
+      </a>
       <a class="portfolio-card linkable" href="/case-studies/legix">
         <div class="p-stat">$1.5M</div>
         <div class="p-stat-sub">Round closed · names withheld</div>
@@ -361,45 +433,36 @@
   </div>
 </section>
 
-<!-- ============ PRICING ============ -->
-<section class="section-centered bg-dark">
+<!-- ============ PRICING — dark, tasteful ============ -->
+<section class="mo-section mo-dark">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">Pricing</span></div>
-    <h2 class="h-section reveal">Simple. <span class="accent">1% of your company.</span></h2>
-
-    <div class="pricing-display reveal">
-      <div class="pricing-num">1%</div>
-      <div class="pricing-terms">24&#8209;month vesting · No cliff</div>
-      <div class="pricing-label">Equity · Lifetime Partnership</div>
+    <div class="mo-head reveal" style="margin-bottom:0;color:#fff">
+      <span class="mo-eyebrow">Pricing</span>
+      <h2 class="mo-display" style="color:#fff">One number. <span class="mo-grad">Total alignment.</span></h2>
     </div>
 
-    <p class="section-lede reveal">No retainer. No success fee. No carry on your investors. We're aligned for the lifetime of the company — not the close of one round.</p>
+    <div class="mo-price reveal">
+      <div class="mo-price-num"><span class="pct">1%</span></div>
+      <div class="mo-price-of">of your company · that's the whole deal</div>
+      <div class="mo-price-terms">24-month vesting · no cliff · lifetime partnership</div>
+    </div>
 
-    <div class="card-grid">
-      <div class="feature-card no-icon reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-        <h3>No retainer.</h3>
-        <p>No monthly fees. No charges between rounds. We make money the same way you do — when the company succeeds.</p>
+    <div class="mo-price-principles reveal">
+      <div>
+        <div class="no"><span class="x">✕</span>No retainer</div>
+        <p>No monthly fees, no charges between rounds. We make money the way you do — when the company wins.</p>
       </div>
-
-      <div class="feature-card no-icon reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-        <h3>No success fee.</h3>
-        <p>We don't take a percentage of the round we help you close. The 1% is for the long game, not the next term sheet.</p>
+      <div>
+        <div class="no"><span class="x">✕</span>No success fee</div>
+        <p>We don't take a cut of the round we help you close. The 1% is for the long game, not the next term sheet.</p>
       </div>
-
-      <div class="feature-card no-icon reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-        <h3>No carry on investors.</h3>
-        <p>Your angels and VCs keep their full upside. We don't take a cut of their returns. That keeps capital coming back.</p>
+      <div>
+        <div class="no"><span class="x">✕</span>No carry on investors</div>
+        <p>Your angels and VCs keep their full upside. That's what keeps capital coming back.</p>
       </div>
     </div>
+
+    <p class="mo-price-close reveal">We're on your cap table for the life of the company — not the close of one round. <strong>We win when you win.</strong></p>
   </div>
 </section>
 

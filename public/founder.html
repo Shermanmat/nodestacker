@@ -1342,22 +1342,22 @@
               </p>
             </a>
 
-            <!-- Bonus shots on goal -->
+            <!-- Extra intro requests (earned) -->
             <div v-if="!treadmill.calibrating && treadmill.bonus" class="bg-white border rounded-lg p-5">
               <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wide text-gray-400">🎯 Bonus shots on goal</span>
-                <span v-if="treadmill.bonus.shots > 0" class="text-sm font-bold text-blue-700">{{ treadmill.bonus.shots }} ready</span>
+                <span class="text-xs uppercase tracking-wide text-gray-400">🎯 Extra intro requests</span>
+                <span v-if="treadmill.bonus.shots > 0" class="text-sm font-bold text-blue-700">{{ treadmill.bonus.shots }} banked</span>
               </div>
               <template v-if="treadmill.bonus.eligible">
-                <p class="text-sm text-gray-500 mt-1">One-off extra intro requests we send on <strong>top</strong> of your pace. They don't change your weekly number — just more chances while you're hot. Earn more (up to 3):</p>
+                <p class="text-sm text-gray-500 mt-1">Earned extras we send on <strong>top</strong> of your pace — they don't change your weekly number, they're banked and spent to ramp up the raise. Earn more (up to 3):</p>
                 <ul class="mt-3 space-y-2">
                   <li v-for="c in treadmill.bonus.carrots" :key="c.key" class="flex items-center justify-between text-sm">
                     <span class="text-gray-700">{{ c.label }}</span>
-                    <span class="text-xs text-gray-400 whitespace-nowrap">{{ c.have }} / {{ c.per }} → shot</span>
+                    <span class="text-xs text-gray-400 whitespace-nowrap">{{ c.have }} / {{ c.per }} → +1 request</span>
                   </li>
                 </ul>
               </template>
-              <p v-else class="text-sm text-gray-500 mt-1">Get your acceptance to <strong>20%+</strong> to start earning bonus shots. Below that, let's focus on landing more yeses first — extra volume won't help until the pitch is landing.</p>
+              <p v-else class="text-sm text-gray-500 mt-1">Get your acceptance to <strong>20%+</strong> to start earning extra requests. Below that, let's focus on landing more yeses first — extra volume won't help until the pitch is landing.</p>
             </div>
           </div>
         </div>

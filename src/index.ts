@@ -966,6 +966,7 @@ app.get('/case-studies/kalendar-ai', serveStatic({ path: './public/case-studies/
 app.get('/case-studies/legix', serveStatic({ path: './public/case-studies/legix.html' }));
 app.get('/case-studies/notary-everyday', serveStatic({ path: './public/case-studies/notary-everyday.html' }));
 app.get('/case-studies/ryniant', serveStatic({ path: './public/case-studies/ryniant.html' }));
+app.get('/case-studies/autolane', serveStatic({ path: './public/case-studies/autolane.html' }));
 // Old stealth slugs → 301 to the de-anonymized clean URLs
 app.get('/case-studies/stealth-vertical-ai', (c) => c.redirect('/case-studies/legix', 301));
 app.get('/case-studies/stealth-proptech', (c) => c.redirect('/case-studies/notary-everyday', 301));

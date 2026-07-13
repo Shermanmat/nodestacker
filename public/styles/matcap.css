@@ -45,7 +45,7 @@ nav.topnav{
   border-bottom:1px solid var(--rule);
 }
 nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
-nav.topnav img{height:34px;width:auto;display:block}
+nav.topnav img{height:50px;width:auto;display:block}
 nav.topnav .tag{
   font-family:var(--display);
   font-size:14px;letter-spacing:3px;color:var(--accent);
@@ -367,7 +367,7 @@ section{position:relative;overflow:hidden}
   flex-wrap:wrap;gap:24px;
   padding-bottom:32px;border-bottom:1px solid #1a1a1a;
 }
-.footer-brand img{height:28px;opacity:.8}
+.footer-brand img{height:46px;opacity:.8}
 .footer-links{display:flex;gap:32px;flex-wrap:wrap}
 .footer-links a{
   color:#888;text-decoration:none;font-size:13px;

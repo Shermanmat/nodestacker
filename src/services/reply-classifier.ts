@@ -15,7 +15,7 @@
 
 import { eq, and, isNull, sql } from 'drizzle-orm';
 import { db, founders, investors, introRequests, agentSettings } from '../db/index.js';
-import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail, sendThreadReply, labelAndArchiveThread, stripQuotedReply } from './gmail.js';
+import { getStatus as getGmailStatus, getLatestMessageFromSender, createDraft, sendGmail, sendThreadReply, labelAndArchiveThread, stripQuotedReply, hasOperatorReplyAfterMessage } from './gmail.js';
 import { classifyReply, type ReplyClass } from './reply-llm.js';
 import { recordAction, proposeAction } from './agent-actions.js';
 
@@ -261,23 +261,31 @@ export async function runReplyClassifierTick(): Promise<ClassifierTickResult> {
       cleanBody.trim().length <= settings.autoReplyToPassMaxReplyChars
     ) {
       try {
-        // A hard "no" explicitly passed → acknowledge the pass. A soft "not now"
-        // ("we'll look / sent it to the team") hasn't actually said no, so a bare
-        // "Thanks!" is right — we still mark it passed internally either way.
-        const replyBody = result.classification === 'no'
-          ? `All good, thanks for letting me know!\n\n- Mat`
-          : `Thanks!\n\n- Mat`;
-        await sendThreadReply({
-          threadId: intro.gmailThreadId!,
-          to: investor.email!,
-          subject: `Re: ${founder.companyName || founder.name}`,
-          body: replyBody,
-          asDraft: false,
-        });
-        await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
-        updates.passAutoRepliedAt = now;
-        autoRepliedPass = true;
-        console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
+        // Never step on a manual reply. If Mat already answered in this thread
+        // after the investor's pass, leave it entirely alone — no canned ack and
+        // no archive (he's handling it, so keep it in his inbox).
+        const humanReplied = await hasOperatorReplyAfterMessage(intro.gmailThreadId!, msg.messageId);
+        if (humanReplied) {
+          console.log(`[reply-classifier] skipping pass auto-reply: human already replied in thread for intro #${intro.id} (${investor.name})`);
+        } else {
+          // A hard "no" explicitly passed → acknowledge the pass. A soft "not now"
+          // ("we'll look / sent it to the team") hasn't actually said no, so a bare
+          // "Thanks!" is right — we still mark it passed internally either way.
+          const replyBody = result.classification === 'no'
+            ? `All good, thanks for letting me know!\n\n- Mat`
+            : `Thanks!\n\n- Mat`;
+          await sendThreadReply({
+            threadId: intro.gmailThreadId!,
+            to: investor.email!,
+            subject: `Re: ${founder.companyName || founder.name}`,
+            body: replyBody,
+            asDraft: false,
+          });
+          await labelAndArchiveThread(intro.gmailThreadId!, 'Passed');
+          updates.passAutoRepliedAt = now;
+          autoRepliedPass = true;
+          console.log(`[reply-classifier] auto-replied + archived pass: intro #${intro.id} (${investor.name})`);
+        }
       } catch (e: any) {
         // Non-fatal — the pass status is already recorded.
         console.error('[reply-classifier] pass auto-reply/archive failed:', e);
@@ -402,6 +410,19 @@ export async function runPassAckBackfill(sinceDays = 7): Promise<{
       skipped++;
       out.push({ introId: intro.id, investorName: investor.name, result: `skip: ${cleanBody.trim().length} chars > ${settings.autoReplyToPassMaxReplyChars}` });
       continue;
+    }
+
+    // Never step on a manual reply. Especially important on backfill: these are
+    // older passes, so Mat is even more likely to have answered by hand already.
+    try {
+      if (await hasOperatorReplyAfterMessage(intro.gmailThreadId, msg.messageId)) {
+        skipped++;
+        out.push({ introId: intro.id, investorName: investor.name, result: 'skip: human already replied' });
+        continue;
+      }
+    } catch (e: any) {
+      // If we can't check the thread, fail open and let the send gates below decide.
+      console.error('[reply-classifier] backfill human-reply check failed:', e);
     }
 
     const now = new Date().toISOString();

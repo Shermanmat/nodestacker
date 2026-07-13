@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Matcap - Pitch Gym</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/@daily-co/daily-js"></script>
+  <style>
+    [v-cloak] { display: none; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <div id="app" v-cloak>
+    <!-- Not logged in -->
+    <div v-if="needsLogin" class="min-h-screen flex items-center justify-center">
+      <div class="bg-white rounded-lg shadow-lg p-8 w-full max-w-md text-center">
+        <h1 class="text-2xl font-bold mb-2">Pitch Gym</h1>
+        <p class="text-gray-500 mb-6">Log in to your Founder Portal to practice.</p>
+        <a href="/founder.html" class="inline-block bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700">Go to Founder Portal</a>
+      </div>
+    </div>
+
+    <div v-else>
+      <!-- Header -->
+      <header class="bg-white shadow-sm border-b">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+          <div>
+            <a href="/founder.html" class="text-sm text-blue-600 hover:underline">← Back to portal</a>
+            <h1 class="text-xl font-bold text-gray-900">Pitch Gym</h1>
+            <p class="text-sm text-gray-500">Practice against an AI VC, then get a blunt readout. Each finished session adds +1 intro request / week.</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm text-gray-500">Reps left this week</div>
+            <div class="text-2xl font-bold" :class="repsRemaining > 0 ? 'text-green-600' : 'text-gray-400'">{{ repsRemaining }}</div>
+          </div>
+        </div>
+      </header>
+
+      <main class="max-w-4xl mx-auto px-4 py-8">
+
+        <!-- Live call -->
+        <div v-show="phase === 'in_call'" class="mb-8">
+          <div class="bg-black rounded-xl overflow-hidden" style="aspect-ratio:16/9;">
+            <div ref="callBox" class="w-full h-full"></div>
+          </div>
+          <p class="text-center text-sm text-gray-500 mt-3">When you're done, click <b>Leave</b> in the call — your readout will generate automatically.</p>
+        </div>
+
+        <!-- Analyzing -->
+        <div v-if="phase === 'analyzing'" class="bg-white rounded-xl shadow p-10 text-center">
+          <div class="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p class="text-gray-700 font-medium">Breaking down your pitch…</p>
+          <p class="text-gray-400 text-sm mt-1">Pulling the transcript and grading it. This takes a moment.</p>
+        </div>
+
+        <!-- Persona picker (idle) -->
+        <div v-if="phase === 'idle'">
+          <div v-if="error" class="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">{{ error }}</div>
+
+          <div v-if="repsRemaining <= 0 && !latest" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6 text-sm">
+            You've used this week's gym rep — it refreshes Monday. (Ask Mat if you need more sooner.)
+          </div>
+
+          <!-- Latest readout -->
+          <div v-if="latest" class="mb-8">
+            <div ref="readout"></div>
+          </div>
+
+          <h2 class="text-lg font-semibold text-gray-900 mb-3">{{ latest ? 'Practice again' : 'Pick your sparring partner' }}</h2>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div v-for="p in personas" :key="p.key" class="bg-white rounded-xl shadow p-5 flex flex-col">
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="font-bold text-gray-900">{{ p.name }}</h3>
+                <span class="text-xs px-2 py-0.5 rounded-full"
+                  :class="{'bg-green-100 text-green-700': p.difficulty==='warm','bg-blue-100 text-blue-700': p.difficulty==='standard','bg-red-100 text-red-700': p.difficulty==='hard'}">{{ p.difficulty }}</span>
+              </div>
+              <p class="text-sm text-gray-600 flex-1">{{ p.tagline }}</p>
+              <button @click="startRep(p)" :disabled="repsRemaining <= 0 || starting"
+                class="mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                {{ starting ? 'Starting…' : 'Start rep' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- History -->
+          <div v-if="reps.length" class="mt-10">
+            <h2 class="text-lg font-semibold text-gray-900 mb-3">Your reps</h2>
+            <div class="bg-white rounded-xl shadow divide-y">
+              <button v-for="r in reps" :key="r.id" @click="openRep(r.id)"
+                class="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50 text-left">
+                <div>
+                  <div class="font-medium text-gray-900">{{ personaName(r.persona) }}</div>
+                  <div class="text-xs text-gray-400">{{ fmtDate(r.createdAt) }}</div>
+                </div>
+                <div class="text-lg font-bold" :class="scoreColor(r.overallScore)">{{ r.overallScore }}/10</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const { createApp, ref, onMounted, nextTick } = Vue;
+    createApp({
+      setup() {
+        const sessionId = localStorage.getItem('nodestacker_session');
+        const needsLogin = ref(!sessionId);
+        const phase = ref('idle');            // idle | in_call | analyzing
+        const personas = ref([]);
+        const reps = ref([]);
+        const repsRemaining = ref(0);
+        const latest = ref(null);             // full readout object
+        const error = ref('');
+        const starting = ref(false);
+        const callBox = ref(null);
+        const readout = ref(null);
+        let frame = null;
+
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+        async function api(method, path, body) {
+          const res = await fetch('/api/gym' + path, {
+            method,
+            headers: { 'Content-Type': 'application/json', 'X-Session-Id': sessionId },
+            ...(body ? { body: JSON.stringify(body) } : {}),
+          });
+          let data = null;
+          try { data = await res.json(); } catch (_) {}
+          return { ok: res.ok, status: res.status, data };
+        }
+
+        async function load() {
+          const r = await api('GET', '/');
+          if (r.status === 401) { needsLogin.value = true; return; }
+          if (!r.ok) { error.value = (r.data && r.data.error) || 'Failed to load'; return; }
+          personas.value = r.data.personas || [];
+          reps.value = r.data.reps || [];
+          repsRemaining.value = r.data.repsRemaining ?? 0;
+        }
+
+        const personaName = (key) => (personas.value.find(p => p.key === key) || {}).name || key || 'Practice call';
+        const scoreColor = (s) => s >= 7 ? 'text-green-600' : s >= 4 ? 'text-amber-600' : 'text-red-600';
+        const fmtDate = (s) => { try { return new Date(s).toLocaleDateString(undefined, {month:'short', day:'numeric'}); } catch { return ''; } };
+
+        function renderReadout(a) {
+          // Build the readout HTML into the readout container.
+          const el = readout.value;
+          if (!el) return;
+          const sc = (a.scorecard || []).map(d =>
+            `<div class="flex items-center justify-between py-1 border-b last:border-0">
+               <span class="text-sm text-gray-700">${escapeHtml(d.dimension)}</span>
+               <span class="text-sm font-semibold">${d.score}/5 <span class="text-gray-400 font-normal">— ${escapeHtml(d.note||'')}</span></span>
+             </div>`).join('');
+          const bs = (a.blindSpots || []).map(b =>
+            `<li class="mb-3"><div class="font-medium text-gray-900">${escapeHtml(b.issue||'')}</div>
+               <div class="text-sm text-gray-500 italic">“${escapeHtml(b.moment||'')}”</div>
+               <div class="text-sm text-gray-600">${escapeHtml(b.whyItMatters||'')}</div></li>`).join('');
+          const co = (a.coaching || []).map(c =>
+            `<li class="mb-3"><div class="font-medium text-gray-900">→ ${escapeHtml(c.fix||'')}</div>
+               <div class="text-sm text-gray-600">${escapeHtml(c.how||'')}</div></li>`).join('');
+          el.innerHTML =
+            `<div class="bg-white rounded-xl shadow p-6">
+               <div class="flex items-center justify-between mb-3">
+                 <h2 class="text-lg font-bold text-gray-900">Your readout</h2>
+                 <div class="text-2xl font-extrabold ${scoreColor(a.overallScore)}">${a.overallScore}/10</div>
+               </div>
+               <p class="text-gray-700 mb-5">${escapeHtml(a.summary||'')}</p>
+               <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Scorecard</h3>
+               <div class="mb-5">${sc}</div>
+               <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Blind spots</h3>
+               <ul class="mb-5">${bs}</ul>
+               <h3 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Coaching before your next call</h3>
+               <ul>${co}</ul>
+             </div>`;
+        }
+
+        function escapeHtml(s) {
+          return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+        }
+
+        async function startRep(p) {
+          starting.value = true; error.value = '';
+          const r = await api('POST', '/conversations', { persona: p.key });
+          starting.value = false;
+          if (!r.ok) { error.value = (r.data && r.data.error) || 'Could not start the call'; return; }
+          phase.value = 'in_call';
+          await nextTick();
+          frame = window.DailyIframe.createFrame(callBox.value, {
+            iframeStyle: { width: '100%', height: '100%', border: '0' },
+            showLeaveButton: true,
+          });
+          frame.on('left-meeting', () => completeRep(r.data.conversationId));
+          await frame.join({ url: r.data.conversationUrl });
+        }
+
+        async function completeRep(conversationId) {
+          try { if (frame) { frame.destroy(); frame = null; } } catch (_) {}
+          phase.value = 'analyzing';
+          // Poll — Tavus needs a few seconds to publish the transcript.
+          for (let i = 0; i < 20; i++) {
+            const r = await api('POST', '/reps/complete', { conversationId });
+            if (r.status === 202) { await sleep(4000); continue; }
+            if (r.ok) { latest.value = r.data; await finishToReadout(); return; }
+            error.value = (r.data && r.data.error) || 'Analysis failed';
+            phase.value = 'idle'; await load(); return;
+          }
+          error.value = 'Timed out waiting for the transcript. Your rep is saved — check back shortly.';
+          phase.value = 'idle'; await load();
+        }
+
+        async function finishToReadout() {
+          phase.value = 'idle';
+          await load();
+          await nextTick();
+          if (latest.value) renderReadout(latest.value);
+        }
+
+        async function openRep(id) {
+          const r = await api('GET', '/reps/' + id);
+          if (r.ok) { latest.value = r.data; await nextTick(); renderReadout(r.data); window.scrollTo({top:0,behavior:'smooth'}); }
+        }
+
+        onMounted(load);
+
+        return { needsLogin, phase, personas, reps, repsRemaining, latest, error, starting,
+                 callBox, readout, startRep, openRep, personaName, scoreColor, fmtDate };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>

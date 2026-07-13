@@ -6,23 +6,146 @@
   <link rel="icon" type="image/png" href="/favicon.png">
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
   <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
-  <title>MatCap — We help non-coastal founders build billion-dollar companies.</title>
-  <meta name="description" content="MatCap is the fundraise point guard for non-coastal founders. We open doors, sharpen the pitch, and help avoid costly mistakes — so founders can focus on building.">
-  <meta property="og:title" content="MatCap — We help non-coastal founders build billion-dollar companies.">
-  <meta property="og:description" content="The fundraise point guard for non-coastal founders.">
-  <meta property="og:image" content="https://matcap.vc/downloads/astro.png">
-  <meta property="og:image:alt" content="MatCap">
+  <title>MatCap — We build your fundraising momentum.</title>
+  <meta name="description" content="MatCap sends warm intro requests to investors on your behalf and runs a system that adapts to how they respond — so pre-seed founders are always moving toward their first check.">
+  <meta property="og:title" content="MatCap — We build your fundraising momentum.">
+  <meta property="og:description" content="Warm intros to investors on your behalf — and a system that adapts to how they respond, so pre-seed founders are always moving toward their first check.">
+  <meta property="og:image" content="https://matcap.vc/downloads/og-momentum.png">
+  <meta property="og:image:width" content="2400">
+  <meta property="og:image:height" content="1260">
+  <meta property="og:image:alt" content="MatCap — We build your fundraising momentum.">
   <meta property="og:url" content="https://matcap.vc">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MatCap — We help non-coastal founders build billion-dollar companies.">
-  <meta name="twitter:description" content="The fundraise point guard for non-coastal founders.">
-  <meta name="twitter:image" content="https://matcap.vc/downloads/astro.png">
+  <meta name="twitter:title" content="MatCap — We build your fundraising momentum.">
+  <meta name="twitter:description" content="Warm intros to investors on your behalf — and a system that adapts to how they respond. Do the work, earn more intro requests, and blitz to close when you land a lead.">
+  <meta name="twitter:image" content="https://matcap.vc/downloads/og-momentum.png">
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles/matcap.css">
+
+  <!-- ===== Homepage-local "Momentum, in motion" design system ===== -->
+  <style>
+    :root{ --heat:#FF5A34; --ink:#0A0A0F;
+      --grad:linear-gradient(96deg,var(--accent) 0%,#5FD0E6 30%,var(--heat) 100%);
+      /* softer, mostly-cyan gradient for headline text — just a hint of heat */
+      --grad-text:linear-gradient(96deg,var(--accent) 5%,#5EC2D8 60%,#E08A5E 135%); }
+    .mo-display{ font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:-0.025em; line-height:1.02; }
+    .mo-grad{ background:var(--grad-text); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .mo-eyebrow{ font-family:'Space Grotesk',sans-serif; text-transform:uppercase; letter-spacing:3px; font-size:12px; font-weight:600; color:var(--accent); }
+
+    /* ---- Dark kinetic hero ---- */
+    .mo-hero{ position:relative; background:var(--ink); color:#fff; overflow:hidden; padding:160px 24px 96px; text-align:center; }
+    .mo-hero::before{ content:''; position:absolute; inset:0; z-index:1;
+      background:radial-gradient(55% 45% at 28% 18%, rgba(0,194,224,0.30), transparent 62%),
+                 radial-gradient(55% 55% at 78% 88%, rgba(255,90,52,0.24), transparent 60%); }
+    .mo-hero::after{ content:''; position:absolute; inset:0; z-index:1; opacity:.5;
+      background-image:linear-gradient(rgba(255,255,255,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.04) 1px,transparent 1px);
+      background-size:44px 44px; -webkit-mask-image:radial-gradient(70% 60% at 50% 40%,#000,transparent 75%); mask-image:radial-gradient(70% 60% at 50% 40%,#000,transparent 75%); }
+    .mo-hero .inner{ position:relative; z-index:2; max-width:940px; margin:0 auto; }
+    .mo-hero h1{ font-size:clamp(46px,7.4vw,92px); }
+    .mo-hero .sub{ font-size:clamp(17px,2vw,21px); color:rgba(255,255,255,.72); max-width:660px; margin:24px auto 0; line-height:1.55; }
+    .mo-cta{ display:flex; gap:14px; justify-content:center; flex-wrap:wrap; margin-top:38px; }
+    .mo-btn{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:15px; padding:14px 28px; border-radius:8px; text-decoration:none; display:inline-block; transition:transform .15s ease, box-shadow .2s ease; }
+    .mo-btn-primary{ background:var(--grad); color:var(--ink); box-shadow:0 8px 30px rgba(255,90,52,.28); }
+    .mo-btn-primary:hover{ transform:translateY(-2px); box-shadow:0 12px 40px rgba(0,194,224,.36); }
+    .mo-btn-ghost{ color:#fff; border:1px solid rgba(255,255,255,.28); }
+    .mo-btn-ghost:hover{ border-color:var(--accent); color:var(--accent); }
+
+    /* animated momentum meter */
+    .mo-meter{ display:flex; gap:7px; align-items:flex-end; height:70px; max-width:440px; margin:52px auto 0; }
+    .mo-meter span{ flex:1; border-radius:4px 4px 0 0; background:var(--grad); transform-origin:bottom; animation:moRise 1s cubic-bezier(.2,.7,.2,1) both; }
+    .mo-meter span:nth-child(1){height:18%;animation-delay:.04s}
+    .mo-meter span:nth-child(2){height:26%;animation-delay:.10s}
+    .mo-meter span:nth-child(3){height:22%;animation-delay:.16s}
+    .mo-meter span:nth-child(4){height:40%;animation-delay:.22s}
+    .mo-meter span:nth-child(5){height:52%;animation-delay:.28s}
+    .mo-meter span:nth-child(6){height:46%;animation-delay:.34s}
+    .mo-meter span:nth-child(7){height:70%;animation-delay:.40s}
+    .mo-meter span:nth-child(8){height:62%;animation-delay:.46s}
+    .mo-meter span:nth-child(9){height:88%;animation-delay:.52s}
+    .mo-meter span:nth-child(10){height:100%;animation-delay:.58s}
+    @keyframes moRise{ from{transform:scaleY(0);opacity:.2} to{transform:scaleY(1);opacity:1} }
+    .mo-scale{ display:flex; justify-content:space-between; max-width:440px; margin:14px auto 0; font-family:'Space Grotesk',sans-serif; font-size:12px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,.5); }
+    .mo-scale .hot{ color:var(--heat); }
+
+    /* ---- Sections ---- */
+    .mo-section{ padding:104px 24px; }
+    .mo-section .inner{ max-width:1100px; margin:0 auto; }
+    .mo-head{ text-align:center; max-width:760px; margin:0 auto 52px; }
+    .mo-head h2{ font-size:clamp(30px,4.4vw,52px); margin-top:14px; }
+    .mo-head p{ color:var(--muted); font-size:18px; margin-top:16px; line-height:1.55; }
+
+    /* the 4-step loop */
+    .mo-loop{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; }
+    .mo-step{ border:1px solid var(--rule); border-radius:14px; padding:26px 22px; background:#fff; position:relative; overflow:hidden; }
+    .mo-step::before{ content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--grad); }
+    .mo-step .n{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13px; letter-spacing:2px; }
+    .mo-step h3{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; margin:10px 0 8px; letter-spacing:-.01em; }
+    .mo-step p{ font-size:14.5px; color:var(--muted); line-height:1.55; }
+
+    /* habits → rewards */
+    .mo-habits{ display:grid; grid-template-columns:1fr 1fr; gap:14px; max-width:820px; margin:0 auto; }
+    .mo-habit{ display:flex; align-items:center; justify-content:space-between; gap:14px; border:1px solid var(--rule); border-radius:12px; padding:18px 22px; background:#fff; }
+    .mo-habit .lbl{ font-weight:600; font-size:15.5px; }
+    .mo-habit .rw{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13px; white-space:nowrap; color:var(--heat); }
+
+    /* gym split */
+    .mo-gym{ display:grid; grid-template-columns:1fr 1fr; gap:22px; max-width:1000px; margin:0 auto; }
+    .mo-gym .card{ border:1px solid var(--rule); border-radius:16px; padding:34px 30px; background:#fff; }
+    .mo-gym .card .ic{ font-size:30px; }
+    .mo-gym .card h3{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:22px; margin:14px 0 10px; letter-spacing:-.01em; }
+    .mo-gym .card p{ color:var(--muted); font-size:15.5px; line-height:1.6; }
+    .mo-gym-note{ text-align:center; max-width:640px; margin:34px auto 0; font-size:17px; color:var(--muted); font-style:italic; }
+    .mo-gym-note strong{ color:var(--text); font-style:normal; }
+
+    /* ---- Pricing (dark, tasteful) ---- */
+    .mo-dark{ background:var(--ink); color:#fff; position:relative; overflow:hidden; }
+    .mo-dark::after{ content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+      background:radial-gradient(46% 42% at 26% 16%, rgba(0,194,224,.20), transparent 62%),
+                 radial-gradient(46% 46% at 78% 90%, rgba(255,90,52,.16), transparent 60%); }
+    .mo-dark > .inner{ position:relative; z-index:2; }
+    .mo-price{ text-align:center; margin-top:44px; }
+    .mo-price-num{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(96px,17vw,210px); line-height:.86; letter-spacing:-.04em; }
+    .mo-price-num .pct{ background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .mo-price-of{ font-family:'Space Grotesk',sans-serif; font-size:13px; letter-spacing:3px; text-transform:uppercase; color:rgba(255,255,255,.5); margin-top:10px; }
+    .mo-price-terms{ margin-top:24px; display:inline-block; font-size:13.5px; letter-spacing:.5px; color:rgba(255,255,255,.72); border:1px solid rgba(255,255,255,.18); border-radius:999px; padding:9px 20px; }
+    .mo-price-principles{ display:grid; grid-template-columns:repeat(3,1fr); max-width:860px; margin:60px auto 0; border-top:1px solid rgba(255,255,255,.14); text-align:left; }
+    .mo-price-principles > div{ padding:30px 26px; border-right:1px solid rgba(255,255,255,.14); }
+    .mo-price-principles > div:last-child{ border-right:none; }
+    .mo-price-principles .no{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:19px; letter-spacing:-.01em; }
+    .mo-price-principles .no .x{ color:var(--heat); margin-right:4px; }
+    .mo-price-principles p{ font-size:13.5px; color:rgba(255,255,255,.6); margin-top:10px; line-height:1.6; }
+    .mo-price-close{ margin:44px auto 0; max-width:620px; text-align:center; font-size:17px; color:rgba(255,255,255,.8); line-height:1.6; }
+    .mo-price-close strong{ color:#fff; }
+    @media (max-width:720px){ .mo-price-principles{ grid-template-columns:1fr; border-top:none } .mo-price-principles > div{ border-right:none; border-top:1px solid rgba(255,255,255,.14) } }
+
+    /* ---- Firms logo cloud ---- */
+    .mo-firms{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 12px; max-width:960px; margin:44px auto 0; }
+    .mo-firms span{ display:inline-flex; align-items:center; gap:9px; font-family:'Space Grotesk',sans-serif; font-size:14px; color:rgba(255,255,255,.85); border:1px solid rgba(255,255,255,.16); border-radius:999px; padding:8px 16px 8px 9px; transition:border-color .2s,color .2s; }
+    .mo-firms span:hover{ border-color:var(--accent); color:#fff; }
+    .mo-firms span img{ width:20px; height:20px; border-radius:5px; background:#fff; object-fit:contain; flex-shrink:0; }
+    .mo-firms-note{ text-align:center; margin-top:28px; font-size:13px; color:rgba(255,255,255,.5); }
+
+    /* ---- Roll the type voice through the rest of the page (shared classes) ---- */
+    .h-section{ font-family:'Space Grotesk',sans-serif !important; font-weight:700; letter-spacing:-.02em; }
+    .eyebrow{ font-family:'Space Grotesk',sans-serif; text-transform:uppercase; letter-spacing:3px; font-weight:600; }
+    .feature-card h3, .cta-card h3, .p-name, .p-stat, .pricing-num, .pricing-label,
+    .receipts-counter, .speakers-grid-c .name, .pull-quote{ font-family:'Space Grotesk',sans-serif; }
+    .feature-card h3, .cta-card h3{ letter-spacing:-.01em; }
+    .pricing-num{ letter-spacing:-.02em; }
+    /* dark sections pick up the signature glow + grid so it feels like one system */
+    .section-centered.bg-dark{ position:relative; overflow:hidden; }
+    .section-centered.bg-dark > .inner{ position:relative; z-index:2; }
+    .section-centered.bg-dark::before{ content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+      background:radial-gradient(50% 45% at 20% 15%, rgba(0,194,224,0.18), transparent 60%),
+                 radial-gradient(50% 50% at 82% 90%, rgba(255,90,52,0.14), transparent 60%); }
+
+    @media (max-width:860px){ .mo-loop{grid-template-columns:1fr 1fr} .mo-gym,.mo-habits{grid-template-columns:1fr} }
+    @media (prefers-reduced-motion:reduce){ .mo-meter span{animation:none} .mo-btn{transition:none} }
+  </style>
 </head>
 <body>
 
@@ -43,6 +166,7 @@
     <div class="cs-dd">
       <a href="#" class="cs-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Case Studies</a>
       <div class="cs-menu">
+        <a href="/case-studies/autolane"><span>Autolane</span><span class="raise">$7.4M</span></a>
         <a href="/case-studies/legix"><span>Legix</span><span class="raise">$1.5M</span></a>
         <a href="/case-studies/notary-everyday"><span>Notary Everyday</span><span class="raise">$600K</span></a>
         <a href="/case-studies/ryniant"><span>Ryniant</span><span class="raise">$300K</span></a>
@@ -51,59 +175,200 @@
     </div>
     
     <a href="/investors">Investors</a>
+    <a href="/dashboard" data-auth-link>Log In</a>
     <a class="btn" href="/signup">Apply</a>
   </div>
 </nav>
 
-<!-- ============ HERO (centered) ============ -->
-<section class="hero-centered">
+<script>
+// Founder auth-aware nav: if a valid session exists, turn "Log In" into "Dashboard".
+(function(){
+  var link = document.querySelector('[data-auth-link]');
+  if(!link) return;
+  var s = localStorage.getItem('public_session');
+  if(!s) return;
+  fetch('/api/public/session', { headers: { 'X-Public-Session': s } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ if(d && d.user){ link.textContent = 'Dashboard'; } })
+    .catch(function(){});
+})();
+</script>
+
+<!-- ============ HERO — dark, kinetic, momentum ============ -->
+<section class="mo-hero">
   <div class="inner">
-    <h1 class="reveal">We help non&#8209;coastal founders build <span class="accent">billion&#8209;dollar</span> companies.</h1>
-    <p class="lede reveal">Get access to a Bay Area grounded network, community, and mindset. <strong>Don't uproot your life to get it.</strong></p>
-    <div class="cta-stack reveal">
-      <a href="/signup" class="btn-primary">Apply as a Founder</a>
-      <a href="/investors" class="btn-secondary">Invest with Us</a>
+    <div class="mo-eyebrow reveal">Pre-seed fundraising, on a system</div>
+    <h1 class="mo-display reveal" style="margin-top:18px">We build your <span class="mo-grad">fundraising momentum.</span></h1>
+    <p class="sub reveal">MatCap sends warm intro requests to investors on your behalf — and runs a system that adapts to how they respond, so you're always moving from your first check to a closed round.</p>
+    <div class="mo-cta reveal">
+      <a href="/signup" class="mo-btn mo-btn-primary">Apply as a Founder</a>
+      <a href="#engine" class="mo-btn mo-btn-ghost">See how it works</a>
+    </div>
+    <div class="mo-meter" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="mo-scale reveal"><span>Start</span><span>Accelerate</span><span class="hot">Blitz</span></div>
+  </div>
+</section>
+
+<!-- ============ THE ENGINE — momentum loop ============ -->
+<section id="engine" class="mo-section" style="background:var(--bg-alt)">
+  <div class="inner">
+    <div class="mo-head reveal">
+      <span class="mo-eyebrow">The engine</span>
+      <h2 class="mo-display">One system, built to land your <span class="mo-grad">first believer.</span></h2>
+      <p>Pre-seed isn't about running an auction — it's about finding the one investor who believes. Everything here is built to get you that first check.</p>
+    </div>
+    <div class="mo-loop">
+      <div class="mo-step reveal"><div class="n mo-grad">01</div><h3>Warm intro requests</h3><p>We reach out to the right investors through our network. You don't chase — they come to you.</p></div>
+      <div class="mo-step reveal"><div class="n mo-grad">02</div><h3>A pace that adapts</h3><p>The more investors lean in, the more requests we send. When they don't, we ease off and sharpen the pitch with you. Your pace reflects your results.</p></div>
+      <div class="mo-step reveal"><div class="n mo-grad">03</div><h3>Habits that earn</h3><p>Stay on top of your raise and earn bonus intro requests on top of your pace — momentum you build, not just momentum we hand you.</p></div>
+      <div class="mo-step reveal"><div class="n mo-grad">04</div><h3>Blitz to close</h3><p>Land a real lead and we throw fuel on the fire — ramping hard to fill the round while you're hot.</p></div>
+    </div>
+    <p class="mo-gym-note reveal" style="font-style:normal"><a href="/intros" style="color:var(--accent);font-weight:600;text-decoration:none">See the engine by the numbers →</a></p>
+  </div>
+</section>
+
+<!-- ============ HABITS → REWARDS ============ -->
+<section class="mo-section">
+  <div class="inner">
+    <div class="mo-head reveal">
+      <span class="mo-eyebrow">Do the work</span>
+      <h2 class="mo-display">Good habits, <span class="mo-grad">extra intro requests.</span></h2>
+      <p>The founders who win stay on top of their raise — so we reward it. Do the work and earn extra intro requests, sent on <strong>top</strong> of your pace. Earned extras you bank and spend to ramp up the raise.</p>
+    </div>
+    <div class="mo-habits reveal">
+      <div class="mo-habit"><span class="lbl">🗂️ Keep your pipeline current</span><span class="rw">+ 1 request</span></div>
+      <div class="mo-habit"><span class="lbl">📝 Log your meeting notes</span><span class="rw">+ 1 request</span></div>
+      <div class="mo-habit"><span class="lbl">🤝 Bring your own investor relationships in</span><span class="rw">+ 1 request</span></div>
+      <div class="mo-habit"><span class="lbl">🏋️ Sharpen your pitch in the Gym</span><span class="rw">+ 1 request</span></div>
     </div>
   </div>
 </section>
 
-<!-- ============ HOW WE WORK ============ -->
-<section class="section-centered bg-alt">
+<!-- ============ THE GYM + COACHING ============ -->
+<section class="mo-section" style="background:var(--bg-alt)">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">How we work</span></div>
-    <h2 class="h-section reveal">Your fundraise <span class="accent">point guard.</span></h2>
-    <p class="section-lede reveal">You're the front man — you pitch, you own the raise. We're behind the scenes making it easier. <strong>We don't run your raise. We make you better at it.</strong></p>
+    <div class="mo-head reveal">
+      <span class="mo-eyebrow">Know how to run the room</span>
+      <h2 class="mo-display">Getting the meeting is half the battle. <span class="mo-grad">Running it is the other half.</span></h2>
+      <p>So we train you for both.</p>
+    </div>
+    <div class="mo-gym reveal">
+      <div class="card">
+        <div class="ic">🎭</div>
+        <h3>Practice against realistic AI VCs</h3>
+        <p>Step into the Pitch Gym and pitch a range of lifelike investor personas — a fund GP, a junior associate at a small fund, a check-writer at a big hedge fund, an angel. Each reacts differently, just like the real thing. Reps any time, with a blunt readout on what landed and what didn't.</p>
+      </div>
+      <div class="card">
+        <div class="ic">🎧</div>
+        <h3>Coaching on your real meetings</h3>
+        <p>We get you set up on Granola so every investor call is captured. After each one, we review the transcript and send you specific coaching — exactly what to tighten before the next.</p>
+      </div>
+    </div>
+    <p class="mo-gym-note reveal">The better you get in the room, the more investors say yes — <strong>and the more your pace climbs.</strong></p>
+  </div>
+</section>
+
+<!-- ============ FIRMS INTRODUCED — 2026 ============ -->
+<section class="mo-section mo-dark">
+  <div class="inner">
+    <div class="mo-head reveal" style="color:#fff;margin-bottom:0">
+      <span class="mo-eyebrow">2026</span>
+      <h2 class="mo-display" style="color:#fff">Firms we've introduced a founder to <span class="mo-grad">this year.</span></h2>
+    </div>
+    <div class="mo-firms reveal">
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=a16z.com" alt="">a16z</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=menlovc.com" alt="">Menlo Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=firstround.com" alt="">First Round</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=precursorvc.com" alt="">Precursor Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=signalfire.com" alt="">SignalFire</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=gradient.com" alt="">Gradient Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=rre.com" alt="">RRE Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=fpvventures.com" alt="">FPV Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=pear.vc" alt="">Pear VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=compound.vc" alt="">Compound VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=collaborativefund.com" alt="">Collaborative Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=foundercollective.com" alt="">Founder Collective</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=chapterone.com" alt="">Chapter One Ventures</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=southparkcommons.com" alt="">South Park Commons</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=hustlefund.vc" alt="">Hustle Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=weekend.fund" alt="">Weekend Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=socialleverage.com" alt="">Social Leverage</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=race.capital" alt="">Race Capital</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=boost.vc" alt="">Boost VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=afore.vc" alt="">Afore VC</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=activecapital.com" alt="">Active Capital</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=1517fund.com" alt="">1517 Fund</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=hf0.com" alt="">HF0</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=zettavp.com" alt="">Zetta Venture Partners</span>
+      <span><img src="https://www.google.com/s2/favicons?sz=64&domain=verdictcap.com" alt="">Verdict Capital</span>
+    </div>
+    <p class="mo-firms-note">A sample of the firms we've made warm intros to on founders' behalf in 2026.</p>
+  </div>
+</section>
+
+<!-- ============ ONLINE SESSIONS (make the most of intros) ============ -->
+<section class="section-centered">
+  <div class="inner">
+    <div class="reveal"><span class="eyebrow">Online sessions</span></div>
+    <h2 class="h-section reveal">A system, <span class="accent">with a team behind it.</span></h2>
+    <p class="section-lede reveal">The intro requests do the heavy lifting. The sessions are the augment — optional, always useful. Show up when you need them, get back to building when you don't.</p>
 
     <div class="card-grid">
       <div class="feature-card reveal">
         <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M15 9h.01M9 13h.01M15 13h.01M11 17h2"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         </div>
-        <h3>Open doors.</h3>
-        <p>Warm intros to the right local angels and coastal VCs — the ones we've already built trust with. You walk in already vouched for.</p>
+        <h3>Talk it out.</h3>
+        <p>Struggling to close? Get on with founders who've already done it and work through it together — same stage, all vetted, all going for the same thing.</p>
       </div>
 
       <div class="feature-card reveal">
         <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         </div>
-        <h3>Sharpen the pitch.</h3>
-        <p>Narrative, deck, run-of-show. We make sure what you walk into the room with is tight before you ever take a meeting.</p>
+        <h3>Ask investors directly.</h3>
+        <p>Monthly AMAs with credible investors. Ask the question you actually want answered — no pitch, no pressure, no performance.</p>
       </div>
 
       <div class="feature-card reveal">
         <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         </div>
-        <h3>Avoid mistakes.</h3>
-        <p>Term sheets, valuation, signaling, when to say yes and when to walk. We've seen the patterns. You shouldn't learn them on your own raise.</p>
+        <h3>A team behind the system.</h3>
+        <p>The system runs your pace; we're in it with you the whole time — intro requests, strategy, gut-checks, and coaching whenever you need them.</p>
       </div>
     </div>
+
+    <div class="reveal" style="margin-top:72px"><span class="eyebrow">Special guests</span></div>
+    <h3 class="reveal" style="font-size:clamp(24px,3.2vw,34px);font-weight:800;letter-spacing:-0.5px;margin:18px auto 10px;max-width:700px">The investors and operators who show up for our founders.</h3>
+    <p class="section-lede reveal">A few of the people who've joined our sessions and AMAs to help the founders we work with.</p>
+
+    <div class="speakers-grid-c speakers-5col reveal">
+      <div class="speaker"><img src="/speakers/julian.png" alt="Julian Weisser"><div class="name">Julian Weisser</div><div class="role">Solo Founders</div></div>
+      <div class="speaker"><img src="/speakers/elizabeth-yin.jpg" alt="Elizabeth Yin"><div class="name">Elizabeth Yin</div><div class="role">Hustle Fund</div></div>
+      <div class="speaker"><img src="/speakers/cyan.png" alt="Cyan Banister"><div class="name">Cyan Banister</div><div class="role">Long Journey</div></div>
+      <div class="speaker"><img src="/speakers/charles-hudson.webp" alt="Charles Hudson"><div class="name">Charles Hudson</div><div class="role">Precursor</div></div>
+      <div class="speaker"><img src="/speakers/jeff-morris-jr.webp" alt="Jeff Morris Jr"><div class="name">Jeff Morris Jr</div><div class="role">Chapter One</div></div>
+      <div class="speaker"><img src="/speakers/eric-ries.webp" alt="Eric Ries"><div class="name">Eric Ries</div><div class="role">The Lean Startup</div></div>
+      <div class="speaker"><img src="/speakers/jack-selby.jpg" alt="Jack Selby"><div class="name">Jack Selby</div><div class="role">Thiel Capital</div></div>
+      <div class="speaker"><img src="/speakers/art-levy.webp" alt="Art Levy"><div class="name">Art Levy</div><div class="role">CBO, Brex</div></div>
+      <div class="speaker"><img src="/speakers/christian-keil.jpeg" alt="Christian Keil"><div class="name">Christian Keil</div><div class="role">a16z</div></div>
+      <div class="speaker"><img src="/speakers/speaker-grey.avif" alt="Cam Doody"><div class="name">Cam Doody</div><div class="role">Brickyard</div></div>
+      <div class="speaker"><img src="/speakers/speaker-teal.jpeg" alt="Mike Randall"><div class="name">Mike Randall</div><div class="role">Monsoon</div></div>
+      <div class="speaker"><img src="/speakers/speaker-denim.jpeg" alt="Delian Asparouhov"><div class="name">Delian Asparouhov</div><div class="role">Founders Fund</div></div>
+      <div class="speaker"><img src="/speakers/speaker-plaid.jpeg" alt="Lori Berenberg"><div class="name">Lori Berenberg</div><div class="role">Bloomberg Beta</div></div>
+      <div class="speaker"><img src="/speakers/speaker-blue.webp" alt="Niko Bonatsos"><div class="name">Niko Bonatsos</div><div class="role">Verdict Capital</div></div>
+      <div class="speaker"><img src="/speakers/speaker-1.jpeg" alt="Shriya Nevatia"><div class="name">Shriya Nevatia</div><div class="role">Superhuman</div></div>
+    </div>
+
+    <p class="pull-quote reveal" style="margin-top:64px">Learn online. Raise on a system. <span class="accent">We're in it with you.</span></p>
   </div>
 </section>
 
 <!-- ============ PORTFOLIO ============ -->
-<section class="section-centered">
+<section class="section-centered bg-alt">
   <div class="inner">
     <div class="reveal"><span class="eyebrow">Portfolio</span></div>
     <h2 class="h-section reveal">Companies we're <span class="accent">working with.</span></h2>
@@ -111,25 +376,6 @@
 
     <div class="portfolio-grid dense reveal" data-portfolio-grid></div>
     <div class="firm-empty reveal" data-portfolio-empty>Portfolio loading…</div>
-  </div>
-</section>
-
-<!-- ============ THE RECEIPTS (LIVE) ============ -->
-<section class="section-centered bg-dark">
-  <div class="inner">
-    <div class="reveal"><span class="eyebrow">Live · last 30 days</span></div>
-    <h2 class="h-section reveal">Firms we've gotten founders <span class="accent">in front of.</span></h2>
-    <p class="section-lede reveal">Pulled live from our database. Founder &amp; investor names omitted to respect stealth raises.</p>
-
-    <div class="receipts-card dark reveal">
-      <div class="receipts-counter" data-firm-count>—</div>
-      <div class="receipts-counter-label">unique firms · last 30 days</div>
-
-      <div class="firm-grid" data-firm-grid style="margin-top:32px"></div>
-      <div class="firm-empty" data-firm-empty>
-        No intros in the last 30 days. Check back soon.
-      </div>
-    </div>
   </div>
 </section>
 
@@ -149,41 +395,21 @@
   </div>
 </section>
 
-<!-- ============ SPEAKERS ============ -->
-<section class="section-centered bg-alt">
-  <div class="inner">
-    <div class="reveal"><span class="eyebrow">Past speakers &amp; guests</span></div>
-    <h2 class="h-section reveal">The people in the rooms.</h2>
-    <p class="section-lede reveal">Founders and investors who've shared time with the MatCap community.</p>
-
-    <div class="speakers-grid-c speakers-5col reveal">
-      <div class="speaker"><img src="/speakers/julian.png" alt="Julian Weisser"><div class="name">Julian Weisser</div><div class="role">Solo Founders</div></div>
-      <div class="speaker"><img src="/speakers/elizabeth-yin.jpg" alt="Elizabeth Yin"><div class="name">Elizabeth Yin</div><div class="role">Hustle Fund</div></div>
-      <div class="speaker"><img src="/speakers/cyan.png" alt="Cyan Banister"><div class="name">Cyan Banister</div><div class="role">Long Journey</div></div>
-      <div class="speaker"><img src="/speakers/charles-hudson.webp" alt="Charles Hudson"><div class="name">Charles Hudson</div><div class="role">Precursor</div></div>
-      <div class="speaker"><img src="/speakers/jeff-morris-jr.webp" alt="Jeff Morris Jr"><div class="name">Jeff Morris Jr</div><div class="role">Chapter One</div></div>
-      <div class="speaker"><img src="/speakers/eric-ries.webp" alt="Eric Ries"><div class="name">Eric Ries</div><div class="role">The Lean Startup</div></div>
-      <div class="speaker"><img src="/speakers/jack-selby.jpg" alt="Jack Selby"><div class="name">Jack Selby</div><div class="role">Thiel Capital</div></div>
-      <div class="speaker"><img src="/speakers/art-levy.webp" alt="Art Levy"><div class="name">Art Levy</div><div class="role">CBO, Brex</div></div>
-      <div class="speaker"><img src="/speakers/christian-keil.jpeg" alt="Christian Keil"><div class="name">Christian Keil</div><div class="role">a16z</div></div>
-      <div class="speaker"><img src="/speakers/speaker-grey.avif" alt="Cam Doody"><div class="name">Cam Doody</div><div class="role">Brickyard</div></div>
-      <div class="speaker"><img src="/speakers/speaker-teal.jpeg" alt="Mike Randall"><div class="name">Mike Randall</div><div class="role">Monsoon</div></div>
-      <div class="speaker"><img src="/speakers/speaker-denim.jpeg" alt="Delian Asparouhov"><div class="name">Delian Asparouhov</div><div class="role">Founders Fund</div></div>
-      <div class="speaker"><img src="/speakers/speaker-plaid.jpeg" alt="Lori Berenberg"><div class="name">Lori Berenberg</div><div class="role">Bloomberg Beta</div></div>
-      <div class="speaker"><img src="/speakers/speaker-blue.webp" alt="Niko Bonatsos"><div class="name">Niko Bonatsos</div><div class="role">Verdict Capital</div></div>
-      <div class="speaker"><img src="/speakers/speaker-1.jpeg" alt="Shriya Nevatia"><div class="name">Shriya Nevatia</div><div class="role">Superhuman</div></div>
-    </div>
-  </div>
-</section>
-
 <!-- ============ CASE STUDIES (stealth) ============ -->
-<section class="section-centered">
+<section class="section-centered bg-alt">
   <div class="inner">
     <div class="reveal"><span class="eyebrow">Case studies</span></div>
     <h2 class="h-section reveal">Outcomes we've helped <span class="accent">close.</span></h2>
-    <p class="section-lede reveal">Two recent stealth raises. Full story, founder names withheld.</p>
+    <p class="section-lede reveal">Three recent raises we helped close. Full breakdown on each.</p>
 
-    <div class="portfolio-grid reveal" style="grid-template-columns:repeat(2,1fr);max-width:880px">
+    <div class="portfolio-grid reveal" style="grid-template-columns:repeat(2,1fr);max-width:840px">
+      <a class="portfolio-card linkable" href="/case-studies/autolane">
+        <div class="p-stat">$7.4M</div>
+        <div class="p-stat-sub">Seed · Draper &amp; Hyperplane · early believer</div>
+        <div class="p-name">Autolane</div>
+        <div class="p-line">The OS for autonomous commerce. We backed it early and made the VC intros — before Ben raised $7.4M.</div>
+        <div class="p-read">Read story →</div>
+      </a>
       <a class="portfolio-card linkable" href="/case-studies/legix">
         <div class="p-stat">$1.5M</div>
         <div class="p-stat-sub">Round closed · names withheld</div>
@@ -198,48 +424,47 @@
         <div class="p-line">Workflow automation in a regulated real-estate services market.</div>
         <div class="p-read">Read story →</div>
       </a>
+      <a class="portfolio-card linkable" href="/case-studies/ryniant">
+        <div class="p-stat">$300K</div>
+        <div class="p-stat-sub">Pre-seed · led by Verdict Capital</div>
+        <div class="p-name">Ryniant</div>
+        <div class="p-line">The fastest path from molecule to best synthesis plan.</div>
+        <div class="p-read">Read story →</div>
+      </a>
     </div>
   </div>
 </section>
 
-<!-- ============ PRICING ============ -->
-<section class="section-centered bg-dark">
+<!-- ============ PRICING — dark, tasteful ============ -->
+<section class="mo-section mo-dark">
   <div class="inner">
-    <div class="reveal"><span class="eyebrow">Pricing</span></div>
-    <h2 class="h-section reveal">Simple. <span class="accent">1% of your company.</span></h2>
-
-    <div class="pricing-display reveal">
-      <div class="pricing-num">1%</div>
-      <div class="pricing-label">Equity · Lifetime Partnership</div>
+    <div class="mo-head reveal" style="margin-bottom:0;color:#fff">
+      <span class="mo-eyebrow">Pricing</span>
+      <h2 class="mo-display" style="color:#fff">One number. <span class="mo-grad">Total alignment.</span></h2>
     </div>
 
-    <p class="section-lede reveal">No retainer. No success fee. No carry on your investors. We're aligned for the lifetime of the company — not the close of one round.</p>
+    <div class="mo-price reveal">
+      <div class="mo-price-num"><span class="pct">1%</span></div>
+      <div class="mo-price-of">of your company · that's the whole deal</div>
+      <div class="mo-price-terms">24-month vesting · no cliff · lifetime partnership</div>
+    </div>
 
-    <div class="card-grid">
-      <div class="feature-card no-icon reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-        <h3>No retainer.</h3>
-        <p>No monthly fees. No charges between rounds. We make money the same way you do — when the company succeeds.</p>
+    <div class="mo-price-principles reveal">
+      <div>
+        <div class="no"><span class="x">✕</span>No retainer</div>
+        <p>No monthly fees, no charges between rounds. We make money the way you do — when the company wins.</p>
       </div>
-
-      <div class="feature-card no-icon reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-        <h3>No success fee.</h3>
-        <p>We don't take a percentage of the round we help you close. The 1% is for the long game, not the next term sheet.</p>
+      <div>
+        <div class="no"><span class="x">✕</span>No success fee</div>
+        <p>We don't take a cut of the round we help you close. The 1% is for the long game, not the next term sheet.</p>
       </div>
-
-      <div class="feature-card no-icon reveal">
-        <div class="feature-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </div>
-        <h3>No carry on investors.</h3>
-        <p>Your angels and VCs keep their full upside. We don't take a cut of their returns. That keeps capital coming back.</p>
+      <div>
+        <div class="no"><span class="x">✕</span>No carry on investors</div>
+        <p>Your angels and VCs keep their full upside. That's what keeps capital coming back.</p>
       </div>
     </div>
+
+    <p class="mo-price-close reveal">We're on your cap table for the life of the company — not the close of one round. <strong>We win when you win.</strong></p>
   </div>
 </section>
 

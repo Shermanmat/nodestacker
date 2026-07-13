@@ -10,7 +10,7 @@
   <link rel="icon" href="/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root{--bg:#FFFFFF;--bg-alt:#F5F5F5;--bg-alt2:#FAFAFA;--text:#000;--muted:#555;--accent:#00C2E0;--accent-dim:rgba(0,194,224,.12);--rule:#e5e5e5}
     *{box-sizing:border-box;margin:0;padding:0}html{scroll-behavior:smooth}
@@ -19,7 +19,7 @@
     nav.topnav{position:fixed;top:0;left:0;right:0;z-index:100;background:#fff;color:#000;padding:10px 24px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid var(--accent)}
     nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
     nav.topnav img{height:34px;width:auto;display:block}
-    nav.topnav .tag{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid var(--rule);padding-left:14px}
+    nav.topnav .tag{font-family:'Space Grotesk',sans-serif;font-size:15px;letter-spacing:3px;color:var(--accent);border-left:1px solid var(--rule);padding-left:14px}
     nav.topnav .links{display:flex;gap:28px;align-items:center}
     nav.topnav .links a{color:#000;text-decoration:none;font-weight:600;font-size:13px;text-transform:uppercase;letter-spacing:1.5px}
     nav.topnav .links a:hover{color:var(--accent)}
@@ -28,34 +28,34 @@
     .inner{max-width:920px;margin:0 auto;padding:0 24px}
     .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
     .reveal.in{opacity:1;transform:translateY(0)}
-    .kicker{font-family:'Bebas Neue',sans-serif;letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px}
+    .kicker{font-family:'Space Grotesk',sans-serif;letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px}
     .back{display:inline-block;padding:90px 0 0;font-size:13px;color:var(--muted);text-decoration:none;text-transform:uppercase;letter-spacing:1.5px;font-weight:700}
     .back:hover{color:var(--accent)}
     .stealth-banner{background:var(--accent-dim);border-left:4px solid var(--accent);padding:14px 24px;margin:20px 0;font-size:14px;color:#222}
     .stealth-banner strong{color:#000}
     .hero{padding:30px 0 60px;border-bottom:1px solid var(--rule)}
-    .hero h1{font-family:'Bebas Neue',sans-serif;font-size:clamp(44px,6.5vw,86px);line-height:.95;letter-spacing:1px;margin-bottom:22px}
+    .hero h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(44px,6.5vw,86px);line-height:.95;letter-spacing:1px;margin-bottom:22px}
     .hero h1 .accent{color:var(--accent)}
     .hero .one-liner{font-size:clamp(18px,1.8vw,22px);color:#222;max-width:760px}
     .snapshot{padding:50px 0;background:var(--bg-alt2);border-bottom:1px solid var(--rule)}
     .snapshot-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--rule);border:1px solid var(--rule)}
     .snapshot-grid > div{background:#fff;padding:22px 24px}
-    .snapshot-grid .label{font-family:'Bebas Neue',sans-serif;font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:6px}
+    .snapshot-grid .label{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:2px;color:var(--muted);margin-bottom:6px}
     .snapshot-grid .value{font-size:16px;font-weight:600;line-height:1.4}
-    .snapshot-grid .value.big{font-family:'Bebas Neue',sans-serif;font-size:30px;color:var(--accent);letter-spacing:1px;line-height:1}
+    .snapshot-grid .value.big{font-family:'Space Grotesk',sans-serif;font-size:30px;color:var(--accent);letter-spacing:1px;line-height:1}
     .snapshot-grid .value.muted{color:var(--muted);font-style:italic;font-weight:500}
     .numbers{padding:90px 0;background:#000;color:#fff}
     .numbers .inner{max-width:1000px}
     .numbers .kicker{color:var(--accent)}
-    .numbers h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,5vw,56px);letter-spacing:2px;line-height:1;margin-bottom:14px}
+    .numbers h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(34px,5vw,56px);letter-spacing:2px;line-height:1;margin-bottom:14px}
     .numbers h2 .accent{color:var(--accent)}
     .numbers .sub{color:#aaa;font-size:16px;margin-bottom:36px;max-width:680px}
     .num-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#222;border:1px solid #222;margin-bottom:36px}
     .num-strip > div{background:#0c0c0c;padding:24px 18px;text-align:center}
-    .num-strip .v{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,4.5vw,60px);line-height:1;letter-spacing:1px;color:var(--accent);margin-bottom:8px}
+    .num-strip .v{font-family:'Space Grotesk',sans-serif;font-size:clamp(40px,4.5vw,60px);line-height:1;letter-spacing:1px;color:var(--accent);margin-bottom:8px}
     .num-strip .l{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#aaa;font-weight:700;line-height:1.3}
     .bar{display:flex;width:100%;height:46px;border:2px solid #222;overflow:hidden;margin-bottom:14px}
-    .bar .seg{display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;color:#000}
+    .bar .seg{display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:13px;letter-spacing:1px;color:#000}
     .bar .seg.accept{background:var(--accent)}
     .bar .seg.passed{background:#999;color:#000}
     .bar .seg.ignored{background:#444;color:#bbb}
@@ -67,14 +67,14 @@
     .bar-legend .sw.ignored{background:#444}
     .bar-legend strong{color:#fff;font-weight:700}
     .firms-block{margin-top:28px}
-    .firms-block h3{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px}
+    .firms-block h3{font-family:'Space Grotesk',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px}
     .firms-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#222;border:1px solid #222;margin-bottom:30px}
     .firms-grid .firm{background:#0c0c0c;padding:12px 14px;font-size:13px;color:#ddd;font-weight:500;text-align:center;display:flex;align-items:center;justify-content:center;min-height:48px}
     .firms-grid .firm.invested{background:var(--accent);color:#000;font-weight:800;letter-spacing:.5px}
     .firms-grid.passed .firm{color:#888}
     .body-section{padding:80px 0;border-bottom:1px solid var(--rule)}
     .body-section.alt{background:var(--bg-alt)}
-    .body-section h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(28px,4vw,42px);letter-spacing:2px;line-height:1;margin-bottom:24px}
+    .body-section h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,4vw,42px);letter-spacing:2px;line-height:1;margin-bottom:24px}
     .body-section h2 .accent{color:var(--accent)}
     .body-section p{font-size:18px;line-height:1.75;margin-bottom:16px;color:#222}
     .body-section ul{list-style:none;padding:0;margin-top:8px}
@@ -84,15 +84,15 @@
     .numbers{padding:90px 0;background:#000;color:#fff}
     .numbers .inner{max-width:1000px}
     .numbers .kicker{color:var(--accent)}
-    .numbers h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,5vw,56px);letter-spacing:2px;line-height:1;margin-bottom:14px}
+    .numbers h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(34px,5vw,56px);letter-spacing:2px;line-height:1;margin-bottom:14px}
     .numbers h2 .accent{color:var(--accent)}
     .numbers .sub{color:#aaa;font-size:16px;margin-bottom:36px;max-width:680px}
     .num-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#222;border:1px solid #222;margin-bottom:36px}
     .num-strip > div{background:#0c0c0c;padding:24px 18px;text-align:center}
-    .num-strip .v{font-family:'Bebas Neue',sans-serif;font-size:clamp(40px,4.5vw,60px);line-height:1;letter-spacing:1px;color:var(--accent);margin-bottom:8px}
+    .num-strip .v{font-family:'Space Grotesk',sans-serif;font-size:clamp(40px,4.5vw,60px);line-height:1;letter-spacing:1px;color:var(--accent);margin-bottom:8px}
     .num-strip .l{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:#aaa;font-weight:700;line-height:1.3}
     .bar{display:flex;width:100%;height:46px;border:2px solid #222;overflow:hidden;margin-bottom:14px}
-    .bar .seg{display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:13px;letter-spacing:1px;color:#000}
+    .bar .seg{display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:13px;letter-spacing:1px;color:#000}
     .bar .seg.accept{background:var(--accent)}
     .bar .seg.passed{background:#999;color:#000}
     .bar .seg.ignored{background:#444;color:#bbb}
@@ -104,13 +104,13 @@
     .bar-legend .sw.ignored{background:#444}
     .bar-legend strong{color:#fff;font-weight:700}
     .firms-block{margin-top:28px}
-    .firms-block h3{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px}
+    .firms-block h3{font-family:'Space Grotesk',sans-serif;font-size:18px;letter-spacing:2px;color:var(--accent);margin-bottom:14px}
     .firms-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#222;border:1px solid #222;margin-bottom:30px}
     .firms-grid .firm{background:#0c0c0c;padding:12px 14px;font-size:13px;color:#ddd;font-weight:500;text-align:center;display:flex;align-items:center;justify-content:center;min-height:48px}
     .firms-grid .firm.invested{background:var(--accent);color:#000;font-weight:800;letter-spacing:.5px}
     .firms-grid.passed .firm{color:#888}
     .cta-band{padding:90px 0;background:#fff;text-align:center}
-    .cta-band h2{font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,5vw,52px);letter-spacing:2px;line-height:1;margin-bottom:20px}
+    .cta-band h2{font-family:'Space Grotesk',sans-serif;font-size:clamp(34px,5vw,52px);letter-spacing:2px;line-height:1;margin-bottom:20px}
     .cta-band h2 .accent{color:var(--accent)}
     .cta-band p{color:var(--muted);margin-bottom:32px;font-size:17px}
     .cta-btn{display:inline-block;background:var(--accent);color:#000;padding:18px 40px;font-weight:800;font-size:14px;text-transform:uppercase;letter-spacing:2px;text-decoration:none;border:2px solid var(--accent);transition:all .2s;margin:0 6px}
@@ -141,6 +141,19 @@
     .cs-dd .cs-menu a .raise{color:var(--accent,#00C2E0);font-weight:700}
     .cs-dd .cs-menu a.view-all{border-top:1px solid #333;margin-top:4px;padding-top:12px!important;color:var(--accent,#00C2E0)!important;font-weight:700;justify-content:center!important}
     .cs-dd .cs-menu a.view-all:hover{background:transparent!important;color:#fff!important}
+
+    /* ===== Momentum retune (Space Grotesk is wider than Bebas) ===== */
+    .hero h1,.numbers h2,.body-section h2,.cta-band h2,.quote{letter-spacing:-.02em!important;line-height:1.05}
+    .hero h1{font-size:clamp(40px,5.6vw,72px)!important}
+    .numbers h2{font-size:clamp(28px,4vw,46px)!important}
+    .body-section h2{font-size:clamp(26px,3.4vw,38px)!important}
+    .cta-band h2{font-size:clamp(28px,4vw,44px)!important}
+    .quote{font-size:clamp(24px,3.4vw,38px)!important;letter-spacing:-.01em!important}
+    .num-strip .v,.snapshot-grid .value.big,.stat-num{letter-spacing:-.01em!important}
+    .hero h1 .accent,.numbers h2 .accent,.cta-band h2 .accent,.body-section h2 .accent{background:linear-gradient(96deg,#00C2E0 5%,#5EC2D8 55%,#E08A5E 130%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .numbers,.quote-section{position:relative;overflow:hidden}
+    .numbers .inner,.quote-section .inner{position:relative;z-index:2}
+    .numbers::after,.quote-section::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(45% 40% at 20% 12%,rgba(0,194,224,.16),transparent 60%),radial-gradient(45% 45% at 82% 90%,rgba(255,90,52,.13),transparent 60%)}
 </style>
 </head>
 <body>
@@ -191,7 +204,7 @@
     <div><div class="v">3</div><div class="l">Wired · 2 platform + 1 direct</div></div>
     <div><div class="v">$1.5M</div><div class="l">Total round size</div></div>
   </div>
-  <h3 style="font-family:'Bebas Neue',sans-serif;letter-spacing:3px;color:var(--accent);font-size:13px;margin-bottom:14px">RESPONSE BREAKDOWN</h3>
+  <h3 style="font-family:'Space Grotesk',sans-serif;letter-spacing:3px;color:var(--accent);font-size:13px;margin-bottom:14px">RESPONSE BREAKDOWN</h3>
   <div class="bar reveal" aria-label="Investor response breakdown">
     <div class="seg accept" style="flex:17">YES · 25%</div>
     <div class="seg passed" style="flex:20">PASSED · 30%</div>

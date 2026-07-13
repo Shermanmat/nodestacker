@@ -12,7 +12,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
     :root{
@@ -40,7 +40,7 @@
     nav.topnav .brand{display:flex;align-items:center;gap:14px;text-decoration:none;color:#000}
     nav.topnav img{height:34px;width:auto;display:block}
     nav.topnav .tag{
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       font-size:15px;letter-spacing:3px;color:var(--accent);
       border-left:1px solid var(--rule);padding-left:14px;
     }
@@ -57,13 +57,13 @@
     .reveal{opacity:0;transform:translateY(22px);transition:opacity .8s ease,transform .8s ease}
     .reveal.in{opacity:1;transform:translateY(0)}
     .kicker{
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       letter-spacing:4px;font-size:14px;color:var(--accent);margin-bottom:14px;
     }
 
     .hero{padding:130px 0 70px;border-bottom:1px solid var(--rule)}
     .hero h1{
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       font-size:clamp(56px,9vw,128px);
       line-height:.95;letter-spacing:2px;margin-bottom:22px;
     }
@@ -85,11 +85,11 @@
     .card:hover{border-color:var(--accent);transform:translateY(-2px)}
     .card .year{
       position:absolute;top:24px;right:28px;
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       font-size:14px;letter-spacing:2px;color:var(--muted);
     }
     .card .stat{
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       font-size:64px;line-height:1;letter-spacing:1px;
       color:var(--accent);margin-bottom:20px;
     }
@@ -98,7 +98,7 @@
       color:var(--muted);font-weight:700;margin-top:-14px;margin-bottom:24px;
     }
     .card .company{
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       font-size:30px;letter-spacing:2px;line-height:1;margin-bottom:6px;
     }
     .card .one-liner{
@@ -112,7 +112,7 @@
     .card .meta .read{color:var(--accent);font-weight:700;letter-spacing:.5px}
 
     .legacy-section{padding:70px 0 90px;background:#fff;border-top:1px solid var(--rule)}
-    .legacy-title{font-family:'Bebas Neue',sans-serif;font-size:32px;letter-spacing:2px;margin-bottom:8px;color:#000}
+    .legacy-title{font-family:'Space Grotesk',sans-serif;font-size:32px;letter-spacing:2px;margin-bottom:8px;color:#000}
     .legacy-sub{font-size:15px;color:var(--muted);max-width:720px;margin-bottom:24px;line-height:1.5}
     .legacy-list{list-style:none;padding:0;margin:0;border-top:1px solid var(--rule)}
     .legacy-list li{padding:14px 0;border-bottom:1px solid var(--rule);font-size:14px;color:#555}
@@ -122,7 +122,7 @@
       padding:90px 0;background:#000;color:#fff;text-align:center;
     }
     .cta-band h2{
-      font-family:'Bebas Neue',sans-serif;
+      font-family:'Space Grotesk',sans-serif;
       font-size:clamp(34px,5vw,52px);letter-spacing:2px;
       line-height:1;margin-bottom:18px;
     }
@@ -174,6 +174,18 @@
     .cs-dd .cs-menu a .raise{color:var(--accent,#00C2E0);font-weight:700}
     .cs-dd .cs-menu a.view-all{border-top:1px solid #333;margin-top:4px;padding-top:12px!important;color:var(--accent,#00C2E0)!important;font-weight:700;justify-content:center!important}
     .cs-dd .cs-menu a.view-all:hover{background:transparent!important;color:#fff!important}
+
+    /* ===== Momentum retune ===== */
+    .hero h1,.cta-band h2{letter-spacing:-.02em!important;line-height:1.05}
+    .hero h1{font-size:clamp(44px,6.5vw,84px)!important}
+    .cta-band h2{font-size:clamp(28px,4vw,46px)!important}
+    .card .company{letter-spacing:-.01em!important;font-weight:600}
+    .legacy-title{letter-spacing:-.01em!important}
+    .card .stat,.card .year,.kicker{letter-spacing:0!important}
+    .hero h1 .accent,.cta-band h2 .accent{background:linear-gradient(96deg,#00C2E0 5%,#5EC2D8 55%,#E08A5E 130%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .cta-band{position:relative;overflow:hidden}
+    .cta-band .inner{position:relative;z-index:2}
+    .cta-band::after{content:'';position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(45% 40% at 20% 12%,rgba(0,194,224,.16),transparent 60%),radial-gradient(45% 45% at 82% 90%,rgba(255,90,52,.13),transparent 60%)}
 </style>
 </head>
 <body>
@@ -196,6 +208,7 @@
     <div class="cs-dd">
       <a href="#" class="cs-trigger" onclick="event.preventDefault();this.parentNode.classList.toggle('open')">Case Studies</a>
       <div class="cs-menu">
+        <a href="/case-studies/autolane"><span>Autolane</span><span class="raise">$7.4M</span></a>
         <a href="/case-studies/legix"><span>Legix</span><span class="raise">$1.5M</span></a>
         <a href="/case-studies/notary-everyday"><span>Notary Everyday</span><span class="raise">$600K</span></a>
         <a href="/case-studies/ryniant"><span>Ryniant</span><span class="raise">$300K</span></a>
@@ -219,6 +232,15 @@
 <section class="grid-section">
   <div class="inner">
     <div class="grid">
+
+      <a class="card reveal" href="/case-studies/autolane">
+        <div class="year">AUTOLANE</div>
+        <div class="stat">$7.4M</div>
+        <div class="stat-sub">Seed · Draper &amp; Hyperplane · MatCap backed it early</div>
+        <div class="company">AUTOLANE · AUTONOMOUS COMMERCE</div>
+        <div class="one-liner">The OS for autonomous commerce. We backed the idea early and put it in front of a top-tier crew to sharpen the thesis.</div>
+        <div class="meta"><span>Ben Seidl · Seed</span><span class="read">Read →</span></div>
+      </a>
 
       <a class="card reveal" href="/case-studies/ryniant">
         <div class="year">RYNIANT</div>

@@ -1225,8 +1225,13 @@
               <option value="default">Sort: Default</option>
               <option value="accept-rate">🏆 Accept rate</option>
               <option value="intro-volume">Intro volume</option>
+              <option value="last-engaged">Last engaged (oldest first)</option>
             </select>
-            <label v-if="investorSortBy !== 'default'" class="flex items-center gap-1 text-sm text-gray-600">
+            <label class="flex items-center gap-1 text-sm text-gray-600" title="Hide investors marked inactive">
+              <input type="checkbox" v-model="investorActiveOnly" class="rounded">
+              Active only
+            </label>
+            <label v-if="investorSortBy !== 'default' && investorSortBy !== 'last-engaged'" class="flex items-center gap-1 text-sm text-gray-600">
               Min intros
               <input v-model.number="investorMinIntros" type="number" min="0" step="1"
                 class="border rounded-lg px-2 py-2 text-sm w-16"
@@ -1295,9 +1300,12 @@
         <div v-if="!planningFounderId && investorSortBy !== 'default'" class="bg-white rounded-lg shadow overflow-hidden mb-4">
           <div class="px-4 py-2 text-xs text-gray-500 border-b flex justify-between items-center">
             <span>
-              {{ filteredAdminInvestors.length }} investors with ≥{{ investorMinIntros }} intros sent
-              <span v-if="investorSortBy === 'accept-rate'">· ranked by accept rate</span>
-              <span v-else-if="investorSortBy === 'intro-volume'">· ranked by intro volume</span>
+              <template v-if="investorSortBy === 'last-engaged'">{{ filteredAdminInvestors.length }} investors · oldest engaged first (never-engaged at top)</template>
+              <template v-else>
+                {{ filteredAdminInvestors.length }} investors with ≥{{ investorMinIntros }} intros sent
+                <span v-if="investorSortBy === 'accept-rate'">· ranked by accept rate</span>
+                <span v-else-if="investorSortBy === 'intro-volume'">· ranked by intro volume</span>
+              </template>
             </span>
             <span class="text-gray-400">Accepted = introduced + meetings + invested. Ignored/Passed = explicit statuses.</span>
           </div>
@@ -1314,7 +1322,7 @@
                 <th class="px-3 py-2 text-right">Pass</th>
                 <th class="px-3 py-2 text-right">Ignored</th>
                 <th class="px-3 py-2 text-right">Rate</th>
-                <th class="px-3 py-2 text-left">Last intro</th>
+                <th class="px-3 py-2 text-left">Last request sent</th>
               </tr>
             </thead>
             <tbody>
@@ -1696,71 +1704,7 @@
           </div>
         </div>
 
-        <!-- Awaiting Reply panel — investors who haven't responded yet,
-             bucketed by age. Polite bump (7-21d) vs close-the-loop (21d+). -->
-        <div class="bg-white rounded-lg shadow p-4 mb-4">
-          <div class="flex items-center justify-between mb-3">
-            <div>
-              <h3 class="text-lg font-semibold">Awaiting reply</h3>
-              <p class="text-xs text-gray-500 mt-1">Sent intros with no response yet. 7–21d gets a polite nudge; 21d+ gets a "close the loop / yes-no-not-now" ask. Oldest first.</p>
-            </div>
-            <div class="flex gap-2">
-              <button @click="loadPendingReplies" :disabled="loadingPending" class="text-blue-600 text-sm hover:underline disabled:opacity-50">
-                {{ loadingPending ? 'Loading…' : 'Refresh' }}
-              </button>
-              <button @click="togglePendingShowFresh" class="text-xs text-gray-500 hover:text-gray-800">
-                {{ pendingShowFresh ? 'Hide < 7d' : 'Show < 7d' }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="loadingPending && pendingReplies.length === 0" class="text-sm text-gray-500 py-6 text-center">Loading…</div>
-          <div v-else-if="pendingRepliesFiltered.length === 0" class="text-sm text-gray-500 py-6 text-center">No pending intros — everything's either replied or hasn't been sent yet.</div>
-
-          <div v-else class="overflow-x-auto">
-            <table class="w-full text-sm">
-              <thead>
-                <tr class="text-left text-xs uppercase tracking-wide text-gray-600 border-b">
-                  <th class="py-2 pr-3">Bucket</th>
-                  <th class="py-2 pr-3">Founder</th>
-                  <th class="py-2 pr-3">Investor</th>
-                  <th class="py-2 pr-3">Firm</th>
-                  <th class="py-2 pr-3">Sent</th>
-                  <th class="py-2 pr-3">Bumps</th>
-                  <th class="py-2 pr-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="r in pendingRepliesFiltered" :key="r.introId" class="border-b hover:bg-gray-50">
-                  <td class="py-2 pr-3">
-                    <span :class="['inline-block text-xs font-semibold px-2 py-0.5 rounded', pendingBucketClass(r.bucket)]">
-                      {{ pendingBucketLabel(r.bucket) }}
-                    </span>
-                  </td>
-                  <td class="py-2 pr-3">{{ r.founderName }}<span v-if="r.companyName" class="text-gray-500"> · {{ r.companyName }}</span></td>
-                  <td class="py-2 pr-3">{{ r.investorName }}</td>
-                  <td class="py-2 pr-3 text-gray-600">{{ r.investorFirm || '—' }}</td>
-                  <td class="py-2 pr-3 text-gray-600">{{ r.daysSinceRequested == null ? '—' : r.daysSinceRequested + 'd' }}</td>
-                  <td class="py-2 pr-3 text-gray-600">{{ r.followupCount }}/2</td>
-                  <td class="py-2 pr-3 text-right">
-                    <button v-if="r.canDraftBump && r.gmailThreadId && gmailStatus.connected"
-                      :disabled="pendingDrafting[r.introId]"
-                      @click="draftPendingBump(r)"
-                      :title="r.templatePreview"
-                      class="text-xs bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 disabled:opacity-50">
-                      {{ pendingDrafting[r.introId] ? 'Drafting…' : 'Draft bump' }}
-                    </button>
-                    <span v-else-if="r.bumpBlockedReason === 'capped'" class="text-xs text-gray-400">Max bumps</span>
-                    <span v-else-if="r.bumpBlockedReason === 'cooldown'" class="text-xs text-gray-400">Wait {{ r.daysUntilNextBump }}d</span>
-                    <span v-else-if="r.bumpBlockedReason === 'too-fresh'" class="text-xs text-gray-400">Too fresh ({{ r.daysUntilNextBump }}d)</span>
-                    <span v-else-if="!r.gmailThreadId" class="text-xs text-gray-400" title="Intro was sent outside the app's Gmail flow, so we don't have a thread to reply into. Bump manually from Gmail.">No thread</span>
-                    <span v-else class="text-xs text-gray-400">Connect Gmail</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <!-- Awaiting-reply panel removed — auto-send follow-ups now bumps silent investors automatically. -->
 
         <div class="bg-white rounded-lg shadow overflow-hidden">
           <table class="w-full text-sm">
@@ -2058,6 +2002,7 @@
                 <th class="px-4 text-right">Ignored</th>
                 <th class="px-4 text-right">Pending</th>
                 <th class="px-4 text-right">Accept Rate</th>
+                <th class="px-4 text-right"></th>
               </tr>
             </thead>
             <tbody>
@@ -2073,6 +2018,9 @@
                 <td class="px-4 text-right text-gray-500">{{ row.pending }}</td>
                 <td class="px-4 text-right font-bold" :class="row.acceptRate >= 50 ? 'text-green-600' : row.acceptRate >= 25 ? 'text-amber-600' : 'text-red-600'">
                   {{ row.acceptRate }}%
+                </td>
+                <td class="px-4 text-right">
+                  <button @click="blitzFounder(row)" class="text-xs bg-orange-500 text-white px-2 py-0.5 rounded hover:bg-orange-600" title="Blitz to close the round">🚀 Blitz</button>
                 </td>
               </tr>
             </tbody>
@@ -4687,7 +4635,7 @@
           if (tabId === 'broadcast') loadBroadcastRecipients();
           if (tabId === 'trials') loadTrials();
           if (tabId === 'agent') loadAgentActions();
-          if (tabId === 'intros') { loadPendingReplies(); loadRepliesNeedingHuman(); loadAgentSettings(); }
+          if (tabId === 'intros') { loadRepliesNeedingHuman(); loadAgentSettings(); }
         }
 
         // Data
@@ -5638,6 +5586,9 @@
         const filterByState = ref('');
         const investorSortBy = ref('default');
         const investorMinIntros = ref(10);
+        // Hide investors marked inactive by default (they shouldn't clutter the
+        // list / re-engagement view). Toggle off to see all.
+        const investorActiveOnly = ref(true);
         const leaderboardShowDetails = ref(false);
 
         // Trading card generator: pure-frontend novelty. DiceBear gives us a
@@ -6212,6 +6163,11 @@
         const filteredAdminInvestors = computed(() => {
           let results = investors.value;
 
+          // Hide investors marked inactive (unless the toggle is off).
+          if (investorActiveOnly.value) {
+            results = results.filter(inv => inv.active !== false && inv.active !== 0);
+          }
+
           // Filter by node
           if (filterByNodeId.value) {
             const nodeId = parseInt(filterByNodeId.value);
@@ -6270,6 +6226,17 @@
               .filter(inv => (inv.introTotal || 0) >= min)
               .slice()
               .sort((a, b) => (b.introTotal || 0) - (a.introTotal || 0));
+          } else if (investorSortBy.value === 'last-engaged') {
+            // Re-engagement view: oldest last-engaged first, never-engaged at the
+            // very top. No min-intros floor — never-contacted investors are exactly
+            // who we want to surface. lastIntroAt = most recent intro we sent them.
+            results = results
+              .slice()
+              .sort((a, b) => {
+                const ta = a.lastIntroAt ? new Date(a.lastIntroAt).getTime() : -Infinity;
+                const tb = b.lastIntroAt ? new Date(b.lastIntroAt).getTime() : -Infinity;
+                return ta - tb;
+              });
           }
 
           return results;
@@ -6791,7 +6758,6 @@
             }
             alert(msg);
             await loadRepliesNeedingHuman();
-            await loadPendingReplies();
             loadIntroRequests();
             loadAllIntroRequests();
           } catch (e) {
@@ -7699,6 +7665,16 @@
           if (period) leaderboardPeriod.value = period;
           const data = await api(`/founders/leaderboard?period=${leaderboardPeriod.value}&min=${leaderboardMin.value}`);
           founderLeaderboard.value = data.data;
+        };
+
+        // Win-blitz: flip a founder into a sprint to close the round after a lead.
+        const blitzFounder = async (row) => {
+          const t = prompt(`Blitz ${row.name} to how many intro requests/week (to close the round)?`, '20');
+          if (t === null) return;
+          const target = parseInt(t);
+          if (!Number.isFinite(target) || target < 1) return;
+          await api(`/founders/${row.founderId}/blitz`, { method: 'POST', body: { target } });
+          alert(`🚀 ${row.name} is blitzing at ${target}/week for the next 3 weeks.`);
         };
 
         const loadPipelineHealth = async () => {
@@ -9058,7 +9034,7 @@
           introFounderOptions, introNodeOptions, introInvestorOptions,
           blurIntroFounder, blurIntroNode, blurIntroInvestor,
           introFilter, investorSearchQuery, filterByNodeId, filterByCategoryId, filterByCountry, filterByState, usStates, availableInvestorStates, filteredAdminInvestors,
-          investorSortBy, investorMinIntros, leaderboardShowDetails, leaderboardRankLabel,
+          investorSortBy, investorMinIntros, investorActiveOnly, leaderboardShowDetails, leaderboardRankLabel,
           tradingCardInvestor, tradingCardAnonymize, tradingCardAvatarUrl, tradingCardSectors, tradingCardCodename,
           tradingCardJoinedLabel, openTradingCard, cycleAvatarStyle,
           tradingCardEl, downloadingTradingCard, downloadTradingCard,
@@ -9135,7 +9111,7 @@
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,
           markInvestorInactive, markInvestorActive, dormancyReasonLabel,
           // Founder Leaderboard
-          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, loadFounderLeaderboard,
+          founderLeaderboard, leaderboardPeriod, leaderboardPeriods, leaderboardMin, loadFounderLeaderboard, blitzFounder,
           // Pipeline Health
           pipelineHealth, networkAvailability, loadPipelineHealth, viewNetworkAvailability,
           updateFounderCadence, toggleFounderCadence,

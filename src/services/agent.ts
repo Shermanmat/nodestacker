@@ -1,6 +1,7 @@
 import { eq, inArray, and, isNull, desc, gte, lt, or, sql } from 'drizzle-orm';
 import { db, founders, investors, nodes, matchSuggestions, introRequests, agentSettings, type MatchSuggestion } from '../db/index.js';
 import { generateMatchSuggestions } from './matching.js';
+import { finalizeCalibrationForAll, recomputePaceForAll, syncCarrotShotsForAll, consumeBonusShots } from './treadmill.js';
 import { buildAskEmail, createDraft, getStatus as getGmailStatus, checkThreadReplies, sendThreadReply } from './gmail.js';
 import { recordAction } from './agent-actions.js';
 
@@ -46,8 +47,23 @@ export async function runAgentTick(): Promise<{
   const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
   const adminEmail = process.env.ADMIN_EMAIL || 'mat@matsherman.com';
 
+  // 0. Set each founder's weekly pace from their acceptance rate before we
+  // generate: finalize any founder whose calibration burst just resolved, then
+  // recompute pace = acceptance for everyone already calibrated.
+  await finalizeCalibrationForAll();
+  await recomputePaceForAll();
+  await syncCarrotShotsForAll();   // grant any newly-earned bonus shots
+
   // 1. Generate fresh suggestions across all eligible founders.
   const { suggestions, batchId, liquidity } = await generateMatchSuggestions();
+
+  // Consume bonus shots that were actually generated (anything beyond the base
+  // weekly pace came from a founder's shot pool).
+  for (const l of liquidity) {
+    const baseRemaining = Math.max(0, l.paceBase - l.usedThisWeek);
+    const bonusUsed = Math.max(0, l.generated - baseRemaining);
+    if (bonusUsed > 0) await consumeBonusShots(l.founderId, bonusUsed);
+  }
 
   // 2. Persist each suggestion as a pending intro_request + linked match_suggestion.
   // generateMatchSuggestions only returns in-memory candidates — the /api/matching/generate
@@ -541,8 +557,9 @@ const CLOSE_LOOP_DAYS = 21;
 // Polite bump — 7-21 days since intro request, no reply yet.
 const FOLLOWUP_POLITE = 'Hey {{first}} — wanted to bump this. Any additional info I can share to help you get to a yes (for the intro) or pass? Thanks!';
 
-// Close-the-loop — 21+ days. More direct, asks for any response.
-const FOLLOWUP_CLOSE_LOOP = `Hey {{first}} — wanted to circle back. I'd rather hear from you than assume it's a pass, but sometimes intros just don't get seen the first time around.\n\nQuick yes / no / not now?`;
+// Close-the-loop — 21+ days. Assumptive pass: gives a clean out and lets them
+// correct it (a wrong assumption is what gets the reply).
+const FOLLOWUP_CLOSE_LOOP = `Hey {{first}} — going to assume this one's a pass and close it out on my end. If I've got that wrong, just let me know.`;
 
 // Pick the template that fits the intro's age. Pass the dateRequested string
 // (YYYY-MM-DD) — returns one of the two strings above.

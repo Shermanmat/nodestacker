@@ -135,8 +135,15 @@ app.get('/', async (c) => {
     if (ACCEPTED_STATUSES.has(i.status)) s.accepted++;
     if (i.status === 'passed') s.passed++;
     if (i.status === 'ignored') s.ignored++;
-    if (i.dateRequested && (!s.lastIntroAt || i.dateRequested > s.lastIntroAt)) {
-      s.lastIntroAt = i.dateRequested;
+    // Compare by parsed DATE value, not string. date_requested has mixed
+    // formats (ISO "2026-06-18" and RFC "Mon, 04 May 2026 ...") — a raw string
+    // compare wrongly ranks letter-prefixed RFC dates above any ISO date.
+    if (i.dateRequested) {
+      const t = new Date(i.dateRequested).getTime();
+      const cur = s.lastIntroAt ? new Date(s.lastIntroAt).getTime() : NaN;
+      if (!Number.isNaN(t) && (s.lastIntroAt == null || Number.isNaN(cur) || t > cur)) {
+        s.lastIntroAt = i.dateRequested;
+      }
     }
     introStats.set(i.investorId, s);
   }

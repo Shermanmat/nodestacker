@@ -363,7 +363,7 @@ export async function processMessage(
 /**
  * Create a new onboarding session
  */
-export async function createSession(): Promise<{
+export async function createSession(opts?: { publicCompanyId?: number }): Promise<{
   sessionId: number;
   openingMessage: string;
 }> {
@@ -374,6 +374,9 @@ export async function createSession(): Promise<{
     .insert(founderLeads)
     .values({
       status: 'in_progress',
+      // When the chat is reached from a founder's application, link the lead
+      // back to that application so the generated blurb attaches to it.
+      publicCompanyId: opts?.publicCompanyId ?? null,
       conversationHistory: JSON.stringify([
         { role: 'assistant', content: openingMessage },
       ]),

@@ -1,4 +1,5 @@
 import { eq, and, inArray, lt, sql } from 'drizzle-orm';
+import { isCalibrationSending, CALIBRATION_WEEKLY } from './treadmill.js';
 import {
   db,
   founders,
@@ -699,6 +700,8 @@ interface FounderLiquidity {
   blockedByCategory: number;
   blockedByRejectRate: number;
   generated: number;
+  paceBase: number;
+  bonusShots: number;
   status: 'healthy' | 'tight' | 'dry';
   targetSource: 'dynamic' | 'manual';
   targetSupplyBased: number;
@@ -1082,7 +1085,15 @@ export async function generateMatchSuggestions(
       heatScore: founderHeat,
       manualBaseline,
     });
-    const target = dyn.target;
+    // Treadmill calibration: a new founder's first CALIBRATION_TARGET requests go
+    // out as a burst so we can read their accept rate. During that send phase the
+    // weekly allowance is elevated; once they've sent enough it falls back to the
+    // normal (finalized) target. (finalizeCalibration runs in the caller first.)
+    const sentSoFar = founderIntros.filter(ir => ir.status !== 'pending_suggestion').length;
+    const paceBase = isCalibrationSending(founder.calibratedAt, sentSoFar) ? CALIBRATION_WEEKLY : dyn.target;
+    // Bonus "shots on goal" ride on TOP of the weekly pace, consumed as sent.
+    const bonusShots = founder.bonusShots ?? 0;
+    const target = paceBase + bonusShots;
     effectiveTargets.set(founder.id, target);
     const targetSource: 'dynamic' | 'manual' = manualBaseline > 0 && manualBaseline >= dyn.supplyBased && manualBaseline >= dyn.heatBased ? 'manual' : 'dynamic';
     if (manualBaseline > 0 && target > manualBaseline) {
@@ -1113,6 +1124,8 @@ export async function generateMatchSuggestions(
       blockedByCategory,
       blockedByRejectRate,
       generated: 0, // filled after filtering
+      paceBase,     // weekly pace without bonus shots
+      bonusShots,   // one-off shots included in weeklyTarget
       status: weeksOfRunway >= 4 ? 'healthy' : weeksOfRunway >= 2 ? 'tight' : 'dry',
       targetSource,
       targetSupplyBased: dyn.supplyBased,

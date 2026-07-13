@@ -560,6 +560,17 @@ try {
   console.log('  Backfilled match_suggestions.rejection_category');
 } catch (e: any) { if (!e.message?.includes('no such column')) throw e; }
 
+// Docs-first onboarding intake — already-incorporated companies upload
+// formation docs (AOC + bylaws + initial board consent), we extract variables.
+safeAddColumn('onboarding_workflows', 'intake_type', "text DEFAULT 'form_new'");
+safeAddColumn('onboarding_workflows', 'bylaws_url', 'text');
+safeAddColumn('onboarding_workflows', 'board_consent_url', 'text');
+safeAddColumn('onboarding_workflows', 'incorporation_date', 'text');
+safeAddColumn('onboarding_workflows', 'extraction_raw', 'text');
+safeAddColumn('onboarding_workflows', 'extracted_at', 'text');
+safeAddColumn('onboarding_workflows', 'docs_confirmed_at', 'text');
+safeAddColumn('board_members', 'source', "text DEFAULT 'manual'");
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

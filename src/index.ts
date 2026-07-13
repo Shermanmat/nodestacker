@@ -47,6 +47,8 @@ import blurbRoutes from './api/blurb.js';
 import instantlyRoutes from './api/instantly.js';
 import brandsRoutes from './api/brands.js';
 import agentActionsRoutes from './api/agent-actions.js';
+import mockCallAnalysisRoutes from './api/mock-call-analysis.js';
+import gymRoutes from './api/gym.js';
 import mcpRoutes from './api/mcp.js';
 import mcpTokensRoutes from './api/mcp-tokens-routes.js';
 import mcpRpcRoutes from './api/mcp-rpc.js';
@@ -177,6 +179,9 @@ app.use('/api/agent/*', adminGuard);
 // Agent actions ledger / approval queue — admin-only
 app.use('/api/agent-actions', adminGuard);
 app.use('/api/agent-actions/*', adminGuard);
+// Mock VC call analyzer — admin-only (transcripts are sensitive founder prep)
+app.use('/api/mock-call-analysis', adminGuard);
+app.use('/api/mock-call-analysis/*', adminGuard);
 
 app.route('/api/categories', categoriesRoutes);
 app.route('/api/founders', foundersRoutes);
@@ -202,6 +207,9 @@ app.route('/api/weekly-digest', weeklyDigestRoutes);
 app.route('/api/instantly', instantlyRoutes);
 app.route('/api/brands', brandsRoutes);
 app.route('/api/agent-actions', agentActionsRoutes);
+app.route('/api/mock-call-analysis', mockCallAnalysisRoutes);
+// Pitch Gym — founder-facing (own session auth inside the route), not admin-guarded
+app.route('/api/gym', gymRoutes);
 // Health check
 app.get('/api/health', (c) => c.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -918,6 +926,10 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 app.get('/trial', serveStatic({ path: './public/trial.html' }));
 app.get('/how-it-works', (c) => c.redirect('/trial', 301));
+// Founder-facing explainer: how MatCap works (the Momentum model).
+app.get('/momentum', serveStatic({ path: './public/momentum.html' }));
+app.get('/treadmill', (c) => c.redirect('/momentum', 302)); // old URL → new
+
 
 // Marketing site
 app.get('/founders', (c) => c.redirect('/signup', 302));
@@ -950,6 +962,7 @@ app.get('/case-studies/kalendar-ai', serveStatic({ path: './public/case-studies/
 app.get('/case-studies/legix', serveStatic({ path: './public/case-studies/legix.html' }));
 app.get('/case-studies/notary-everyday', serveStatic({ path: './public/case-studies/notary-everyday.html' }));
 app.get('/case-studies/ryniant', serveStatic({ path: './public/case-studies/ryniant.html' }));
+app.get('/case-studies/autolane', serveStatic({ path: './public/case-studies/autolane.html' }));
 // Old stealth slugs → 301 to the de-anonymized clean URLs
 app.get('/case-studies/stealth-vertical-ai', (c) => c.redirect('/case-studies/legix', 301));
 app.get('/case-studies/stealth-proptech', (c) => c.redirect('/case-studies/notary-everyday', 301));

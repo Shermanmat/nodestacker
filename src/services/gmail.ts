@@ -455,6 +455,50 @@ export async function checkThreadReplies(
   };
 }
 
+// Did WE (the operator) already reply in this thread, AFTER the given message?
+// Used to suppress automated replies (e.g. the canned pass ack) when a human
+// has already answered by hand — so the bot never lands a duplicate underneath
+// a manual response. Compares Gmail's internalDate (server receipt time) on both
+// sides rather than the Date header, so clock skew between mail clients can't
+// flip the "who was later" decision.
+//
+// Fails OPEN (returns false) when it can't identify our own address or locate
+// the baseline message — i.e. it won't block the auto-reply on uncertainty,
+// preserving prior behavior in a misconfigured setup rather than silently
+// disabling the feature.
+export async function hasOperatorReplyAfterMessage(
+  threadId: string,
+  afterMessageId: string,
+): Promise<boolean> {
+  const client = await getAuthedClient();
+  const stored = await loadStoredCredentials();
+  // Same fallback as checkThreadReplies: OAuth's gmail.modify scope doesn't
+  // expose our own address, so lean on ADMIN_EMAIL to recognize our sends.
+  const myEmail = (stored?.email || process.env.ADMIN_EMAIL || '').toLowerCase();
+  if (!myEmail) return false; // can't tell which messages are ours — fail open
+  const gmail: gmail_v1.Gmail = google.gmail({ version: 'v1', auth: client });
+  const res = await gmail.users.threads.get({
+    userId: 'me',
+    id: threadId,
+    format: 'metadata',
+    metadataHeaders: ['From'],
+  });
+  const messages = res.data.messages || [];
+  const baseline = messages.find(m => m.id === afterMessageId);
+  const baseMs = baseline?.internalDate ? parseInt(baseline.internalDate) : NaN;
+  if (isNaN(baseMs)) return false; // can't anchor to the investor's reply — fail open
+  for (const msg of messages) {
+    const t = msg.internalDate ? parseInt(msg.internalDate) : NaN;
+    if (isNaN(t) || t <= baseMs) continue; // only messages strictly after the investor's
+    const headers = msg.payload?.headers || [];
+    const fromHeader = headers.find(h => h.name?.toLowerCase() === 'from')?.value || '';
+    const emailMatch = fromHeader.match(/<([^>]+)>/);
+    const from = (emailMatch ? emailMatch[1] : fromHeader).trim().toLowerCase();
+    if (from === myEmail) return true;
+  }
+  return false;
+}
+
 // Reply to an existing thread. Uses the same MIME build as sendGmail but adds
 // In-Reply-To + References + threadId so Gmail threads it correctly. No
 // attachment — follow-ups are short bumps.

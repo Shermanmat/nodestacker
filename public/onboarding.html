@@ -120,10 +120,18 @@
         </div>
 
         <template v-if="companyId">
-          <button @click="startCall" :disabled="starting" class="hero-cta">
+          <label style="display:flex;gap:12px;align-items:flex-start;margin-top:26px;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:14px 16px;">
+            <input type="checkbox" v-model="granolaReady" style="margin-top:2px;width:18px;height:18px;accent-color:#22C9E6;flex:none;cursor:pointer;" />
+            <span style="font-size:14px;color:rgba(255,255,255,.82);line-height:1.5;">
+              <b style="color:#fff;font-weight:600;">Granola is downloaded and running</b>, ready to take notes on this call.
+              <span style="color:rgba(255,255,255,.55);">We use the transcript to coach you afterward.</span>
+            </span>
+          </label>
+          <button @click="startCall" :disabled="starting || !granolaReady" class="hero-cta" style="margin-top:14px;">
             {{ starting ? 'Connecting…' : 'Start the conversation' }}
           </button>
-          <p class="hero-note">Grab a quiet room — this is a real video call with camera + mic.</p>
+          <p v-if="!granolaReady" class="hero-note">Confirm Granola is running so it can capture this call for your coaching.</p>
+          <p v-else class="hero-note">Grab a quiet room — this is a real video call with camera + mic.</p>
         </template>
         <template v-else>
           <a href="/signup" class="hero-cta" style="display:block;text-align:center;text-decoration:none;">Apply first →</a>
@@ -205,6 +213,7 @@
         const starting = ref(false);
         const error = ref(null);
         const granolaClicked = ref(localStorage.getItem('granola_clicked') === '1');
+        const granolaReady = ref(false);   // confirmed running before the call starts
         const callBox = ref(null);
 
         // Transcript upload (closes the Granola loop on the done screen).
@@ -324,7 +333,7 @@
         }
 
         return {
-          phase, starting, error, granolaClicked, callBox, companyId, applied,
+          phase, starting, error, granolaClicked, granolaReady, callBox, companyId, applied,
           openGranola, startCall,
           transcriptText, transcriptTitle, transcriptSubmitting, transcriptSent, transcriptError,
           submitTranscript, resetTranscript,

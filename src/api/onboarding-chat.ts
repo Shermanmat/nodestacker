@@ -14,7 +14,14 @@ const app = new Hono();
 // Start a new onboarding conversation
 app.post('/start', async (c) => {
   try {
-    const { sessionId, openingMessage } = await createSession();
+    // Optional: link this conversation to the founder's application when the
+    // chat is reached from the signup success screen.
+    const body = await c.req.json().catch(() => ({}));
+    const publicCompanyId = Number.isInteger(body?.publicCompanyId)
+      ? body.publicCompanyId
+      : undefined;
+
+    const { sessionId, openingMessage } = await createSession({ publicCompanyId });
 
     return c.json({
       sessionId,

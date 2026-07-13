@@ -4,11 +4,21 @@
   <meta charset="UTF-8">
   <link rel="icon" type="image/png" href="/favicon.png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MatCap - Step 1: Get on Our Radar</title>
+  <title>MatCap — Talk to our AI VC</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
     [v-cloak] { display: none; }
+    .display { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
+    .brand-accent { color: #0A8AA0; }
+    .step-num {
+      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+      width: 28px; height: 28px; border-radius: 8px;
+      display: grid; place-items: center; font-size: 14px; flex: none;
+    }
     .chat-message {
       animation: fadeIn 0.3s ease-out;
     }
@@ -41,25 +51,77 @@
     <!-- Header -->
     <header class="bg-white shadow-sm border-b sticky top-0 z-10">
       <div class="max-w-2xl mx-auto px-4 py-4">
-        <h1 class="text-xl font-bold text-gray-900">MatCap</h1>
-        <p class="text-sm text-gray-500">Step 1: Get on our radar</p>
+        <h1 class="text-xl font-bold text-gray-900 display">MatCap</h1>
+        <p class="text-sm text-gray-500">{{ sessionId ? 'Talking with our AI VC' : 'Founder application' }}</p>
       </div>
     </header>
 
     <!-- Main Chat Container -->
     <main class="max-w-2xl mx-auto pb-32">
-      <!-- Intro Section (shown before starting) -->
-      <div v-if="!sessionId" class="px-4 py-12 text-center">
-        <div class="bg-white rounded-2xl shadow-lg p-8 max-w-md mx-auto">
-          <div class="text-5xl mb-4">👋</div>
-          <h2 class="text-2xl font-bold text-gray-900 mb-3">Let's get to know you</h2>
-          <p class="text-gray-600 mb-6">
-            Answer a few thoughtful questions and receive a sharp blurb you can immediately use when talking to investors.
+      <!-- Intro Section: coaching pitch → Granola → start the AI VC chat -->
+      <div v-if="!sessionId" class="px-4 py-10 sm:py-12">
+        <div class="max-w-lg mx-auto">
+          <!-- Coaching pitch -->
+          <div class="text-center mb-8">
+            <p class="text-xs font-semibold uppercase tracking-widest brand-accent mb-3">Coaching from your very first call</p>
+            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 display mb-3">We coach our founders on every&nbsp;investor call.</h2>
+            <p class="text-gray-600 leading-relaxed">
+              Whether or not we end up working together, MatCap gives founders honest feedback on every investor conversation —
+              what landed, what to tighten, and what to do next. We'd love to start doing that for you right now.
+            </p>
+          </div>
+
+          <!-- Step 1: Granola -->
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
+            <div class="flex gap-4">
+              <div class="step-num" :class="granolaClicked ? 'bg-emerald-100 text-emerald-700' : 'bg-cyan-50 brand-accent'">
+                <span v-if="granolaClicked">✓</span><span v-else>1</span>
+              </div>
+              <div class="flex-1">
+                <h3 class="font-semibold text-gray-900 display">Get Granola, so we can hear your calls</h3>
+                <p class="text-sm text-gray-600 mt-1 mb-4">
+                  Granola quietly records and transcribes your investor calls so we can give you specific feedback.
+                  Founders get their <span class="font-medium text-gray-800">first month free</span> through our link.
+                </p>
+                <button @click="openGranola"
+                  class="inline-flex items-center gap-2 bg-gray-900 text-white text-sm font-medium py-2.5 px-5 rounded-lg hover:bg-gray-800 transition-colors">
+                  Download Granola
+                  <span aria-hidden="true">↗</span>
+                </button>
+                <p v-if="granolaClicked" class="text-sm text-emerald-700 mt-3">
+                  Opened in a new tab — install it, then come back and start the conversation.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: AI VC chat -->
+          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
+            <div class="flex gap-4">
+              <div class="step-num bg-cyan-50 brand-accent">2</div>
+              <div class="flex-1">
+                <h3 class="font-semibold text-gray-900 display">Talk to our AI VC</h3>
+                <p class="text-sm text-gray-600 mt-1 mb-4">
+                  A short conversation to get to know you and your raise. You'll walk away with a sharp investor
+                  blurb you can use today.
+                </p>
+                <button @click="startConversation" :disabled="starting"
+                  class="w-full sm:w-auto py-2.5 px-6 rounded-lg font-medium transition-colors disabled:opacity-50"
+                  :class="granolaClicked
+                    ? 'bg-cyan-600 text-white hover:bg-cyan-700'
+                    : 'bg-white text-cyan-700 border border-cyan-600 hover:bg-cyan-50'">
+                  {{ starting ? 'Starting…' : 'Start the conversation' }}
+                </button>
+                <p v-if="!granolaClicked" class="text-xs text-gray-400 mt-3">
+                  Already use Granola? You can start right away.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <p class="text-center text-sm text-gray-500">
+            This is part of your application — but you'll get feedback either way.
           </p>
-          <button @click="startConversation" :disabled="starting"
-            class="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
-            {{ starting ? 'Starting...' : 'Start Conversation' }}
-          </button>
         </div>
       </div>
 
@@ -160,6 +222,9 @@
   <script>
     const { createApp, ref, nextTick, watch } = Vue;
 
+    // MatCap → Granola partner link (founders get first month free).
+    const GRANOLA_URL = 'https://www.granola.ai?via=mat-sherman';
+
     createApp({
       setup() {
         const sessionId = ref(null);
@@ -167,6 +232,7 @@
         const userInput = ref('');
         const sending = ref(false);
         const starting = ref(false);
+        const granolaClicked = ref(localStorage.getItem('granola_clicked') === '1');
         const isComplete = ref(false);
         const outputs = ref(null);
         const error = ref(null);
@@ -189,13 +255,24 @@
           }
         });
 
+        function openGranola() {
+          window.open(GRANOLA_URL, '_blank', 'noopener');
+          granolaClicked.value = true;
+          localStorage.setItem('granola_clicked', '1');
+        }
+
         async function startConversation() {
           starting.value = true;
           error.value = null;
 
           try {
+            // Carry the applicant's company id (from signup) so this chat links
+            // back to their application.
+            const companyId = parseInt(new URLSearchParams(location.search).get('companyId'));
             const response = await fetch('/api/onboarding-chat/start', {
               method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(Number.isInteger(companyId) ? { publicCompanyId: companyId } : {}),
             });
 
             if (!response.ok) {
@@ -307,6 +384,8 @@
           copiedOneLiner,
           scrollAnchor,
           inputField,
+          granolaClicked,
+          openGranola,
           startConversation,
           sendMessage,
           copyToClipboard,

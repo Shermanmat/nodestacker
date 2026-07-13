@@ -14,7 +14,6 @@ import relationshipsRoutes from './api/relationships.js';
 import digestRoutes from './api/digest.js';
 import authRoutes from './api/auth.js';
 import founderPortalRoutes from './api/founder-portal.js';
-import docsOnboardingRoutes from './api/docs-onboarding.js';
 import portalCrmRoutes from './api/portal-crm.js';
 import peopleCapturesRoutes from './api/people-captures.js';
 import adminPeopleRoutes from './api/admin-people.js';
@@ -75,9 +74,6 @@ app.use('/api/*', cors());
 app.route('/api/admin-auth', adminAuthRoutes);
 app.route('/api/auth', authRoutes);
 app.route('/api/portal', founderPortalRoutes);
-// Docs-first onboarding: already-incorporated companies upload formation docs
-// (AOC + bylaws + initial board consent), we extract variables, founder confirms.
-app.route('/api/portal/docs', docsOnboardingRoutes);
 // Founder-private CRM: investor pipeline + self-added records + interaction logs.
 // All routes scoped to the logged-in founder; no admin endpoint reads any of these.
 app.route('/api/portal/crm', portalCrmRoutes);

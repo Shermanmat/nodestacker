@@ -571,6 +571,33 @@ safeAddColumn('onboarding_workflows', 'extracted_at', 'text');
 safeAddColumn('onboarding_workflows', 'docs_confirmed_at', 'text');
 safeAddColumn('board_members', 'source', "text DEFAULT 'manual'");
 
+// Applicant AI-VC calls — public Tavus conversation tied to an application.
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`applicant_vc_calls\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`public_company_id\` integer NOT NULL REFERENCES \`public_companies\`(\`id\`),
+  \`conversation_id\` text NOT NULL,
+  \`conversation_url\` text,
+  \`persona\` text,
+  \`status\` text NOT NULL DEFAULT 'started',
+  \`transcript\` text,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  \`completed_at\` text
+)`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_applicant_vc_calls_company\` ON \`applicant_vc_calls\` (\`public_company_id\`)`);
+sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`applicant_vc_calls_conversation_id_unique\` ON \`applicant_vc_calls\` (\`conversation_id\`)`);
+console.log('  Ensured applicant_vc_calls table exists');
+
+// Applicant-submitted real investor-call transcripts (pasted from Granola).
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`applicant_transcripts\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`public_company_id\` integer NOT NULL REFERENCES \`public_companies\`(\`id\`),
+  \`title\` text,
+  \`transcript\` text NOT NULL,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_applicant_transcripts_company\` ON \`applicant_transcripts\` (\`public_company_id\`)`);
+console.log('  Ensured applicant_transcripts table exists');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

@@ -41,33 +41,10 @@
   <div id="app" v-cloak class="pt-28 pb-20">
     <div class="mx-auto max-w-xl px-6">
 
-      <!-- Success -->
-      <div v-if="success" class="text-center py-16">
-        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 mb-6">
-          <svg class="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-          </svg>
-        </div>
-        <h2 class="text-2xl font-bold text-slate-900 mb-3">Application received</h2>
-        <p class="text-slate-500 mb-8">We review every application personally. You'll hear from us soon.</p>
-
-        <!-- Next step: coaching from call one — download Granola, then talk to
-             our AI VC. The chat gives us your pitch to review alongside your
-             application, and ends with a sharp investor blurb they can use. -->
-        <div class="mx-auto max-w-md rounded-xl border border-slate-200 bg-slate-50 p-6 mb-8 text-left">
-          <p class="text-xs font-semibold uppercase tracking-wide text-blue-600 mb-2">While we review — next step</p>
-          <h3 class="text-lg font-bold text-slate-900 mb-1.5">Talk to our AI VC 🎙️</h3>
-          <p class="text-sm text-slate-500 mb-4">We coach founders on every investor call — starting now. Set up Granola so we can hear your calls, then have a quick conversation with our AI VC. You'll walk away with a sharp, investor-ready blurb.</p>
-          <a :href="onboardingUrl" class="inline-block rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Start with our AI VC →</a>
-        </div>
-
-        <a href="/" class="text-sm font-medium text-slate-400 hover:text-slate-600">Skip for now — back to homepage</a>
-      </div>
-
-      <!-- Application Form -->
-      <div v-else>
+      <!-- Application Form → straight into the AI-VC conversation on submit -->
+      <div>
         <h1 class="text-3xl font-bold tracking-tight mb-2">Apply as a Founder</h1>
-        <p class="text-slate-500 mb-10">Tell us about yourself and your company. We review every application.</p>
+        <p class="text-slate-500 mb-10">Tell us about yourself and your company. Next you'll have a live conversation with our AI VC — we review every application and send feedback either way.</p>
 
         <form @submit.prevent="handleSignup" class="space-y-5">
           <!-- About You Section -->
@@ -187,8 +164,6 @@
 
         const loading = ref(false);
         const error = ref(null);
-        const success = ref(false);
-        const onboardingUrl = ref('/onboarding');
 
         function normalizeLinkedin() {
           let url = form.linkedinUrl.trim();
@@ -221,14 +196,13 @@
             const data = await response.json();
             if (!response.ok) throw new Error(data.error || 'Application failed');
 
-            // Flow into the AI-VC coaching chat: carry the IDs so the chat (and
-            // the blurb it produces) links back to this application.
+            // Go straight into the AI-VC conversation; carry the IDs so the call
+            // links back to this application. No interstitial screen.
             const params = new URLSearchParams();
             if (data.user?.id) params.set('userId', data.user.id);
             if (data.company?.id) params.set('companyId', data.company.id);
-            onboardingUrl.value = '/onboarding?' + params.toString();
-
-            success.value = true;
+            params.set('applied', '1');
+            window.location.href = '/onboarding?' + params.toString();
           } catch (err) {
             error.value = err.message;
           } finally {
@@ -236,7 +210,7 @@
           }
         }
 
-        return { form, loading, error, success, onboardingUrl, handleSignup, normalizeLinkedin, normalizeCompanyUrl };
+        return { form, loading, error, handleSignup, normalizeLinkedin, normalizeCompanyUrl };
       }
     }).mount('#app');
   </script>

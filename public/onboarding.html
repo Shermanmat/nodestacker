@@ -7,253 +7,221 @@
   <title>MatCap — Talk to our AI VC</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/@daily-co/daily-js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <style>
-    [v-cloak] { display: none; }
-    .display { font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif; letter-spacing: -0.02em; }
-    .brand-accent { color: #0A8AA0; }
-    .step-num {
-      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-      width: 28px; height: 28px; border-radius: 8px;
-      display: grid; place-items: center; font-size: 14px; flex: none;
-    }
-    .chat-message {
-      animation: fadeIn 0.3s ease-out;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .typing-indicator {
-      display: flex;
-      gap: 4px;
-      padding: 12px 16px;
-    }
-    .typing-indicator span {
-      width: 8px;
-      height: 8px;
-      background: #94a3b8;
-      border-radius: 50%;
-      animation: bounce 1.4s infinite ease-in-out both;
-    }
-    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
-    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
-    @keyframes bounce {
-      0%, 80%, 100% { transform: scale(0); }
-      40% { transform: scale(1); }
-    }
+    [v-cloak]{ display:none; }
+    .display{ font-family:'Space Grotesk',ui-sans-serif,system-ui,sans-serif; letter-spacing:-0.02em; }
+
+    /* ---- Bold dark hero (MatCap "Momentum" look) ---- */
+    .hero-dark{ background:#0A0A0F; color:#fff; position:relative; overflow:hidden; min-height:100vh; padding:44px 20px 72px; }
+    .hero-dark::before{ content:''; position:absolute; inset:0; z-index:0;
+      background:radial-gradient(52% 42% at 20% 10%, rgba(0,194,224,0.28), transparent 60%),
+                 radial-gradient(52% 52% at 86% 94%, rgba(255,90,52,0.20), transparent 58%); }
+    .hero-dark::after{ content:''; position:absolute; inset:0; z-index:0; opacity:.5;
+      background-image:linear-gradient(rgba(255,255,255,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.045) 1px,transparent 1px);
+      background-size:44px 44px;
+      -webkit-mask-image:radial-gradient(72% 55% at 50% 28%,#000,transparent 78%);
+              mask-image:radial-gradient(72% 55% at 50% 28%,#000,transparent 78%); }
+    .hero-inner{ position:relative; z-index:1; max-width:580px; margin:0 auto; }
+    .hero-brand{ font-weight:700; font-size:20px; letter-spacing:-0.02em; }
+    .hero-eyebrow{ font-family:'Space Grotesk',sans-serif; text-transform:uppercase; letter-spacing:3px;
+      font-size:12px; font-weight:600; color:#22C9E6; margin-top:40px; }
+    .hero-h1{ font-family:'Space Grotesk',sans-serif; font-weight:700; letter-spacing:-0.03em;
+      line-height:1.04; font-size:clamp(30px,7vw,48px); margin-top:14px; text-wrap:balance; }
+    .hero-grad{ background:linear-gradient(96deg,#22C9E6 0%,#5FD0E6 42%,#FF7A54 112%);
+      -webkit-background-clip:text; background-clip:text; color:transparent; }
+    .hero-sub{ color:rgba(255,255,255,.7); font-size:16px; line-height:1.6; margin-top:18px; }
+
+    .hero-steps{ margin-top:30px; display:flex; flex-direction:column; gap:12px; }
+    .hstep{ display:flex; gap:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.09);
+      border-radius:14px; padding:16px 18px; }
+    .hstep-num{ flex:none; width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
+      font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px;
+      background:rgba(0,194,224,.14); color:#22C9E6; }
+    .hstep-num.done{ background:rgba(62,207,154,.16); color:#3ECF9A; }
+    .hstep-body h3{ font-family:'Space Grotesk',sans-serif; font-size:16px; font-weight:600; color:#fff; }
+    .hstep-body p{ font-size:14px; color:rgba(255,255,255,.62); margin-top:4px; line-height:1.5; }
+    .btn-granola{ margin-top:12px; display:inline-flex; align-items:center; gap:8px; background:#fff; color:#0A0A0F;
+      font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:14px; padding:10px 18px; border-radius:9px;
+      cursor:pointer; transition:transform .15s ease; }
+    .btn-granola:hover{ transform:translateY(-1px); }
+    .hstep-ok{ color:#3ECF9A; margin-top:10px; font-size:13px; }
+
+    .hero-cta{ margin-top:26px; width:100%; font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;
+      padding:15px 24px; border-radius:12px; cursor:pointer; border:0;
+      background:linear-gradient(96deg,#00C2E0 0%,#5FD0E6 34%,#FF5A34 100%); color:#0A0A0F;
+      box-shadow:0 10px 34px rgba(255,90,52,.24); transition:transform .15s ease, box-shadow .2s ease; }
+    .hero-cta:hover:not(:disabled){ transform:translateY(-2px); box-shadow:0 14px 44px rgba(0,194,224,.30); }
+    .hero-cta:disabled{ opacity:.6; cursor:default; }
+    .hero-note{ text-align:center; color:rgba(255,255,255,.62); font-size:13px; margin-top:12px; }
+    .hero-foot{ text-align:center; color:rgba(255,255,255,.4); font-size:13px; margin-top:16px; }
+    .hero-foot a{ color:rgba(255,255,255,.7); text-decoration:underline; }
+
+    /* ---- Call stage ---- */
+    .stage{ min-height:100vh; background:#0A0A0F; color:#fff; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .callwrap{ width:100%; max-width:1024px; }
+    .callbox{ width:100%; aspect-ratio:16/9; background:#000; border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.1); }
+    .spinner{ width:44px; height:44px; border-radius:50%; border:3px solid rgba(255,255,255,.15); border-top-color:#22C9E6; animation:spin 1s linear infinite; margin:0 auto; }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+    @media (prefers-reduced-motion:reduce){ .spinner{ animation:none; } .hero-cta,.btn-granola{ transition:none; } }
   </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-black">
   <div id="app" v-cloak>
-    <!-- Header -->
-    <header class="bg-white shadow-sm border-b sticky top-0 z-10">
-      <div class="max-w-2xl mx-auto px-4 py-4">
-        <h1 class="text-xl font-bold text-gray-900 display">MatCap</h1>
-        <p class="text-sm text-gray-500">{{ sessionId ? 'Talking with our AI VC' : 'Founder application' }}</p>
+
+    <!-- ============ INTRO (bold hero) ============ -->
+    <section v-if="phase === 'intro'" class="hero-dark">
+      <div class="hero-inner">
+        <div class="hero-brand display"><span style="color:#22C9E6">◆</span> MatCap</div>
+
+        <div v-if="applied" style="margin-top:22px;display:inline-flex;align-items:center;gap:8px;background:rgba(62,207,154,.12);border:1px solid rgba(62,207,154,.3);color:#3ECF9A;font-size:13px;font-weight:600;padding:7px 14px;border-radius:999px;">
+          ✓ Application received — one more step
+        </div>
+
+        <p class="hero-eyebrow">Unlike other accelerators</p>
+        <h1 class="hero-h1 display">
+          We interview <span class="hero-grad">every founder</span> — and give feedback on <span class="hero-grad">every application</span>.
+        </h1>
+        <p class="hero-sub">
+          Most funds ghost you with a form rejection. We don't. Whether or not we end up working together,
+          you'll get an honest read on your pitch and your raise — from a real conversation, not a checkbox.
+        </p>
+
+        <div class="hero-steps">
+          <!-- 1 · Granola -->
+          <div class="hstep">
+            <div class="hstep-num" :class="granolaClicked ? 'done' : ''"><span v-if="granolaClicked">✓</span><span v-else>1</span></div>
+            <div class="hstep-body">
+              <h3>Connect Granola</h3>
+              <p>So we can hear the transcript of your investor calls and coach you on them. Founders get their <span style="color:rgba(255,255,255,.85)">first month free</span> through our link.</p>
+              <button @click="openGranola" class="btn-granola">Download Granola <span aria-hidden="true">↗</span></button>
+              <p v-if="granolaClicked" class="hstep-ok">Opened in a new tab — install it, then come back.</p>
+            </div>
+          </div>
+          <!-- 2 · AI VC video -->
+          <div class="hstep">
+            <div class="hstep-num">2</div>
+            <div class="hstep-body">
+              <h3>Talk to our fine-tuned AI VC</h3>
+              <p>A live video conversation about you and your raise — trained on how sharp pre-seed investors actually think.</p>
+            </div>
+          </div>
+          <!-- 3 · Feedback -->
+          <div class="hstep">
+            <div class="hstep-num">3</div>
+            <div class="hstep-body">
+              <h3>Get your feedback</h3>
+              <p>We review the conversation and send you honest notes on your pitch — either way.</p>
+            </div>
+          </div>
+        </div>
+
+        <template v-if="companyId">
+          <button @click="startCall" :disabled="starting" class="hero-cta">
+            {{ starting ? 'Connecting…' : 'Start the conversation' }}
+          </button>
+          <p class="hero-note">Grab a quiet room — this is a real video call with camera + mic.</p>
+        </template>
+        <template v-else>
+          <a href="/signup" class="hero-cta" style="display:block;text-align:center;text-decoration:none;">Apply first →</a>
+          <p class="hero-note">The AI VC conversation is the next step right after you apply.</p>
+        </template>
+
+        <p v-if="error" class="hero-note" style="color:#F0705E">{{ error }}</p>
+        <p class="hero-foot">Part of your application — but you'll get feedback either way.</p>
       </div>
-    </header>
+    </section>
 
-    <!-- Main Chat Container -->
-    <main class="max-w-2xl mx-auto pb-32">
-      <!-- Intro Section: coaching pitch → Granola → start the AI VC chat -->
-      <div v-if="!sessionId" class="px-4 py-10 sm:py-12">
-        <div class="max-w-lg mx-auto">
-          <!-- Coaching pitch -->
-          <div class="text-center mb-8">
-            <p class="text-xs font-semibold uppercase tracking-widest brand-accent mb-3">Coaching from your very first call</p>
-            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 display mb-3">We coach our founders on every&nbsp;investor call.</h2>
-            <p class="text-gray-600 leading-relaxed">
-              Whether or not we end up working together, MatCap gives founders honest feedback on every investor conversation —
-              what landed, what to tighten, and what to do next. We'd love to start doing that for you right now.
-            </p>
-          </div>
+    <!-- ============ IN CALL ============ -->
+    <section v-else-if="phase === 'in_call'" class="stage">
+      <div class="callwrap">
+        <div ref="callBox" class="callbox"></div>
+        <p class="hero-note" style="margin-top:16px">When you're done, click <b>Leave</b> in the call — we'll take it from there.</p>
+      </div>
+    </section>
 
-          <!-- Step 1: Granola -->
-          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
-            <div class="flex gap-4">
-              <div class="step-num" :class="granolaClicked ? 'bg-emerald-100 text-emerald-700' : 'bg-cyan-50 brand-accent'">
-                <span v-if="granolaClicked">✓</span><span v-else>1</span>
-              </div>
-              <div class="flex-1">
-                <h3 class="font-semibold text-gray-900 display">Get Granola, so we can hear your calls</h3>
-                <p class="text-sm text-gray-600 mt-1 mb-4">
-                  Granola quietly records and transcribes your investor calls so we can give you specific feedback.
-                  Founders get their <span class="font-medium text-gray-800">first month free</span> through our link.
-                </p>
-                <button @click="openGranola"
-                  class="inline-flex items-center gap-2 bg-gray-900 text-white text-sm font-medium py-2.5 px-5 rounded-lg hover:bg-gray-800 transition-colors">
-                  Download Granola
-                  <span aria-hidden="true">↗</span>
-                </button>
-                <p v-if="granolaClicked" class="text-sm text-emerald-700 mt-3">
-                  Opened in a new tab — install it, then come back and start the conversation.
-                </p>
-              </div>
-            </div>
-          </div>
+    <!-- ============ WRAPPING UP ============ -->
+    <section v-else-if="phase === 'analyzing'" class="stage">
+      <div class="text-center max-w-md">
+        <div class="spinner mb-6"></div>
+        <h2 class="text-2xl font-bold display mb-2">Wrapping up your conversation…</h2>
+        <p style="color:rgba(255,255,255,.6)">Saving the transcript so the team can review it. This takes a few seconds.</p>
+      </div>
+    </section>
 
-          <!-- Step 2: AI VC chat -->
-          <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-6">
-            <div class="flex gap-4">
-              <div class="step-num bg-cyan-50 brand-accent">2</div>
-              <div class="flex-1">
-                <h3 class="font-semibold text-gray-900 display">Talk to our AI VC</h3>
-                <p class="text-sm text-gray-600 mt-1 mb-4">
-                  A short conversation to get to know you and your raise. You'll walk away with a sharp investor
-                  blurb you can use today.
-                </p>
-                <button @click="startConversation" :disabled="starting"
-                  class="w-full sm:w-auto py-2.5 px-6 rounded-lg font-medium transition-colors disabled:opacity-50"
-                  :class="granolaClicked
-                    ? 'bg-cyan-600 text-white hover:bg-cyan-700'
-                    : 'bg-white text-cyan-700 border border-cyan-600 hover:bg-cyan-50'">
-                  {{ starting ? 'Starting…' : 'Start the conversation' }}
-                </button>
-                <p v-if="!granolaClicked" class="text-xs text-gray-400 mt-3">
-                  Already use Granola? You can start right away.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <p class="text-center text-sm text-gray-500">
-            This is part of your application — but you'll get feedback either way.
+    <!-- ============ DONE ============ -->
+    <section v-else class="stage">
+      <div class="w-full max-w-lg">
+        <div class="text-center">
+          <div class="text-5xl mb-4">🎉</div>
+          <h2 class="text-2xl font-bold display mb-3">That's it — nice work.</h2>
+          <p style="color:rgba(255,255,255,.7);line-height:1.6" class="mb-8">
+            We've got your conversation with the AI VC. The team will review it and send honest
+            feedback on your pitch — whether or not we end up working together.
           </p>
         </div>
-      </div>
 
-      <!-- Chat Messages -->
-      <div v-else class="px-4 py-6 space-y-4">
-        <div v-for="(msg, index) in messages" :key="index"
-          class="chat-message"
-          :class="msg.role === 'assistant' ? 'flex justify-start' : 'flex justify-end'">
-          <div :class="msg.role === 'assistant'
-            ? 'bg-white shadow rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%]'
-            : 'bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-3 max-w-[85%]'">
-            <p class="whitespace-pre-wrap">{{ msg.content }}</p>
-          </div>
-        </div>
-
-        <!-- Typing Indicator -->
-        <div v-if="sending" class="flex justify-start">
-          <div class="bg-white shadow rounded-2xl rounded-tl-sm typing-indicator">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
-        </div>
-
-        <!-- Completion Card -->
-        <div v-if="isComplete && outputs" class="bg-white shadow-lg rounded-2xl p-6 space-y-6">
-          <div class="text-center">
-            <div class="text-4xl mb-2">🎉</div>
-            <h3 class="text-xl font-bold text-gray-900">Your Investor Blurb</h3>
-            <p class="text-sm text-gray-500 mt-1">Copy and use this when reaching out to investors</p>
-          </div>
-
-          <!-- Blurb -->
-          <div class="bg-gray-50 rounded-lg p-4">
-            <div class="flex justify-between items-start mb-2">
-              <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">Blurb</span>
-              <button @click="copyToClipboard(outputs.investorBlurb, 'blurb')"
-                class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
-                <span v-if="copiedBlurb">✓ Copied!</span>
-                <span v-else>Copy</span>
-              </button>
-            </div>
-            <p class="text-gray-800 leading-relaxed">{{ outputs.investorBlurb }}</p>
-          </div>
-
-          <!-- One-Liner -->
-          <div class="bg-gray-50 rounded-lg p-4">
-            <div class="flex justify-between items-start mb-2">
-              <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">One-Liner</span>
-              <button @click="copyToClipboard(outputs.oneLiner, 'oneliner')"
-                class="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center gap-1">
-                <span v-if="copiedOneLiner">✓ Copied!</span>
-                <span v-else>Copy</span>
-              </button>
-            </div>
-            <p class="text-gray-800 font-medium">{{ outputs.oneLiner }}</p>
-          </div>
-
-          <div class="text-center pt-4 border-t">
-            <p class="text-sm text-gray-500 mb-2">We've also sent this to your email for easy reference.</p>
-            <p class="text-sm text-gray-600">
-              Questions? Reach out to <a href="mailto:mat@matsherman.com" class="text-blue-600 hover:underline">mat@matsherman.com</a>
-            </p>
-          </div>
-        </div>
-
-        <!-- Scroll anchor -->
-        <div ref="scrollAnchor"></div>
-      </div>
-    </main>
-
-    <!-- Input Area -->
-    <div v-if="sessionId && !isComplete" class="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg">
-      <div class="max-w-2xl mx-auto px-4 py-4">
-        <form @submit.prevent="sendMessage" class="flex gap-3">
-          <input v-model="userInput" type="text"
-            :disabled="sending"
-            placeholder="Type your message..."
-            class="flex-1 border rounded-full px-5 py-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
-            ref="inputField">
-          <button type="submit" :disabled="sending || !userInput.trim()"
-            class="bg-blue-600 text-white px-6 py-3 rounded-full font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-            Send
+        <!-- Close the Granola loop: paste a real investor-call transcript -->
+        <div v-if="!transcriptSent" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:16px;padding:20px;text-align:left;">
+          <h3 class="display" style="font-size:17px;font-weight:600;color:#fff;">Got a real investor call recorded?</h3>
+          <p style="color:rgba(255,255,255,.62);font-size:14px;margin-top:6px;line-height:1.5;">
+            Paste the transcript from Granola (or any call) and we'll coach you on it — what landed, what to tighten, what to do next.
+          </p>
+          <input v-model="transcriptTitle" type="text" placeholder="Which call? (optional) — e.g. 'Solly @ Formation'"
+            style="width:100%;margin-top:14px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:10px 12px;color:#fff;font-size:14px;outline:none;" />
+          <textarea v-model="transcriptText" rows="7" placeholder="Paste the transcript here…"
+            style="width:100%;margin-top:10px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:10px 12px;color:#fff;font-size:14px;font-family:ui-monospace,monospace;outline:none;resize:vertical;"></textarea>
+          <button @click="submitTranscript" :disabled="transcriptSubmitting || transcriptText.trim().length < 40" class="hero-cta" style="margin-top:12px;">
+            {{ transcriptSubmitting ? 'Sending…' : 'Send it for coaching' }}
           </button>
-        </form>
-      </div>
-    </div>
+          <p v-if="transcriptError" style="color:#F0705E;font-size:13px;margin-top:10px;">{{ transcriptError }}</p>
+        </div>
+        <div v-else style="background:rgba(62,207,154,.1);border:1px solid rgba(62,207,154,.32);border-radius:16px;padding:22px;text-align:center;">
+          <p class="display" style="color:#3ECF9A;font-weight:600;font-size:16px;">✓ Transcript sent</p>
+          <p style="color:rgba(255,255,255,.62);font-size:14px;margin-top:6px;">We'll review it and get you feedback. Send more anytime.</p>
+          <button @click="resetTranscript" style="color:#22C9E6;font-size:13px;text-decoration:underline;margin-top:12px;">Paste another</button>
+        </div>
 
-    <!-- Error Toast -->
-    <div v-if="error" class="fixed bottom-20 left-4 right-4 max-w-md mx-auto">
-      <div class="bg-red-100 text-red-700 px-4 py-3 rounded-lg shadow-lg flex justify-between items-center">
-        <span>{{ error }}</span>
-        <button @click="error = null" class="text-red-700 hover:text-red-900">✕</button>
+        <div class="text-center" style="margin-top:22px;">
+          <a href="/" class="text-sm font-medium" style="color:#22C9E6;text-decoration:underline">Back to matcap.vc</a>
+        </div>
       </div>
-    </div>
+    </section>
+
   </div>
 
   <script>
-    const { createApp, ref, nextTick, watch } = Vue;
+    const { createApp, ref, nextTick } = Vue;
 
     // MatCap → Granola partner link (founders get first month free).
     const GRANOLA_URL = 'https://www.granola.ai?via=mat-sherman';
 
     createApp({
       setup() {
-        const sessionId = ref(null);
-        const messages = ref([]);
-        const userInput = ref('');
-        const sending = ref(false);
+        const phase = ref('intro');           // intro | in_call | analyzing | done
         const starting = ref(false);
-        const granolaClicked = ref(localStorage.getItem('granola_clicked') === '1');
-        const isComplete = ref(false);
-        const outputs = ref(null);
         const error = ref(null);
-        const copiedBlurb = ref(false);
-        const copiedOneLiner = ref(false);
-        const scrollAnchor = ref(null);
-        const inputField = ref(null);
+        const granolaClicked = ref(localStorage.getItem('granola_clicked') === '1');
+        const callBox = ref(null);
 
-        // Auto-scroll to bottom when messages change
-        watch(messages, async () => {
-          await nextTick();
-          scrollAnchor.value?.scrollIntoView({ behavior: 'smooth' });
-        }, { deep: true });
+        // Transcript upload (closes the Granola loop on the done screen).
+        const transcriptText = ref('');
+        const transcriptTitle = ref('');
+        const transcriptSubmitting = ref(false);
+        const transcriptSent = ref(false);
+        const transcriptError = ref(null);
 
-        // Focus input after sending
-        watch(sending, async (newVal) => {
-          if (!newVal) {
-            await nextTick();
-            inputField.value?.focus();
-          }
-        });
+        // The application this conversation belongs to (from the signup redirect).
+        const params = new URLSearchParams(location.search);
+        const companyIdRaw = parseInt(params.get('companyId'));
+        const companyId = ref(Number.isInteger(companyIdRaw) ? companyIdRaw : null);
+        const applied = ref(params.get('applied') === '1');
+
+        let frame = null;
+        let conversationId = null;
 
         function openGranola() {
           window.open(GRANOLA_URL, '_blank', 'noopener');
@@ -261,134 +229,105 @@
           localStorage.setItem('granola_clicked', '1');
         }
 
-        async function startConversation() {
+        async function startCall() {
+          if (!companyId.value || starting.value) return;
           starting.value = true;
           error.value = null;
 
           try {
-            // Carry the applicant's company id (from signup) so this chat links
-            // back to their application.
-            const companyId = parseInt(new URLSearchParams(location.search).get('companyId'));
-            const response = await fetch('/api/onboarding-chat/start', {
+            const res = await fetch('/api/public/vc/start', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(Number.isInteger(companyId) ? { publicCompanyId: companyId } : {}),
+              body: JSON.stringify({ publicCompanyId: companyId.value }),
             });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Could not start the call');
 
-            if (!response.ok) {
-              const data = await response.json();
-              throw new Error(data.error || 'Failed to start conversation');
-            }
+            // They already finished a call earlier — jump to the done screen.
+            if (data.alreadyCompleted) { phase.value = 'done'; return; }
 
-            const data = await response.json();
-            sessionId.value = data.sessionId;
-            messages.value = [{ role: 'assistant', content: data.message }];
-
-            // Store session ID in localStorage
-            localStorage.setItem('onboarding_session', data.sessionId);
-
+            conversationId = data.conversationId;
+            phase.value = 'in_call';
             await nextTick();
-            inputField.value?.focus();
+
+            frame = window.DailyIframe.createFrame(callBox.value, {
+              iframeStyle: { width: '100%', height: '100%', border: '0' },
+              showLeaveButton: true,
+            });
+            frame.on('left-meeting', onLeftCall);
+            await frame.join({ url: data.conversationUrl });
           } catch (err) {
             error.value = err.message;
+            phase.value = 'intro';
           } finally {
             starting.value = false;
           }
         }
 
-        async function sendMessage() {
-          if (!userInput.value.trim() || sending.value) return;
+        async function onLeftCall() {
+          try { if (frame) { frame.destroy(); frame = null; } } catch (_) {}
+          phase.value = 'analyzing';
+          pollComplete(0);
+        }
 
-          const message = userInput.value.trim();
-          userInput.value = '';
-          messages.value.push({ role: 'user', content: message });
-          sending.value = true;
-          error.value = null;
-
+        // Tavus needs a moment to prepare the transcript after the call ends.
+        // Poll /complete until it's stored (up to ~60s), then show the done state.
+        async function pollComplete(attempt) {
+          if (!conversationId) { phase.value = 'done'; return; }
           try {
-            const response = await fetch(`/api/onboarding-chat/${sessionId.value}/message`, {
+            const res = await fetch('/api/public/vc/complete', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ message }),
+              body: JSON.stringify({ conversationId }),
             });
+            if (res.status === 200) { phase.value = 'done'; return; }
+            // 202 (processing) or a transient error — retry a bounded number of times.
+          } catch (_) { /* network blip — retry */ }
 
-            if (!response.ok) {
-              const data = await response.json();
-              throw new Error(data.error || 'Failed to send message');
-            }
+          if (attempt < 15) {
+            setTimeout(() => pollComplete(attempt + 1), 4000);
+          } else {
+            // Give up waiting on the transcript; the call happened either way.
+            phase.value = 'done';
+          }
+        }
 
-            const data = await response.json();
-            messages.value.push({ role: 'assistant', content: data.message });
-
-            if (data.isComplete && data.outputs) {
-              isComplete.value = true;
-              outputs.value = data.outputs;
-            }
+        async function submitTranscript() {
+          if (transcriptSubmitting.value || transcriptText.value.trim().length < 40) return;
+          if (!companyId.value) { transcriptError.value = 'Missing your application — re-open this from your signup link.'; return; }
+          transcriptSubmitting.value = true;
+          transcriptError.value = null;
+          try {
+            const res = await fetch('/api/public/vc/transcript', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                publicCompanyId: companyId.value,
+                transcript: transcriptText.value.trim(),
+                title: transcriptTitle.value.trim() || undefined,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Could not send the transcript');
+            transcriptSent.value = true;
           } catch (err) {
-            error.value = err.message;
+            transcriptError.value = err.message;
           } finally {
-            sending.value = false;
+            transcriptSubmitting.value = false;
           }
         }
 
-        function copyToClipboard(text, type) {
-          navigator.clipboard.writeText(text).then(() => {
-            if (type === 'blurb') {
-              copiedBlurb.value = true;
-              setTimeout(() => copiedBlurb.value = false, 2000);
-            } else {
-              copiedOneLiner.value = true;
-              setTimeout(() => copiedOneLiner.value = false, 2000);
-            }
-          });
+        function resetTranscript() {
+          transcriptSent.value = false;
+          transcriptText.value = '';
+          transcriptTitle.value = '';
         }
-
-        // Check for existing session on load
-        async function checkExistingSession() {
-          const savedSession = localStorage.getItem('onboarding_session');
-          if (savedSession) {
-            try {
-              const response = await fetch(`/api/onboarding-chat/${savedSession}`);
-              if (response.ok) {
-                const data = await response.json();
-                if (data.status !== 'completed') {
-                  sessionId.value = parseInt(savedSession);
-                  messages.value = data.conversationHistory || [];
-                  isComplete.value = false;
-                } else if (data.outputs) {
-                  sessionId.value = parseInt(savedSession);
-                  messages.value = data.conversationHistory || [];
-                  isComplete.value = true;
-                  outputs.value = data.outputs;
-                }
-              }
-            } catch (err) {
-              console.error('Failed to restore session:', err);
-              localStorage.removeItem('onboarding_session');
-            }
-          }
-        }
-
-        checkExistingSession();
 
         return {
-          sessionId,
-          messages,
-          userInput,
-          sending,
-          starting,
-          isComplete,
-          outputs,
-          error,
-          copiedBlurb,
-          copiedOneLiner,
-          scrollAnchor,
-          inputField,
-          granolaClicked,
-          openGranola,
-          startConversation,
-          sendMessage,
-          copyToClipboard,
+          phase, starting, error, granolaClicked, callBox, companyId, applied,
+          openGranola, startCall,
+          transcriptText, transcriptTitle, transcriptSubmitting, transcriptSent, transcriptError,
+          submitTranscript, resetTranscript,
         };
       }
     }).mount('#app');

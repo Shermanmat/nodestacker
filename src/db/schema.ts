@@ -1049,6 +1049,39 @@ export const publicSessions = sqliteTable('public_sessions', {
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
 
+// Applicant AI-VC calls — a founder who just applied has a live Tavus video
+// conversation with our AI VC as part of their application. No login required;
+// scoped to the public_company they applied as. The transcript is stored so we
+// can send feedback afterward.
+export const applicantVcCalls = sqliteTable('applicant_vc_calls', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  publicCompanyId: integer('public_company_id').notNull().references(() => publicCompanies.id),
+  conversationId: text('conversation_id').notNull(),
+  conversationUrl: text('conversation_url'),
+  persona: text('persona'),
+  status: text('status').notNull().default('started'), // started | completed
+  transcript: text('transcript'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+  completedAt: text('completed_at'),
+});
+
+export type ApplicantVcCall = typeof applicantVcCalls.$inferSelect;
+export type NewApplicantVcCall = typeof applicantVcCalls.$inferInsert;
+
+// Applicant-submitted real investor-call transcripts (pasted from Granola after
+// the AI-VC call) — closes the loop: we coach them on their actual calls. No
+// login; scoped to the application they submitted.
+export const applicantTranscripts = sqliteTable('applicant_transcripts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  publicCompanyId: integer('public_company_id').notNull().references(() => publicCompanies.id),
+  title: text('title'),
+  transcript: text('transcript').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type ApplicantTranscript = typeof applicantTranscripts.$inferSelect;
+export type NewApplicantTranscript = typeof applicantTranscripts.$inferInsert;
+
 // Public Network Relations
 
 export const publicUsersRelations = relations(publicUsers, ({ many }) => ({

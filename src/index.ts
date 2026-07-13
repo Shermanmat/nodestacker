@@ -32,6 +32,7 @@ import commsApproveRoutes from './api/comms-approve.js';
 import investorCandidatesRoutes from './api/investor-candidates.js';
 import weeklyDigestRoutes from './api/weekly-digest.js';
 import publicAuthRoutes from './api/public-auth.js';
+import publicVcRoutes from './api/public-vc.js';
 import publicProfileRoutes from './api/public-profile.js';
 import publicCompaniesRoutes from './api/public-companies.js';
 import publicIntrosRoutes from './api/public-intros.js';
@@ -91,6 +92,7 @@ app.route('/api/people-captures', peopleCapturesRoutes);
 app.route('/api/admin/people', adminPeopleRoutes);
 // Public network signup/login (separate from founder auth)
 app.route('/api/public', publicAuthRoutes);
+app.route('/api/public/vc', publicVcRoutes);
 app.route('/api/public', publicProfileRoutes);
 app.route('/api/public/companies', publicCompaniesRoutes);
 app.route('/api/public/intros', publicIntrosRoutes);

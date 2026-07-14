@@ -703,9 +703,6 @@
                   <div v-if="onboarding.nextAction.type === 'confirm_entity_info'" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <p class="text-sm text-blue-900 font-medium">We pulled these from your formation documents.</p>
                     <p class="text-sm text-blue-800 mt-1">Give them a quick check, fix anything that looks off, and add your EIN (it's not in your formation docs).</p>
-                    <ul v-if="onboarding.extractionWarnings && onboarding.extractionWarnings.length" class="mt-3 text-sm text-amber-700 list-disc list-inside space-y-1">
-                      <li v-for="(w, i) in onboarding.extractionWarnings" :key="i">{{ w }}</li>
-                    </ul>
                   </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>

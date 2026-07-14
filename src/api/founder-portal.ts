@@ -911,11 +911,6 @@ app.get('/onboarding/status', async (c) => {
     },
     shareDetails,
     nextAction,
-    // Warnings surfaced from the formation-doc extraction (name/share mismatches,
-    // unsigned board consent, missing fields) — shown on the confirm step.
-    extractionWarnings: (() => {
-      try { return JSON.parse(workflow.extractionRaw || '{}').warnings || []; } catch { return []; }
-    })(),
     boardMembers: (workflow.boardMembers || []).map(m => ({
       id: m.id,
       name: m.name,
@@ -1299,7 +1294,32 @@ app.post('/onboarding/upload-formation-docs', async (c) => {
     warnings: extracted.warnings || [],
   });
 
-  return c.json({ success: true, extracted, warnings: extracted.warnings || [] });
+  // Route the extraction QA flags to the admin (not the founder) for review.
+  try {
+    const bm = (extracted.boardMembers || [])
+      .map((m) => `  - ${m.name}${m.email ? ` <${m.email}>` : ''}${m.title ? ` (${m.title})` : ''}`)
+      .join('\n') || '  (none found)';
+    const warns = (extracted.warnings || []).map((w) => `  • ${w}`).join('\n') || '  (none)';
+    const summary =
+      `${founder.name} (${founder.companyName}) uploaded their formation documents. Extracted:\n\n` +
+      `Entity: ${extracted.entityName || '—'}\n` +
+      `Type / State: ${extracted.entityType || '—'} / ${extracted.entityState || '—'}\n` +
+      `Authorized shares: ${extracted.authorizedShares ?? '—'}  ·  Par: ${extracted.parValue || '—'}\n` +
+      `Incorporated: ${extracted.incorporationDate || '—'}\n\n` +
+      `Board members:\n${bm}\n\n` +
+      `Extraction flags to review:\n${warns}\n\n` +
+      `The founder is reviewing and confirming these now.`;
+    await sendEmail({
+      to: ADMIN_EMAIL,
+      subject: `📄 Formation docs extracted — ${founder.companyName}`,
+      text: summary,
+      html: `<pre style="font-family:ui-monospace,monospace;white-space:pre-wrap;font-size:13px">${summary.replace(/[<>&]/g, (ch) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[ch] as string))}</pre>`,
+    });
+  } catch (e) {
+    console.error('[onboarding] admin docs-extracted notify failed:', e);
+  }
+
+  return c.json({ success: true });
 });
 
 // Submit entity info

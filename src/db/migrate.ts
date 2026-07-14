@@ -570,6 +570,8 @@ safeAddColumn('onboarding_workflows', 'extraction_raw', 'text');
 safeAddColumn('onboarding_workflows', 'extracted_at', 'text');
 safeAddColumn('onboarding_workflows', 'docs_confirmed_at', 'text');
 safeAddColumn('board_members', 'source', "text DEFAULT 'manual'");
+// Drop-off reminder marker for the formation-docs upload step.
+safeAddColumn('onboarding_workflows', 'docs_reminder_sent_at', 'text');
 
 // Magic-link tokens — persisted so pending login links survive restarts/deploys.
 sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_magic_tokens\` (

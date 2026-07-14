@@ -1039,11 +1039,9 @@ app.post('/onboarding/incorporation-answer', async (c) => {
 
     await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_ANSWERED, founder.email, { incorporated: true });
 
-    await onboardingEmails.sendEntityInfoRequestEmail({
-      name: founder.name,
-      email: founder.email,
-      companyName: founder.companyName,
-    });
+    // No email here — the founder is in the portal right now. A drop-off
+    // reminder is sent by the docs-reminder sweep only if they haven't uploaded
+    // within 10 minutes.
 
     return c.json({ success: true, message: 'Great! Upload your Articles of Incorporation, bylaws, and initial board consent — we\'ll fill in your company details automatically.' });
   }
@@ -1164,7 +1162,7 @@ app.post('/onboarding/confirm-incorporation', async (c) => {
 
   await db.update(onboardingWorkflows)
     .set({
-      status: OnboardingStatus.ENTITY_INFO_PENDING,
+      status: OnboardingStatus.DOCS_PENDING,
       incorporated: true,
       updatedAt: now,
     })
@@ -1172,13 +1170,9 @@ app.post('/onboarding/confirm-incorporation', async (c) => {
 
   await logOnboardingEvent(workflow.id, OnboardingEventType.INCORPORATION_CONFIRMED, founder.email);
 
-  await onboardingEmails.sendEntityInfoRequestEmail({
-    name: founder.name,
-    email: founder.email,
-    companyName: founder.companyName,
-  });
+  // No email here — drop-off reminder is handled by the docs-reminder sweep.
 
-  return c.json({ success: true, message: 'Congratulations on incorporating! Please submit your company details.' });
+  return c.json({ success: true, message: 'Congratulations on incorporating! Upload your Articles of Incorporation, bylaws, and initial board consent and we\'ll fill in your company details automatically.' });
 });
 
 // Upload the three formation documents (Articles of Incorporation, bylaws,

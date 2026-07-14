@@ -5,6 +5,7 @@ import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { serveStatic } from '@hono/node-server/serve-static';
 import cron from 'node-cron';
+import { runDocsReminders } from './services/docs-reminder.js';
 
 import foundersRoutes from './api/founders.js';
 import nodesRoutes from './api/nodes.js';
@@ -1142,9 +1143,21 @@ cron.schedule('0 15 * * *', async () => {
   }
 }, { timezone: 'UTC' });
 
+// Formation-docs upload drop-off reminder — checks every 5 minutes, emails a
+// founder only if they've sat in docs_pending for >10 minutes without uploading.
+cron.schedule('*/5 * * * *', async () => {
+  try {
+    const { sent } = await runDocsReminders();
+    if (sent > 0) console.log(`[CRON] Formation-docs upload reminders sent: ${sent}`);
+  } catch (err) {
+    console.error('[CRON] Formation-docs upload reminder failed:', err);
+  }
+});
+
 console.log('[CRON] Trial decision nudge scheduled for daily 16:30 UTC (9:30am Arizona)');
 console.log('[CRON] Reply classifier scheduled hourly at :15');
 console.log('[CRON] Investor discovery scheduled daily at 15:00 UTC');
+console.log('[CRON] Formation-docs upload reminder scheduled (every 5 min; 10-min drop-off)');
 
 serve({
   fetch: app.fetch,

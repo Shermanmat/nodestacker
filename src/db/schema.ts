@@ -779,6 +779,9 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   incorporationDate: text('incorporation_date'),
   extractionRaw: text('extraction_raw'), // JSON: full Claude extraction result
   extractedAt: text('extracted_at'),
+  // Set when the "upload your formation docs" drop-off reminder has been sent
+  // (only fires if a founder sits in docs_pending >10 min without uploading).
+  docsReminderSentAt: text('docs_reminder_sent_at'),
   docsConfirmedAt: text('docs_confirmed_at'),
 
   // Incorporation check

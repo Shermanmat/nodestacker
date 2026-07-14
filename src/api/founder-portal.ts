@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
-import { eq, and, inArray, notInArray, desc, sql } from 'drizzle-orm';
-import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, commsChangeRequests, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
+import { eq, and, inArray, notInArray, desc, sql, isNull } from 'drizzle-orm';
+import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, commsChangeRequests, mcpTokens, founderInvestorRecords, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
 import { sendEmail } from '../services/email.js';
 import crypto from 'crypto';
@@ -54,6 +54,36 @@ app.get('/comms', async (c) => {
     deckServePath: founder.deckFile ? `/decks/${founder.deckFile}` : null,
     pending: pending.map((r) => ({ id: r.id, kind: r.kind, note: r.note, createdAt: r.createdAt })),
   });
+});
+
+// ── First-run setup checklist ──────────────────────────────────────────────
+// Computed (not stored) from the founder's actual data, so it can never drift
+// out of sync. Drives the "get set up" card on the portal's overview tab; the
+// card hides itself once every item is done.
+app.get('/checklist', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+
+  const [mcpTok, firstInvestor] = await Promise.all([
+    // An active (non-revoked) MCP token means they've connected an AI client.
+    db.query.mcpTokens.findFirst({
+      where: and(eq(mcpTokens.founderId, founderId), isNull(mcpTokens.revokedAt)),
+    }),
+    // At least one non-archived investor in their private CRM.
+    db.query.founderInvestorRecords.findFirst({
+      where: and(eq(founderInvestorRecords.founderId, founderId), isNull(founderInvestorRecords.archivedAt)),
+    }),
+  ]);
+
+  const items = [
+    { key: 'blurb', label: 'Write your investor blurb', hint: 'The one-paragraph intro we send on your behalf.', tab: 'comms', cta: 'Add blurb', done: !!founder.blurb?.trim() },
+    { key: 'deck', label: 'Upload your pitch deck', hint: 'Attached to your intros so investors can dig in.', tab: 'comms', cta: 'Upload deck', done: !!(founder.deckFile || founder.deckUrl) },
+    { key: 'connect', label: 'Connect your AI assistant', hint: 'Log calls and manage your pipeline from your AI client.', tab: 'connect', cta: 'Connect', done: !!mcpTok },
+    { key: 'investors', label: 'Add your first investors', hint: 'Track everyone you’re talking to in one place.', tab: 'pipeline', cta: 'Add investors', done: !!firstInvestor },
+  ];
+  const completed = items.filter((i) => i.done).length;
+  return c.json({ items, completed, total: items.length, complete: completed === items.length });
 });
 
 // ── Treadmill: the founder's weekly intro-request allowance + how to grow it ──

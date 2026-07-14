@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, lt } from 'drizzle-orm';
-import { db, founders, founderSessions } from '../db/index.js';
+import { db, founders, founderSessions, founderMagicTokens } from '../db/index.js';
 import { z } from 'zod';
 import crypto from 'crypto';
 import * as postmark from 'postmark';
@@ -12,21 +12,42 @@ const postmarkClient = process.env.POSTMARK_API_KEY
   ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
   : null;
 
-// Magic-link tokens are short-lived (15 min) and kept in memory. Founder
-// sessions, by contrast, are persisted in the DB (founder_sessions) so a login
-// survives server restarts and deploys — an in-memory session map logs every
-// founder out on every deploy.
-const tokens = new Map<string, { founderId: number; expires: Date }>();
+// Magic-link tokens AND sessions are both persisted in the DB so a pending login
+// link (founder_magic_tokens) and an active login (founder_sessions) survive a
+// server restart or deploy. An in-memory token map would invalidate every
+// outstanding magic link on every deploy.
+async function saveFounderToken(token: string, founderId: number, expires: Date): Promise<void> {
+  await db.insert(founderMagicTokens).values({
+    token,
+    founderId,
+    expiresAt: expires.toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+}
+
+// Single-use: returns the founderId if the token is valid, else null. The token
+// is always deleted (whether valid or expired), so a link can't be replayed.
+async function consumeFounderToken(token: string): Promise<{ founderId: number } | null> {
+  const row = await db.query.founderMagicTokens.findFirst({
+    where: eq(founderMagicTokens.token, token),
+  });
+  if (!row) return null;
+  await db.delete(founderMagicTokens).where(eq(founderMagicTokens.token, token));
+  if (new Date() > new Date(row.expiresAt)) return null;
+  return { founderId: row.founderId };
+}
 
 // How long a founder stays logged in (4 weeks).
 const SESSION_TTL_MS = 28 * 24 * 60 * 60 * 1000;
 
-// Sweep expired founder sessions hourly.
+// Sweep expired founder sessions + magic-link tokens hourly.
 setInterval(async () => {
+  const nowIso = new Date().toISOString();
   try {
-    await db.delete(founderSessions).where(lt(founderSessions.expiresAt, new Date().toISOString()));
+    await db.delete(founderSessions).where(lt(founderSessions.expiresAt, nowIso));
+    await db.delete(founderMagicTokens).where(lt(founderMagicTokens.expiresAt, nowIso));
   } catch (err) {
-    console.error('[auth] founder_sessions cleanup failed:', err);
+    console.error('[auth] founder session/token cleanup failed:', err);
   }
 }, 60 * 60 * 1000);
 
@@ -53,7 +74,7 @@ app.post('/magic-link', async (c) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  tokens.set(token, { founderId: founder.id, expires });
+  await saveFounderToken(token, founder.id, expires);
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
   const magicLink = `${baseUrl}/founder?token=${token}`;
@@ -104,15 +125,10 @@ app.post('/verify', async (c) => {
     return c.json({ error: 'Invalid token' }, 400);
   }
 
-  const tokenData = tokens.get(parsed.data.token);
+  const tokenData = await consumeFounderToken(parsed.data.token);
 
   if (!tokenData) {
     return c.json({ error: 'Invalid or expired token' }, 401);
-  }
-
-  if (new Date() > tokenData.expires) {
-    tokens.delete(parsed.data.token);
-    return c.json({ error: 'Token expired' }, 401);
   }
 
   // Create a persisted session (survives restarts/deploys), valid for 4 weeks.
@@ -124,7 +140,6 @@ app.post('/verify', async (c) => {
     expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
     createdAt: nowIso,
   });
-  tokens.delete(parsed.data.token);
 
   const founder = await db.query.founders.findFirst({
     where: eq(founders.id, tokenData.founderId),
@@ -206,7 +221,7 @@ app.post('/admin/generate-link/:founderId', async (c) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-  tokens.set(token, { founderId: founder.id, expires });
+  await saveFounderToken(token, founder.id, expires);
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
   const magicLink = `${baseUrl}/founder?token=${token}`;

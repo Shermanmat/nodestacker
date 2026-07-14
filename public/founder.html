@@ -90,6 +90,28 @@
           </div>
 
           <div class="space-y-5">
+            <!-- First-run setup checklist (hides itself once every item is done) -->
+            <div v-if="checklist && !checklist.complete" class="bg-white border rounded-lg p-6">
+              <div class="flex items-center justify-between mb-1">
+                <h3 class="text-base font-semibold text-gray-900">Finish setting up</h3>
+                <span class="text-xs text-gray-500">{{ checklist.completed }}/{{ checklist.total }} done</span>
+              </div>
+              <p class="text-sm text-gray-500 mb-4">A few quick steps so your intros land their best.</p>
+              <div class="h-2 bg-gray-200 rounded-full overflow-hidden mb-5">
+                <div class="h-full bg-blue-600 rounded-full transition-all" :style="{ width: Math.round(100*checklist.completed/checklist.total)+'%' }"></div>
+              </div>
+              <ul class="divide-y divide-gray-100">
+                <li v-for="item in checklist.items" :key="item.key" class="flex items-center gap-3 py-2.5">
+                  <span :class="['flex-none w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold', item.done ? 'bg-green-100 text-green-700' : 'border border-gray-300 text-transparent']">✓</span>
+                  <div class="flex-1 min-w-0">
+                    <div :class="['text-sm font-medium', item.done ? 'text-gray-400 line-through' : 'text-gray-900']">{{ item.label }}</div>
+                    <div v-if="!item.done" class="text-xs text-gray-500 mt-0.5">{{ item.hint }}</div>
+                  </div>
+                  <button v-if="!item.done" @click="activeTab = item.tab" class="flex-none text-sm font-medium text-blue-600 hover:text-blue-700">{{ item.cta }} →</button>
+                </li>
+              </ul>
+            </div>
+
             <!-- Momentum hero -->
             <button @click="activeTab = 'treadmill'"
                     class="w-full text-left bg-white border rounded-lg p-6 hover:border-blue-300 transition">
@@ -2091,7 +2113,14 @@
           loadCrm();
           loadTreadmill();   // momentum reading (incl. gym reps remaining) — powers the Overview
           loadComms();       // blurb/deck status for the Overview
+          loadChecklist();   // first-run setup checklist for the Overview
           loadOnboarding(true); // Set tab to onboarding if active
+        };
+
+        // First-run setup checklist (computed server-side from the founder's data).
+        const checklist = ref(null);
+        const loadChecklist = async () => {
+          try { checklist.value = await api('/portal/checklist'); } catch (_) { /* non-fatal */ }
         };
 
         // Overview refresh (on tab revisit) — pulls the latest of everything it shows.
@@ -2100,6 +2129,7 @@
             loadTreadmill(),
             loadCrm(),
             loadComms(),
+            loadChecklist(),
             (async () => { tasks.value = await api('/portal/tasks') || []; })(),
           ]);
         };
@@ -2419,7 +2449,7 @@
           mcpTokens, newToken, tokenName, tokenExpiry, tokenLoading, tokenError, copied, nowIso, configSnippet, claudeDesktopSnippet,
           loadMcpTokens, createMcpToken, revokeMcpToken, copyText,
           // Overview (command center)
-          loadOverview,
+          loadOverview, checklist,
           // Momentum
           treadmill, treadmillLoading, treadmillError, loadTreadmill,
           loginEmail, loggingIn, loginError, magicLinkSent,

@@ -571,6 +571,21 @@ safeAddColumn('onboarding_workflows', 'extracted_at', 'text');
 safeAddColumn('onboarding_workflows', 'docs_confirmed_at', 'text');
 safeAddColumn('board_members', 'source', "text DEFAULT 'manual'");
 
+// Magic-link tokens — persisted so pending login links survive restarts/deploys.
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_magic_tokens\` (
+  \`token\` text PRIMARY KEY NOT NULL,
+  \`founder_id\` integer NOT NULL,
+  \`expires_at\` text NOT NULL,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`public_magic_tokens\` (
+  \`token\` text PRIMARY KEY NOT NULL,
+  \`email\` text NOT NULL,
+  \`expires_at\` text NOT NULL,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+console.log('  Ensured magic-link token tables exist');
+
 // Applicant AI-VC calls — public Tavus conversation tied to an application.
 sqlite.exec(`CREATE TABLE IF NOT EXISTS \`applicant_vc_calls\` (
   \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,

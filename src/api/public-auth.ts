@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, lt } from 'drizzle-orm';
-import { db, publicUsers, publicCompanies, publicSessions } from '../db/index.js';
+import { db, publicUsers, publicCompanies, publicSessions, publicMagicTokens } from '../db/index.js';
 import { z } from 'zod';
 import crypto from 'crypto';
 import * as postmark from 'postmark';
@@ -12,8 +12,28 @@ const postmarkClient = process.env.POSTMARK_API_KEY
   ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
   : null;
 
-// In-memory token store for magic links (use Redis in production)
-const tokens = new Map<string, { email: string; expires: Date }>();
+// Magic-link tokens are persisted (public_magic_tokens) so a pending login link
+// survives a server restart or deploy instead of dying with the process.
+async function savePublicToken(token: string, email: string, expires: Date): Promise<void> {
+  await db.insert(publicMagicTokens).values({
+    token,
+    email,
+    expiresAt: expires.toISOString(),
+    createdAt: new Date().toISOString(),
+  });
+}
+
+// Single-use: returns the email if the token is valid, else null. Always deletes
+// the token (valid or expired) so a link can't be replayed.
+async function consumePublicToken(token: string): Promise<{ email: string } | null> {
+  const row = await db.query.publicMagicTokens.findFirst({
+    where: eq(publicMagicTokens.token, token),
+  });
+  if (!row) return null;
+  await db.delete(publicMagicTokens).where(eq(publicMagicTokens.token, token));
+  if (new Date() > new Date(row.expiresAt)) return null;
+  return { email: row.email };
+}
 
 // Auto-add https:// to LinkedIn URLs
 function normalizeLinkedinUrl(url: string | undefined): string | null {
@@ -186,7 +206,7 @@ app.post('/login', async (c) => {
   const token = crypto.randomBytes(32).toString('hex');
   const expires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
-  tokens.set(token, { email: user.email, expires });
+  await savePublicToken(token, user.email, expires);
 
   const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
   const magicLink = `${baseUrl}/dashboard?token=${token}`;
@@ -237,15 +257,10 @@ app.post('/verify', async (c) => {
     return c.json({ error: 'Invalid token' }, 400);
   }
 
-  const tokenData = tokens.get(parsed.data.token);
+  const tokenData = await consumePublicToken(parsed.data.token);
 
   if (!tokenData) {
     return c.json({ error: 'Invalid or expired token' }, 401);
-  }
-
-  if (new Date() > tokenData.expires) {
-    tokens.delete(parsed.data.token);
-    return c.json({ error: 'Token expired' }, 401);
   }
 
   // Find user
@@ -254,7 +269,6 @@ app.post('/verify', async (c) => {
   });
 
   if (!user) {
-    tokens.delete(parsed.data.token);
     return c.json({ error: 'User not found' }, 404);
   }
 
@@ -269,8 +283,6 @@ app.post('/verify', async (c) => {
     expiresAt: sessionExpires.toISOString(),
     createdAt: now,
   });
-
-  tokens.delete(parsed.data.token);
 
   return c.json({
     success: true,
@@ -356,13 +368,14 @@ export async function getPublicSessionUserId(sessionId: string | undefined): Pro
   return session.userId;
 }
 
-// Cleanup expired sessions (run hourly)
+// Cleanup expired sessions + magic-link tokens (run hourly)
 setInterval(async () => {
   try {
     const now = new Date().toISOString();
     await db.delete(publicSessions).where(lt(publicSessions.expiresAt, now));
+    await db.delete(publicMagicTokens).where(lt(publicMagicTokens.expiresAt, now));
   } catch (err) {
-    console.error('[PUBLIC-AUTH] Failed to cleanup expired sessions:', err);
+    console.error('[PUBLIC-AUTH] Failed to cleanup expired sessions/tokens:', err);
   }
 }, 60 * 60 * 1000);
 

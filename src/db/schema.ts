@@ -566,6 +566,16 @@ export const founderSessions = sqliteTable('founder_sessions', {
 export type FounderSession = typeof founderSessions.$inferSelect;
 export type NewFounderSession = typeof founderSessions.$inferInsert;
 
+// Founder magic-link tokens — short-lived (15 min / 7-day invites). Persisted so
+// a pending login link survives a server restart or deploy (an in-memory map
+// invalidates every outstanding link on every deploy).
+export const founderMagicTokens = sqliteTable('founder_magic_tokens', {
+  token: text('token').primaryKey(),
+  founderId: integer('founder_id').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
 // Meeting transcripts (Granola etc.), ingested per-founder via the founder's own
 // token, matched to a pipeline item and scored by an LLM. The transcript is the
 // founder's data — we only ever ingest what they forward us.
@@ -1045,6 +1055,15 @@ export const publicCompanies = sqliteTable('public_companies', {
 export const publicSessions = sqliteTable('public_sessions', {
   id: text('id').primaryKey(),
   userId: integer('user_id').notNull().references(() => publicUsers.id),
+  expiresAt: text('expires_at').notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+// Public-user magic-link tokens — persisted (see founder_magic_tokens) so a
+// pending login link survives restarts/deploys instead of dying with the process.
+export const publicMagicTokens = sqliteTable('public_magic_tokens', {
+  token: text('token').primaryKey(),
+  email: text('email').notNull(),
   expiresAt: text('expires_at').notNull(),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });

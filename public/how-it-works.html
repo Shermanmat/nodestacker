@@ -56,6 +56,10 @@
     .hiw .alt { background: var(--bg-alt2); }
 
     .hiw .prose { max-width: 720px; margin: 0 auto; color: var(--muted); font-size: 17px; line-height: 1.65; }
+    /* matcap.css sets `.prose p{color:#222}` on the element itself, and a direct
+       rule always beats an inherited one — so the container color above never
+       reaches the paragraphs. Restate it per-<p> or dark sections render #222 on ink. */
+    .hiw .prose p { font-size: 17px; line-height: 1.65; color: var(--muted); }
     .hiw .prose strong { color: var(--text); font-weight: 700; }
 
     .hiw .pull {
@@ -74,8 +78,8 @@
       background: radial-gradient(46% 42% at 26% 16%, rgba(0,194,224,.20), transparent 62%),
                   radial-gradient(46% 46% at 78% 90%, rgba(255,90,52,.16), transparent 60%);
     }
-    .hiw .dark .head p, .hiw .dark .prose { color: rgba(255,255,255,.66); }
-    .hiw .dark .head p strong, .hiw .dark .prose strong, .hiw .dark .pull { color: #fff; }
+    .hiw .dark .head p, .hiw .dark .prose, .hiw .dark .prose p { color: rgba(255,255,255,.72); }
+    .hiw .dark .head p strong, .hiw .dark .prose strong, .hiw .dark .prose p strong, .hiw .dark .pull { color: #fff; }
     .hiw .dark .note { color: rgba(255,255,255,.55); }
 
     /* ---------- hero ---------- */

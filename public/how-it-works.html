@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
+  <title>MatCap — How It Works</title>
+  <meta name="description" content="How MatCap works, in detail: we send 10 intro requests to calibrate your accept rate, place you in a bracket that sets your weekly pace, and blitz when you land a lead. Plus Mat blocking and tackling the raise with you — all for 1%.">
+  <meta property="og:title" content="MatCap — How It Works">
+  <meta property="og:description" content="10 intro requests to calibrate. A bracket that sets your pace. Bonus requests you earn. A blitz when you land a lead. And Mat in your texts for the rest of the raise — all for 1%.">
+  <meta property="og:image" content="https://matcap.vc/downloads/og-momentum.png">
+  <meta property="og:image:width" content="2400">
+  <meta property="og:image:height" content="1260">
+  <meta property="og:image:alt" content="MatCap — How It Works">
+  <meta property="og:url" content="https://matcap.vc/how-it-works">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MatCap — How It Works">
+  <meta name="twitter:description" content="10 intro requests to calibrate. A bracket that sets your pace. A blitz when you land a lead. And Mat in your texts for the rest — all for 1%.">
+  <meta name="twitter:image" content="https://matcap.vc/downloads/og-momentum.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/matcap.css">
+
+  <style>
+    /* =========================================================
+       Page-local: /how-it-works — the mechanics, in detail.
+       All rules scoped under .hiw so nothing leaks into
+       matcap.css's global section / .inner / h2 styles.
+       Tokens (--accent, --heat, --ink, --grad, --rule, --muted)
+       come from matcap.css. Only page-local ones declared here.
+       ========================================================= */
+    .hiw {
+      --card: #FFFFFF;
+      --bub-in: #F1F1F3;
+    }
+
+    /* ---------- type ---------- */
+    .hiw .display { font-family: var(--display); font-weight: 700; letter-spacing: -0.025em; line-height: 1.02; text-wrap: balance; }
+    .hiw .grad { background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hiw .eyebrow { font-family: var(--display); text-transform: uppercase; letter-spacing: 3px; font-size: 12px; font-weight: 600; color: var(--accent); margin: 0; }
+    .hiw h2 { font-family: var(--display); font-weight: 700; letter-spacing: -0.025em; line-height: 1.05; font-size: clamp(30px, 4.4vw, 52px); margin: 14px 0 0; text-wrap: balance; }
+    .hiw h3 { font-family: var(--display); font-weight: 600; font-size: 19px; letter-spacing: -0.01em; margin: 0 0 8px; }
+    .hiw p { margin: 0 0 16px; }
+    .hiw p:last-child { margin-bottom: 0; }
+
+    /* ---------- layout ---------- */
+    .hiw section { padding: 104px 0; }
+    .hiw .head { text-align: center; max-width: 760px; margin: 0 auto 52px; }
+    .hiw .head p { color: var(--muted); font-size: 18px; margin-top: 16px; line-height: 1.55; }
+    .hiw .head p strong { color: var(--text); font-weight: 700; }
+    .hiw .alt { background: var(--bg-alt2); }
+
+    .hiw .prose { max-width: 720px; margin: 0 auto; color: var(--muted); font-size: 17px; line-height: 1.65; }
+    .hiw .prose strong { color: var(--text); font-weight: 700; }
+
+    .hiw .pull {
+      font-family: var(--display); font-weight: 600;
+      font-size: clamp(19px, 2.2vw, 24px); line-height: 1.35; letter-spacing: -0.015em;
+      color: var(--text); border-left: 3px solid transparent; border-image: var(--grad) 1;
+      padding-left: 22px; margin: 34px auto; max-width: 720px;
+    }
+    .hiw .n { font-family: var(--display); font-weight: 700; color: var(--heat); }
+    .hiw .note { text-align: center; font-family: var(--display); font-size: 13px; letter-spacing: .5px; color: var(--muted); margin-top: 30px; }
+
+    /* ---------- dark sections ---------- */
+    .hiw .dark { background: var(--ink); color: #fff; }
+    .hiw .dark::after {
+      content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+      background: radial-gradient(46% 42% at 26% 16%, rgba(0,194,224,.20), transparent 62%),
+                  radial-gradient(46% 46% at 78% 90%, rgba(255,90,52,.16), transparent 60%);
+    }
+    .hiw .dark .head p, .hiw .dark .prose { color: rgba(255,255,255,.66); }
+    .hiw .dark .head p strong, .hiw .dark .prose strong, .hiw .dark .pull { color: #fff; }
+    .hiw .dark .note { color: rgba(255,255,255,.55); }
+
+    /* ---------- hero ---------- */
+    .hiw .hero { background: var(--ink); color: #fff; text-align: center; padding: 160px 0 92px; }
+    .hiw .hero::before {
+      content: ''; position: absolute; inset: 0; z-index: 1;
+      background: radial-gradient(55% 45% at 28% 18%, rgba(0,194,224,.30), transparent 62%),
+                  radial-gradient(55% 55% at 78% 88%, rgba(255,90,52,.24), transparent 60%);
+    }
+    .hiw .hero::after {
+      content: ''; position: absolute; inset: 0; z-index: 1; opacity: .5;
+      background-image: linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,.04) 1px, transparent 1px);
+      background-size: 44px 44px;
+      -webkit-mask-image: radial-gradient(70% 60% at 50% 40%, #000, transparent 75%);
+      mask-image: radial-gradient(70% 60% at 50% 40%, #000, transparent 75%);
+    }
+    .hiw .hero .inner { max-width: 940px; }
+    .hiw .hero h1 { font-size: clamp(42px, 6.6vw, 82px); margin: 18px 0 0; }
+    .hiw .hero .sub { font-size: clamp(17px, 2vw, 21px); color: rgba(255,255,255,.72); max-width: 680px; margin: 24px auto 0; line-height: 1.55; }
+    .hiw .hero .sub strong { color: #fff; font-weight: 700; }
+
+    .hiw .meter { display: flex; gap: 7px; align-items: flex-end; height: 66px; max-width: 440px; margin: 52px auto 0; }
+    .hiw .meter span { flex: 1; border-radius: 4px 4px 0 0; background: var(--grad); transform-origin: bottom; animation: hiwRise 1s cubic-bezier(.2,.7,.2,1) both; }
+    .hiw .meter span:nth-child(1){height:18%;animation-delay:.04s}
+    .hiw .meter span:nth-child(2){height:26%;animation-delay:.10s}
+    .hiw .meter span:nth-child(3){height:22%;animation-delay:.16s}
+    .hiw .meter span:nth-child(4){height:40%;animation-delay:.22s}
+    .hiw .meter span:nth-child(5){height:52%;animation-delay:.28s}
+    .hiw .meter span:nth-child(6){height:46%;animation-delay:.34s}
+    .hiw .meter span:nth-child(7){height:70%;animation-delay:.40s}
+    .hiw .meter span:nth-child(8){height:62%;animation-delay:.46s}
+    .hiw .meter span:nth-child(9){height:88%;animation-delay:.52s}
+    .hiw .meter span:nth-child(10){height:100%;animation-delay:.58s}
+    @keyframes hiwRise { from { transform: scaleY(0); opacity: .2; } to { transform: scaleY(1); opacity: 1; } }
+    .hiw .scale { display: flex; justify-content: space-between; max-width: 440px; margin: 14px auto 0; font-family: var(--display); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,.5); }
+    .hiw .scale .hot { color: var(--heat); }
+
+    /* ---------- cards ---------- */
+    .hiw .card { border: 1px solid var(--rule); border-radius: 14px; padding: 26px 22px; background: var(--card); position: relative; overflow: hidden; }
+    .hiw .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: var(--grad); }
+    .hiw .card p { font-size: 14.5px; color: var(--muted); line-height: 1.55; }
+    .hiw .card .n-lab { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 2px; color: var(--accent); }
+    .hiw .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .hiw .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; max-width: 900px; margin: 0 auto 40px; }
+
+    /* ---------- funnel ---------- */
+    .hiw .funnel { max-width: 820px; margin: 0 auto; display: grid; gap: 6px; }
+    .hiw .frow { display: grid; grid-template-columns: 92px 1fr 128px; align-items: center; gap: 16px; padding: 8px 0; }
+    .hiw .flab { font-family: var(--display); font-size: 12px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .hiw .fbar { height: 26px; border-radius: 4px; min-width: 4px; }
+    .hiw .fval { font-family: var(--display); font-weight: 600; font-size: 14px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .hiw .fval b { color: var(--text); font-weight: 700; font-size: 17px; }
+
+    /* ---------- ladder ---------- */
+    .hiw .ladder { max-width: 940px; margin: 0 auto; border: 1px solid var(--rule); border-radius: 16px; overflow: hidden; background: var(--card); }
+    .hiw .lhead, .hiw .rung { display: grid; grid-template-columns: 130px 1fr 150px 92px; align-items: center; gap: 20px; padding: 20px 26px; border-bottom: 1px solid var(--rule); }
+    .hiw .rung:last-child { border-bottom: none; }
+    .hiw .lhead { padding: 14px 26px; background: var(--bg-alt2); font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .hiw .rrate { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+    .hiw .rlab { font-family: var(--display); font-weight: 600; font-size: 18px; letter-spacing: -.01em; }
+    .hiw .rlab span { display: block; font-family: 'Inter', sans-serif; font-weight: 400; font-size: 14px; color: var(--muted); line-height: 1.5; letter-spacing: 0; margin-top: 3px; }
+    .hiw .dots { display: flex; gap: 6px; }
+    .hiw .dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--rule); }
+    .hiw .dot.on { background: var(--grad); border-color: transparent; }
+    .hiw .rpace { font-family: var(--display); font-weight: 700; font-size: 30px; text-align: right; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .hiw .rpace small { display: block; font-size: 10px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .hiw .rung.top { background: var(--accent-ghost); }
+    .hiw .rung.top .rrate, .hiw .rung.top .rpace { color: var(--accent); }
+    .hiw .rung.risk .rrate { color: var(--heat); }
+
+    /* ---------- habits ---------- */
+    .hiw .habits { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 900px; margin: 0 auto; }
+    .hiw .habit { display: flex; align-items: center; justify-content: space-between; gap: 16px; border: 1px solid var(--rule); border-radius: 12px; padding: 20px 24px; background: var(--card); }
+    .hiw .habit .lbl { font-weight: 600; font-size: 15.5px; }
+    .hiw .habit .lbl span { display: block; font-weight: 400; font-size: 13.5px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
+    .hiw .habit .rw { font-family: var(--display); font-weight: 700; font-size: 14px; white-space: nowrap; color: var(--heat); }
+
+    /* ---------- stats ---------- */
+    .hiw .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); max-width: 1000px; margin: 0 auto; border-top: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+    .hiw .stat { padding: 28px 24px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+    .hiw .stat .v { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+    .hiw .stat .k { font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-top: 10px; }
+    .hiw .stat .v.hot { color: var(--heat); }
+    .hiw .stat .v.cool { color: var(--accent); }
+    .hiw .dark .stats, .hiw .dark .stat { border-color: rgba(255,255,255,.14); }
+    .hiw .dark .stat .k { color: rgba(255,255,255,.5); }
+
+    /* ---------- threads ---------- */
+    .hiw .threads { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px; }
+    .hiw .thread { border: 1px solid var(--rule); border-radius: 16px; background: var(--card); padding: 22px; display: flex; flex-direction: column; gap: 8px; }
+    .hiw .tcap { font-family: var(--display); font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+    .hiw .bub { max-width: 86%; padding: 10px 14px; border-radius: 16px; font-size: 14.5px; line-height: 1.45; }
+    .hiw .bub.them { align-self: flex-start; background: var(--bub-in); color: var(--text); border-bottom-left-radius: 5px; }
+    .hiw .bub.mat { align-self: flex-end; background: var(--accent); color: #04262C; border-bottom-right-radius: 5px; font-weight: 500; }
+    .hiw .gbub { max-width: 94%; align-self: flex-start; background: var(--bub-in); border-radius: 5px 16px 16px 16px; padding: 12px 15px; font-size: 14.5px; line-height: 1.5; color: var(--text); }
+    .hiw .gname { display: block; font-family: var(--display); font-size: 12px; font-weight: 700; letter-spacing: .5px; margin-bottom: 5px; }
+    .hiw .n1 { color: var(--accent); }
+    .hiw .n2 { color: var(--heat); }
+    .hiw .n3 { color: #7C5CD6; }
+    .hiw .quoted { border-left: 2px solid var(--accent); padding-left: 10px; margin-bottom: 8px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+
+    /* ---------- price ---------- */
+    .hiw .price { text-align: center; margin-top: 44px; }
+    .hiw .price-num { font-family: var(--display); font-weight: 700; font-size: clamp(96px, 17vw, 200px); line-height: .86; letter-spacing: -.04em; }
+    .hiw .price-num .pct { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .hiw .price-of { font-family: var(--display); font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: rgba(255,255,255,.5); margin-top: 14px; }
+    .hiw .price-terms { margin-top: 26px; display: inline-block; font-size: 13.5px; letter-spacing: .5px; color: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 10px 22px; }
+    .hiw .principles { display: grid; grid-template-columns: repeat(3, 1fr); max-width: 880px; margin: 60px auto 0; border-top: 1px solid rgba(255,255,255,.14); text-align: left; }
+    .hiw .principles > div { padding: 30px 26px; border-right: 1px solid rgba(255,255,255,.14); }
+    .hiw .principles > div:last-child { border-right: none; }
+    .hiw .principles .no { font-family: var(--display); font-weight: 600; font-size: 19px; letter-spacing: -.01em; color: #fff; }
+    .hiw .principles .no .x { color: var(--heat); margin-right: 4px; }
+    .hiw .principles p { font-size: 13.5px; color: rgba(255,255,255,.6); margin-top: 10px; line-height: 1.6; }
+
+    /* ---------- cta ---------- */
+    .hiw .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-top: 44px; }
+    .hiw .btn { font-family: var(--display); font-weight: 600; font-size: 15px; padding: 14px 28px; border-radius: 8px; text-decoration: none; display: inline-block; transition: transform .15s ease, box-shadow .2s ease; }
+    .hiw .btn-primary { background: var(--grad); color: var(--ink); box-shadow: 0 8px 30px rgba(255,90,52,.28); }
+    .hiw .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,194,224,.36); }
+    .hiw .btn-ghost { color: #fff; border: 1px solid rgba(255,255,255,.28); }
+    .hiw .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ---------- faq ---------- */
+    .hiw .faq { max-width: 800px; margin: 0 auto; }
+    .hiw details { border-bottom: 1px solid var(--rule); }
+    .hiw summary { cursor: pointer; list-style: none; padding: 22px 40px 22px 0; font-family: var(--display); font-weight: 600; font-size: 19px; letter-spacing: -.01em; line-height: 1.35; position: relative; transition: color .15s ease; }
+    .hiw summary::-webkit-details-marker { display: none; }
+    .hiw summary:hover, .hiw details[open] summary { color: var(--accent); }
+    .hiw summary::after { content: '+'; position: absolute; right: 6px; top: 20px; font-family: var(--display); font-weight: 400; font-size: 22px; color: var(--muted); }
+    .hiw details[open] summary::after { content: '\2013'; color: var(--accent); }
+    .hiw summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+    .hiw .answer { padding: 0 40px 26px 0; color: var(--muted); font-size: 15.5px; line-height: 1.65; }
+    .hiw .answer p { margin-bottom: 14px; }
+    .hiw .answer strong { color: var(--text); font-weight: 700; }
+
+    .hiw .scroller { overflow-x: auto; }
+
+    @media (max-width: 860px) {
+      .hiw .grid-3, .hiw .grid-2, .hiw .habits, .hiw .principles { grid-template-columns: 1fr; }
+      .hiw .principles > div { border-right: none; border-bottom: 1px solid rgba(255,255,255,.14); }
+      .hiw .lhead { display: none; }
+      .hiw .rung { grid-template-columns: 100px 1fr 74px; gap: 14px; padding: 18px; }
+      .hiw .rung .dots { display: none; }
+      .hiw .frow { grid-template-columns: 74px 1fr 104px; gap: 10px; }
+      .hiw section { padding: 72px 0; }
+      .hiw .hero { padding: 130px 0 72px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hiw * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="/">
+    <img src="/downloads/matcap-logo.png" alt="MatCap">
+    <span class="tag">How It Works</span>
+  </a>
+  <div class="links">
+    <a href="/how-it-works">How It Works</a>
+    <a href="/investors">Investors</a>
+    <a href="/dashboard" data-auth-link>Log In</a>
+    <a class="btn" href="/signup">Apply</a>
+  </div>
+</nav>
+
+<main class="hiw">
+
+<!-- ===================== HERO ===================== -->
+<section class="hero">
+  <div class="inner">
+    <p class="eyebrow">How it works</p>
+    <h1 class="display">We send the intro requests.<br><span class="grad">You close the round.</span></h1>
+    <p class="sub">
+      MatCap is your <strong>point guard</strong> on a pre-seed raise — not your quarterback. You own
+      the pitch, the round, and the relationships. We send warm intro requests at a pace you can
+      actually convert at, then block and tackle the rest of the raise with you.
+    </p>
+    <div class="meter" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+    <div class="scale">
+      <span>Start</span><span>Calibrate</span><span>Accelerate</span><span class="hot">Blitz</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== THE CURRENCY ===================== -->
+<section>
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">The currency</p>
+      <h2 class="display">Intro requests are what we promise. Intros are what you earn.</h2>
+      <p>
+        Every founder has one number: <strong>intro requests per week</strong>. It's the unit we send,
+        the unit we count, and the only thing we commit to.
+      </p>
+    </div>
+
+    <div class="prose">
+      <p>
+        A request is a warm, personalized ask sent on your behalf to an investor — or to a node who
+        can forward it. We deliberately do <em>not</em> promise intros. An intro is an investor saying
+        yes, and we don't control that. You do.
+      </p>
+      <p>
+        What we control is how many qualified, well-matched, warmly-routed asks land in front of the
+        right people each week.
+      </p>
+    </div>
+
+    <p class="pull">The request is ours. The yes is yours. Your accept rate is the exchange rate between them.</p>
+
+    <div class="funnel">
+      <div class="frow">
+        <div class="flab">Accepted</div>
+        <div class="fbar" style="background: var(--accent); width: 64%;"></div>
+        <div class="fval"><b>249</b> · 25%</div>
+      </div>
+      <div class="frow">
+        <div class="flab">Passed</div>
+        <div class="fbar" style="background: var(--heat); width: 97%;"></div>
+        <div class="fval"><b>387</b> · 38%</div>
+      </div>
+      <div class="frow">
+        <div class="flab">Ignored</div>
+        <div class="fbar" style="background: var(--muted); width: 83%;"></div>
+        <div class="fval"><b>329</b> · 33%</div>
+      </div>
+      <div class="frow">
+        <div class="flab">Pending</div>
+        <div class="fbar" style="background: var(--rule); width: 11%;"></div>
+        <div class="fval"><b>45</b> · 4%</div>
+      </div>
+    </div>
+    <p class="note">1,010 intro requests sent across the network → 249 intros. Platform accept rate: 25%.</p>
+  </div>
+</section>
+
+<!-- ===================== WEEK ONE ===================== -->
+<section class="alt">
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">Week one</p>
+      <h2 class="display">We send 10 requests before we set your pace.</h2>
+      <p>
+        We don't guess your pace from your deck, your logo, or your last company. <strong>We measure
+        it.</strong>
+      </p>
+    </div>
+
+    <div class="grid-3">
+      <div class="card">
+        <div class="n-lab">01 — WEEK 1</div>
+        <h3>Sending</h3>
+        <p>Your first 10 intro requests go out as a single burst. This is the read, not the routine — the sample we use to see how the market actually responds to you.</p>
+      </div>
+      <div class="card">
+        <div class="n-lab">02 — WEEKS 1–4</div>
+        <h3>Waiting</h3>
+        <p>Replies land. Accepts, passes, and silence all count as information. You sit at a neutral 2/week in the meantime, and a 28-day backstop means you never stall out waiting.</p>
+      </div>
+      <div class="card">
+        <div class="n-lab">03 — THEN</div>
+        <h3>Calibrated</h3>
+        <p>Your accept rate is real. You're placed in a bracket and your pace goes live — and from there it recomputes continuously as every request resolves.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BRACKETS ===================== -->
+<section>
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">The brackets</p>
+      <h2 class="display">Your accept rate — and nothing else — sets your pace.</h2>
+      <p>
+        Not your traction. Not how much we like you. Not how loud you are on Twitter. One input, one
+        output: <strong>accepted ÷ decided</strong>, with pending requests excluded until they resolve.
+      </p>
+    </div>
+
+    <div class="scroller">
+      <div class="ladder">
+        <div class="lhead">
+          <div>Accept rate</div><div>Bracket</div><div>Pace</div><div>Per week</div>
+        </div>
+
+        <div class="rung top">
+          <div class="rrate">30%+</div>
+          <div class="rlab">Exceptional
+            <span>Top of the ladder. Investors want what you're selling. Land a lead and we blitz.</span>
+          </div>
+          <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i></div>
+          <div class="rpace">5<small>req/wk</small></div>
+        </div>
+
+        <div class="rung">
+          <div class="rrate">25–29%</div>
+          <div class="rlab">Strong
+            <span>Above the platform average. The story is landing, so we lean in.</span>
+          </div>
+          <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot"></i></div>
+          <div class="rpace">4<small>req/wk</small></div>
+        </div>
+
+        <div class="rung">
+          <div class="rrate">20–24%</div>
+          <div class="rlab">Solid
+            <span>Healthy and sustainable. Also the floor for earning bonus requests.</span>
+          </div>
+          <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot on"></i><i class="dot"></i><i class="dot"></i></div>
+          <div class="rpace">3<small>req/wk</small></div>
+        </div>
+
+        <div class="rung">
+          <div class="rrate">17–19%</div>
+          <div class="rlab">Slipping
+            <span>The warning zone. We slow the volume and put coaching in front of you.</span>
+          </div>
+          <div class="dots"><i class="dot on"></i><i class="dot on"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+          <div class="rpace">2<small>req/wk</small></div>
+        </div>
+
+        <div class="rung risk">
+          <div class="rrate">Under 17%</div>
+          <div class="rlab">At risk
+            <span>Something in the pitch isn't landing. More volume would only burn the network.</span>
+          </div>
+          <div class="dots"><i class="dot on"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i><i class="dot"></i></div>
+          <div class="rpace">1<small>req/wk</small></div>
+        </div>
+      </div>
+    </div>
+
+    <p class="note">Minimum sample: 4 decided requests. Below that we don't trust the number and hold you at a neutral 2/week.</p>
+  </div>
+</section>
+
+<!-- ===================== REDIRECT, NOT PUNISHMENT ===================== -->
+<section class="alt">
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">What each bracket gets you</p>
+      <h2 class="display">A low pace is a redirect, not a punishment.</h2>
+    </div>
+
+    <div class="prose">
+      <p>
+        Dropping to 1 or 2 requests a week doesn't mean we've stopped working on your raise. It means
+        we've stopped spending your reputation. The network is finite — <strong>373 investors, 184
+        firms</strong> — and a request that gets passed on doesn't just fail. It costs you that
+        investor for this round.
+      </p>
+      <p>
+        So when acceptance drops below <span class="n">17%</span>, we pull volume back and put the
+        effort where it compounds: the pitch. Founders in the bottom two brackets get pitch review,
+        messaging rework, and Gym reps. Founders at the top get volume, bonus shots, and a blitz when
+        they land a lead. Same engine — it just responds to what the market is telling it.
+      </p>
+    </div>
+
+    <p class="pull">Below 17%, more volume doesn't help. It just spends the last of your warm network on a pitch that isn't converting yet.</p>
+  </div>
+</section>
+
+<!-- ===================== EARN MORE ===================== -->
+<section>
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">Earning more</p>
+      <h2 class="display">Good habits, extra intro requests.</h2>
+      <p>
+        Your bracket sets the baseline. On top of that you can <strong>earn extra requests</strong> —
+        bonus shots on goal, sent on top of your weekly pace, not instead of it.
+      </p>
+    </div>
+
+    <div class="habits">
+      <div class="habit">
+        <div class="lbl">🏋️ Sharpen your pitch in the Gym
+          <span>Complete a practice rep against a simulated investor. One rep per week, resets Monday.</span>
+        </div>
+        <div class="rw">+1 request</div>
+      </div>
+      <div class="habit">
+        <div class="lbl">📝 Log your meeting notes
+          <span>Close the loop on what happened after an intro. Every 3 meetings you log yourself.</span>
+        </div>
+        <div class="rw">+1 request</div>
+      </div>
+      <div class="habit">
+        <div class="lbl">🤝 Bring your own investors in
+          <span>Add relationships you already have to your CRM. Every 5 outside investors added.</span>
+        </div>
+        <div class="rw">+1 request</div>
+      </div>
+      <div class="habit">
+        <div class="lbl">⚡ Two rules on earning
+          <span>You must be converting at 20%+ to earn anything, and you can hold 3 shots at once. Excess isn't banked — so spend them.</span>
+        </div>
+        <div class="rw">Cap: 3</div>
+      </div>
+    </div>
+
+    <p class="note">Below 20% acceptance, extra volume works against you — we'd rather fix the pitch first.</p>
+  </div>
+</section>
+
+<!-- ===================== BLITZ ===================== -->
+<section class="dark">
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">The blitz</p>
+      <h2 class="display">When you land a lead, we go to <span class="grad">20 a week.</span></h2>
+      <p>
+        Pre-seed is about finding your <strong>one believer</strong> — the first check that anchors the
+        round. Everything before that is a search. Everything after is a sprint.
+      </p>
+    </div>
+
+    <div class="prose">
+      <p>
+        The moment you have a real lead, the pace ladder stops applying. We move you to 20 intro
+        requests per week for 21 days and stop recomputing your accept rate for the duration. You now
+        have the one thing that makes every other conversation easy — a term sheet and a clock — and
+        the job is to close the round while it's hot.
+      </p>
+    </div>
+
+    <p class="pull">Momentum compounds momentum. The blitz is where a lead becomes a round.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="v hot">20</div><div class="k">Requests / week</div></div>
+      <div class="stat"><div class="v hot">21</div><div class="k">Days</div></div>
+      <div class="stat"><div class="v hot">60</div><div class="k">Total requests</div></div>
+      <div class="stat"><div class="v">Paused</div><div class="k">Pace recompute</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== BEYOND THE INTROS ===================== -->
+<section>
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">Beyond the intros</p>
+      <h2 class="display">The intros open the door. Mat blocks and tackles the rest of the raise.</h2>
+      <p>
+        Everything above is the engine — the part that runs on numbers. The other half isn't automated
+        and never will be: it's <strong>Mat, in your texts</strong>, working the raise with you.
+      </p>
+    </div>
+
+    <div class="prose">
+      <p>
+        That means killing the twelve-slide memo-in-deck-form before an investor sees it. Naming the
+        number and the timeline when you're circling. Drafting the email to your existing investors.
+        Telling you who to see when you're in SF for a week. Pulling a third person into the thread
+        when you need PR, or a design partner, or a lawyer.
+      </p>
+    </div>
+
+    <p class="pull">You own the pitch and the round. Mat makes sure you don't walk into it holding the wrong story.</p>
+
+    <div class="threads">
+      <div class="thread">
+        <p class="tcap">Deck teardown</p>
+        <div class="bub them">[deck.pdf]</div>
+        <div class="bub mat">Reviewing now</div>
+        <div class="bub mat">I'm not gunna lie, this is like a memo in deck form</div>
+        <div class="bub mat">It's just so much info. Way too much.</div>
+        <div class="bub mat">We should get on a call and figure out how to tell a much more simple story here</div>
+      </div>
+
+      <div class="thread">
+        <p class="tcap">Round strategy</p>
+        <div class="bub them">I'll checkout the CRM</div>
+        <div class="bub mat">Then you should draft up an email to your current investors telling them based on traction in the last few months, you're gearing up for a round. Link the sheet. Tell everyone to add people they think could invest. Run the draft by me before you send</div>
+        <div class="bub mat">Once you send that, I'll start a new thread with you, me and a PR person</div>
+      </div>
+
+      <div class="thread">
+        <p class="tcap">Positioning</p>
+        <div class="bub them">still a bit confused — a "temporary opportunity" to build and take market share. why am i saying im capitalizing on a temp opp?</div>
+        <div class="bub mat">It's a why now statement</div>
+        <div class="bub mat">The ground shifted beneath the feet of the incumbents</div>
+        <div class="bub mat">You're capitalizing</div>
+        <div class="bub them">ahh okay</div>
+      </div>
+
+      <div class="thread">
+        <p class="tcap">Working the network</p>
+        <div class="bub them">I'm going to be up in SF next week, anyone I should meet up there?</div>
+        <div class="bub mat">I surely can ping a ton of people that you're up there</div>
+        <div class="bub mat">How was last month for biz?</div>
+        <div class="bub them">30% MRR growth</div>
+        <div class="bub mat">Two months in a row of 30% MoM. lfg — that's the line that goes in the update</div>
+      </div>
+    </div>
+
+    <p class="note">Real threads, lightly redacted. This is the half of MatCap that doesn't show up in a dashboard.</p>
+  </div>
+</section>
+
+<!-- ===================== ADDITIVE ===================== -->
+<section class="alt">
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">Additive</p>
+      <h2 class="display">And then there's the part that isn't a mechanic at all.</h2>
+      <p>
+        Intros and advice are the product. Everything here is <strong>additive</strong> — it isn't what
+        you're buying. But raising is lonely and long, and founders who have people around them do it
+        better.
+      </p>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="n-lab">IN PERSON</div>
+        <h3>IRL programming in Phoenix</h3>
+        <p>Real-life programming for the portfolio out of Phoenix — dinners, working sessions, time with other founders mid-raise. Other cities follow as the portfolio concentrates in them. The point isn't networking. It's that you know these people by the time you need them.</p>
+      </div>
+      <div class="card">
+        <div class="n-lab">ALWAYS ON</div>
+        <h3>The portfolio WhatsApp</h3>
+        <p>One group chat with every MatCap founder in it. Someone in there has taken a meeting with the investor you're about to meet, priced the round you're about to price, and hit the wall you're about to hit. Ask the group before you ask the internet.</p>
+      </div>
+    </div>
+
+    <div class="threads">
+      <div class="thread">
+        <p class="tcap">Hiring — 7:56 PM</p>
+        <div class="gbub">
+          <span class="gname n1">Founder A</span>
+          Hey guys, I need some quick help. If you were hiring a founding engineer and the final round
+          involved the candidate presenting a project they had worked on, what kinds of questions would
+          you ask during the one-hour interview?
+        </div>
+        <div class="gbub">
+          <span class="gname n2">Founder B</span>
+          We run this interview. Have them send you a Loom (and the repo if possible) a day ahead of
+          time so you can prep a bunch of questions. I try to push on architectural decisions that
+          meaningfully impact the UX.
+        </div>
+        <div class="gbub">
+          <span class="gname n2">Founder B</span>
+          I'd push on literally anything I could imagine an alternative for. Even if I believe the
+          alternative is worse. Just want to know why the candidate made the decision they did.
+        </div>
+      </div>
+
+      <div class="thread">
+        <p class="tcap">Perks &amp; credits — 12:08 PM</p>
+        <div class="gbub">
+          <span class="gname n3">Founder C</span>
+          Has anyone found a good founder/startup perks bundle that is actually worth using? We're
+          trying options but they aren't good deals — turns out going directly to the SaaS company is
+          better. Zoom for Startups gives 25 seats free instead of 10% off.
+        </div>
+        <div class="gbub">
+          <span class="gname n2">Founder D</span>
+          <div class="quoted">Founder C: Has anyone found a good founder/startup perks bundle…</div>
+          Google for Startups, AWS Accelerate, Microsoft for Startups, and Nvidia's Inception program.
+          All great programs.
+        </div>
+        <div class="gbub">
+          <span class="gname n2">Founder D</span>
+          If you get into Microsoft for Startups they'll give you Teams and all other Office products
+          for a year in addition to credits.
+        </div>
+      </div>
+
+      <div class="thread">
+        <p class="tcap">Same boat — 1:01 PM</p>
+        <div class="gbub">
+          <span class="gname n1">Founder E</span>
+          Who has a connection at Anthropic? I need Fable 5 back…
+        </div>
+        <div class="gbub">
+          <span class="gname n3">Founder F</span>
+          Ayo same.
+        </div>
+        <div class="gbub">
+          <span class="gname n2">Founder B</span>
+          i'm gonna ask our rep and see if there's any news bc i also have Fable withdrawals rn lol
+        </div>
+        <div class="gbub">
+          <span class="gname n1">Founder E</span>
+          <div class="quoted">Founder B: i'm gonna ask our rep and see if there's any news…</div>
+          Please report back!
+        </div>
+      </div>
+    </div>
+
+    <p class="note">Real threads from the portfolio group. Hiring loops, credits, and the occasional shared crisis.</p>
+  </div>
+</section>
+
+<!-- ===================== PRICE ===================== -->
+<section class="dark">
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">The price</p>
+      <h2 class="display">All of it for one number.</h2>
+    </div>
+
+    <div class="price">
+      <div class="price-num"><span class="pct">1%</span></div>
+      <div class="price-of">Intros · Advice · Everything else</div>
+      <div class="price-terms">It pays when your round closes — and not before.</div>
+    </div>
+
+    <div class="principles">
+      <div>
+        <div class="no"><span class="x">✕</span> No retainer</div>
+        <p>We don't get paid to look busy. There's no monthly fee to keep the lights on while nothing happens.</p>
+      </div>
+      <div>
+        <div class="no"><span class="x">✕</span> No à la carte</div>
+        <p>The engine, the pace, the bonus shots, the blitz, Mat in your texts, Phoenix, and the group chat. One price, all of it.</p>
+      </div>
+      <div>
+        <div class="no"><span class="x">✕</span> No misaligned incentive</div>
+        <p>Your accept rate has to be real and the round has to actually close. Otherwise we've done all this for nothing.</p>
+      </div>
+    </div>
+
+    <div class="cta">
+      <a class="btn btn-primary" href="/signup">Apply to MatCap</a>
+      <a class="btn btn-ghost" href="/investors">For investors</a>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== NETWORK ===================== -->
+<section>
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">The network, today</p>
+      <h2 class="display">What's actually behind the requests.</h2>
+      <p>
+        A request only works if it's warm and well-routed. We score every investor for reliability and
+        every match for fit before anything is sent — and retire the nodes who don't forward.
+      </p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v">373</div><div class="k">Investors</div></div>
+      <div class="stat"><div class="v">184</div><div class="k">Unique firms</div></div>
+      <div class="stat"><div class="v">105</div><div class="k">Firms opted in</div></div>
+      <div class="stat"><div class="v">51</div><div class="k">Founders</div></div>
+      <div class="stat"><div class="v cool">1,010</div><div class="k">Requests sent</div></div>
+      <div class="stat"><div class="v cool">249</div><div class="k">Intros made</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FAQ ===================== -->
+<section class="alt">
+  <div class="inner">
+    <div class="head">
+      <p class="eyebrow">Questions</p>
+      <h2 class="display">Frequently asked.</h2>
+    </div>
+
+    <div class="faq">
+
+      <details>
+        <summary>Why won't you just promise me a number of intros?</summary>
+        <div class="answer">
+          <p>Because we'd be promising you something we don't control. An intro happens when an investor says yes. We can control who we ask, how warm the routing is, how well the ask is written, and how many go out — so that's what we commit to.</p>
+          <p>Anyone promising you intros is either padding the number with investors who'll take any meeting, or is about to miss. The honest unit is the request.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>What exactly counts as "accepted"?</summary>
+        <div class="answer">
+          <p>Any request where the investor engaged: they took the intro, took a first or second meeting, came back with follow-up questions, asked to circle back when the round opens, or invested. All of those are yeses of different sizes, and all count in your favor.</p>
+          <p>A pass or a hard ignore counts against you. A request still in flight counts for nothing in either direction until it resolves.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Does an ignore hurt me as much as a pass?</summary>
+        <div class="answer">
+          <p>In the math, yes — both land in the denominator as "decided" and neither lands in the numerator. That feels harsh, but it's the right call: an investor who doesn't even reply to a warm, well-matched intro request is telling you something about the pitch just as clearly as one who writes back "not for us."</p>
+          <p>Across the network, ignores are <strong>33%</strong> of all requests. They're normal. They're also the single biggest lever you have.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>I'm at 1 request a week. Am I being punished?</summary>
+        <div class="answer">
+          <p>No — you're being protected. Below 17% acceptance, every additional request spends a warm relationship on a pitch the market is telling us isn't ready. Those investors don't come back for this round.</p>
+          <p>The work doesn't stop, it moves. Gym reps, pitch review, and messaging rework are what get you back up the ladder. A slow week is a redirect, never a demotion.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>How fast can my pace change?</summary>
+        <div class="answer">
+          <p>Continuously. Your accept rate is recomputed as requests resolve, and your pace follows it. There's no review cycle, no monthly reset, and no one arguing your case internally — it's arithmetic.</p>
+          <p>The practical floor is sample size: we need at least 4 decided requests before we trust a rate at all. Below that you sit at a neutral 2 per week.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Can I go faster than 5 a week?</summary>
+        <div class="answer">
+          <p>Two ways. Bonus shots ride on top of your pace — a founder at 5/week holding 3 shots gets 8 requests that week. And the blitz overrides the ladder entirely at 20/week for 21 days once you land a lead.</p>
+          <p>There is no way to buy your way past the ladder. The only currency is acceptance.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Why cap bonus shots at 3?</summary>
+        <div class="answer">
+          <p>So they get used. A cap that banks forever turns into a hoard — founders grind Gym reps for a month, then dump 15 requests into the network at once, which is exactly the kind of unwarm blast we exist to avoid.</p>
+          <p>Three outstanding, spend them, earn more. Excess beyond the cap is not banked.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Why do I have to be at 20% to earn bonus requests at all?</summary>
+        <div class="answer">
+          <p>Because bonus requests are a volume lever, and volume only helps when conversion is already working. Handing extra requests to a founder converting at 12% doesn't accelerate their raise — it accelerates the rate at which they run out of investors.</p>
+          <p>Get to 20%, then the Gym and the CRM start paying you back in requests.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Do I pick which investors get asked?</summary>
+        <div class="answer">
+          <p>We generate the matches — scored on fit, on how likely the routing node is to forward it, and on the investor's own reliability history — and you have visibility into them. The engine won't route to investors who ghost, and it retires nodes whose forward rate drops too low.</p>
+          <p>You can always add your own investor relationships to your CRM. That's one of the three ways to earn bonus shots.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>How much of this is actually Mat, and how much is software?</summary>
+        <div class="answer">
+          <p>The pace, the matching, the routing, and the accept-rate math are software — that's what lets us run it for every founder at once without it degrading into spray-and-pray.</p>
+          <p>The advice is Mat. Deck teardowns, positioning, round strategy, the draft of your investor update, who to see when you're in a city for a week, who to pull into the thread. That's a text away, and it isn't going to be automated — the whole point is that someone who has seen a hundred of these is looking at yours.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Do you help with seed rounds too?</summary>
+        <div class="answer">
+          <p>Yes — it's just a different strategy, and it's worth being clear about the difference.</p>
+          <p><strong>Pre-seed is a search for one believer.</strong> You're hunting for the first check that anchors everything after it. So the engine is tuned for discovery: read the signal, pace to what's converting, and blitz the moment a lead appears.</p>
+          <p><strong>Seed is an auction.</strong> You have traction, and the job is to get the right investors looking at the same time, compress them into the same window, and let competitive pressure set your terms. That's a different use of the same network — less about finding a yes, more about timing and stacking the yeses you can already see.</p>
+          <p>Same intros, same advice, same 1%. Different playbook once you're in it — and Mat will tell you which one you're actually running.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Do I have to be in Phoenix?</summary>
+        <div class="answer">
+          <p>No. The IRL programming runs out of Phoenix today and we'll add cities as the portfolio concentrates in them, but the product — intros and advice — is remote and always has been. Founders raise from everywhere.</p>
+          <p>Come if you can. The founders who show up get more out of the portfolio than the ones who don't, but nobody's pace depends on it.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>What's the WhatsApp actually for?</summary>
+        <div class="answer">
+          <p>Every MatCap founder is in one group chat. It's where you ask what an investor is actually like before you take the meeting, what a fair price is for the round you're about to run, and whether anyone has hit the exact wall you just hit.</p>
+          <p>It's additive, not the product. But it's the fastest place to get an honest answer from someone with no incentive to sell you anything.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>What does MatCap get out of this?</summary>
+        <div class="answer">
+          <p><strong>1%</strong> — for all of it: the intros, the advice, Phoenix, and the group chat. No retainer and no monthly fee, so we don't get paid for activity. We get paid when you close.</p>
+          <p>Which means our incentive and yours are the same one: your accept rate has to be real, and the round has to actually happen.</p>
+        </div>
+      </details>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ FOOTER ============ -->
+<footer class="site-footer">
+  <div class="inner">
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="/downloads/matcap-logo-light.png" alt="MatCap">
+      </div>
+      <div class="footer-links">
+        <a href="/how-it-works">How It Works</a>
+        <a href="/investors">Investors</a>
+        <a href="/signup">Apply</a>
+      </div>
+    </div>
+    <div class="footer-foot">&copy; 2026 MatCap</div>
+  </div>
+</footer>
+
+<script src="/scripts/matcap.js"></script>
+</body>
+</html>

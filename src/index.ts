@@ -927,10 +927,11 @@ app.get('/voice-interview', serveStatic({ path: './public/voice-interview.html' 
 // Blurb builder
 app.get('/blurb', serveStatic({ path: './public/blurb.html' }));
 app.get('/trial', serveStatic({ path: './public/trial.html' }));
-app.get('/how-it-works', (c) => c.redirect('/trial', 301));
-// Founder-facing explainer: how MatCap works (the Momentum model).
-app.get('/momentum', serveStatic({ path: './public/momentum.html' }));
-app.get('/treadmill', (c) => c.redirect('/momentum', 302)); // old URL → new
+// Founder-facing explainer: the full mechanics — intro requests, the accept-rate
+// brackets, earning bonus shots, the blitz, and everything beyond the intros.
+app.get('/how-it-works', serveStatic({ path: './public/how-it-works.html' }));
+app.get('/momentum', (c) => c.redirect('/how-it-works', 302)); // superseded by /how-it-works
+app.get('/treadmill', (c) => c.redirect('/how-it-works', 302)); // old URL → new
 
 
 // Marketing site

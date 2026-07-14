@@ -9,6 +9,8 @@ import * as onboardingEmails from '../services/onboarding-emails.js';
 import * as esign from '../services/esign.js';
 import { checkFirmBlocked } from '../services/matching.js';
 import { getTreadmillReading } from '../services/treadmill.js';
+import * as drive from '../services/google-drive.js';
+import { extractFormationDocuments } from '../services/document-extraction.js';
 
 type Variables = {
   founderId: number;
@@ -807,8 +809,14 @@ app.get('/onboarding/status', async (c) => {
       } else if (workflow.incorporated === false && !workflow.equityCommitmentSignedAt) {
         nextAction = { type: 'equity_commitment', message: 'Sign the pre-incorporation equity commitment' };
       } else {
-        nextAction = { type: 'entity_info', message: 'Submit your company details' };
+        nextAction = { type: 'upload_formation_docs', message: 'Upload your formation documents' };
       }
+      break;
+    case OnboardingStatus.DOCS_PENDING:
+      nextAction = { type: 'upload_formation_docs', message: 'Upload your formation documents' };
+      break;
+    case OnboardingStatus.DOCS_EXTRACTED:
+      nextAction = { type: 'confirm_entity_info', message: 'Review the details we pulled from your documents' };
       break;
     case OnboardingStatus.PENDING_INCORPORATION:
       nextAction = { type: 'confirm_incorporation', message: 'Let us know when you\'re incorporated' };
@@ -875,8 +883,13 @@ app.get('/onboarding/status', async (c) => {
       entityState: workflow.entityState,
       ein: workflow.ein,
       articlesOfIncorporationUrl: workflow.articlesOfIncorporationUrl,
+      bylawsUrl: workflow.bylawsUrl,
+      boardConsentUrl: workflow.boardConsentUrl,
       authorizedShares: workflow.authorizedShares,
       sharePrice: workflow.sharePrice,
+      founderTitle: workflow.founderTitle,
+      incorporationDate: workflow.incorporationDate,
+      extractedAt: workflow.extractedAt,
       entityInfoReceivedAt: workflow.entityInfoReceivedAt,
       agreementSentAt: workflow.agreementSentAt,
       founderSignedAt: workflow.founderSignedAt,
@@ -898,6 +911,11 @@ app.get('/onboarding/status', async (c) => {
     },
     shareDetails,
     nextAction,
+    // Warnings surfaced from the formation-doc extraction (name/share mismatches,
+    // unsigned board consent, missing fields) — shown on the confirm step.
+    extractionWarnings: (() => {
+      try { return JSON.parse(workflow.extractionRaw || '{}').warnings || []; } catch { return []; }
+    })(),
     boardMembers: (workflow.boardMembers || []).map(m => ({
       id: m.id,
       name: m.name,
@@ -1014,10 +1032,11 @@ app.post('/onboarding/incorporation-answer', async (c) => {
       return c.json({ success: true, docsFirst: true, message: 'Great! Upload your formation documents (Articles of Incorporation, bylaws, and initial board consent) and we\'ll fill in your company details automatically.' });
     }
 
-    // Already incorporated → go straight to manual entity info
+    // Already incorporated → upload formation documents; we auto-fill the
+    // company details from them.
     await db.update(onboardingWorkflows)
       .set({
-        status: OnboardingStatus.ENTITY_INFO_PENDING,
+        status: OnboardingStatus.DOCS_PENDING,
         incorporated: true,
         updatedAt: now,
       })
@@ -1031,7 +1050,7 @@ app.post('/onboarding/incorporation-answer', async (c) => {
       companyName: founder.companyName,
     });
 
-    return c.json({ success: true, message: 'Great! Please submit your company details.' });
+    return c.json({ success: true, message: 'Great! Upload your Articles of Incorporation, bylaws, and initial board consent — we\'ll fill in your company details automatically.' });
   }
 
   // Not incorporated — tell them to incorporate first and come back
@@ -1167,6 +1186,122 @@ app.post('/onboarding/confirm-incorporation', async (c) => {
   return c.json({ success: true, message: 'Congratulations on incorporating! Please submit your company details.' });
 });
 
+// Upload the three formation documents (Articles of Incorporation, bylaws,
+// initial board consent) and auto-extract the company details from them. All
+// three are required. On success we store the PDFs to Drive, save the extracted
+// fields + pre-fill board members, and move to DOCS_EXTRACTED for the founder to
+// review and confirm.
+const MISSING_DOCS_MSG =
+  'We need all three formation documents — your Articles of Incorporation, bylaws, and initial board consent — to move forward. If you incorporated through Stripe Atlas or Clerky, all three are in your account.';
+
+app.post('/onboarding/upload-formation-docs', async (c) => {
+  const founderId = c.get('founderId') as number;
+  const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  if (!founder) return c.json({ error: 'Founder not found' }, 404);
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+  if (!portfolioCompany) return c.json({ error: 'Not a portfolio company' }, 400);
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+  if (!workflow) return c.json({ error: 'No onboarding workflow found' }, 404);
+  if (workflow.status !== OnboardingStatus.DOCS_PENDING &&
+      workflow.status !== OnboardingStatus.DOCS_EXTRACTED &&
+      workflow.status !== OnboardingStatus.ENTITY_INFO_PENDING) {
+    return c.json({ error: `Cannot upload formation documents in status: ${workflow.status}` }, 400);
+  }
+
+  // Parse the multipart upload; all three files are required.
+  const form = await c.req.parseBody();
+  const asBuffer = async (v: unknown): Promise<Buffer | null> => {
+    if (v && typeof (v as any).arrayBuffer === 'function') {
+      return Buffer.from(await (v as any).arrayBuffer());
+    }
+    return null;
+  };
+  const [aoc, bylaws, boardConsent] = await Promise.all([
+    asBuffer(form['aoc']), asBuffer(form['bylaws']), asBuffer(form['boardConsent']),
+  ]);
+  if (!aoc || !bylaws || !boardConsent) {
+    return c.json({ error: MISSING_DOCS_MSG, missingDocs: true }, 400);
+  }
+
+  // Extract the company details from the three PDFs via Claude.
+  let extracted;
+  try {
+    extracted = await extractFormationDocuments({ aoc, bylaws, boardConsent });
+  } catch (err: any) {
+    console.error('[onboarding] formation-doc extraction failed:', err?.message || err);
+    return c.json({ error: 'We couldn\'t read those documents. Make sure each is a clear PDF and try again.' }, 502);
+  }
+
+  // Store the PDFs to the company's Drive folder (best-effort; extraction is the
+  // thing that must succeed).
+  const now = new Date().toISOString();
+  let aocUrl: string | null = null, bylawsUrl: string | null = null, consentUrl: string | null = null;
+  if (drive.isConfigured()) {
+    try {
+      let folderId = workflow.driveFolderId;
+      if (!folderId) {
+        const folder = await drive.createCompanyFolder(founder.companyName || `company-${founder.id}`);
+        folderId = folder.id;
+        await db.update(onboardingWorkflows).set({ driveFolderId: folder.id, driveFolderUrl: folder.webViewLink }).where(eq(onboardingWorkflows.id, workflow.id));
+      }
+      const safe = (founder.companyName || 'company').replace(/[^a-z0-9]+/gi, '-');
+      const [f1, f2, f3] = await Promise.all([
+        drive.uploadDocument(folderId, `${safe}-articles-of-incorporation.pdf`, aoc, 'application/pdf'),
+        drive.uploadDocument(folderId, `${safe}-bylaws.pdf`, bylaws, 'application/pdf'),
+        drive.uploadDocument(folderId, `${safe}-board-consent.pdf`, boardConsent, 'application/pdf'),
+      ]);
+      aocUrl = f1.webViewLink; bylawsUrl = f2.webViewLink; consentUrl = f3.webViewLink;
+    } catch (err: any) {
+      console.error('[onboarding] Drive upload of formation docs failed:', err?.message || err);
+    }
+  }
+
+  // Save extracted fields + doc links on the workflow.
+  await db.update(onboardingWorkflows).set({
+    status: OnboardingStatus.DOCS_EXTRACTED,
+    articlesOfIncorporationUrl: aocUrl ?? workflow.articlesOfIncorporationUrl,
+    bylawsUrl: bylawsUrl ?? workflow.bylawsUrl,
+    boardConsentUrl: consentUrl ?? workflow.boardConsentUrl,
+    entityName: extracted.entityName ?? workflow.entityName,
+    entityType: extracted.entityType ?? workflow.entityType,
+    entityState: extracted.entityState ?? workflow.entityState,
+    authorizedShares: extracted.authorizedShares ?? workflow.authorizedShares,
+    sharePrice: extracted.parValue ?? workflow.sharePrice,
+    incorporationDate: extracted.incorporationDate ?? workflow.incorporationDate,
+    extractionRaw: JSON.stringify(extracted),
+    extractedAt: now,
+    intakeType: 'docs_first',
+    updatedAt: now,
+  }).where(eq(onboardingWorkflows.id, workflow.id));
+
+  // Pre-fill board members from the extraction (founder edits/confirms next).
+  await db.delete(boardMembers).where(eq(boardMembers.workflowId, workflow.id));
+  for (const m of (extracted.boardMembers || [])) {
+    if (!m.name) continue;
+    await db.insert(boardMembers).values({
+      workflowId: workflow.id,
+      name: m.name,
+      email: m.email || '',
+      title: m.title || null,
+      isFounder: (m.email || '').toLowerCase() === founder.email.toLowerCase(),
+      createdAt: now,
+    });
+  }
+
+  await logOnboardingEvent(workflow.id, OnboardingEventType.FORMATION_DOCS_EXTRACTED, founder.email, {
+    entityName: extracted.entityName,
+    authorizedShares: extracted.authorizedShares,
+    boardMemberCount: (extracted.boardMembers || []).length,
+    warnings: extracted.warnings || [],
+  });
+
+  return c.json({ success: true, extracted, warnings: extracted.warnings || [] });
+});
+
 // Submit entity info
 app.post('/onboarding/entity-info', async (c) => {
   const founderId = c.get('founderId') as number;
@@ -1177,7 +1312,9 @@ app.post('/onboarding/entity-info', async (c) => {
     entityType: z.enum(['llc', 'c_corp', 's_corp', 'partnership', 'sole_prop', 'other']),
     entityState: z.string().min(2).max(2), // State code
     ein: z.string().min(1, 'EIN is required'),
-    articlesOfIncorporationUrl: z.string().min(1, 'Articles of incorporation are required'),
+    // Optional here: in the docs-first flow the AoC link is already stored from
+    // the formation-document upload; the confirm step doesn't re-ask for it.
+    articlesOfIncorporationUrl: z.string().optional(),
     authorizedShares: z.number().positive(),
     sharePrice: z.string().optional(), // Defaults to 0.0001 if not provided
     founderTitle: z.string().optional(), // Defaults to 'Founder & CEO' if not provided
@@ -1218,7 +1355,8 @@ app.post('/onboarding/entity-info', async (c) => {
   }
 
   if (workflow.status !== OnboardingStatus.OFFER_ACCEPTED &&
-      workflow.status !== OnboardingStatus.ENTITY_INFO_PENDING) {
+      workflow.status !== OnboardingStatus.ENTITY_INFO_PENDING &&
+      workflow.status !== OnboardingStatus.DOCS_EXTRACTED) {
     return c.json({ error: `Cannot submit entity info in status: ${workflow.status}` }, 400);
   }
 
@@ -1234,7 +1372,7 @@ app.post('/onboarding/entity-info', async (c) => {
       entityType: parsed.data.entityType,
       entityState: parsed.data.entityState,
       ein: parsed.data.ein,
-      articlesOfIncorporationUrl: parsed.data.articlesOfIncorporationUrl,
+      articlesOfIncorporationUrl: parsed.data.articlesOfIncorporationUrl || workflow.articlesOfIncorporationUrl,
       authorizedShares: parsed.data.authorizedShares,
       sharePrice,
       founderTitle,
@@ -1243,7 +1381,9 @@ app.post('/onboarding/entity-info', async (c) => {
     })
     .where(eq(onboardingWorkflows.id, workflow.id));
 
-  // Save board members
+  // Save board members. Replace any rows pre-filled from the formation-doc
+  // extraction so the founder's confirmed list is authoritative (no duplicates).
+  await db.delete(boardMembers).where(eq(boardMembers.workflowId, workflow.id));
   for (const member of parsed.data.boardMembers) {
     await db.insert(boardMembers).values({
       workflowId: workflow.id,

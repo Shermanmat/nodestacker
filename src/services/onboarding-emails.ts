@@ -129,7 +129,7 @@ function formatVestingSchedule(vestingMonths: number, vestingCliffMonths: number
  * Email: MatCap wants to work with you
  */
 export async function sendOfferEmail(founder: FounderInfo, equityPercent: string, offer: OfferDetails): Promise<EmailResult> {
-  const subject = `Your Offer To Join The MatCap Network`;
+  const subject = `Your Offer To Join The MatCap Portfolio`;
   const portalUrl = `${BASE_URL}/founder`;
   const vestingText = formatVestingSchedule(offer.vestingMonths, offer.vestingCliffMonths);
   const firstName = founder.name.split(' ')[0];
@@ -499,12 +499,12 @@ Mat`;
  * Email: Light engagement confirmation (side project path)
  */
 export async function sendLightEngagementConfirmationEmail(founder: FounderInfo): Promise<EmailResult> {
-  const subject = `Welcome to the MatCap network`;
+  const subject = `Welcome to the MatCap portfolio`;
   const firstName = founder.name.split(' ')[0];
 
   const htmlBody = wrapEmail(`
     <h2>Hi ${firstName},</h2>
-    <p>No rush on incorporation - we're glad to have you in the network!</p>
+    <p>No rush on incorporation - we're glad to have you in the portfolio!</p>
     <p>Here's what this means:</p>
     <ul>
       <li>You'll have access to MatCap events and office hours</li>
@@ -516,7 +516,7 @@ export async function sendLightEngagementConfirmationEmail(founder: FounderInfo)
 
   const textBody = `Hi ${firstName},
 
-No rush on incorporation - we're glad to have you in the network!
+No rush on incorporation - we're glad to have you in the portfolio!
 
 Here's what this means:
 - You'll have access to MatCap events and office hours

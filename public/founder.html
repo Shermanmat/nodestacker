@@ -586,7 +586,7 @@
 
                 <!-- Accept Offer -->
                 <div v-if="onboarding.nextAction.type === 'accept_offer'">
-                  <p class="text-sm text-gray-500 mb-3">By accepting, you're indicating your intent to join the MatCap network on these terms. This is not a legally binding agreement — the formal paperwork comes next.</p>
+                  <p class="text-sm text-gray-500 mb-3">By accepting, you're indicating your intent to join the MatCap portfolio on these terms. This is not a legally binding agreement — the formal paperwork comes next.</p>
                   <button @click="acceptOffer" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
                     I'm In — Let's Get Started
                   </button>
@@ -671,7 +671,42 @@
                 </div>
 
                 <!-- Entity Info Form -->
-                <div v-if="onboarding.nextAction.type === 'entity_info'" class="space-y-4">
+                <!-- Formation document upload (AoC + bylaws + board consent) -->
+                <div v-if="onboarding.nextAction.type === 'upload_formation_docs'" class="space-y-4">
+                  <p class="text-sm text-gray-600">Upload your three formation documents and we'll pull your company details out automatically — entity name, share count, board members, and more. No manual typing.</p>
+                  <div class="space-y-4">
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Articles of Incorporation <span class="text-red-500">*</span></label>
+                      <input type="file" accept="application/pdf" @change="onDocFile('aoc', $event)"
+                        class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium hover:file:bg-blue-100">
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Bylaws <span class="text-red-500">*</span></label>
+                      <input type="file" accept="application/pdf" @change="onDocFile('bylaws', $event)"
+                        class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium hover:file:bg-blue-100">
+                    </div>
+                    <div>
+                      <label class="block text-sm font-medium text-gray-700 mb-1">Initial board consent <span class="text-red-500">*</span></label>
+                      <input type="file" accept="application/pdf" @change="onDocFile('boardConsent', $event)"
+                        class="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-medium hover:file:bg-blue-100">
+                    </div>
+                  </div>
+                  <p class="text-xs text-gray-400">All three are required. Incorporated through Stripe Atlas or Clerky? All three are in your account.</p>
+                  <p v-if="docError" class="text-sm text-red-600">{{ docError }}</p>
+                  <button @click="uploadFormationDocs" :disabled="uploadingDocs"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">
+                    {{ uploadingDocs ? 'Reading your documents…' : 'Upload & auto-fill' }}
+                  </button>
+                </div>
+
+                <div v-if="['entity_info','confirm_entity_info'].includes(onboarding.nextAction.type)" class="space-y-4">
+                  <div v-if="onboarding.nextAction.type === 'confirm_entity_info'" class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm text-blue-900 font-medium">We pulled these from your formation documents.</p>
+                    <p class="text-sm text-blue-800 mt-1">Give them a quick check, fix anything that looks off, and add your EIN (it's not in your formation docs).</p>
+                    <ul v-if="onboarding.extractionWarnings && onboarding.extractionWarnings.length" class="mt-3 text-sm text-amber-700 list-disc list-inside space-y-1">
+                      <li v-for="(w, i) in onboarding.extractionWarnings" :key="i">{{ w }}</li>
+                    </ul>
+                  </div>
                   <div class="grid grid-cols-2 gap-4">
                     <div>
                       <label class="block text-sm font-medium text-gray-700 mb-1">Legal Entity Name</label>
@@ -698,7 +733,7 @@
                     </div>
                   </div>
 
-                  <div class="mt-4">
+                  <div v-if="onboarding.nextAction.type === 'entity_info'" class="mt-4">
                     <label class="block text-sm font-medium text-gray-700 mb-1">Articles of Incorporation / EIN Confirmation Letter</label>
                     <input v-model="entityForm.articlesOfIncorporationUrl" type="text" class="w-full border rounded px-3 py-2" placeholder="Google Drive, Dropbox, or other link">
                     <p class="text-xs text-gray-400 mt-1">Upload to Google Drive or Dropbox and paste the share link here</p>
@@ -751,7 +786,7 @@
                   </div>
 
                   <button @click="submitEntityInfo" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-                    Submit Company Details
+                    {{ onboarding.nextAction.type === 'confirm_entity_info' ? 'Confirm & continue' : 'Submit Company Details' }}
                   </button>
                 </div>
 
@@ -2137,12 +2172,59 @@
         const loadOnboarding = async (setTab = false) => {
           try {
             onboarding.value = await api('/portal/onboarding/status') || { hasOnboarding: false };
+            // Pre-fill the confirm form with what we extracted from the founder's
+            // formation documents (they review/correct, then add their EIN).
+            const wf = onboarding.value.workflow;
+            if (onboarding.value.nextAction?.type === 'confirm_entity_info' && wf) {
+              entityForm.entityName = wf.entityName || '';
+              entityForm.entityType = wf.entityType || 'c_corp';
+              entityForm.entityState = wf.entityState || 'DE';
+              entityForm.ein = wf.ein || '';
+              entityForm.authorizedShares = wf.authorizedShares || 10000000;
+              entityForm.sharePrice = wf.sharePrice || '0.0001';
+              entityForm.founderTitle = wf.founderTitle || 'Founder & CEO';
+              const bm = (onboarding.value.boardMembers || []).map(m => ({ name: m.name, email: m.email, title: m.title || '' }));
+              entityForm.boardMembers = bm.length ? bm : [{ name: '', email: '', title: '' }];
+            }
             // If there's active onboarding (not completed), switch to onboarding tab
             if (setTab && onboarding.value.hasOnboarding && onboarding.value.workflow?.status !== 'completed') {
               activeTab.value = 'onboarding';
             }
           } catch (e) {
             onboarding.value = { hasOnboarding: false };
+          }
+        };
+
+        // ===== Formation-document upload (AoC + bylaws + board consent) =====
+        const docFiles = reactive({ aoc: null, bylaws: null, boardConsent: null });
+        const uploadingDocs = ref(false);
+        const docError = ref('');
+        const onDocFile = (kind, e) => { docFiles[kind] = (e.target.files && e.target.files[0]) || null; };
+        const uploadFormationDocs = async () => {
+          docError.value = '';
+          if (!docFiles.aoc || !docFiles.bylaws || !docFiles.boardConsent) {
+            docError.value = 'Please attach all three documents to continue.';
+            return;
+          }
+          uploadingDocs.value = true;
+          try {
+            const fd = new FormData();
+            fd.append('aoc', docFiles.aoc);
+            fd.append('bylaws', docFiles.bylaws);
+            fd.append('boardConsent', docFiles.boardConsent);
+            const res = await fetch('/api/portal/onboarding/upload-formation-docs', {
+              method: 'POST',
+              headers: { 'X-Session-Id': getSessionId() }, // no Content-Type — browser sets the multipart boundary
+              body: fd,
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.status === 401) { clearSession(); session.value = null; return; }
+            if (!res.ok) { docError.value = data.error || 'Upload failed. Please try again.'; return; }
+            await loadOnboarding();
+          } catch (e) {
+            docError.value = 'Upload failed: ' + e.message;
+          } finally {
+            uploadingDocs.value = false;
           }
         };
 
@@ -2484,6 +2566,7 @@
           showNotIncorporatedOptions, incorporationPath, selectedPartner,
           equityCommitmentName, equityCommitmentAcknowledged,
           loadOnboarding, acceptOffer, submitEntityInfo, approveBoardConsent, uploadWireInfo, uploadCertificate,
+          docFiles, uploadingDocs, docError, onDocFile, uploadFormationDocs,
           answerIncorporation, signEquityCommitment, confirmIncorporation, formatPartnerName,
           formatOnboardingStatus, formatVestingSchedule,
         };

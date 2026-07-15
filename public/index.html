@@ -144,6 +144,22 @@
                  radial-gradient(50% 50% at 82% 90%, rgba(255,90,52,0.14), transparent 60%); }
 
     @media (max-width:860px){ .mo-loop{grid-template-columns:1fr 1fr} .mo-gym,.mo-habits{grid-template-columns:1fr} }
+    @media (max-width:600px){
+      .mo-hero{ padding:112px 20px 60px; }
+      .mo-hero h1{ font-size:clamp(34px,9vw,92px); }
+      .mo-hero .sub{ font-size:16px; margin-top:18px; }
+      .mo-cta{ margin-top:30px; }
+      .mo-cta .mo-btn{ width:100%; text-align:center; }
+      .mo-section{ padding:64px 20px; }
+      .mo-head{ margin-bottom:38px; }
+      .mo-loop{ grid-template-columns:1fr; }
+      /* Case Studies grid carries an inline 2-col style — override it so the
+         cards don't overflow the viewport on phones. */
+      .portfolio-grid{ grid-template-columns:1fr !important; }
+      .mo-habit{ padding:16px 18px; }
+      .mo-price-num{ font-size:clamp(88px,34vw,210px); }
+      .mo-price-principles > div{ padding:24px 20px; }
+    }
     @media (prefers-reduced-motion:reduce){ .mo-meter span{animation:none} .mo-btn{transition:none} }
   </style>
 </head>
@@ -255,19 +271,59 @@
       <h2 class="mo-display">Getting the meeting is half the battle. <span class="mo-grad">Running it is the other half.</span></h2>
       <p>So we train you for both.</p>
     </div>
-    <div class="mo-gym reveal">
-      <div class="card">
-        <div class="ic">🎭</div>
-        <h3>Practice against realistic AI VCs</h3>
-        <p>Step into the Pitch Gym and pitch a range of lifelike investor personas — a fund GP, a junior associate at a small fund, a check-writer at a big hedge fund, an angel. Each reacts differently, just like the real thing. Reps any time, with a blunt readout on what landed and what didn't.</p>
-      </div>
-      <div class="card">
-        <div class="ic">🎧</div>
-        <h3>Coaching on your real meetings</h3>
-        <p>We get you set up on Granola so every investor call is captured. After each one, we review the transcript and send you specific coaching — exactly what to tighten before the next.</p>
+    <!-- Practice against realistic AI VCs -->
+    <div class="reveal">
+      <h3 class="rr-subhead">🎭 Practice against realistic AI VCs</h3>
+      <p class="rr-sublede">Step into the Pitch Gym and pitch lifelike investor personas over live video — each reacts differently, just like the real thing. Reps any time, with a blunt readout on what landed and what didn't.</p>
+      <div class="vc-personas">
+        <div class="vc-persona">
+          <div class="vc-avatar ph-gp">🧑🏻‍💼</div>
+          <div class="vc-name">The GP</div>
+          <span class="vc-diff diff-standard">Standard</span>
+          <p class="vc-tag">Runs a real first pitch — warm open, then digs into market, traction, and your ask.</p>
+        </div>
+        <div class="vc-persona">
+          <div class="vc-avatar ph-assoc">🧑🏽‍💻</div>
+          <div class="vc-name">The Associate</div>
+          <span class="vc-diff diff-warm">Warm</span>
+          <p class="vc-tag">A junior at a small fund — eager and curious, tests how clearly you explain.</p>
+        </div>
+        <div class="vc-persona">
+          <div class="vc-avatar ph-hedge">🕴🏼</div>
+          <div class="vc-name">The Check-Writer</div>
+          <span class="vc-diff diff-hard">Hard</span>
+          <p class="vc-tag">A partner at a big fund — skeptical, numbers-first, no patience for fluff.</p>
+        </div>
+        <div class="vc-persona">
+          <div class="vc-avatar ph-angel">😇</div>
+          <div class="vc-name">The Angel</div>
+          <span class="vc-diff diff-warm">Warm</span>
+          <p class="vc-tag">An operator writing their own check — cares about you, the wedge, and why now.</p>
+        </div>
       </div>
     </div>
-    <p class="mo-gym-note reveal">The better you get in the room, the more investors say yes — <strong>and the more your pace climbs.</strong></p>
+
+    <!-- Coaching on every real call -->
+    <div class="reveal" style="margin-top:72px">
+      <h3 class="rr-subhead">🎧 Coaching on every real call</h3>
+      <p class="rr-sublede">We get you set up on Granola so every investor call is captured — then Mat coaches you on it. Pitch and positioning feedback, investor updates, and celebrating the wins, straight from the DMs.</p>
+      <div class="proof-wall">
+        <figure class="proof-shot">
+          <img src="/proof/coaching-whynow.jpg" alt="Mat coaching a founder on their 'why now' statement" loading="lazy">
+          <figcaption>Sharpening the &ldquo;why now&rdquo;</figcaption>
+        </figure>
+        <figure class="proof-shot">
+          <img src="/proof/coaching-deck.jpg" alt="Honest deck feedback, then a call to simplify the story" loading="lazy">
+          <figcaption>Straight deck feedback &rarr; a call</figcaption>
+        </figure>
+        <figure class="proof-shot">
+          <img src="/proof/coaching-intros.jpg" alt="Offering intros and celebrating a founder's traction" loading="lazy">
+          <figcaption>Intros, and celebrating the wins</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <p class="mo-gym-note reveal" style="margin-top:56px">The better you get in the room, the more investors say yes — <strong>and the more your pace climbs.</strong></p>
   </div>
 </section>
 
@@ -394,21 +450,6 @@
       <div class="photo"><img src="/events/irl-4.png" alt=""></div>
     </div>
 
-    <p class="section-lede reveal" style="margin-top:64px">And the coaching doesn't stop at intros. Real threads from Mat's DMs — pitch and positioning feedback, investor updates, and celebrating the wins.</p>
-    <div class="proof-wall reveal">
-      <figure class="proof-shot">
-        <img src="/proof/coaching-whynow.jpg" alt="Mat coaching a founder on their 'why now' statement" loading="lazy">
-        <figcaption>Sharpening the &ldquo;why now&rdquo;</figcaption>
-      </figure>
-      <figure class="proof-shot">
-        <img src="/proof/coaching-deck.jpg" alt="Honest deck feedback, then a call to simplify the story" loading="lazy">
-        <figcaption>Straight deck feedback &rarr; a call</figcaption>
-      </figure>
-      <figure class="proof-shot">
-        <img src="/proof/coaching-intros.jpg" alt="Offering intros and celebrating a founder's traction" loading="lazy">
-        <figcaption>Intros, and celebrating the wins</figcaption>
-      </figure>
-    </div>
   </div>
 </section>
 
@@ -515,5 +556,6 @@
 </footer>
 
 <script src="/scripts/matcap.js"></script>
+  <script src="/scripts/nav.js"></script>
 </body>
 </html>

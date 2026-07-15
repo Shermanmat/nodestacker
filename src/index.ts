@@ -1154,6 +1154,24 @@ cron.schedule('*/5 * * * *', async () => {
   }
 });
 
+// Close-the-loop nudges — daily 17:30 UTC (10:30am Arizona). Emails founders to
+// report how an intro went while it's stuck in 'introduced' (nudge at 10 days,
+// again at 20, then stop). GATED: runs dry-run/preview only until the env flag
+// CLOSE_LOOP_ENABLED=true is set, so shipping this cron doesn't email anyone
+// until we deliberately turn it on.
+cron.schedule('30 17 * * *', async () => {
+  const enabled = process.env.CLOSE_LOOP_ENABLED === 'true';
+  console.log(`[CRON] Running close-the-loop nudges (enabled=${enabled})...`);
+  try {
+    const { runCloseTheLoop } = await import('./services/close-the-loop.js');
+    const { withCronRun } = await import('./services/cron-log.js');
+    const result = await withCronRun('close_the_loop', () => runCloseTheLoop({ dryRun: !enabled }));
+    console.log('[CRON] Close-the-loop result:', result);
+  } catch (err) {
+    console.error('[CRON] Close-the-loop failed:', err);
+  }
+}, { timezone: 'UTC' });
+
 console.log('[CRON] Trial decision nudge scheduled for daily 16:30 UTC (9:30am Arizona)');
 console.log('[CRON] Reply classifier scheduled hourly at :15');
 console.log('[CRON] Investor discovery scheduled daily at 15:00 UTC');

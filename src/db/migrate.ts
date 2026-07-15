@@ -219,6 +219,27 @@ safeAddColumn('intro_requests', 'founder_next_action_date', 'text');
 safeAddColumn('intro_requests', 'founder_check_size', 'text');
 safeAddColumn('intro_requests', 'founder_owned_notes', 'text');
 
+// Close-the-loop nudge tracking — email reminders to report an intro's outcome.
+// Count drives the cadence (0 → 10-day nudge, 1 → 20-day nudge, ≥2 → stop).
+safeAddColumn('intro_requests', 'close_loop_nudge_count', 'integer NOT NULL DEFAULT 0');
+safeAddColumn('intro_requests', 'close_loop_nudge_last_at', 'text');
+// One-time grandfather: every intro already 'introduced' when this shipped is
+// treated as already-nudged, so close-the-loop only ever nudges intros
+// introduced from the cutoff date forward ("start fresh with new ones"). The
+// cutoff is a FIXED date, which makes this idempotent across deploys — it can
+// never neutralize a genuinely new intro (those have a later date_introduced).
+try {
+  const GRANDFATHER_BEFORE = '2026-07-16'; // ship date + 1: grandfathers everything through 2026-07-15
+  const r = sqlite.prepare(
+    `UPDATE intro_requests SET close_loop_nudge_count = 2
+     WHERE status = 'introduced' AND close_loop_nudge_count = 0
+       AND COALESCE(date_introduced, substr(updated_at, 1, 10)) < ?`
+  ).run(GRANDFATHER_BEFORE);
+  if (r.changes > 0) console.log(`  Close-loop: grandfathered ${r.changes} pre-existing introduced intros (no nudge)`);
+} catch (e: any) {
+  if (!e.message?.includes('no such column')) throw e;
+}
+
 // Founder CRM tables — private to each founder, no admin endpoint reads them.
 try {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS \`founder_investor_records\` (

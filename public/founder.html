@@ -335,7 +335,11 @@
                       class="w-full bg-transparent border-0 px-0 py-0 text-sm focus:bg-yellow-50 focus:ring-0 focus:outline-none" />
                   </td>
                   <td class="py-2 px-3 text-gray-600 text-xs max-w-[180px] truncate">{{ row.founderNotes || '—' }}</td>
-                  <td class="py-2 px-3 text-right text-gray-400">›</td>
+                  <td class="py-2 px-3 text-right whitespace-nowrap" @click.stop>
+                    <button v-if="row.kind === 'matcap_intro'" @click="openOutcomeReporter(row)"
+                      class="text-xs font-medium text-blue-600 hover:underline">Report outcome →</button>
+                    <span v-else class="text-gray-400">›</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -410,9 +414,14 @@
                 <span v-if="detailRow.source === 'warm_intro' && detailRow.warmIntroConnector" class="text-gray-500">via {{ detailRow.warmIntroConnector }}</span>
               </div>
               <div class="mt-4 flex gap-2">
-                <button @click="openInteractionModal('meeting')" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">+ Log meeting</button>
-                <button @click="openInteractionModal('note')" class="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200">+ Note</button>
-                <button @click="openInteractionModal('email')" class="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200">+ Email</button>
+                <!-- MatCap intro: report the outcome (drives accept rate + bonus requests). -->
+                <button v-if="detailRow.kind === 'matcap_intro'" @click="openOutcomeReporter(detailRow)" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">📣 Report outcome</button>
+                <!-- Self-tracked investor: free-form interaction log. -->
+                <template v-else>
+                  <button @click="openInteractionModal('meeting')" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700">+ Log meeting</button>
+                  <button @click="openInteractionModal('note')" class="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200">+ Note</button>
+                  <button @click="openInteractionModal('email')" class="text-xs bg-gray-100 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-200">+ Email</button>
+                </template>
                 <button v-if="detailRow.kind === 'self_record'" @click="deleteSelfRecord" class="ml-auto text-xs text-red-600 hover:underline">Delete</button>
               </div>
             </div>
@@ -1443,8 +1452,8 @@
             <input v-model="introUpdate.nextFollowupDate" type="date" class="w-full border rounded px-3 py-2">
           </div>
           <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <textarea v-model="introUpdate.notes" rows="3" class="w-full border rounded px-3 py-2"></textarea>
+            <label class="block text-sm font-medium text-gray-700 mb-1">How did it go? <span class="text-gray-400 font-normal">(optional — shared with the MatCap team)</span></label>
+            <textarea v-model="introUpdate.notes" rows="3" class="w-full border rounded px-3 py-2" placeholder="What did they say? Next steps? Anything we should know?"></textarea>
           </div>
           <div class="flex justify-end space-x-3">
             <button @click="showIntroModal = false" class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>
@@ -2075,9 +2084,28 @@
           return res.json();
         };
 
+        // Deep-link target from an email CTA (?intro=<id>): open that intro's
+        // outcome reporter once we're logged in and the pipeline has loaded.
+        const pendingIntroId = ref(null);
+
+        const applyDeepLink = async () => {
+          if (!pendingIntroId.value) return;
+          const id = pendingIntroId.value;
+          pendingIntroId.value = null;
+          activeTab.value = 'pipeline';         // wins over any tab loadData() set
+          await loadCrm();                       // make sure the row exists before opening
+          const row = (crmRows.value || []).find(
+            r => r.kind === 'matcap_intro' && Number(r.id) === id
+          );
+          if (row) openOutcomeReporter(row);
+        };
+
         const checkSession = async () => {
-          // Check for token in URL
+          // Capture the deep-link intro id BEFORE we strip the URL below.
           const params = new URLSearchParams(window.location.search);
+          const introParam = parseInt(params.get('intro'), 10);
+          if (introParam) pendingIntroId.value = introParam;
+
           const token = params.get('token');
           if (token) {
             try {
@@ -2091,9 +2119,12 @@
                 setSessionId(result.sessionId);
                 session.value = result;
                 window.history.replaceState({}, '', '/founder.html');
-                loadData();
+                await loadData();
+                applyDeepLink();
                 return;
               }
+              // Token invalid/consumed (e.g. a second deep-link click after the
+              // first already logged in) — fall through to the stored session.
             } catch (e) {
               loginError.value = 'Invalid or expired link';
             }
@@ -2106,7 +2137,9 @@
               const result = await api('/auth/session');
               if (result) {
                 session.value = result;
-                loadData();
+                window.history.replaceState({}, '', '/founder.html');
+                await loadData();
+                applyDeepLink();
               }
             } catch (e) {
               clearSession();
@@ -2496,6 +2529,23 @@
           showIntroModal.value = true;
         };
 
+        // Open the outcome reporter from a Pipeline CRM row. The /investor-crm
+        // endpoint returns matcap_intro rows with a numeric `id` (the intro id) —
+        // map that onto what the Update Intro modal expects, then open it.
+        const openOutcomeReporter = (row) => {
+          const introId = Number(row.id);
+          if (!introId || row.kind !== 'matcap_intro') return;
+          selectedIntro.value = {
+            id: introId,
+            investor: { name: row.investorName, firm: row.firm },
+            node: { name: row.nodeName },
+          };
+          introUpdate.status = '';
+          introUpdate.nextFollowupDate = row.nextActionDate || '';
+          introUpdate.notes = '';
+          showIntroModal.value = true;
+        };
+
         const submitIntroUpdate = async () => {
           try {
             const body = {};
@@ -2508,7 +2558,9 @@
               body,
             });
             showIntroModal.value = false;
-            loadData();
+            closeRowDetail();      // close the pipeline drawer if it was open
+            loadCrm();             // refresh the pipeline so the new status shows
+            loadData();            // refresh overview/treadmill (status feeds the pace)
           } catch (e) {
             alert(e.message);
           }
@@ -2541,7 +2593,7 @@
           selectedIntro, introUpdate,
           requestMagicLink, logout,
           formatStatus, statusClass, isOverdue,
-          showIntroDetail, submitIntroUpdate, showTaskAction,
+          showIntroDetail, submitIntroUpdate, openOutcomeReporter, showTaskAction,
           toggleFounderFilter, clearFounderFilters, toggleResearchExpand,
           truncateText, extractFounderPrefs,
           // Investor Comms

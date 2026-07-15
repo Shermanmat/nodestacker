@@ -214,6 +214,11 @@ export const introRequests = sqliteTable('intro_requests', {
   // Follow-up tracking
   followupCount: integer('followup_count').notNull().default(0),
   lastFollowupAt: text('last_followup_at'),
+  // Close-the-loop nudges: email reminders asking the founder to report how an
+  // intro went while it's stuck in 'introduced'. Count drives the cadence —
+  // 0 → send at 10 days, 1 → send at 20 days, ≥2 → stop. See services/close-the-loop.ts.
+  closeLoopNudgeCount: integer('close_loop_nudge_count').notNull().default(0),
+  closeLoopNudgeLastAt: text('close_loop_nudge_last_at'),
   notes: text('notes'),
   // Founder-side CRM fields. Separate from admin-side `notes` so a founder
   // can keep their own diligence notes / next-action without polluting the

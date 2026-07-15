@@ -481,10 +481,39 @@ app.put('/my-intros/:id', async (c) => {
   }
 
   const now = new Date().toISOString();
+  const { notes, ...outcome } = parsed.data;
+
+  // Build the update explicitly. The founder's free-text note goes to
+  // `founderOwnedNotes` (their column), NOT the admin `notes` column — writing
+  // there would silently overwrite whatever the admin has written on this intro.
+  const updates: Record<string, unknown> = { ...outcome, updatedAt: now };
+  if (notes !== undefined) updates.founderOwnedNotes = notes;
+
   const result = await db.update(introRequests)
-    .set({ ...parsed.data, updatedAt: now })
+    .set(updates)
     .where(eq(introRequests.id, introId))
     .returning();
+
+  // When a founder reports a meeting actually happened, record a founder-completed
+  // meeting_update followup log. This is what the treadmill counts toward the
+  // "every 3 meetings → +1 bonus request" carrot — otherwise that loop is unearnable
+  // (nothing else creates a completedBy:'founder' log from the portal). Guarded on a
+  // real status transition so resubmitting the same outcome doesn't double-count.
+  const reportsMeeting =
+    outcome.status === 'first_meeting_complete' ||
+    outcome.status === 'second_meeting_complete';
+  if (reportsMeeting && outcome.status !== intro.status) {
+    await db.insert(followupLogs).values({
+      introRequestId: introId,
+      followupType: 'meeting_update',
+      completedBy: 'founder',
+      completedAt: now,
+      notes: notes ?? null,
+    });
+    await db.update(introRequests)
+      .set({ lastFollowupDate: now.split('T')[0] })
+      .where(eq(introRequests.id, introId));
+  }
 
   return c.json(result[0]);
 });

@@ -619,6 +619,32 @@ section{position:relative;overflow:hidden}
 }
 .photo-grid .photo:hover img{transform:scale(1.04)}
 
+/* Wall of proof — real chat threads, shown as a light pile of receipts */
+.proof-wall{
+  display:flex;flex-wrap:wrap;gap:22px;justify-content:center;
+  align-items:flex-start;margin:32px auto 0;max-width:1080px;
+}
+.proof-shot{
+  margin:0;width:320px;max-width:88vw;background:#fff;
+  border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;
+  box-shadow:0 14px 44px rgba(10,10,15,.13);
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+.proof-shot:nth-child(odd){transform:rotate(-1.4deg)}
+.proof-shot:nth-child(even){transform:rotate(1.4deg)}
+.proof-shot:hover{transform:rotate(0) translateY(-4px);box-shadow:0 20px 60px rgba(10,10,15,.2);z-index:2}
+.proof-shot img{
+  width:100%;display:block;
+  max-height:430px;object-fit:cover;object-position:top;
+  -webkit-mask-image:linear-gradient(#000 78%,transparent);
+          mask-image:linear-gradient(#000 78%,transparent);
+}
+.proof-shot figcaption{
+  font-family:var(--display);font-size:14px;font-weight:600;color:#333;
+  text-align:center;padding:2px 14px 16px;
+}
+@media (max-width:640px){ .proof-shot:nth-child(n){transform:none} }
+
 /* Portfolio grid */
 .portfolio-grid{
   display:grid;grid-template-columns:repeat(3,1fr);

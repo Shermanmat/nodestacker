@@ -11,7 +11,7 @@
 
 import { Hono } from 'hono';
 import { eq } from 'drizzle-orm';
-import { db, applicantVcCalls, applicantTranscripts, publicCompanies, publicUsers } from '../db/index.js';
+import { db, applicantVcCalls, applicantTranscripts, publicCompanies, publicUsers, aiInterviewInvites } from '../db/index.js';
 import { z } from 'zod';
 import * as postmark from 'postmark';
 import { createConversation, getConversation, formatTranscript } from '../services/tavus.js';
@@ -25,6 +25,39 @@ const postmarkClient = process.env.POSTMARK_API_KEY
 
 // Cap the applicant call so a public endpoint can't run up Tavus cost.
 const MAX_CALL_SECS = 8 * 60;
+
+// Resolve an admin-issued interview invite token to the application it's scoped
+// to, so the emailed link never carries a raw, guessable company id. The
+// onboarding page calls this first, then reuses the normal /start + /complete.
+app.get('/invite/:token', async (c) => {
+  const token = c.req.param('token');
+  const invite = await db.query.aiInterviewInvites.findFirst({
+    where: eq(aiInterviewInvites.token, token),
+  });
+  if (!invite) return c.json({ error: 'This interview link is invalid or has expired.' }, 404);
+
+  const company = await db.query.publicCompanies.findFirst({
+    where: eq(publicCompanies.id, invite.publicCompanyId),
+  });
+  if (!company) return c.json({ error: 'Application not found' }, 404);
+
+  const existing = await db.query.applicantVcCalls.findFirst({
+    where: eq(applicantVcCalls.publicCompanyId, invite.publicCompanyId),
+  });
+
+  // Mark the invite opened (first visit only) so admin can see it was started.
+  if (invite.status === 'sent') {
+    await db.update(aiInterviewInvites)
+      .set({ status: 'started' })
+      .where(eq(aiInterviewInvites.id, invite.id));
+  }
+
+  return c.json({
+    companyId: invite.publicCompanyId,
+    companyName: company.companyName,
+    alreadyCompleted: existing?.status === 'completed',
+  });
+});
 
 const startSchema = z.object({ publicCompanyId: z.number().int().positive() });
 
@@ -121,6 +154,12 @@ app.post('/complete', async (c) => {
     .update(applicantVcCalls)
     .set({ status: 'completed', transcript, completedAt: new Date().toISOString() })
     .where(eq(applicantVcCalls.id, call.id));
+
+  // If this call came from an admin-issued interview invite, close it out too.
+  await db
+    .update(aiInterviewInvites)
+    .set({ status: 'completed', completedAt: new Date().toISOString() })
+    .where(eq(aiInterviewInvites.publicCompanyId, call.publicCompanyId));
 
   // Notify admin so a human can send feedback on the application.
   notifyAdmin(call.publicCompanyId, 'call', transcript).catch((e) =>

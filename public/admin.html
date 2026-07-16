@@ -3110,6 +3110,18 @@
                 <span class="text-xs text-gray-400 ml-auto">Empty fields revert to source data</span>
               </div>
             </div>
+            <div v-if="directoryDetail.sources.includes('founder_lead')" class="p-5 border-b">
+              <h4 class="text-sm font-semibold text-gray-700 mb-2">AI VC interview</h4>
+              <p class="text-xs text-gray-500 mb-2">Email this lead a link to talk to our AI VC. You'll get the transcript when they finish.</p>
+              <div class="flex items-center gap-2">
+                <button @click="sendAiInterview" :disabled="aiInterviewSending" class="text-xs bg-purple-600 text-white px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50">
+                  {{ aiInterviewSending ? 'Sending…' : 'Send AI interview' }}
+                </button>
+                <span v-if="aiInterviewResult" :class="aiInterviewResult.ok ? 'text-green-600' : 'text-red-600'" class="text-xs">{{ aiInterviewResult.msg }}</span>
+              </div>
+              <input v-if="aiInterviewResult && aiInterviewResult.url" :value="aiInterviewResult.url" readonly onclick="this.select()"
+                class="w-full border rounded px-2 py-1 text-xs text-gray-600 font-mono mt-2">
+            </div>
             <div class="p-5 border-b">
               <h4 class="text-sm font-semibold text-gray-700 mb-2">Tags</h4>
               <div class="flex flex-wrap gap-1 mb-2">
@@ -3222,6 +3234,11 @@
                 </td>
                 <td class="px-4 py-3">
                   <div class="flex gap-2 flex-wrap">
+                    <button v-if="!app._aiInvite" @click="sendAiInterviewForCompany(app)" :disabled="app._aiSending"
+                      class="text-xs text-purple-600 hover:underline font-medium disabled:opacity-50">
+                      {{ app._aiSending ? 'Sending…' : '🎙️ AI interview' }}
+                    </button>
+                    <span v-else class="text-xs text-purple-600 font-medium">{{ app._aiInvite.emailed ? '🎙️ Interview sent ✓' : '🎙️ Invite ready' }}</span>
                     <template v-if="app.applicationStatus === 'applied'">
                       <button @click="approveApplication(app.id)" class="text-xs text-green-600 hover:underline font-medium">Approve</button>
                       <button @click="startTrialForApplicant(app)" class="text-xs text-green-700 hover:underline font-medium">Start trial</button>
@@ -4979,6 +4996,7 @@
             notes: ov.notes ?? '',
           };
           directorySavedAt.value = 0;
+          aiInterviewResult.value = null;
         }
 
         function closeDirectoryDetail() {
@@ -5012,6 +5030,34 @@
             console.error('saveDirectoryOverride failed:', e);
           } finally {
             directorySaving.value = false;
+          }
+        }
+
+        // Proactively invite a lead to talk to the AI VC (the optional
+        // interview step, triggered from here instead of only post-application).
+        const aiInterviewSending = ref(false);
+        const aiInterviewResult = ref(null);
+
+        async function sendAiInterview() {
+          if (!directoryDetail.value || aiInterviewSending.value) return;
+          const email = directoryDetail.value.email;
+          const who = directoryDetail.value.name || email;
+          if (!confirm(`Email ${who} an invite to talk to the AI VC?`)) return;
+          aiInterviewSending.value = true;
+          aiInterviewResult.value = null;
+          try {
+            const res = await api('/admin/people/ai-interview', { method: 'POST', body: { email } });
+            aiInterviewResult.value = {
+              ok: !!(res && res.emailed),
+              msg: res && res.emailed
+                ? `Invite emailed to ${res.to || email} ✓`
+                : `Not emailed (${res && res.emailError ? res.emailError : 'unknown'}) — copy the link below.`,
+              url: res && res.inviteUrl ? res.inviteUrl : null,
+            };
+          } catch (e) {
+            aiInterviewResult.value = { ok: false, msg: 'Could not send the invite.', url: null };
+          } finally {
+            aiInterviewSending.value = false;
           }
         }
 
@@ -5201,6 +5247,30 @@
 
         // Voice Interview
         const expandedInterview = ref(null);
+
+        // Invite an applicant into the full "how we work" flow: they get an
+        // email link to /onboarding → connect Granola (our partner link) →
+        // talk to the AI VC → get feedback. Reuses the AI-interview endpoint.
+        async function sendAiInterviewForCompany(app) {
+          const who = app.companyName || (app.user ? `${app.user.firstName} ${app.user.lastName}` : 'this founder');
+          if (!confirm(`Email ${who} an invite to talk to the AI VC? They'll connect Granola and do the video call — the way we work.`)) return;
+          app._aiSending = true;
+          try {
+            const res = await api('/admin/people/ai-interview', { method: 'POST', body: { companyId: app.id } });
+            app._aiInvite = res || { ok: true, emailed: false };
+            if (res && !res.emailed) {
+              alert(
+                `Invite created, but the email did NOT send to ${res.to || 'the founder'}.\n\n` +
+                `Reason: ${res.emailError || 'unknown'}\n\n` +
+                `The link still works — copy it and send manually:\n${res.inviteUrl}`
+              );
+            }
+          } catch (e) {
+            /* handled by api() */
+          } finally {
+            app._aiSending = false;
+          }
+        }
 
         async function sendVoiceInterview(companyId) {
           if (!confirm('Send a voice interview? This will research the company and email the founder tailored questions.')) return;
@@ -9144,11 +9214,13 @@
           loadDirectory, openDirectoryDetail, closeDirectoryDetail,
           addDirectoryTag, removeDirectoryTag,
           directoryEdit, directorySaving, directorySavedAt, saveDirectoryOverride,
+          aiInterviewSending, aiInterviewResult, sendAiInterview,
           // Signups
           signups, signupStatusFilter, signupRoleFilter, filteredSignups, signupStats,
           loadSignups, updateSignupStatus, convertSignup,
           portfolioApplications, filteredPortfolioApplications, hideDeclinedApps, showSignupsList,
           approveApplication, declineApplication, sendTrial, startTrialForApplicant, requestMeeting,
+          sendAiInterviewForCompany,
           scoreApp, scorePending,
           sendVoiceInterview, expandedInterview, toggleInterviewReview, getAnswer, audioProxyUrl,
         };

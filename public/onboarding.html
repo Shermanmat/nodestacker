@@ -136,7 +136,10 @@
           </div>
         </div>
 
-        <template v-if="companyId">
+        <template v-if="resolvingInvite">
+          <p class="hero-note" style="margin-top:26px">Loading your interview…</p>
+        </template>
+        <template v-else-if="companyId">
           <label style="display:flex;gap:12px;align-items:flex-start;margin-top:26px;cursor:pointer;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:14px 16px;">
             <input type="checkbox" v-model="granolaReady" style="margin-top:2px;width:18px;height:18px;accent-color:#22C9E6;flex:none;cursor:pointer;" />
             <span style="font-size:14px;color:rgba(255,255,255,.82);line-height:1.5;">
@@ -219,7 +222,7 @@
   </div>
 
   <script>
-    const { createApp, ref, nextTick } = Vue;
+    const { createApp, ref, nextTick, onMounted } = Vue;
 
     // MatCap → Granola partner link (founders get first month free).
     const GRANOLA_URL = 'https://www.granola.ai?via=mat-sherman';
@@ -240,11 +243,34 @@
         const transcriptSent = ref(false);
         const transcriptError = ref(null);
 
-        // The application this conversation belongs to (from the signup redirect).
+        // The application this conversation belongs to. Two ways in:
+        //   ?companyId=…  — the post-signup redirect (founder just applied)
+        //   ?invite=…     — an admin-issued AI-interview invite (a lead Mat
+        //                   proactively invited); we resolve the token to its
+        //                   company, then the flow is identical.
         const params = new URLSearchParams(location.search);
         const companyIdRaw = parseInt(params.get('companyId'));
         const companyId = ref(Number.isInteger(companyIdRaw) ? companyIdRaw : null);
         const applied = ref(params.get('applied') === '1');
+        const inviteToken = params.get('invite');
+        const resolvingInvite = ref(!!inviteToken && !companyId.value);
+
+        // Resolve an invite token to its company before showing the start UI.
+        onMounted(async () => {
+          if (!inviteToken || companyId.value) return;
+          try {
+            const res = await fetch('/api/public/vc/invite/' + encodeURIComponent(inviteToken));
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'This interview link is invalid or has expired.');
+            companyId.value = data.companyId;
+            applied.value = true;
+            if (data.alreadyCompleted) phase.value = 'done';
+          } catch (err) {
+            error.value = err.message;
+          } finally {
+            resolvingInvite.value = false;
+          }
+        });
 
         let frame = null;
         let conversationId = null;
@@ -350,7 +376,7 @@
         }
 
         return {
-          phase, starting, error, granolaClicked, granolaReady, callBox, companyId, applied,
+          phase, starting, error, granolaClicked, granolaReady, callBox, companyId, applied, resolvingInvite,
           openGranola, startCall,
           transcriptText, transcriptTitle, transcriptSubmitting, transcriptSent, transcriptError,
           submitTranscript, resetTranscript,

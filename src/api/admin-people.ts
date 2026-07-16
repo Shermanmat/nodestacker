@@ -1,17 +1,25 @@
 import { Hono } from 'hono';
 import { eq, and, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { randomBytes } from 'crypto';
+import * as postmark from 'postmark';
 import {
   db,
   founders,
   publicUsers,
+  publicCompanies,
   founderLeads,
+  aiInterviewInvites,
   peopleCaptures,
   peopleTags,
   peopleOverrides,
 } from '../db/index.js';
 
 const app = new Hono();
+
+const postmarkClient = process.env.POSTMARK_API_KEY
+  ? new postmark.ServerClient(process.env.POSTMARK_API_KEY)
+  : null;
 
 type UnifiedRow = {
   email: string;
@@ -247,5 +255,167 @@ app.get('/tags', async (c) => {
 const safeJson = (s: string): unknown => {
   try { return JSON.parse(s); } catch { return s; }
 };
+
+// ============ AI-VC interview invite ============
+// Proactively invite someone to talk to the AI VC — the optional interview
+// step, triggered from admin instead of only appearing after a full
+// application. Two entry points:
+//   { companyId } — from the Signups/Applications page (applicant already has a
+//                   public_company; we invite them straight into the flow).
+//   { email }     — from the People/Leads directory (a lead Mat is interested
+//                   in; we resolve or create a minimal public_company).
+// Either way we email a tokenized link to /onboarding, which runs the full
+// "how we work" flow: connect Granola (Mat's partner link) → talk to the AI VC
+// → get feedback. The AI-VC call reuses the existing /api/public/vc endpoints.
+const aiInterviewSchema = z
+  .object({
+    email: z.string().email().optional(),
+    companyId: z.number().int().positive().optional(),
+  })
+  .refine((d) => d.email || d.companyId, { message: 'email or companyId is required' });
+
+app.post('/ai-interview', async (c) => {
+  const parsed = aiInterviewSchema.safeParse(await c.req.json().catch(() => ({})));
+  if (!parsed.success) return c.json({ error: 'A valid email or companyId is required' }, 400);
+
+  let publicCompanyId: number | null = null;
+  let email = '';
+  let firstName: string | null = null;
+  let leadId: number | null = null;
+
+  if (parsed.data.companyId) {
+    // Applicant path — the public_company already exists.
+    const company = await db.query.publicCompanies.findFirst({
+      where: eq(publicCompanies.id, parsed.data.companyId),
+    });
+    if (!company) return c.json({ error: 'Application not found' }, 404);
+    const user = await db.query.publicUsers.findFirst({ where: eq(publicUsers.id, company.userId) });
+    if (!user?.email) return c.json({ error: 'This applicant has no email on file' }, 400);
+    publicCompanyId = company.id;
+    email = normEmail(user.email);
+    firstName = user.firstName || null;
+    const lead = await db.query.founderLeads.findFirst({ where: eq(founderLeads.email, email) });
+    if (lead) { leadId = lead.id; firstName = lead.firstName || firstName; }
+  } else {
+    // Lead path — resolve or create a minimal public_company to anchor the call.
+    email = normEmail(parsed.data.email!);
+    const lead = await db.query.founderLeads.findFirst({ where: eq(founderLeads.email, email) });
+    leadId = lead?.id ?? null;
+    firstName = lead?.firstName ?? null;
+
+    publicCompanyId = lead?.publicCompanyId ?? null;
+    if (publicCompanyId) {
+      const exists = await db.query.publicCompanies.findFirst({ where: eq(publicCompanies.id, publicCompanyId) });
+      if (!exists) publicCompanyId = null;
+    }
+
+    if (!publicCompanyId) {
+      let user = await db.query.publicUsers.findFirst({ where: eq(publicUsers.email, email) });
+      if (!user) {
+        const [inserted] = await db.insert(publicUsers).values({
+          firstName: lead?.firstName || 'Founder',
+          lastName: lead?.lastName || '',
+          email,
+          role: 'founder',
+          status: 'pending',
+          oneLiner: lead?.oneLiner || null,
+          createdAt: new Date().toISOString(),
+        }).returning();
+        user = inserted;
+      }
+      if (!firstName) firstName = user.firstName || null;
+
+      // Minimal company; application_status left null so it doesn't appear as a
+      // submitted application — it only anchors the AI-VC call.
+      let company = await db.query.publicCompanies.findFirst({ where: eq(publicCompanies.userId, user.id) });
+      if (!company) {
+        const [insertedCompany] = await db.insert(publicCompanies).values({
+          userId: user.id,
+          companyName: lead?.companyName || `${user.firstName}'s company`,
+          oneLiner: lead?.oneLiner || null,
+          sector: lead?.sector || null,
+          createdAt: new Date().toISOString(),
+        }).returning();
+        company = insertedCompany;
+      }
+      publicCompanyId = company.id;
+
+      if (lead && (!lead.publicUserId || !lead.publicCompanyId)) {
+        await db.update(founderLeads)
+          .set({ publicUserId: user.id, publicCompanyId })
+          .where(eq(founderLeads.id, lead.id));
+      }
+    }
+  }
+
+  // Issue the invite token and email the link.
+  const token = randomBytes(24).toString('hex');
+  const now = new Date().toISOString();
+  await db.insert(aiInterviewInvites).values({
+    token,
+    founderLeadId: leadId,
+    publicCompanyId,
+    email,
+    persona: 'gp',
+    status: 'sent',
+    sentAt: now,
+    createdAt: now,
+  });
+
+  const baseUrl = process.env.BASE_URL || 'https://matcap.vc';
+  const inviteUrl = `${baseUrl}/onboarding?invite=${token}`;
+
+  const sendResult = await sendInterviewInvite(email, firstName, inviteUrl);
+  if (!sendResult.sent) {
+    console.error('[admin-people] AI interview invite email not sent:', sendResult.error);
+  }
+
+  // Return the invite regardless (the link works even if email didn't send),
+  // but surface WHY it didn't send so admin isn't left guessing.
+  return c.json({ ok: true, inviteUrl, to: email, emailed: sendResult.sent, emailError: sendResult.error });
+});
+
+async function sendInterviewInvite(
+  email: string,
+  firstName: string | null,
+  inviteUrl: string,
+): Promise<{ sent: boolean; error?: string }> {
+  if (!postmarkClient) {
+    return { sent: false, error: 'POSTMARK_API_KEY is not set in this environment.' };
+  }
+  const from = process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com';
+  const greeting = firstName ? `Hi ${firstName},` : 'Hi,';
+  try {
+    const res = await postmarkClient.sendEmail({
+      From: from,
+      To: email,
+      ReplyTo: 'mat@matsherman.com',
+      Subject: 'Your AI VC interview with MatCap',
+      TextBody:
+        `${greeting}\n\n` +
+        `I'd love for you to talk to our fine-tuned AI VC — a short live video conversation ` +
+        `about you and your raise. It's the fastest way for us to get a feel for your story, ` +
+        `and you'll get honest feedback on your pitch either way.\n\n` +
+        `Two quick steps when you open the link:\n` +
+        `  1. Connect Granola (free first month through our link) so it can take notes on the call — ` +
+        `this is how we coach you on your real investor calls too.\n` +
+        `  2. Jump into the video call with the AI VC.\n\n` +
+        `Start whenever you're ready:\n${inviteUrl}\n\n` +
+        `Grab a quiet room — it's a real video call with camera + mic, about 8 minutes.\n\n` +
+        `— Mat`,
+    });
+    // Postmark returns 200 with a non-zero ErrorCode for some soft failures.
+    if (res.ErrorCode && res.ErrorCode !== 0) {
+      return { sent: false, error: `Postmark ${res.ErrorCode}: ${res.Message}` };
+    }
+    return { sent: true };
+  } catch (e: any) {
+    // Postmark client throws on hard errors (e.g. 406 inactive recipient,
+    // 300 invalid/unconfirmed From address). Pass the reason through.
+    const code = e?.code ?? e?.ErrorCode;
+    const msg = e?.message || 'Unknown send error';
+    return { sent: false, error: code ? `Postmark ${code}: ${msg}` : msg };
+  }
+}
 
 export default app;

@@ -1109,6 +1109,27 @@ export const applicantTranscripts = sqliteTable('applicant_transcripts', {
 export type ApplicantTranscript = typeof applicantTranscripts.$inferSelect;
 export type NewApplicantTranscript = typeof applicantTranscripts.$inferInsert;
 
+// Admin-triggered AI-VC interview invites. Lets Mat proactively invite a
+// founder lead (someone he's interested in) to talk to the AI VC — even before
+// a full application. The token maps to the public_company the AI-VC call is
+// scoped to, so the emailed link never exposes a raw, guessable company id and
+// the existing /api/public/vc/{start,complete} flow is reused unchanged.
+export const aiInterviewInvites = sqliteTable('ai_interview_invites', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  token: text('token').notNull().unique(),
+  founderLeadId: integer('founder_lead_id').references(() => founderLeads.id),
+  publicCompanyId: integer('public_company_id').notNull().references(() => publicCompanies.id),
+  email: text('email').notNull(),
+  persona: text('persona').notNull().default('gp'),
+  status: text('status').notNull().default('sent'), // sent | started | completed
+  sentAt: text('sent_at'),
+  completedAt: text('completed_at'),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type AiInterviewInvite = typeof aiInterviewInvites.$inferSelect;
+export type NewAiInterviewInvite = typeof aiInterviewInvites.$inferInsert;
+
 // Public Network Relations
 
 export const publicUsersRelations = relations(publicUsers, ({ many }) => ({

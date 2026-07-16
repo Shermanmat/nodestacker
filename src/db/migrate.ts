@@ -636,6 +636,23 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`applicant_transcripts\` (
 sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_applicant_transcripts_company\` ON \`applicant_transcripts\` (\`public_company_id\`)`);
 console.log('  Ensured applicant_transcripts table exists');
 
+// Admin-triggered AI-VC interview invites (tokenized links Mat sends to leads).
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`ai_interview_invites\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`token\` text NOT NULL,
+  \`founder_lead_id\` integer REFERENCES \`founder_leads\`(\`id\`),
+  \`public_company_id\` integer NOT NULL REFERENCES \`public_companies\`(\`id\`),
+  \`email\` text NOT NULL,
+  \`persona\` text NOT NULL DEFAULT 'gp',
+  \`status\` text NOT NULL DEFAULT 'sent',
+  \`sent_at\` text,
+  \`completed_at\` text,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS \`ai_interview_invites_token_unique\` ON \`ai_interview_invites\` (\`token\`)`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_ai_interview_invites_company\` ON \`ai_interview_invites\` (\`public_company_id\`)`);
+console.log('  Ensured ai_interview_invites table exists');
+
 console.log(`Running migrations from ${migrationsFolder}...`);
 migrate(db, { migrationsFolder });
 console.log('Migrations complete!');

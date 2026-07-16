@@ -152,47 +152,18 @@ app.post('/applications/:id/approve', async (c) => {
 // Decline portfolio application
 app.post('/applications/:id/decline', async (c) => {
   const companyId = parseInt(c.req.param('id'));
-  const body = await c.req.json().catch(() => ({}));
-  const reason: string | undefined = (body?.reason || '').trim() || undefined;
 
-  // Get company and user info for the email
   const company = await db.select().from(publicCompanies).where(eq(publicCompanies.id, companyId)).get();
   if (!company) return c.json({ error: 'Company not found' }, 404);
-
-  const user = await db.select().from(publicUsers).where(eq(publicUsers.id, company.userId)).get();
 
   await db.update(publicCompanies)
     .set({ applicationStatus: 'declined' })
     .where(eq(publicCompanies.id, companyId));
 
-  // Send rejection email to the founder
-  if (postmarkClient && user) {
-    try {
-      const reasonHtml = reason
-        ? `<p>${reason.replace(/\n/g, '<br>')}</p>`
-        : '';
-      const reasonText = reason ? `\n${reason}\n` : '';
-      await postmarkClient.sendEmail({
-        From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
-        To: user.email,
-        Subject: `Update on your MatCap application`,
-        HtmlBody: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-            <p>Hi ${user.firstName},</p>
-            <p>Thanks for applying to MatCap and sharing what you're building.</p>
-            <p>I have to be honest with you — I'm one person, and I can only work closely with a handful of founders at any given time. That keeps the bar high on who I take on, and it means I have to pass on a lot of good companies.</p>
-            <p>Right now, ${company.companyName} isn't a fit for our portfolio.</p>
-            ${reasonHtml}
-            <p>Wishing you the best as you build.</p>
-            <p>Mat Sherman<br>Founder, MatCap</p>
-          </div>
-        `,
-        TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap and sharing what you're building.\n\nI have to be honest with you — I'm one person, and I can only work closely with a handful of founders at any given time. That keeps the bar high on who I take on, and it means I have to pass on a lot of good companies.\n\nRight now, ${company.companyName} isn't a fit for our portfolio.${reasonText}\n\nWishing you the best as you build.\n\nMat Sherman\nFounder, MatCap`,
-      });
-    } catch (err) {
-      console.error('Failed to send decline email:', err);
-    }
-  }
+  // Intentionally NO applicant email here. Rejections are sent by hand as a
+  // custom email, so declining in the admin only records the status — it must
+  // never auto-notify the applicant. (Acceptance / meeting / trial emails live
+  // in their own endpoints below and are unaffected.)
 
   return c.json({ success: true });
 });

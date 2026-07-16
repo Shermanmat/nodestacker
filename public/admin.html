@@ -5143,16 +5143,15 @@
 
         async function declineApplication(companyId) {
           const reason = prompt(
-            "Reject this application — optional reason to include in the email (leave blank to send the standard 'one-person bandwidth' rejection):",
+            "Reject this application. No email is sent — send your custom rejection yourself. Optional private reason (for your records + matcher training):",
             ""
           );
           // prompt returns null if cancelled
           if (reason === null) return;
-          await saveDecisionReason(companyId, reason);  // doubles as training signal
+          await saveDecisionReason(companyId, reason);  // private training signal only
           try {
             await api(`/signups/applications/${companyId}/decline`, {
               method: 'POST',
-              body: { reason: reason.trim() || undefined },
             });
             await loadSignups();
           } catch (e) { /* handled by api() */ }

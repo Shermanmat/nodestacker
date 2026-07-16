@@ -397,7 +397,7 @@ async function sendInterviewInvite(
         `about you and your raise. It's the fastest way for us to get a feel for your story, ` +
         `and you'll get honest feedback on your pitch either way.\n\n` +
         `Two quick steps when you open the link:\n` +
-        `  1. Connect Granola (free first month through our link) so it can take notes on the call — ` +
+        `  1. Connect Granola so it can take notes on the call — ` +
         `this is how we coach you on your real investor calls too. Get it here: https://www.granola.ai?via=mat-sherman\n` +
         `  2. Jump into the video call with the AI VC.\n\n` +
         `Important: we can only evaluate your interview if you run Granola on the call and send us the ` +

@@ -5143,17 +5143,21 @@
 
         async function declineApplication(companyId) {
           const reason = prompt(
-            "Reject this application. No email is sent — send your custom rejection yourself. Optional private reason (for your records + matcher training):",
+            "Reject this application.\n\nIf they haven't been interviewed, the standard rejection email is sent — add an optional line to include.\nIf you've already sent them to an interview or AI VC, NO email goes out (send your own).",
             ""
           );
           // prompt returns null if cancelled
           if (reason === null) return;
-          await saveDecisionReason(companyId, reason);  // private training signal only
+          await saveDecisionReason(companyId, reason);  // private record + matcher-training signal
           try {
-            await api(`/signups/applications/${companyId}/decline`, {
+            const res = await api(`/signups/applications/${companyId}/decline`, {
               method: 'POST',
+              body: { reason: reason.trim() || undefined },
             });
             await loadSignups();
+            if (res && res.emailed === false) {
+              alert("Declined. No auto-email sent (they were already interviewed) — send your custom rejection.");
+            }
           } catch (e) { /* handled by api() */ }
         }
 

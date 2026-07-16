@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, isNotNull, and, isNull } from 'drizzle-orm';
-import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, founderLeads, trials, ensureDefaultNodeRelationship } from '../db/index.js';
+import { db, publicUsers, publicCompanies, founders, investors, nodes, portfolioCompanies, onboardingWorkflows, onboardingEvents, founderNodeRelationships, nodeInvestorConnections, founderLeads, trials, applicantVcCalls, voiceInterviews, ensureDefaultNodeRelationship } from '../db/index.js';
 import { scoreApplication } from '../services/application-scorer.js';
 import { z } from 'zod';
 import * as postmark from 'postmark';
@@ -152,20 +152,64 @@ app.post('/applications/:id/approve', async (c) => {
 // Decline portfolio application
 app.post('/applications/:id/decline', async (c) => {
   const companyId = parseInt(c.req.param('id'));
+  const body = await c.req.json().catch(() => ({}));
+  const reason: string | undefined = (body?.reason || '').trim() || undefined;
 
   const company = await db.select().from(publicCompanies).where(eq(publicCompanies.id, companyId)).get();
   if (!company) return c.json({ error: 'Company not found' }, 404);
+
+  // Decide whether to auto-email BEFORE we overwrite the status. The standard
+  // rejection letter only goes to applicants we passed on cold. If we ever sent
+  // them to an interview or AI VC interview, we reject by hand with a custom
+  // note instead, so we suppress the auto-email.
+  //   - cold  = status still 'applied'/null (never advanced) → email
+  //   - a Tavus AI-VC call never touches applicationStatus, so we must check the
+  //     applicant_vc_calls row directly; likewise voice_interviews for the voice
+  //     interview. Either of those (or any advanced status) → no email.
+  const priorStatus = company.applicationStatus;
+  const cold = priorStatus == null || priorStatus === 'applied';
+  const vcCall = await db.select({ id: applicantVcCalls.id }).from(applicantVcCalls)
+    .where(eq(applicantVcCalls.publicCompanyId, companyId)).get();
+  const voiceInt = await db.select({ id: voiceInterviews.id }).from(voiceInterviews)
+    .where(eq(voiceInterviews.publicCompanyId, companyId)).get();
+  const wasInterviewed = !cold || !!vcCall || !!voiceInt;
 
   await db.update(publicCompanies)
     .set({ applicationStatus: 'declined' })
     .where(eq(publicCompanies.id, companyId));
 
-  // Intentionally NO applicant email here. Rejections are sent by hand as a
-  // custom email, so declining in the admin only records the status — it must
-  // never auto-notify the applicant. (Acceptance / meeting / trial emails live
-  // in their own endpoints below and are unaffected.)
+  let emailed = false;
+  if (!wasInterviewed && postmarkClient) {
+    const user = await db.select().from(publicUsers).where(eq(publicUsers.id, company.userId)).get();
+    if (user) {
+      try {
+        const reasonHtml = reason ? `<p>${reason.replace(/\n/g, '<br>')}</p>` : '';
+        const reasonText = reason ? `\n${reason}\n` : '';
+        await postmarkClient.sendEmail({
+          From: process.env.POSTMARK_FROM_EMAIL || 'mat@matsherman.com',
+          To: user.email,
+          Subject: `Update on your MatCap application`,
+          HtmlBody: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+              <p>Hi ${user.firstName},</p>
+              <p>Thanks for applying to MatCap and sharing what you're building.</p>
+              <p>I have to be honest with you — I'm one person, and I can only work closely with a handful of founders at any given time. That keeps the bar high on who I take on, and it means I have to pass on a lot of good companies.</p>
+              <p>Right now, ${company.companyName} isn't a fit for our portfolio.</p>
+              ${reasonHtml}
+              <p>Wishing you the best as you build.</p>
+              <p>Mat Sherman<br>Founder, MatCap</p>
+            </div>
+          `,
+          TextBody: `Hi ${user.firstName},\n\nThanks for applying to MatCap and sharing what you're building.\n\nI have to be honest with you — I'm one person, and I can only work closely with a handful of founders at any given time. That keeps the bar high on who I take on, and it means I have to pass on a lot of good companies.\n\nRight now, ${company.companyName} isn't a fit for our portfolio.${reasonText}\n\nWishing you the best as you build.\n\nMat Sherman\nFounder, MatCap`,
+        });
+        emailed = true;
+      } catch (err) {
+        console.error('Failed to send decline email:', err);
+      }
+    }
+  }
 
-  return c.json({ success: true });
+  return c.json({ success: true, emailed });
 });
 
 // Request a meeting with the founder (the new positive-path action)

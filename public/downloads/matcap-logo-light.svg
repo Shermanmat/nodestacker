@@ -1,11 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 477 360" fill="none">
-  <defs>
-    <linearGradient id="mc" x1="20" y1="0" x2="446" y2="0" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#00C2E0"/>
-      <stop offset="0.5" stop-color="#8FA3A0"/>
-      <stop offset="1" stop-color="#FF5A34"/>
-    </linearGradient>
-  </defs>
-  <g fill="url(#mc)"><rect x="20" y="184.0" width="30" height="36.0" rx="12"/><rect x="64" y="168.0" width="30" height="52.0" rx="12"/><rect x="108" y="176.0" width="30" height="44.0" rx="12"/><rect x="152" y="140.0" width="30" height="80.0" rx="12"/><rect x="196" y="116.0" width="30" height="104.0" rx="12"/><rect x="240" y="128.0" width="30" height="92.0" rx="12"/><rect x="284" y="80.0" width="30" height="140.0" rx="12"/><rect x="328" y="96.0" width="30" height="124.0" rx="12"/><rect x="372" y="44.0" width="30" height="176.0" rx="12"/><rect x="416" y="20.0" width="30" height="200.0" rx="12"/></g>
-  <text x="18" y="316.6" font-family="'Space Grotesk',sans-serif" font-weight="700" font-size="118" letter-spacing="-2" fill="#FFFFFF">MatCap</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 477 368" fill="none">
+  <defs><linearGradient id="mc" x1="25.650000000000006" y1="0" x2="451.65" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#00C2E0"/><stop offset="0.5" stop-color="#8FA3A0"/><stop offset="1" stop-color="#FF5A34"/>
+  </linearGradient></defs>
+  <g fill="url(#mc)"><rect x="25.650000000000006" y="188.0" width="30" height="36.0" rx="12"/><rect x="69.65" y="172.0" width="30" height="52.0" rx="12"/><rect x="113.65" y="180.0" width="30" height="44.0" rx="12"/><rect x="157.65" y="144.0" width="30" height="80.0" rx="12"/><rect x="201.65" y="120.0" width="30" height="104.0" rx="12"/><rect x="245.65" y="132.0" width="30" height="92.0" rx="12"/><rect x="289.65" y="84.0" width="30" height="140.0" rx="12"/><rect x="333.65" y="100.0" width="30" height="124.0" rx="12"/><rect x="377.65" y="48.0" width="30" height="176.0" rx="12"/><rect x="421.65" y="24.0" width="30" height="200.0" rx="12"/></g>
+  <text x="238.7" y="320.6" text-anchor="middle" font-family="'Space Grotesk',sans-serif" font-weight="700" font-size="118" letter-spacing="-2" fill="#FFFFFF">MatCap</text>
 </svg>

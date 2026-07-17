@@ -7,5 +7,5 @@
     </linearGradient>
   </defs>
   <g fill="url(#mc)"><rect x="20" y="184.0" width="30" height="36.0" rx="12"/><rect x="64" y="168.0" width="30" height="52.0" rx="12"/><rect x="108" y="176.0" width="30" height="44.0" rx="12"/><rect x="152" y="140.0" width="30" height="80.0" rx="12"/><rect x="196" y="116.0" width="30" height="104.0" rx="12"/><rect x="240" y="128.0" width="30" height="92.0" rx="12"/><rect x="284" y="80.0" width="30" height="140.0" rx="12"/><rect x="328" y="96.0" width="30" height="124.0" rx="12"/><rect x="372" y="44.0" width="30" height="176.0" rx="12"/><rect x="416" y="20.0" width="30" height="200.0" rx="12"/></g>
-  <text x="18" y="316.6" font-family="'Space Grotesk',sans-serif" font-weight="700" font-size="118" letter-spacing="-2" fill="#0A0A0F">MatCap</text>
+  <text x="18" y="316.6" font-family="'Space Grotesk',sans-serif" font-weight="700" font-size="118" letter-spacing="-2" fill="#FFFFFF">MatCap</text>
 </svg>

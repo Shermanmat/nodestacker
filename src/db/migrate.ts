@@ -590,6 +590,8 @@ safeAddColumn('onboarding_workflows', 'incorporation_date', 'text');
 safeAddColumn('onboarding_workflows', 'extraction_raw', 'text');
 safeAddColumn('onboarding_workflows', 'extracted_at', 'text');
 safeAddColumn('onboarding_workflows', 'docs_confirmed_at', 'text');
+// Founder self-attests booking their onboarding call with Mat (post-docs step).
+safeAddColumn('onboarding_workflows', 'onboarding_call_booked_at', 'text');
 safeAddColumn('board_members', 'source', "text DEFAULT 'manual'");
 // Drop-off reminder marker for the formation-docs upload step.
 safeAddColumn('onboarding_workflows', 'docs_reminder_sent_at', 'text');

@@ -845,7 +845,15 @@ app.get('/onboarding/status', async (c) => {
       nextAction = { type: 'upload_formation_docs', message: 'Upload your formation documents' };
       break;
     case OnboardingStatus.DOCS_EXTRACTED:
-      nextAction = { type: 'confirm_entity_info', message: 'Review the details we pulled from your documents' };
+      // Once the 3 formation docs are in, the founder's next step is to book their
+      // onboarding call with Mat — entity confirmation + the advisory agreement are
+      // handled on/after that call. After they self-attest booking, show a friendly
+      // "you're booked" state instead of nagging.
+      if (workflow.onboardingCallBookedAt) {
+        nextAction = { type: 'call_booked', message: "You're booked — Mat will finish your onboarding on the call." };
+      } else {
+        nextAction = { type: 'book_call', message: 'Finish onboarding — book your call with Mat', url: 'https://cal.com/matsherman/onboarding' };
+      }
       break;
     case OnboardingStatus.PENDING_INCORPORATION:
       nextAction = { type: 'confirm_incorporation', message: 'Let us know when you\'re incorporated' };
@@ -919,6 +927,7 @@ app.get('/onboarding/status', async (c) => {
       founderTitle: workflow.founderTitle,
       incorporationDate: workflow.incorporationDate,
       extractedAt: workflow.extractedAt,
+      onboardingCallBookedAt: workflow.onboardingCallBookedAt,
       entityInfoReceivedAt: workflow.entityInfoReceivedAt,
       agreementSentAt: workflow.agreementSentAt,
       founderSignedAt: workflow.founderSignedAt,
@@ -998,6 +1007,38 @@ app.post('/onboarding/accept-offer', async (c) => {
   await logOnboardingEvent(workflow.id, OnboardingEventType.OFFER_ACCEPTED, founder.email);
 
   return c.json({ success: true, message: 'Offer accepted! Next: tell us about your incorporation status.' });
+});
+
+// Founder self-attests that they booked their onboarding call with Mat (the step
+// shown once the 3 formation docs are uploaded). Stamps a timestamp so the prompt
+// stops nagging and admin can see who's booked. Idempotent; does not change status
+// (Mat drives the rest of the flow from the call).
+app.post('/onboarding/mark-call-booked', async (c) => {
+  const founderId = c.get('founderId') as number;
+
+  const portfolioCompany = await db.query.portfolioCompanies.findFirst({
+    where: eq(portfolioCompanies.founderId, founderId),
+  });
+  if (!portfolioCompany) {
+    return c.json({ error: 'Not a portfolio company' }, 400);
+  }
+
+  const workflow = await db.query.onboardingWorkflows.findFirst({
+    where: eq(onboardingWorkflows.portfolioCompanyId, portfolioCompany.id),
+  });
+  if (!workflow) {
+    return c.json({ error: 'No onboarding workflow found' }, 404);
+  }
+
+  // Only meaningful at the post-docs step; no-op stamp is harmless otherwise.
+  const now = new Date().toISOString();
+  if (!workflow.onboardingCallBookedAt) {
+    await db.update(onboardingWorkflows)
+      .set({ onboardingCallBookedAt: now, updatedAt: now })
+      .where(eq(onboardingWorkflows.id, workflow.id));
+  }
+
+  return c.json({ success: true, message: "Thanks — you're booked. Mat will finish your onboarding on the call." });
 });
 
 // Answer incorporation question

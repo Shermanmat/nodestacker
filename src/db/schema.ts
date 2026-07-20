@@ -788,6 +788,9 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   // (only fires if a founder sits in docs_pending >10 min without uploading).
   docsReminderSentAt: text('docs_reminder_sent_at'),
   docsConfirmedAt: text('docs_confirmed_at'),
+  // Set when the founder self-attests booking their onboarding call with Mat
+  // (the step shown after the 3 formation docs are uploaded).
+  onboardingCallBookedAt: text('onboarding_call_booked_at'),
 
   // Incorporation check
   incorporated: integer('incorporated', { mode: 'boolean' }),

@@ -946,6 +946,8 @@ app.get('/trial', serveStatic({ path: './public/trial.html' }));
 // Founder-facing explainer: the full mechanics — intro requests, the accept-rate
 // brackets, earning bonus shots, the blitz, and everything beyond the intros.
 app.get('/how-it-works', serveStatic({ path: './public/how-it-works.html' }));
+// Portfolio perks — founder deals/credits (Claude, Stripe Atlas, Granola, …).
+app.get('/perks', serveStatic({ path: './public/perks.html' }));
 app.get('/momentum', (c) => c.redirect('/how-it-works', 302)); // superseded by /how-it-works
 app.get('/treadmill', (c) => c.redirect('/how-it-works', 302)); // old URL → new
 

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/png" href="/favicon.png">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-EMCXYX6H0V"></script>
+  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','G-EMCXYX6H0V');</script>
+  <title>MatCap — Portfolio Perks</title>
+  <meta name="description" content="Deals and credits for MatCap portfolio founders — Claude API credits, incorporation, meeting notes, and more.">
+  <meta property="og:title" content="MatCap — Portfolio Perks">
+  <meta property="og:description" content="Deals and credits for MatCap portfolio founders.">
+  <meta property="og:url" content="https://matcap.vc/perks">
+  <meta property="og:type" content="website">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/matcap.css">
+
+  <style>
+    /* Page-local: /perks. Scoped under .perks; tokens come from matcap.css. */
+    .perks { --card: #FFFFFF; }
+    .perks .display { font-family: var(--display); font-weight: 700; letter-spacing: -0.025em; line-height: 1.02; text-wrap: balance; }
+    .perks .grad { background: var(--grad-text); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .perks .eyebrow { font-family: var(--display); text-transform: uppercase; letter-spacing: 3px; font-size: 12px; font-weight: 600; color: var(--accent); margin: 0; }
+
+    .perks .hero { background: var(--ink); color: #fff; text-align: center; padding: 150px 24px 84px; position: relative; overflow: hidden; }
+    .perks .hero::before {
+      content: ''; position: absolute; inset: 0; z-index: 1;
+      background: radial-gradient(55% 45% at 28% 18%, rgba(0,194,224,.30), transparent 62%),
+                  radial-gradient(55% 55% at 78% 88%, rgba(255,90,52,.24), transparent 60%);
+    }
+    .perks .hero .inner { position: relative; z-index: 2; max-width: 780px; margin: 0 auto; }
+    .perks .hero h1 { font-size: clamp(40px, 6.4vw, 76px); margin: 16px 0 0; }
+    .perks .hero .sub { font-size: clamp(17px, 2vw, 20px); color: rgba(255,255,255,.72); max-width: 620px; margin: 22px auto 0; line-height: 1.55; }
+
+    .perks section { padding: 88px 24px; }
+    .perks .inner { max-width: 1000px; margin: 0 auto; }
+
+    .perks .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+    .perks .card {
+      border: 1px solid var(--rule); border-radius: 16px; background: var(--card);
+      padding: 28px 26px; display: flex; flex-direction: column; position: relative; overflow: hidden;
+    }
+    .perks .card.feature { border-color: transparent; box-shadow: 0 0 0 2px var(--accent); }
+    .perks .card.feature::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--grad); }
+
+    .perks .badge {
+      align-self: flex-start; font-family: var(--display); font-size: 11px; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent);
+      background: var(--accent-ghost); border-radius: 999px; padding: 4px 12px; margin-bottom: 14px;
+    }
+    .perks .card h3 { font-family: var(--display); font-weight: 600; font-size: 22px; letter-spacing: -.01em; margin: 0 0 4px; color: var(--text); }
+    .perks .card .amount { font-family: var(--display); font-weight: 700; font-size: 15px; color: var(--heat); margin-bottom: 12px; }
+    .perks .card p { font-size: 15px; color: var(--muted); line-height: 1.6; margin: 0 0 20px; flex: 1; }
+    .perks .card .via { font-size: 13px; color: var(--muted); margin: 0 0 20px; }
+    .perks .card .via b { color: var(--text); font-weight: 600; }
+
+    .perks .btn-perk {
+      align-self: flex-start; font-family: var(--display); font-weight: 600; font-size: 15px;
+      padding: 12px 22px; border-radius: 8px; text-decoration: none; display: inline-block;
+      transition: transform .15s ease, box-shadow .2s ease;
+    }
+    .perks .btn-perk.primary { background: var(--grad); color: var(--ink); box-shadow: 0 8px 24px rgba(255,90,52,.22); }
+    .perks .btn-perk.primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(0,194,224,.30); }
+    .perks .btn-perk.ghost { color: var(--text); border: 1px solid var(--rule); }
+    .perks .btn-perk.ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+    .perks .note { text-align: center; font-family: var(--display); font-size: 13px; letter-spacing: .3px; color: var(--muted); margin-top: 44px; }
+    .perks .note a { color: var(--accent); }
+
+    @media (max-width: 640px) { .perks section { padding: 60px 20px; } .perks .hero { padding: 120px 20px 64px; } }
+    @media (prefers-reduced-motion: reduce) { .perks * { transition: none !important; } }
+  </style>
+</head>
+<body>
+
+<nav class="topnav">
+  <a class="brand" href="/">
+    <img src="/downloads/matcap-logo.png" alt="MatCap">
+    <span class="tag">Perks</span>
+  </a>
+  <div class="links">
+    <a href="/how-it-works">How It Works</a>
+    <a href="/investors">Investors</a>
+    <a href="/dashboard" data-auth-link>Log In</a>
+    <a class="btn" href="/signup">Apply</a>
+  </div>
+</nav>
+
+<main class="perks">
+
+  <section class="hero">
+    <div class="inner">
+      <p class="eyebrow">Portfolio Perks</p>
+      <h1 class="display">The tools our founders run on — <span class="grad">on us, or on a deal.</span></h1>
+      <p class="sub">Credits and deals we've lined up for MatCap portfolio founders. More get added as we build the network — if there's a tool you want a deal on, tell Mat.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="inner">
+      <div class="grid">
+
+        <!-- Featured: Claude via Eric Ries -->
+        <div class="card feature">
+          <span class="badge">New</span>
+          <h3>Claude</h3>
+          <div class="amount">$1,500 in API credits</div>
+          <p>Build with the latest Claude models — the same ones behind MatCap's own tooling. $1,500 in Anthropic API credits to get your AI features shipping.</p>
+          <p class="via">Courtesy of our friend <b>Eric Ries</b>.</p>
+          <a class="btn-perk primary" href="https://platform.claude.com/offers/4205da14-615b-4f29-b4ec-79d800cd1bd7" target="_blank" rel="noopener">Claim your credits →</a>
+        </div>
+
+        <!-- Stripe Atlas -->
+        <div class="card">
+          <h3>Stripe Atlas</h3>
+          <div class="amount">Delaware C-Corp — $500</div>
+          <p>Incorporate the right way in a few clicks — Delaware C-Corp, EIN, and your founder stock, all set up cleanly. The structure MatCap onboarding expects.</p>
+          <a class="btn-perk ghost" href="https://stripe.com/atlas" target="_blank" rel="noopener">Incorporate →</a>
+        </div>
+
+        <!-- Granola -->
+        <div class="card">
+          <h3>Granola</h3>
+          <div class="amount">AI meeting notes</div>
+          <p>Auto-transcribe and summarize your investor calls, then paste the transcript into your MatCap pipeline to score the meeting and pull out next steps.</p>
+          <a class="btn-perk ghost" href="https://www.granola.ai?via=mat-sherman" target="_blank" rel="noopener">Get Granola →</a>
+        </div>
+
+      </div>
+
+      <p class="note">A MatCap portfolio founder and don't see a perk you were promised? <a href="mailto:mat@matsherman.com">Email Mat</a>.</p>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="inner">
+    <div class="footer-row">
+      <div class="footer-brand">
+        <img src="/downloads/matcap-logo-light.png" alt="MatCap">
+      </div>
+      <div class="footer-links">
+        <a href="/how-it-works">How It Works</a>
+        <a href="/perks">Perks</a>
+        <a href="/investors">Investors</a>
+        <a href="/signup">Apply</a>
+      </div>
+    </div>
+    <div class="footer-foot">&copy; 2026 MatCap</div>
+  </div>
+</footer>
+
+<script src="/scripts/matcap.js"></script>
+</body>
+</html>

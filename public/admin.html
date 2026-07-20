@@ -2968,8 +2968,15 @@
             <h2 class="text-xl font-semibold">Directory</h2>
             <p class="text-sm text-gray-500">Every person we've touched — founders, signups, leads, and anyone who's used a lead-magnet tool.</p>
           </div>
-          <button @click="loadDirectory" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          <div class="flex items-center gap-3 flex-none">
+            <button @click="exportDirectoryEmails"
+              class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700">
+              Export CSV ({{ filteredDirectoryRows.length }})
+            </button>
+            <button @click="loadDirectory" class="text-blue-600 text-sm hover:underline">Refresh</button>
+          </div>
         </div>
+        <p class="text-xs text-gray-400 -mt-2 mb-4">Exports the {{ hasDirectoryFilters ? 'filtered' : 'full' }} list. People &amp; leads only (not investors), no unsubscribe suppression — for your own list-building, not blind cold sends.</p>
 
         <!-- Stat cards -->
         <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
@@ -6634,6 +6641,34 @@
           a.remove();
           URL.revokeObjectURL(url);
         };
+        // Export the currently-filtered Directory rows to CSV (respects the
+        // active search/source/tag filters — same set shown in the "X / Y" count).
+        const exportDirectoryEmails = () => {
+          const src = filteredDirectoryRows.value.filter(r => r.email);
+          if (!src.length) { alert('No contacts to export (nothing matches the current filters).'); return; }
+          const esc = (v) => {
+            const s = v == null ? '' : String(v);
+            return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+          };
+          const cols = ['email', 'name', 'company', 'sources', 'tags'];
+          const rows = src.map((r) => [
+            r.email || '',
+            r.name || '',
+            r.company || '',
+            (r.sources || []).join('; '),
+            (r.tags || []).join('; '),
+          ]);
+          const csv = [cols, ...rows].map((r) => r.map(esc).join(',')).join('\n');
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'matcap-contacts-' + new Date().toISOString().slice(0, 10) + '.csv';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        };
         const resetRoundForm = () => Object.assign(roundForm, { investorName: '', roundName: '', valuation: null, amountInvested: null, roundDate: '' });
         const openRoundsModal = async (company) => {
           roundsCompany.value = company;
@@ -9209,7 +9244,7 @@
           directorySourceFilter, directoryTagFilter, directoryDetail, newDirectoryTag,
           directoryDisplayLimit, directorySourceOptions,
           directoryStatsBySource, directoryCaptureCount, hasDirectoryFilters, filteredDirectoryRows,
-          toggleDirectorySource, clearDirectoryFilters,
+          toggleDirectorySource, clearDirectoryFilters, exportDirectoryEmails,
           directorySourceLabel, directorySourceBadgeClass, directoryFormatRelative,
           loadDirectory, openDirectoryDetail, closeDirectoryDetail,
           addDirectoryTag, removeDirectoryTag,

@@ -2971,7 +2971,7 @@
           <div class="flex items-center gap-3 flex-none">
             <button @click="exportDirectoryEmails"
               class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700">
-              Export CSV ({{ filteredDirectoryRows.length }})
+              Export CSV ({{ exportableDirectoryRows.length }})
             </button>
             <button @click="loadDirectory" class="text-blue-600 text-sm hover:underline">Refresh</button>
           </div>
@@ -6641,11 +6641,18 @@
           a.remove();
           URL.revokeObjectURL(url);
         };
+        // Placeholder emails (e.g. name@placeholder.com) are seeded fill-ins, not
+        // real contacts — never export them.
+        const isExportableEmail = (email) => !!email && !/(?:@|\.)placeholder\./i.test(email);
+        // The rows the export will actually write: current filters, minus placeholders.
+        const exportableDirectoryRows = computed(() =>
+          filteredDirectoryRows.value.filter(r => isExportableEmail(r.email))
+        );
         // Export the currently-filtered Directory rows to CSV (respects the
-        // active search/source/tag filters — same set shown in the "X / Y" count).
+        // active search/source/tag filters; excludes placeholder emails).
         const exportDirectoryEmails = () => {
-          const src = filteredDirectoryRows.value.filter(r => r.email);
-          if (!src.length) { alert('No contacts to export (nothing matches the current filters).'); return; }
+          const src = exportableDirectoryRows.value;
+          if (!src.length) { alert('No real contacts to export (nothing matches the current filters, or all are placeholder emails).'); return; }
           const esc = (v) => {
             const s = v == null ? '' : String(v);
             return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
@@ -9244,7 +9251,7 @@
           directorySourceFilter, directoryTagFilter, directoryDetail, newDirectoryTag,
           directoryDisplayLimit, directorySourceOptions,
           directoryStatsBySource, directoryCaptureCount, hasDirectoryFilters, filteredDirectoryRows,
-          toggleDirectorySource, clearDirectoryFilters, exportDirectoryEmails,
+          toggleDirectorySource, clearDirectoryFilters, exportDirectoryEmails, exportableDirectoryRows,
           directorySourceLabel, directorySourceBadgeClass, directoryFormatRelative,
           loadDirectory, openDirectoryDetail, closeDirectoryDetail,
           addDirectoryTag, removeDirectoryTag,

@@ -61,6 +61,21 @@ import { eq, and, or, inArray, isNull, sql } from 'drizzle-orm';
 import { db, nodes, investors, founders, nodeInvestorConnections, founderNodeRelationships, introRequests } from './db/index.js';
 import { desc } from 'drizzle-orm';
 
+// Production safety net. A stray rejected promise (e.g. an un-awaited DB write
+// that hits a FOREIGN KEY constraint) would otherwise take the whole process
+// down — and when a retrying webhook keeps re-triggering it, the machine
+// crash-loops until Fly gives up (a 503 outage). Log the FULL error + stack so
+// we can fix the real culprit, but keep the process alive. This is a backstop,
+// not a license to leave rejections unhandled — the underlying write should
+// still be fixed once the logged stack identifies it.
+process.on('unhandledRejection', (reason: unknown) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('[FATAL-GUARD] Unhandled promise rejection (process kept alive):', err.stack || err.message);
+});
+process.on('uncaughtException', (err: Error) => {
+  console.error('[FATAL-GUARD] Uncaught exception (process kept alive):', err.stack || err.message);
+});
+
 const app = new Hono();
 
 // Liveness/readiness probe — fast, no DB, no auth. Fly's health check hits this

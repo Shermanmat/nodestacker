@@ -871,27 +871,6 @@
             </template>
           </div>
 
-          <!-- Intro Request Terms (always editable) -->
-          <div class="mb-4 p-4 bg-green-50 rounded-lg border border-green-200">
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-xs font-medium text-gray-500 uppercase">Intro Requests</div>
-              <button v-if="introRequestsDirty" @click="saveIntroRequestTerms" class="text-xs bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700">Save Changes</button>
-            </div>
-            <p class="text-xs text-gray-500 mb-3">We run on intro requests. The accept rate determines how well they're doing in the network. We start at a number and our goal is to increase it — but investor behavior dictates that.</p>
-            <div class="grid grid-cols-2 gap-4">
-              <div>
-                <label class="text-xs text-gray-500">Intro requests per week</label>
-                <select v-model="offerTermsForm.introRequestsPerWeek" class="w-full border rounded px-2 py-1">
-                  <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option>
-                </select>
-              </div>
-              <div>
-                <label class="text-xs text-gray-500">Revisit date</label>
-                <input v-model="offerTermsForm.introRequestsRevisitDate" type="date" class="w-full border rounded px-2 py-1" />
-              </div>
-            </div>
-          </div>
-
           <!-- Progress Steps -->
           <div class="mb-6 p-4 bg-gray-50 rounded-lg">
             <h4 class="font-medium mb-3">Progress</h4>

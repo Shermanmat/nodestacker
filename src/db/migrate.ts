@@ -58,6 +58,8 @@ safeAddColumn('onboarding_workflows', 'last_incorporation_nudge_at', 'text');
 // onboarding_workflows entity verification columns (migration 0031)
 safeAddColumn('onboarding_workflows', 'ein', 'text');
 safeAddColumn('onboarding_workflows', 'articles_of_incorporation_url', 'text');
+// Founder-issued shares — used to check if there's room to issue MatCap
+safeAddColumn('onboarding_workflows', 'issued_shares', 'integer');
 
 // voice_interviews + voice_interview_answers tables (migration 0032)
 try {

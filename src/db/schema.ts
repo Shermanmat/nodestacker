@@ -821,6 +821,10 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   ein: text('ein'),
   articlesOfIncorporationUrl: text('articles_of_incorporation_url'),
   authorizedShares: integer('authorized_shares'),
+  // Shares the founders already issued to themselves (from the board consent,
+  // or entered manually). authorized_shares − issued_shares = the unissued pool
+  // available to issue MatCap; if that's smaller than our stake there's no room.
+  issuedShares: integer('issued_shares'),
   sharePrice: text('share_price').default('0.0001'),
   founderTitle: text('founder_title'),
   entityInfoReceivedAt: text('entity_info_received_at'),

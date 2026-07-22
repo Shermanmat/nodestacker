@@ -982,13 +982,43 @@
             </div>
           </div>
 
-          <!-- Share Details -->
+          <!-- Share Details + room-for-MatCap check -->
           <div v-if="workflowDetails.shareDetails" class="mb-6 p-4 bg-blue-50 rounded-lg">
-            <h4 class="font-medium mb-2">Share Details</h4>
-            <div class="grid grid-cols-3 gap-4 text-sm">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-medium">Share Details</h4>
+              <span v-if="workflowDetails.shareDetails.hasRoom === true" class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">✓ Room for MatCap</span>
+              <span v-else-if="workflowDetails.shareDetails.hasRoom === false" class="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">✕ No room — needs more authorized shares</span>
+              <span v-else class="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800">Issued shares unknown</span>
+            </div>
+
+            <!-- Cap-table room math -->
+            <div class="grid grid-cols-3 gap-4 text-sm mb-3">
               <div>
-                <div class="text-gray-500">Shares</div>
-                <div class="font-medium">{{ workflowDetails.shareDetails.shareCount?.toLocaleString() }}</div>
+                <div class="text-gray-500">Authorized</div>
+                <div class="font-medium">{{ workflowDetails.shareDetails.authorizedShares?.toLocaleString() ?? '—' }}</div>
+              </div>
+              <div>
+                <div class="text-gray-500">Issued to founders</div>
+                <div class="font-medium">{{ workflowDetails.shareDetails.issuedShares != null ? workflowDetails.shareDetails.issuedShares.toLocaleString() : '—' }}</div>
+              </div>
+              <div>
+                <div class="text-gray-500">Available (unissued)</div>
+                <div class="font-medium">{{ workflowDetails.shareDetails.availableShares != null ? workflowDetails.shareDetails.availableShares.toLocaleString() : '—' }}</div>
+              </div>
+            </div>
+
+            <p v-if="workflowDetails.shareDetails.hasRoom === false" class="text-xs text-red-700 mb-3">
+              Only {{ workflowDetails.shareDetails.availableShares?.toLocaleString() }} shares are unissued, but MatCap needs {{ workflowDetails.shareDetails.shareCount?.toLocaleString() }}. The company would need to authorize more shares before it can issue MatCap.
+            </p>
+            <p v-else-if="workflowDetails.shareDetails.issuedShares == null" class="text-xs text-amber-700 mb-3">
+              We couldn't find issued shares in the formation docs. Enter it below to check whether there's room.
+            </p>
+
+            <!-- MatCap's stake -->
+            <div class="grid grid-cols-3 gap-4 text-sm border-t border-blue-100 pt-3">
+              <div>
+                <div class="text-gray-500">MatCap shares</div>
+                <div class="font-medium">{{ workflowDetails.shareDetails.shareCount != null ? workflowDetails.shareDetails.shareCount.toLocaleString() : '—' }}</div>
               </div>
               <div>
                 <div class="text-gray-500">Price/Share</div>
@@ -996,8 +1026,21 @@
               </div>
               <div>
                 <div class="text-gray-500">Total</div>
-                <div class="font-medium">${{ workflowDetails.shareDetails.totalAmount }}</div>
+                <div class="font-medium">{{ workflowDetails.shareDetails.totalAmount != null ? '$' + workflowDetails.shareDetails.totalAmount : '—' }}</div>
               </div>
+            </div>
+
+            <!-- Manual issued-shares entry (fallback when docs don't state it) -->
+            <div class="flex items-end gap-2 mt-3 border-t border-blue-100 pt-3">
+              <label class="text-xs text-gray-500 flex-1">
+                Set issued shares
+                <input v-model="issuedSharesEdit" type="number" min="0" placeholder="e.g. 8000000"
+                  class="w-full border rounded px-2 py-1 text-sm mt-0.5">
+              </label>
+              <button @click="saveIssuedShares" :disabled="savingIssuedShares"
+                class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded hover:bg-blue-700 disabled:opacity-50">
+                {{ savingIssuedShares ? 'Saving…' : 'Save' }}
+              </button>
             </div>
           </div>
 
@@ -8136,7 +8179,21 @@
           offerTermsForm.vestingCliffMonths = w?.vestingCliffMonths || 0;
           offerTermsForm.introRequestsPerWeek = w?.introRequestsPerWeek || 3;
           offerTermsForm.introRequestsRevisitDate = w?.introRequestsRevisitDate || '';
+          issuedSharesEdit.value = (w?.issuedShares ?? '') === null ? '' : (w?.issuedShares ?? '');
           showWorkflowModal.value = true;
+        };
+
+        const issuedSharesEdit = ref('');
+        const savingIssuedShares = ref(false);
+        const saveIssuedShares = async () => {
+          const id = workflowDetails.value?.workflow?.id;
+          if (!id) return;
+          savingIssuedShares.value = true;
+          try {
+            await api(`/onboarding/${id}/issued-shares`, { method: 'PUT', body: { issuedShares: issuedSharesEdit.value } });
+            await openWorkflowModal({ id });
+          } catch (e) { /* handled by api() */ }
+          finally { savingIssuedShares.value = false; }
         };
 
         const closeWorkflowModal = () => {
@@ -9199,6 +9256,7 @@
           loadOnboardingWorkflows, getEligibleForOnboarding, openStartOnboardingModal, startOnboarding,
           offerTermsForm, offerTermsDirty, saveOfferTerms, introRequestsDirty, saveIntroRequestTerms,
           openWorkflowModal, closeWorkflowModal, sendOffer, resendOffer, generateAdvisoryAgreement, checkSignatureStatus,
+          issuedSharesEdit, savingIssuedShares, saveIssuedShares,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,
           // Network Health

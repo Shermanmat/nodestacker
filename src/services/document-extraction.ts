@@ -32,6 +32,12 @@ export interface ExtractedFormationData {
   /** ISO date (YYYY-MM-DD) the entity was incorporated, if stated. */
   incorporationDate: string | null;
   authorizedShares: number | null;
+  /**
+   * Total shares already issued to the founders, if the board consent (or any
+   * uploaded doc) states it. Often absent — issuance can live in a separate
+   * stock purchase agreement or cap table we don't collect — so null is common.
+   */
+  issuedShares: number | null;
   /** Par value / price per share as a string (e.g. "0.0001"). */
   parValue: string | null;
   registeredAgent: string | null;
@@ -51,7 +57,7 @@ const EXTRACTION_PROMPT = `You are a corporate paralegal extracting structured d
 
 1. ARTICLES_OF_INCORPORATION (AOC) — the authoritative source for entity name, state, type, authorized shares, and par value.
 2. BYLAWS — officer roles, share classes, board structure.
-3. INITIAL_BOARD_CONSENT — the initial board members and the officers/board they appointed, plus the consent date.
+3. INITIAL_BOARD_CONSENT — the initial board members and the officers/board they appointed, the consent date, and (often) the shares issued to the founders.
 
 Extract the following and return ONLY a JSON object (no prose, no markdown fences):
 
@@ -61,6 +67,7 @@ Extract the following and return ONLY a JSON object (no prose, no markdown fence
   "entityState": string | null,           // 2-letter US state code of incorporation (e.g. "DE")
   "incorporationDate": string | null,     // YYYY-MM-DD if stated, else null
   "authorizedShares": number | null,      // total authorized shares from the AOC
+  "issuedShares": number | null,          // total shares ISSUED to founders, from the board consent if stated (sum across all founders); null if not stated in any document
   "parValue": string | null,              // par value per share as a string, e.g. "0.0001"
   "registeredAgent": string | null,
   "officers": [ { "name": string, "title": string } ],
@@ -111,6 +118,10 @@ function normalize(raw: any): ExtractedFormationData {
     typeof raw?.authorizedShares === 'number' && Number.isFinite(raw.authorizedShares)
       ? Math.round(raw.authorizedShares)
       : null;
+  const issuedShares =
+    typeof raw?.issuedShares === 'number' && Number.isFinite(raw.issuedShares)
+      ? Math.round(raw.issuedShares)
+      : null;
 
   const officers = Array.isArray(raw?.officers)
     ? raw.officers
@@ -138,6 +149,7 @@ function normalize(raw: any): ExtractedFormationData {
     entityState,
     incorporationDate: raw?.incorporationDate ? String(raw.incorporationDate).trim() : null,
     authorizedShares,
+    issuedShares,
     parValue: raw?.parValue != null ? String(raw.parValue).trim() : null,
     registeredAgent: raw?.registeredAgent ? String(raw.registeredAgent).trim() : null,
     officers,

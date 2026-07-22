@@ -190,14 +190,29 @@ app.get('/workflows/:id', async (c) => {
     return c.json({ error: 'Workflow not found' }, 404);
   }
 
-  // Calculate share details if we have the info
+  // Share details + "is there room to issue MatCap?" check.
+  // available = authorized − issued (the unissued pool). We have room only if
+  // that pool is at least as big as the stake we need to be issued. issued is
+  // often unknown (not in the uploaded docs), in which case hasRoom is null.
   let shareDetails = null;
-  if (workflow.authorizedShares && workflow.offerEquityPercent && workflow.sharePrice) {
-    const shareCount = calculateShareCount(workflow.offerEquityPercent, workflow.authorizedShares);
+  if (workflow.authorizedShares) {
+    const authorizedShares = workflow.authorizedShares;
+    const issuedShares = workflow.issuedShares ?? null;
+    const availableShares = issuedShares != null ? authorizedShares - issuedShares : null;
+    const sharePrice = workflow.sharePrice || '0.0001';
+    const shareCount = workflow.offerEquityPercent
+      ? calculateShareCount(workflow.offerEquityPercent, authorizedShares)
+      : null;
+    const hasRoom =
+      availableShares != null && shareCount != null ? availableShares >= shareCount : null;
     shareDetails = {
+      authorizedShares,
+      issuedShares,
+      availableShares,
       shareCount,
-      sharePrice: workflow.sharePrice,
-      totalAmount: calculateTotalAmount(shareCount, workflow.sharePrice),
+      sharePrice,
+      totalAmount: shareCount != null ? calculateTotalAmount(shareCount, sharePrice) : null,
+      hasRoom, // true = room, false = not enough unissued shares, null = issued count unknown
     };
   }
 
@@ -305,6 +320,30 @@ app.put('/:id/offer-terms', async (c) => {
   await db.update(onboardingWorkflows).set(updates).where(eq(onboardingWorkflows.id, workflowId));
 
   await logEvent(workflowId, OnboardingEventType.WORKFLOW_STARTED, OnboardingActor.ADMIN, 'Offer terms updated', updates);
+
+  return c.json({ success: true });
+});
+
+// ============== UPDATE FOUNDER-ISSUED SHARES ==============
+// Manual fallback for when the formation docs didn't state issued shares.
+// Editable anytime (unlike offer terms), since it feeds the "room to issue
+// MatCap" check that matters right through the equity step.
+
+app.put('/:id/issued-shares', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+
+  const body = await c.req.json().catch(() => ({}));
+  const n = parseInt(body.issuedShares);
+  const issuedShares =
+    body.issuedShares === '' || body.issuedShares === null || Number.isNaN(n) ? null : n;
+
+  await db.update(onboardingWorkflows)
+    .set({ issuedShares, updatedAt: new Date().toISOString() })
+    .where(eq(onboardingWorkflows.id, workflowId));
+
+  await logEvent(workflowId, OnboardingEventType.WORKFLOW_STARTED, OnboardingActor.ADMIN, 'Issued shares updated', { issuedShares });
 
   return c.json({ success: true });
 });

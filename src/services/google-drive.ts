@@ -42,7 +42,10 @@ function getDriveClient() {
 
   const auth = new google.auth.GoogleAuth({
     credentials,
-    scopes: ['https://www.googleapis.com/auth/drive.file'],
+    // Full drive scope (not drive.file) — required to write into a Shared Drive
+    // the service account is a member of. Files live in the "MatCap Portfolio"
+    // Shared Drive because service accounts have no My Drive storage quota.
+    scopes: ['https://www.googleapis.com/auth/drive'],
   });
 
   driveClient = google.drive({ version: 'v3', auth });
@@ -85,6 +88,7 @@ export async function createCompanyFolder(companyName: string): Promise<DriveFol
       parents: [parentFolderId],
     },
     fields: 'id, name, webViewLink',
+    supportsAllDrives: true,
   });
 
   const folder = response.data;
@@ -126,6 +130,7 @@ export async function uploadDocument(
       body: stream,
     },
     fields: 'id, name, webViewLink, mimeType',
+    supportsAllDrives: true,
   });
 
   const file = response.data;
@@ -150,6 +155,7 @@ export async function getDocumentLink(fileId: string): Promise<string> {
   const response = await drive.files.get({
     fileId,
     fields: 'webViewLink',
+    supportsAllDrives: true,
   });
 
   if (!response.data.webViewLink) {
@@ -160,18 +166,15 @@ export async function getDocumentLink(fileId: string): Promise<string> {
 }
 
 /**
- * Move a company folder to the Fully Onboarded Companies folder
+ * Move a company folder to the Fully Onboarded Companies folder.
+ *
+ * No-op under the single-folder model: all company folders live in one place
+ * (the "MatCap Portfolio" Shared Drive), so there's nothing to move on
+ * completion — onboarding status is tracked in the app, not by folder location.
+ * Kept as a callable no-op so existing callers don't need to change.
  */
-export async function moveToFullyOnboarded(folderId: string): Promise<void> {
-  const drive = getDriveClient();
-  const completedFolderId = getCompletedFolderId();
-  const onboardingFolderId = getOnboardingFolderId();
-
-  await drive.files.update({
-    fileId: folderId,
-    addParents: completedFolderId,
-    removeParents: onboardingFolderId,
-  });
+export async function moveToFullyOnboarded(_folderId: string): Promise<void> {
+  return;
 }
 
 /**
@@ -183,6 +186,8 @@ export async function listFolderContents(folderId: string): Promise<DriveFile[]>
   const response = await drive.files.list({
     q: `'${folderId}' in parents and trashed = false`,
     fields: 'files(id, name, webViewLink, mimeType)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   const files = response.data.files || [];
@@ -201,11 +206,11 @@ export async function downloadFile(fileId: string): Promise<{ stream: any; mimeT
   const drive = getDriveClient();
 
   // Get file metadata first for mime type
-  const meta = await drive.files.get({ fileId, fields: 'mimeType' });
+  const meta = await drive.files.get({ fileId, fields: 'mimeType', supportsAllDrives: true });
   const mimeType = meta.data.mimeType || 'application/octet-stream';
 
   const response = await drive.files.get(
-    { fileId, alt: 'media' },
+    { fileId, alt: 'media', supportsAllDrives: true },
     { responseType: 'stream' }
   );
 
@@ -217,7 +222,9 @@ export async function downloadFile(fileId: string): Promise<{ stream: any; mimeT
  */
 export async function deleteFile(fileId: string): Promise<void> {
   const drive = getDriveClient();
-  await drive.files.delete({ fileId });
+  // Shared Drives restrict permanent delete to Managers; trash instead, which a
+  // Content-manager service account is allowed to do.
+  await drive.files.update({ fileId, requestBody: { trashed: true }, supportsAllDrives: true });
 }
 
 /**
@@ -229,6 +236,7 @@ export async function getFolderInfo(folderId: string): Promise<DriveFolder> {
   const response = await drive.files.get({
     fileId: folderId,
     fields: 'id, name, webViewLink',
+    supportsAllDrives: true,
   });
 
   const folder = response.data;
@@ -253,6 +261,8 @@ export async function findCompanyFolder(companyName: string): Promise<DriveFolde
   const response = await drive.files.list({
     q: `'${onboardingFolderId}' in parents and name = '${companyName}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
     fields: 'files(id, name, webViewLink)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
 
   const files = response.data.files || [];

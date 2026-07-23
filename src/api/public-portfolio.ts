@@ -35,6 +35,8 @@ app.get('/', async (c) => {
 
   const items = companies
     .filter((pc) => {
+      // Manually unlisted (we don't hold equity in it) — never show.
+      if (pc.listed === false) return false;
       const st = wfStatusByPc.get(pc.id);
       if (st == null) return true; // legacy company, no onboarding workflow
       const rank = STATUS_ORDER.indexOf(st);

@@ -371,6 +371,10 @@ export const portfolioCompanies = sqliteTable('portfolio_companies', {
   equitySigned: integer('equity_signed', { mode: 'boolean' }).notNull().default(false),
   sharesPaid: integer('shares_paid', { mode: 'boolean' }).notNull().default(false),
   certificateReceived: integer('certificate_received', { mode: 'boolean' }).notNull().default(false),
+  // Whether this company shows in the public portfolio at all. Defaults true;
+  // set false to hide a company we don't actually hold equity in (a row that
+  // was created speculatively or by mistake) without deleting its record.
+  listed: integer('listed', { mode: 'boolean' }).notNull().default(true),
   notes: text('notes'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
   updatedAt: text('updated_at').notNull().default('CURRENT_TIMESTAMP'),

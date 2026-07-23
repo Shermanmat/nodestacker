@@ -563,6 +563,7 @@ console.log('  Ensured investor_candidates table exists');
 
 // Portfolio markup tracking: entry-valuation baseline + per-round funding events.
 safeAddColumn('portfolio_companies', 'entry_valuation', 'integer');
+safeAddColumn('portfolio_companies', 'listed', 'integer NOT NULL DEFAULT 1');
 sqlite.exec(`CREATE TABLE IF NOT EXISTS \`portfolio_rounds\` (
   \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
   \`portfolio_company_id\` integer NOT NULL,

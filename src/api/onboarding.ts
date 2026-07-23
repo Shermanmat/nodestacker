@@ -348,6 +348,29 @@ app.put('/:id/issued-shares', async (c) => {
   return c.json({ success: true });
 });
 
+// ============== MANUAL STATUS OVERRIDE (admin) ==============
+// Escape hatch to set a workflow's onboarding status by hand — for driving an
+// onboarding live on a call, or unsticking a workflow that has no wired next
+// action (e.g. docs_extracted). Validated against the known status set; logged.
+app.put('/:id/status', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+
+  const body = await c.req.json().catch(() => ({}));
+  const status = String(body.status || '').trim();
+  const validStatuses = Object.values(OnboardingStatus) as string[];
+  if (!validStatuses.includes(status)) {
+    return c.json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` }, 400);
+  }
+
+  const from = workflow.status;
+  await updateWorkflowStatus(workflowId, status);
+  await logEvent(workflowId, OnboardingEventType.WORKFLOW_STARTED, OnboardingActor.ADMIN, `Status manually set: ${from} → ${status}`, { from, to: status });
+
+  return c.json({ success: true, from, to: status });
+});
+
 // ============== UPDATE INTRO REQUEST TERMS ==============
 
 app.put('/:id/intro-request-terms', async (c) => {

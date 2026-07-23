@@ -1082,6 +1082,22 @@
               Send Reminder
             </button>
           </div>
+
+          <!-- Manual status override (admin escape hatch) -->
+          <div class="mt-4 pt-4 border-t border-dashed">
+            <label class="block text-xs font-medium text-gray-500 uppercase mb-1">Manually set status</label>
+            <div class="flex items-center gap-2">
+              <select v-model="manualStatusEdit" class="border rounded px-2 py-1.5 text-sm flex-1">
+                <option value="">Current: {{ workflowDetails.workflow?.status }} — pick a new status…</option>
+                <option v-for="s in ONBOARDING_STATUSES" :key="s" :value="s" :disabled="s === workflowDetails.workflow?.status">{{ s }}</option>
+              </select>
+              <button @click="setManualStatus" :disabled="!manualStatusEdit || savingStatus"
+                class="bg-amber-600 text-white px-3 py-1.5 rounded text-sm hover:bg-amber-700 disabled:opacity-50">
+                {{ savingStatus ? 'Setting…' : 'Set Status' }}
+              </button>
+            </div>
+            <p class="text-xs text-gray-400 mt-1">Skips the guided flow — use to drive onboarding by hand or unstick a workflow.</p>
+          </div>
         </div>
       </div>
 
@@ -8196,6 +8212,30 @@
           finally { savingIssuedShares.value = false; }
         };
 
+        // Manual onboarding status override — escape hatch to drive an onboarding
+        // by hand (e.g. live on a call) or unstick a workflow with no wired next action.
+        const ONBOARDING_STATUSES = [
+          'offer_pending','offer_accepted','pending_incorporation','light_engagement',
+          'docs_pending','docs_uploaded','docs_extracted','entity_info_pending','entity_info_received',
+          'advisory_agreement_sent','admin_signed','founder_signed','board_approval_pending','board_approved',
+          'equity_agreement_pending','equity_founder_signed','equity_admin_signed','equity_agreement_signed',
+          'wire_info_pending','shares_purchased','83b_filed','certificate_pending','completed',
+        ];
+        const manualStatusEdit = ref('');
+        const savingStatus = ref(false);
+        const setManualStatus = async () => {
+          const id = workflowDetails.value?.workflow?.id;
+          if (!id || !manualStatusEdit.value) return;
+          if (!confirm(`Manually set status to "${manualStatusEdit.value}"? This skips the guided flow.`)) return;
+          savingStatus.value = true;
+          try {
+            await api(`/onboarding/${id}/status`, { method: 'PUT', body: { status: manualStatusEdit.value } });
+            await openWorkflowModal({ id });
+            manualStatusEdit.value = '';
+          } catch (e) { /* handled by api() */ }
+          finally { savingStatus.value = false; }
+        };
+
         const closeWorkflowModal = () => {
           showWorkflowModal.value = false;
           selectedWorkflow.value = null;
@@ -9257,6 +9297,7 @@
           offerTermsForm, offerTermsDirty, saveOfferTerms, introRequestsDirty, saveIntroRequestTerms,
           openWorkflowModal, closeWorkflowModal, sendOffer, resendOffer, generateAdvisoryAgreement, checkSignatureStatus,
           issuedSharesEdit, savingIssuedShares, saveIssuedShares,
+          ONBOARDING_STATUSES, manualStatusEdit, savingStatus, setManualStatus,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,
           // Network Health

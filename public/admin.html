@@ -876,13 +876,13 @@
             <h4 class="font-medium mb-3">Progress</h4>
             <div class="space-y-2 text-sm">
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.offerSentAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.offerSentAt, 'offer_accepted') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Offer Sent</span>
                 <span v-if="workflowDetails.workflow?.offerSentAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.offerSentAt?.split('T')[0] }}</span>
                 <button v-if="workflowDetails.workflow?.offerSentAt" @click="resendOffer(workflowDetails.workflow.id)" class="text-xs text-blue-600 hover:underline ml-2">Resend</button>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.offerAcceptedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.offerAcceptedAt, 'offer_accepted') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Offer Accepted</span>
                 <span v-if="workflowDetails.workflow?.offerAcceptedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.offerAcceptedAt?.split('T')[0] }}</span>
               </div>
@@ -897,58 +897,58 @@
                 <span class="text-gray-400 text-xs">{{ workflowDetails.workflow?.equityCommitmentSignedAt?.split('T')[0] }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.entityInfoReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.entityInfoReceivedAt, 'entity_info_received') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Entity Info Received</span>
                 <span v-if="workflowDetails.workflow?.entityName" class="text-gray-400 text-xs">({{ workflowDetails.workflow?.entityName }})</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.adminSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.adminSignedAt, 'admin_signed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Admin Signed Advisory</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.founderSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.founderSignedAt, 'founder_signed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Founder Signed Advisory</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.boardApprovedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.boardApprovedAt, 'board_approved') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Board Approval</span>
                 <span v-if="workflowDetails.workflow?.boardApprovedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.boardApprovedAt?.split('T')[0] }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.equityAgreementReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.equityAgreementReceivedAt, 'equity_agreement_pending') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Stock Agreement Sent</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.equityFounderSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.equityFounderSignedAt, 'equity_founder_signed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Founder Signed Stock Agreement</span>
                 <span v-if="workflowDetails.workflow?.equityFounderSignedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.equityFounderSignedAt?.split('T')[0] }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.equityAdminSignedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.equityAdminSignedAt, 'equity_admin_signed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Admin Signed Stock Agreement</span>
                 <span v-if="workflowDetails.workflow?.equityAdminSignedAt" class="text-gray-400 text-xs">{{ workflowDetails.workflow?.equityAdminSignedAt?.split('T')[0] }}</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.wireInfoUrl ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.wireInfoUrl, 'shares_purchased') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Wire Info Received</span>
                 <a v-if="workflowDetails.workflow?.wireInfoUrl" :href="workflowDetails.workflow?.wireInfoUrl" target="_blank" class="text-blue-600 text-xs hover:underline">View</a>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.sharePurchaseDate ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.sharePurchaseDate, 'shares_purchased') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Shares Purchased</span>
                 <span v-if="workflowDetails.workflow?.sharePurchaseAmount" class="text-gray-400 text-xs">(${{ workflowDetails.workflow?.sharePurchaseAmount }})</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.election83bFiledAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.election83bFiledAt, '83b_filed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>83(b) Election Filed</span>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.certificateReceivedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.certificateReceivedAt, 'completed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Certificate Received</span>
                 <a v-if="workflowDetails.workflow?.certificateUrl" :href="workflowDetails.workflow?.certificateUrl" target="_blank" class="text-blue-600 text-xs hover:underline">View</a>
               </div>
               <div class="flex items-center gap-2">
-                <span :class="workflowDetails.workflow?.equityVerifiedAt ? 'text-green-500' : 'text-gray-300'">✓</span>
+                <span :class="wfStepDone(workflowDetails.workflow?.equityVerifiedAt, 'completed') ? 'text-green-500' : 'text-gray-300'">✓</span>
                 <span>Completed</span>
               </div>
             </div>
@@ -8239,6 +8239,15 @@
           'equity_agreement_pending','equity_founder_signed','equity_admin_signed','equity_agreement_signed',
           'wire_info_pending','shares_purchased','83b_filed','certificate_pending','completed',
         ];
+        // A progress step is done if its timestamp/URL is set OR the workflow's
+        // status has advanced to/past the step's status — so a manual status
+        // change updates the checkmarks even without the underlying timestamps.
+        const statusRank = (s) => { const i = ONBOARDING_STATUSES.indexOf(s); return i < 0 ? -1 : i; };
+        const wfStepDone = (marker, thresholdStatus) => {
+          if (marker) return true;
+          const cur = workflowDetails.value?.workflow?.status;
+          return cur ? statusRank(cur) >= statusRank(thresholdStatus) : false;
+        };
         const manualStatusEdit = ref('');
         const savingStatus = ref(false);
         const setManualStatus = async () => {
@@ -9315,7 +9324,7 @@
           offerTermsForm, offerTermsDirty, saveOfferTerms, introRequestsDirty, saveIntroRequestTerms,
           openWorkflowModal, closeWorkflowModal, sendOffer, resendOffer, generateAdvisoryAgreement, checkSignatureStatus,
           issuedSharesEdit, savingIssuedShares, saveIssuedShares, backupDocUrl,
-          ONBOARDING_STATUSES, manualStatusEdit, savingStatus, setManualStatus,
+          ONBOARDING_STATUSES, manualStatusEdit, savingStatus, setManualStatus, wfStepDone,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,
           // Network Health

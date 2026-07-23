@@ -87,6 +87,20 @@ app.get('/health', (c) => c.text('ok'));
 app.use('*', logger());
 app.use('/api/*', cors());
 
+// Don't let browsers serve stale HTML. The portal/gym/marketing pages are static
+// files that change on every deploy; without this, browsers cache the old HTML
+// and users see a blank/outdated page until a hard refresh. Force revalidation
+// on HTML responses only (other assets keep their default caching).
+app.use('*', async (c, next) => {
+  await next();
+  const ct = c.res.headers.get('content-type') || '';
+  if (ct.includes('text/html')) {
+    const headers = new Headers(c.res.headers);
+    headers.set('Cache-Control', 'no-cache, must-revalidate');
+    c.res = new Response(c.res.body, { status: c.res.status, headers });
+  }
+});
+
 // Public API Routes (no auth required)
 app.route('/api/admin-auth', adminAuthRoutes);
 app.route('/api/auth', authRoutes);
@@ -947,7 +961,6 @@ app.get('/trial', serveStatic({ path: './public/trial.html' }));
 // brackets, earning bonus shots, the blitz, and everything beyond the intros.
 app.get('/how-it-works', serveStatic({ path: './public/how-it-works.html' }));
 // Portfolio perks — founder deals/credits (Claude, Stripe Atlas, Granola, …).
-app.get('/perks', serveStatic({ path: './public/perks.html' }));
 app.get('/momentum', (c) => c.redirect('/how-it-works', 302)); // superseded by /how-it-works
 app.get('/treadmill', (c) => c.redirect('/how-it-works', 302)); // old URL → new
 

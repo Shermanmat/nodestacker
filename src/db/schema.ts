@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, blob } from 'drizzle-orm/sqlite-core';
 import { relations } from 'drizzle-orm';
 
 // Enums as const objects
@@ -897,6 +897,22 @@ export const boardMembers = sqliteTable('board_members', {
   approvalIp: text('approval_ip'),
   createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
 });
+
+// Raw formation documents kept in the DB as a backup, so a failed Drive upload
+// never loses the founder's files. Stored as BLOBs (PDFs are small).
+export const onboardingDocuments = sqliteTable('onboarding_documents', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  workflowId: integer('workflow_id').notNull().references(() => onboardingWorkflows.id),
+  kind: text('kind').notNull(), // 'aoc' | 'bylaws' | 'board_consent'
+  filename: text('filename'),
+  mimeType: text('mime_type').notNull().default('application/pdf'),
+  sizeBytes: integer('size_bytes'),
+  content: blob('content', { mode: 'buffer' }).notNull(),
+  createdAt: text('created_at').notNull().default('CURRENT_TIMESTAMP'),
+});
+
+export type OnboardingDocument = typeof onboardingDocuments.$inferSelect;
+export type NewOnboardingDocument = typeof onboardingDocuments.$inferInsert;
 
 // Onboarding Relations
 export const onboardingWorkflowsRelations = relations(onboardingWorkflows, ({ one, many }) => ({

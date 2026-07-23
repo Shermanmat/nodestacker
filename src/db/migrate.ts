@@ -61,6 +61,20 @@ safeAddColumn('onboarding_workflows', 'articles_of_incorporation_url', 'text');
 // Founder-issued shares — used to check if there's room to issue MatCap
 safeAddColumn('onboarding_workflows', 'issued_shares', 'integer');
 
+// Formation-doc backups (raw PDFs stored in the DB in case Drive upload fails)
+sqlite.exec(`CREATE TABLE IF NOT EXISTS \`onboarding_documents\` (
+  \`id\` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+  \`workflow_id\` integer NOT NULL REFERENCES \`onboarding_workflows\`(\`id\`),
+  \`kind\` text NOT NULL,
+  \`filename\` text,
+  \`mime_type\` text NOT NULL DEFAULT 'application/pdf',
+  \`size_bytes\` integer,
+  \`content\` blob NOT NULL,
+  \`created_at\` text NOT NULL DEFAULT CURRENT_TIMESTAMP
+)`);
+sqlite.exec(`CREATE INDEX IF NOT EXISTS \`idx_onboarding_documents_workflow\` ON \`onboarding_documents\` (\`workflow_id\`)`);
+console.log('  Ensured onboarding_documents table exists');
+
 // voice_interviews + voice_interview_answers tables (migration 0032)
 try {
   sqlite.exec(`CREATE TABLE IF NOT EXISTS \`voice_interviews\` (

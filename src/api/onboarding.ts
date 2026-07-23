@@ -13,6 +13,7 @@ import {
   portfolioCompanies,
   founders,
   boardMembers,
+  onboardingDocuments,
   OnboardingStatus,
   OnboardingEventType,
   OnboardingActor,
@@ -216,7 +217,33 @@ app.get('/workflows/:id', async (c) => {
     };
   }
 
-  return c.json({ workflow, shareDetails, boardMembers: workflow.boardMembers || [] });
+  // Backup copies of the formation docs kept in the DB (metadata only, no bytes).
+  const backupDocs = await db
+    .select({
+      id: onboardingDocuments.id,
+      kind: onboardingDocuments.kind,
+      filename: onboardingDocuments.filename,
+      sizeBytes: onboardingDocuments.sizeBytes,
+      createdAt: onboardingDocuments.createdAt,
+    })
+    .from(onboardingDocuments)
+    .where(eq(onboardingDocuments.workflowId, id));
+
+  return c.json({ workflow, shareDetails, boardMembers: workflow.boardMembers || [], backupDocs });
+});
+
+// Download a DB-backed formation doc (admin only; guard also accepts ?session=).
+app.get('/:id/documents/:docId/download', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const docId = parseInt(c.req.param('docId'));
+  const doc = await db.query.onboardingDocuments.findFirst({
+    where: eq(onboardingDocuments.id, docId),
+  });
+  if (!doc || doc.workflowId !== id) return c.json({ error: 'Not found' }, 404);
+
+  c.header('Content-Type', doc.mimeType || 'application/pdf');
+  c.header('Content-Disposition', `inline; filename="${doc.filename || 'document.pdf'}"`);
+  return c.body(doc.content as unknown as ArrayBuffer);
 });
 
 // ============== START WORKFLOW ==============

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { eq, and, inArray, notInArray, desc, sql, isNull } from 'drizzle-orm';
-import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, commsChangeRequests, mcpTokens, founderInvestorRecords, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
+import { db, founders, nodes, investors, founderNodeRelationships, nodeInvestorConnections, introRequests, followupLogs, investorResearch, portfolioCompanies, onboardingWorkflows, onboardingEvents, boardMembers, onboardingDocuments, commsChangeRequests, mcpTokens, founderInvestorRecords, OnboardingStatus, OnboardingEventType, OnboardingActor } from '../db/index.js';
 import { getSessionFounderId } from './auth.js';
 import { sendEmail } from '../services/email.js';
 import crypto from 'crypto';
@@ -79,10 +79,10 @@ app.get('/checklist', async (c) => {
   ]);
 
   const items = [
-    { key: 'blurb', label: 'Write your investor blurb', hint: 'The one-paragraph intro we send on your behalf.', tab: 'comms', cta: 'Add blurb', done: !!founder.blurb?.trim() },
-    { key: 'deck', label: 'Upload your pitch deck', hint: 'Attached to your intros so investors can dig in.', tab: 'comms', cta: 'Upload deck', done: !!(founder.deckFile || founder.deckUrl) },
-    { key: 'connect', label: 'Connect your AI assistant', hint: 'Log calls and manage your pipeline from your AI client.', tab: 'connect', cta: 'Connect', done: !!mcpTok },
-    { key: 'investors', label: 'Add your first investors', hint: 'Track everyone you’re talking to in one place.', tab: 'pipeline', cta: 'Add investors', done: !!firstInvestor },
+    { key: 'blurb', label: 'Your investor blurb', hint: 'The one-paragraph intro we send on your behalf. Edit it anytime — it goes live the moment we approve.', tab: 'comms', cta: 'Open Comms', done: !!founder.blurb?.trim() },
+    { key: 'deck', label: 'Your pitch deck', hint: 'Attached to every intro so investors can dig in. Swap it whenever; the new one is live once we approve.', tab: 'comms', cta: 'Open Comms', done: !!(founder.deckFile || founder.deckUrl) },
+    { key: 'investors', label: 'Your investor CRM', hint: 'You’ve got a full investor CRM in here. Upload a few investors you’re already talking to and get in the swing of it.', tab: 'pipeline', cta: 'Open CRM', done: !!firstInvestor },
+    { key: 'connect', label: 'Connect via the MatCap MCP', hint: 'AI-pilled? Connect your AI client to your CRM through the MatCap MCP and run it all from there.', tab: 'connect', cta: 'Connect', done: !!mcpTok },
   ];
   const completed = items.filter((i) => i.done).length;
   return c.json({ items, completed, total: items.length, complete: completed === items.length });
@@ -1318,6 +1318,26 @@ app.post('/onboarding/upload-formation-docs', async (c) => {
     } catch (err: any) {
       console.error('[onboarding] Drive upload of formation docs failed:', err?.message || err);
     }
+  }
+
+  // Always keep a raw backup of the PDFs in the DB, so a Drive failure never
+  // loses the founder's files. Replaces any prior copy for this workflow.
+  try {
+    const safe = (founder.companyName || 'company').replace(/[^a-z0-9]+/gi, '-');
+    await db.delete(onboardingDocuments).where(eq(onboardingDocuments.workflowId, workflow.id));
+    for (const [kind, buf] of [['aoc', aoc], ['bylaws', bylaws], ['board_consent', boardConsent]] as [string, Buffer][]) {
+      await db.insert(onboardingDocuments).values({
+        workflowId: workflow.id,
+        kind,
+        filename: `${safe}-${kind.replace(/_/g, '-')}.pdf`,
+        mimeType: 'application/pdf',
+        sizeBytes: buf.length,
+        content: buf,
+        createdAt: now,
+      });
+    }
+  } catch (err: any) {
+    console.error('[onboarding] DB backup of formation docs failed:', err?.message || err);
   }
 
   // Save extracted fields + doc links on the workflow.

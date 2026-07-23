@@ -1071,6 +1071,19 @@
             </a>
           </div>
 
+          <!-- Formation-doc backups stored in the DB -->
+          <div v-if="workflowDetails.backupDocs && workflowDetails.backupDocs.length" class="mb-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="font-medium mb-2 text-sm">Formation docs — backup copies <span class="text-gray-400 font-normal">(stored in DB)</span></h4>
+            <div class="flex flex-col gap-1">
+              <a v-for="doc in workflowDetails.backupDocs" :key="doc.id"
+                :href="backupDocUrl(doc.id)"
+                target="_blank" class="text-blue-600 hover:underline text-sm flex items-center gap-2">
+                📄 {{ doc.filename || doc.kind }}
+                <span class="text-gray-400 text-xs">{{ doc.sizeBytes ? Math.round(doc.sizeBytes/1024) + ' KB' : '' }}</span>
+              </a>
+            </div>
+          </div>
+
           <!-- Actions -->
           <div class="flex gap-2">
             <button v-if="getNextOnboardingAction(workflowDetails.workflow)"
@@ -5338,6 +5351,11 @@
           return `/api/admin/voice-interviews/audio/${answer.id}?session=${adminSessionId.value}`;
         }
 
+        function backupDocUrl(docId) {
+          const wid = workflowDetails.value?.workflow?.id;
+          return `/api/onboarding/${wid}/documents/${docId}/download?session=${adminSessionId.value}`;
+        }
+
         async function updateSignupStatus(id, status) {
           try {
             await api(`/signups/${id}/status`, { method: 'PUT', body: { status } });
@@ -9296,7 +9314,7 @@
           loadOnboardingWorkflows, getEligibleForOnboarding, openStartOnboardingModal, startOnboarding,
           offerTermsForm, offerTermsDirty, saveOfferTerms, introRequestsDirty, saveIntroRequestTerms,
           openWorkflowModal, closeWorkflowModal, sendOffer, resendOffer, generateAdvisoryAgreement, checkSignatureStatus,
-          issuedSharesEdit, savingIssuedShares, saveIssuedShares,
+          issuedSharesEdit, savingIssuedShares, saveIssuedShares, backupDocUrl,
           ONBOARDING_STATUSES, manualStatusEdit, savingStatus, setManualStatus,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,

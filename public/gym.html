@@ -60,7 +60,7 @@
         <div v-if="phase === 'idle'">
           <div v-if="error" class="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">{{ error }}</div>
 
-          <div v-if="repsRemaining <= 0 && !latest" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6 text-sm">
+          <div v-if="loaded && repsRemaining <= 0 && !latest" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6 text-sm">
             You've used this week's gym rep — it refreshes Monday. (Ask Mat if you need more sooner.)
           </div>
 
@@ -114,6 +114,7 @@
         const personas = ref([]);
         const reps = ref([]);
         const repsRemaining = ref(0);
+        const loaded = ref(false);            // true once gym status has actually loaded
         const latest = ref(null);             // full readout object
         const error = ref('');
         const starting = ref(false);
@@ -141,6 +142,7 @@
           personas.value = r.data.personas || [];
           reps.value = r.data.reps || [];
           repsRemaining.value = r.data.repsRemaining ?? 0;
+          loaded.value = true;
         }
 
         const personaName = (key) => (personas.value.find(p => p.key === key) || {}).name || key || 'Practice call';

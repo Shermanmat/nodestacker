@@ -91,32 +91,10 @@
           </div>
 
           <div class="space-y-5">
-            <!-- First-run setup checklist (hides itself once every item is done) -->
-            <div v-if="checklist && !checklist.complete" class="bg-white border rounded-lg p-6">
-              <div class="flex items-center justify-between mb-1">
-                <h3 class="text-base font-semibold text-gray-900">Finish setting up</h3>
-                <span class="text-xs text-gray-500">{{ checklist.completed }}/{{ checklist.total }} done</span>
-              </div>
-              <p class="text-sm text-gray-500 mb-4">A few quick steps so your intros land their best.</p>
-              <div class="h-2 bg-gray-200 rounded-full overflow-hidden mb-5">
-                <div class="h-full bg-blue-600 rounded-full transition-all" :style="{ width: Math.round(100*checklist.completed/checklist.total)+'%' }"></div>
-              </div>
-              <ul class="divide-y divide-gray-100">
-                <li v-for="item in checklist.items" :key="item.key" class="flex items-center gap-3 py-2.5">
-                  <span :class="['flex-none w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold', item.done ? 'bg-green-100 text-green-700' : 'border border-gray-300 text-transparent']">✓</span>
-                  <div class="flex-1 min-w-0">
-                    <div :class="['text-sm font-medium', item.done ? 'text-gray-400 line-through' : 'text-gray-900']">{{ item.label }}</div>
-                    <div v-if="!item.done" class="text-xs text-gray-500 mt-0.5">{{ item.hint }}</div>
-                  </div>
-                  <button v-if="!item.done" @click="activeTab = item.tab" class="flex-none text-sm font-medium text-blue-600 hover:text-blue-700">{{ item.cta }} →</button>
-                </li>
-              </ul>
-            </div>
-
-            <!-- Get set up -->
+            <!-- Get set up (mandatory first steps) -->
             <div class="bg-white border rounded-lg p-6">
               <h3 class="text-base font-semibold text-gray-900 mb-1">Get set up</h3>
-              <p class="text-sm text-gray-500 mb-4">Three quick things we set every portfolio founder up with.</p>
+              <p class="text-sm text-gray-500 mb-4">Three quick things we set every portfolio founder up with — start here.</p>
               <ul class="divide-y divide-gray-100">
                 <li class="flex items-start gap-3 py-3">
                   <span class="flex-none text-lg">📊</span>
@@ -141,6 +119,28 @@
                     <div class="text-xs text-gray-500 mt-0.5">Our founders-only group chat — ask questions and get real answers from other MatCap founders.</div>
                   </div>
                   <a href="https://chat.whatsapp.com/H03rPTdQDZ84hrar3NbAzD" target="_blank" rel="noopener" class="flex-none text-sm font-medium text-blue-600 hover:text-blue-700">Join →</a>
+                </li>
+              </ul>
+            </div>
+
+            <!-- Quick tour of the platform (hides itself once you've tried each part) -->
+            <div v-if="checklist && !checklist.complete" class="bg-white border rounded-lg p-6">
+              <div class="flex items-center justify-between mb-1">
+                <h3 class="text-base font-semibold text-gray-900">Take a quick tour</h3>
+                <span class="text-xs text-gray-500">{{ checklist.completed }}/{{ checklist.total }} explored</span>
+              </div>
+              <p class="text-sm text-gray-500 mb-4">Here's what you can do in here — poke around each one.</p>
+              <div class="h-2 bg-gray-200 rounded-full overflow-hidden mb-5">
+                <div class="h-full bg-blue-600 rounded-full transition-all" :style="{ width: Math.round(100*checklist.completed/checklist.total)+'%' }"></div>
+              </div>
+              <ul class="divide-y divide-gray-100">
+                <li v-for="item in checklist.items" :key="item.key" class="flex items-start gap-3 py-3">
+                  <span :class="['flex-none w-5 h-5 mt-0.5 rounded-full flex items-center justify-center text-[11px] font-bold', item.done ? 'bg-green-100 text-green-700' : 'border border-gray-300 text-transparent']">✓</span>
+                  <div class="flex-1 min-w-0">
+                    <div :class="['text-sm font-medium', item.done ? 'text-gray-400' : 'text-gray-900']">{{ item.label }}</div>
+                    <div class="text-xs text-gray-500 mt-0.5">{{ item.hint }}</div>
+                  </div>
+                  <button @click="activeTab = item.tab" class="flex-none text-sm font-medium text-blue-600 hover:text-blue-700">{{ item.cta }} →</button>
                 </li>
               </ul>
             </div>

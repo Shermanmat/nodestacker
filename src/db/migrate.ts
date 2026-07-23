@@ -538,6 +538,7 @@ sqlite.exec(`CREATE TABLE IF NOT EXISTS \`comms_change_requests\` (
   \`resolved_at\` text
 )`);
 safeAddColumn('comms_change_requests', 'approve_token', 'text');
+safeAddColumn('comms_change_requests', 'proposed_blurb', 'text');
 console.log('  Ensured comms_change_requests table exists');
 
 // Investor-discovery agent candidates (pending admin review).

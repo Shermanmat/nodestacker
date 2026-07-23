@@ -1246,11 +1246,10 @@
                 <h3 class="font-semibold text-gray-900">Your blurb</h3>
                 <span v-if="commsPending.some(p => p.kind==='blurb')" class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Change requested</span>
               </div>
-              <pre class="whitespace-pre-wrap text-sm text-gray-700 bg-gray-50 rounded p-3 border mb-3" style="font-family:inherit">{{ comms.blurb || 'No blurb set yet.' }}</pre>
-              <label class="block text-sm font-medium text-gray-700 mb-1">Request a change</label>
-              <textarea v-model="blurbNote" rows="3" placeholder="What should change? New metrics, a clarification, a different angle…" class="w-full border rounded px-3 py-2 text-sm mb-2"></textarea>
+              <p class="text-xs text-gray-500 mb-2">This is the exact intro we send investors on your behalf. Edit it below and suggest the change — it goes live once Mat approves.</p>
+              <textarea v-model="blurbEdit" rows="7" placeholder="No blurb set yet — write the intro you want us to send." class="w-full border rounded px-3 py-2 text-sm mb-2" style="font-family:inherit"></textarea>
               <div class="flex items-center gap-3">
-                <button @click="submitBlurbRequest" :disabled="blurbSubmitting || blurbNote.trim().length < 3" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">{{ blurbSubmitting ? 'Sending…' : 'Request blurb change' }}</button>
+                <button @click="submitBlurbRequest" :disabled="blurbSubmitting || !blurbChanged" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">{{ blurbSubmitting ? 'Sending…' : 'Suggest this edit' }}</button>
                 <span v-if="blurbMsg" class="text-sm text-green-600">{{ blurbMsg }}</span>
                 <span v-if="blurbErr" class="text-sm text-red-600">{{ blurbErr }}</span>
               </div>
@@ -1795,6 +1794,7 @@
         const commsLoading = ref(false);
         const commsPending = ref([]);
         const blurbNote = ref('');
+        const blurbEdit = ref('');   // editable copy of the blurb the founder proposes
         const blurbSubmitting = ref(false);
         const blurbMsg = ref('');
         const blurbErr = ref('');
@@ -1808,16 +1808,17 @@
           commsLoading.value = true;
           try {
             const res = await api('/portal/comms');
-            if (res) { comms.value = res; commsPending.value = res.pending || []; }
+            if (res) { comms.value = res; commsPending.value = res.pending || []; blurbEdit.value = res.blurb || ''; }
           } catch (e) { /* ignore */ } finally { commsLoading.value = false; }
         };
+        const blurbChanged = computed(() => blurbEdit.value.trim().length >= 10 && blurbEdit.value.trim() !== (comms.value?.blurb || '').trim());
         const submitBlurbRequest = async () => {
           blurbMsg.value = ''; blurbErr.value = '';
-          if (blurbNote.value.trim().length < 3) { blurbErr.value = 'Add a bit more detail.'; return; }
+          if (!blurbChanged.value) { blurbErr.value = 'Edit your blurb before suggesting a change.'; return; }
           blurbSubmitting.value = true;
           try {
-            const res = await api('/portal/comms/blurb-request', { method: 'POST', body: { note: blurbNote.value } });
-            if (res && res.success) { blurbMsg.value = "Sent — we'll review it."; blurbNote.value = ''; await loadComms(); }
+            const res = await api('/portal/comms/blurb-request', { method: 'POST', body: { proposedBlurb: blurbEdit.value } });
+            if (res && res.success) { blurbMsg.value = "Sent to Mat — it goes live once he approves."; await loadComms(); }
             else if (res && res.error) { blurbErr.value = res.error; }
           } catch (e) { blurbErr.value = e.message || 'Something went wrong'; }
           finally { blurbSubmitting.value = false; }
@@ -2684,7 +2685,7 @@
           toggleFounderFilter, clearFounderFilters, toggleResearchExpand,
           truncateText, extractFounderPrefs,
           // Investor Comms
-          comms, commsLoading, commsPending, blurbNote, blurbSubmitting, blurbMsg, blurbErr,
+          comms, commsLoading, commsPending, blurbNote, blurbEdit, blurbChanged, blurbSubmitting, blurbMsg, blurbErr,
           deckFile, deckNote, deckSubmitting, deckMsg, deckErr, loadComms, submitBlurbRequest, submitDeckRequest, onDeckFilePick,
           // Pipeline / CRM
           showMeetingPaste, meetingTitle, meetingTranscript, meetingSubmitting, meetingResult, meetingError, submitMeetingNotes,

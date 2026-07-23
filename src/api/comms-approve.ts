@@ -2,9 +2,10 @@
  * One-click approve for founder comms change-requests (blurb + deck).
  *
  * Clicked from the notification email the admin receives — the unguessable
- * token IS the auth, so there's no login and no admin UI. Approving a deck
- * request swaps the staged proposed PDF into the founder's live deck; approving
- * a blurb request just marks it handled (clears the founder's "pending" badge).
+ * token IS the auth, so there's no login and no admin UI. Approving swaps the
+ * founder's staged edit into what we send: a deck request promotes the proposed
+ * PDF to founders.deckFile; a blurb request writes the proposed text to
+ * founders.blurb (the exact text used in intros).
  *
  * Mounted at /comms/approve (NOT under the session-guarded portal router).
  */
@@ -41,8 +42,13 @@ app.get('/:token', async (c) => {
     }
     await db.update(founders).set({ deckFile: reqRow.proposedDeckFile }).where(eq(founders.id, reqRow.founderId));
     message = `<b>${founder?.name || 'The founder'}'s</b> new deck is now live and will attach to future intros.`;
+  } else if (reqRow.kind === 'blurb' && reqRow.proposedBlurb) {
+    // Promote the proposed blurb to the live blurb — this is exactly what we
+    // send out in intros, so approving makes the founder's edit go live.
+    await db.update(founders).set({ blurb: reqRow.proposedBlurb }).where(eq(founders.id, reqRow.founderId));
+    message = `<b>${founder?.name || 'The founder'}'s</b> new blurb is now live and will be used in future intros.`;
   } else {
-    message = `Marked <b>${founder?.name || 'the founder'}'s</b> blurb request as handled. Update the blurb copy wherever you normally do — this just clears their pending badge.`;
+    message = `Marked <b>${founder?.name || 'the founder'}'s</b> request as handled.`;
   }
 
   await db.update(commsChangeRequests).set({ status: 'approved', resolvedAt: now }).where(eq(commsChangeRequests.id, reqRow.id));

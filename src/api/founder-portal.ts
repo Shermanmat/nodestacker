@@ -98,19 +98,30 @@ app.get('/treadmill', async (c) => {
 app.post('/comms/blurb-request', async (c) => {
   const founderId = c.get('founderId') as number;
   const body = await c.req.json().catch(() => ({} as any));
+  // The founder now edits the actual blurb text; `proposedBlurb` is the new
+  // version that replaces founders.blurb verbatim once the admin approves.
+  const proposedBlurb = typeof body.proposedBlurb === 'string' ? body.proposedBlurb.trim() : '';
   const note = typeof body.note === 'string' ? body.note.trim() : '';
-  if (note.length < 3) return c.json({ error: 'Add a note describing the change' }, 400);
+  if (proposedBlurb.length < 10) return c.json({ error: 'The blurb looks too short — write the full intro.' }, 400);
+
   const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
+  const current = (founder?.blurb || '').trim();
+  if (proposedBlurb === current) return c.json({ error: 'This matches your current blurb — make an edit first.' }, 400);
+
   const approveToken = crypto.randomBytes(24).toString('hex');
   const [row] = await db.insert(commsChangeRequests).values({
-    founderId, kind: 'blurb', note, approveToken, status: 'pending', createdAt: new Date().toISOString(),
+    founderId, kind: 'blurb', proposedBlurb, note: note || null, approveToken, status: 'pending', createdAt: new Date().toISOString(),
   }).returning();
   const approveLink = `${APP_BASE_URL}/comms/approve/${approveToken}`;
+  const esc = (s: string) => s.replace(/</g, '&lt;');
   sendEmail({
     to: ADMIN_EMAIL,
-    subject: `Blurb change request — ${founder?.name || 'founder #' + founderId}`,
-    html: `<p><b>${founder?.name || 'Founder #' + founderId}</b> (${founder?.companyName || ''}) requested a blurb change:</p><blockquote>${note.replace(/</g, '&lt;')}</blockquote><p>After you update the blurb, <a href="${approveLink}">mark this handled</a> (clears their "pending" badge).</p>`,
-    text: `${founder?.name || 'Founder #' + founderId} (${founder?.companyName || ''}) requested a blurb change:\n\n${note}\n\nAfter you update the blurb, mark it handled: ${approveLink}`,
+    subject: `Blurb edit — ${founder?.name || 'founder #' + founderId}`,
+    html: `<p><b>${founder?.name || 'Founder #' + founderId}</b> (${founder?.companyName || ''}) edited their blurb.${note ? ` Note: ${esc(note)}` : ''}</p>`
+      + `<p style="color:#888;font-size:13px;margin-bottom:4px;">CURRENT</p><blockquote style="border-left:3px solid #ddd;padding-left:12px;color:#666;white-space:pre-wrap;">${esc(current) || '<i>(none)</i>'}</blockquote>`
+      + `<p style="color:#888;font-size:13px;margin-bottom:4px;">PROPOSED</p><blockquote style="border-left:3px solid #2563eb;padding-left:12px;white-space:pre-wrap;">${esc(proposedBlurb)}</blockquote>`
+      + `<p><a href="${approveLink}" style="display:inline-block;background:#2563eb;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;">Approve &amp; make it live</a> — this replaces the blurb we send out.</p>`,
+    text: `${founder?.name || 'Founder #' + founderId} (${founder?.companyName || ''}) edited their blurb.${note ? ' Note: ' + note : ''}\n\nCURRENT:\n${current || '(none)'}\n\nPROPOSED:\n${proposedBlurb}\n\nApprove & make it live (replaces the blurb we send out): ${approveLink}`,
   }).catch((e) => console.error('[comms] blurb-request email failed:', e));
   return c.json({ success: true, id: row.id });
 });

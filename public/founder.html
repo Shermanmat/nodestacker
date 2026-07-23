@@ -59,8 +59,6 @@
             <p class="text-sm text-gray-500">Matcap</p>
           </div>
           <div class="flex items-center space-x-4">
-            <a href="/perks" target="_blank" class="text-sm text-gray-600 hover:text-blue-600">🎁 Perks</a>
-            <a href="/gym.html" class="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">🏋️ Pitch Gym</a>
             <span class="text-sm text-gray-600">{{ session.founder.name }}</span>
             <button @click="logout" class="text-sm text-red-600 hover:underline">Logout</button>
           </div>
@@ -77,6 +75,8 @@
               <span v-if="tab.id === 'tasks' && tasks.length > 0"
                 class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">{{ tasks.length }}</span>
             </button>
+            <a href="/gym.html" class="py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">Gym</a>
+            <a href="/perks" class="py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700">Perks</a>
           </div>
         </div>
       </nav>

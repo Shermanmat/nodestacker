@@ -3,6 +3,7 @@
  * Handles advisory agreement creation, sending, and webhook processing
  */
 
+import crypto from 'node:crypto';
 import * as pdfFill from './pdf-fill.js';
 
 interface SignerInfo {
@@ -354,7 +355,6 @@ export function verifyWebhookSignature(payload: string, signature: string): bool
   const apiKey = process.env.DROPBOX_SIGN_API_KEY;
   if (!apiKey) return false;
 
-  const crypto = require('crypto');
   const expectedSignature = crypto
     .createHmac('sha256', apiKey)
     .update(payload)

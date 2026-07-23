@@ -4,6 +4,7 @@
  */
 
 import { google } from 'googleapis';
+import { Readable } from 'node:stream';
 
 interface DriveFile {
   id: string;
@@ -115,7 +116,6 @@ export async function uploadDocument(
   const drive = getDriveClient();
 
   // Create a readable stream from the buffer
-  const { Readable } = require('stream');
   const stream = new Readable();
   stream.push(fileBuffer);
   stream.push(null);

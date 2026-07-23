@@ -33,8 +33,8 @@
             <p class="text-sm text-gray-500">Practice against an AI VC, then get a blunt readout. Each finished session adds +1 intro request / week.</p>
           </div>
           <div class="text-right">
-            <div class="text-sm text-gray-500">Reps left this week</div>
-            <div class="text-2xl font-bold" :class="repsRemaining > 0 ? 'text-green-600' : 'text-gray-400'">{{ repsRemaining }}</div>
+            <div class="text-sm text-gray-500">{{ unlimited ? 'Reps this week' : 'Reps left this week' }}</div>
+            <div class="text-2xl font-bold" :class="(unlimited ? repsUsed > 0 : repsRemaining > 0) ? 'text-green-600' : 'text-gray-400'">{{ unlimited ? repsUsed : repsRemaining }}</div>
           </div>
         </div>
       </header>
@@ -60,7 +60,7 @@
         <div v-if="phase === 'idle'">
           <div v-if="error" class="mb-4 p-3 bg-red-100 text-red-700 rounded text-sm">{{ error }}</div>
 
-          <div v-if="loaded && repsRemaining <= 0 && !latest" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6 text-sm">
+          <div v-if="loaded && !unlimited && repsRemaining <= 0 && !latest" class="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-4 mb-6 text-sm">
             You've used this week's gym rep — it refreshes Monday. (Ask Mat if you need more sooner.)
           </div>
 
@@ -78,7 +78,7 @@
                   :class="{'bg-green-100 text-green-700': p.difficulty==='warm','bg-blue-100 text-blue-700': p.difficulty==='standard','bg-red-100 text-red-700': p.difficulty==='hard'}">{{ p.difficulty }}</span>
               </div>
               <p class="text-sm text-gray-600 flex-1">{{ p.tagline }}</p>
-              <button @click="startRep(p)" :disabled="repsRemaining <= 0 || starting"
+              <button @click="startRep(p)" :disabled="(!unlimited && repsRemaining <= 0) || starting"
                 class="mt-4 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">
                 {{ starting ? 'Starting…' : 'Start rep' }}
               </button>
@@ -114,6 +114,8 @@
         const personas = ref([]);
         const reps = ref([]);
         const repsRemaining = ref(0);
+        const repsUsed = ref(0);
+        const unlimited = ref(false);         // no weekly cap right now
         const loaded = ref(false);            // true once gym status has actually loaded
         const latest = ref(null);             // full readout object
         const error = ref('');
@@ -142,6 +144,8 @@
           personas.value = r.data.personas || [];
           reps.value = r.data.reps || [];
           repsRemaining.value = r.data.repsRemaining ?? 0;
+          repsUsed.value = r.data.repsUsed ?? 0;
+          unlimited.value = !!r.data.unlimited;
           loaded.value = true;
         }
 
@@ -229,7 +233,7 @@
 
         onMounted(load);
 
-        return { needsLogin, phase, personas, reps, repsRemaining, latest, error, starting,
+        return { needsLogin, phase, personas, reps, repsRemaining, repsUsed, unlimited, loaded, latest, error, starting,
                  callBox, readout, startRep, openRep, personaName, scoreColor, fmtDate };
       }
     }).mount('#app');

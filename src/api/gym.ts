@@ -68,7 +68,7 @@ app.post('/conversations', async (c) => {
   if (!persona || !persona.enabled) return c.json({ error: 'Unknown persona' }, 400);
 
   const status = await getGymStatus(founderId);
-  if (status.repsRemaining <= 0) return c.json({ error: 'No gym reps remaining', ...status }, 403);
+  if (!status.unlimited && status.repsRemaining <= 0) return c.json({ error: 'No gym reps remaining', ...status }, 403);
 
   try {
     const conv = await createConversation({
@@ -126,7 +126,7 @@ app.post('/reps/complete', async (c) => {
   if (!transcript.trim()) return c.json({ status: 'processing' }, 202);
 
   const status = await getGymStatus(founderId);
-  if (status.repsRemaining <= 0) return c.json({ error: 'No gym reps remaining', ...status }, 403);
+  if (!status.unlimited && status.repsRemaining <= 0) return c.json({ error: 'No gym reps remaining', ...status }, 403);
 
   try {
     const result = await analyzeMockCall({ transcript, founderId, persona, tavusConversationId: conversationId });
@@ -155,7 +155,7 @@ app.post('/reps', async (c) => {
   if (!getPersona(parsed.data.persona)) return c.json({ error: 'Unknown persona' }, 400);
 
   const status = await getGymStatus(founderId);
-  if (status.repsRemaining <= 0) return c.json({ error: 'No gym reps remaining', ...status }, 403);
+  if (!status.unlimited && status.repsRemaining <= 0) return c.json({ error: 'No gym reps remaining', ...status }, 403);
 
   try {
     const result = await analyzeMockCall({ transcript: parsed.data.transcript, founderId, persona: parsed.data.persona });

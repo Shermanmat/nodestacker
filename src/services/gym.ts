@@ -11,10 +11,16 @@ import { db, founders, mockCallAnalyses } from '../db/index.js';
 /** Baseline practice reps every founder gets each week. */
 export const WEEKLY_GYM_REPS = 1;
 
+/** Temporarily lifted: let founders practice freely while we watch who uses it.
+ *  Usage is still tracked (every rep logs a mock_call_analyses row). Flip to
+ *  false to restore the weekly cap. */
+export const GYM_UNLIMITED = true;
+
 export interface GymStatus {
   repsAllowed: number;   // reps per week for this founder
   repsUsed: number;      // reps used THIS week
   repsRemaining: number;
+  unlimited: boolean;    // true = no weekly cap right now
 }
 
 /** Monday 00:00 UTC of the current week, as epoch ms. */
@@ -50,7 +56,7 @@ export async function getGymStatus(founderId: number): Promise<GymStatus> {
   // founder always has at least WEEKLY_GYM_REPS/week regardless of stored value.
   const repsAllowed = Math.max(WEEKLY_GYM_REPS, founder?.gymRepsAllowed ?? WEEKLY_GYM_REPS);
   const repsUsed = await countGymReps(founderId, true);
-  return { repsAllowed, repsUsed, repsRemaining: Math.max(0, repsAllowed - repsUsed) };
+  return { repsAllowed, repsUsed, repsRemaining: Math.max(0, repsAllowed - repsUsed), unlimited: GYM_UNLIMITED };
 }
 
 /** Set a founder's weekly rep rate (admin). Min 1. */

@@ -202,8 +202,8 @@
                   <span class="text-xs uppercase tracking-wide text-gray-400">Pitch Gym</span>
                   <span class="text-xs text-blue-600 font-medium">Practice →</span>
                 </div>
-                <p class="mt-2 text-2xl font-bold text-gray-900">{{ treadmill ? treadmill.gymRepsRemaining : '—' }}</p>
-                <p class="text-xs text-gray-500">rep{{ treadmill && treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week</p>
+                <p class="mt-2 text-2xl font-bold text-gray-900">{{ treadmill ? (treadmill.gymUnlimited ? treadmill.gymRepsUsed : treadmill.gymRepsRemaining) : '—' }}</p>
+                <p class="text-xs text-gray-500">rep{{ treadmill && (treadmill.gymUnlimited ? treadmill.gymRepsUsed : treadmill.gymRepsRemaining) === 1 ? '' : 's' }} this week</p>
               </a>
             </div>
 
@@ -1473,7 +1473,8 @@
               </div>
               <p class="text-sm text-gray-500 mt-1">
                 Sharpen your pitch against an AI VC — a better pitch means more yeses, which lifts your pace.
-                <template v-if="treadmill.gymRepsRemaining > 0"> You have <strong>{{ treadmill.gymRepsRemaining }}</strong> rep{{ treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week.</template>
+                <template v-if="treadmill.gymUnlimited"> Practice as often as you like.</template>
+                <template v-else-if="treadmill.gymRepsRemaining > 0"> You have <strong>{{ treadmill.gymRepsRemaining }}</strong> rep{{ treadmill.gymRepsRemaining === 1 ? '' : 's' }} this week.</template>
                 <template v-else> Your rep resets Monday.</template>
               </p>
             </a>

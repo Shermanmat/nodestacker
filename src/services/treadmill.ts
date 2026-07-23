@@ -329,6 +329,8 @@ export interface TreadmillReading {
   requestsPerWeek: number;       // current weekly pace
   cadenceActive: boolean;
   gymRepsRemaining: number;      // gym reps available this week (practice)
+  gymRepsUsed: number;           // gym reps done this week
+  gymUnlimited: boolean;         // true = no weekly cap right now
   calibrating: boolean;
   calibration: { phase: 'sending' | 'waiting'; sentCount: number; target: number } | null;
   blitzing: boolean;             // in a live win-blitz
@@ -352,7 +354,10 @@ export interface TreadmillReading {
 export async function getTreadmillReading(founderId: number): Promise<TreadmillReading> {
   const founder = await db.query.founders.findFirst({ where: eq(founders.id, founderId) });
   const cadenceActive = Boolean(founder?.introCadenceActive);
-  const gymRepsRemaining = (await getGymStatus(founderId)).repsRemaining;
+  const gymStatus = await getGymStatus(founderId);
+  const gymRepsRemaining = gymStatus.repsRemaining;
+  const gymRepsUsed = gymStatus.repsUsed;
+  const gymUnlimited = gymStatus.unlimited;
   const intros = await loadIntros(founderId);
   const blitzing = isBlitzing(founder);
 
@@ -371,7 +376,7 @@ export async function getTreadmillReading(founderId: number): Promise<TreadmillR
     const view = calibrationView(intros);
     if (view.phase !== 'ready') {
       return {
-        requestsPerWeek: founder?.introTargetPerWeek ?? BASE_TARGET, cadenceActive, gymRepsRemaining,
+        requestsPerWeek: founder?.introTargetPerWeek ?? BASE_TARGET, cadenceActive, gymRepsRemaining, gymRepsUsed, gymUnlimited,
         calibrating: true,
         calibration: { phase: view.phase, sentCount: view.sentCount, target: CALIBRATION_TARGET },
         blitzing, bonus, explainer: null,
@@ -399,5 +404,5 @@ export async function getTreadmillReading(founderId: number): Promise<TreadmillR
           : (rate < 0.30 ? 'When investors accept more of your intro requests, your pace picks up.' : null)),
   };
 
-  return { requestsPerWeek, cadenceActive, gymRepsRemaining, calibrating: false, calibration: null, blitzing, bonus, explainer };
+  return { requestsPerWeek, cadenceActive, gymRepsRemaining, gymRepsUsed, gymUnlimited, calibrating: false, calibration: null, blitzing, bonus, explainer };
 }

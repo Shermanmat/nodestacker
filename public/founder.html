@@ -149,7 +149,7 @@
             <button @click="activeTab = 'treadmill'"
                     class="w-full text-left bg-white border rounded-lg p-6 hover:border-blue-300 transition">
               <div class="flex items-center justify-between">
-                <span class="text-xs uppercase tracking-wide text-gray-400">Your Momentum</span>
+                <span class="text-xs uppercase tracking-wide text-gray-400">Your Pace</span>
                 <span class="text-xs text-blue-600 font-medium">Open →</span>
               </div>
               <template v-if="treadmill && treadmill.calibrating">
@@ -180,7 +180,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <button @click="activeTab='pipeline'" class="text-left bg-white border rounded-lg p-5 hover:border-blue-300 transition">
                 <div class="flex items-center justify-between">
-                  <span class="text-xs uppercase tracking-wide text-gray-400">Pipeline</span>
+                  <span class="text-xs uppercase tracking-wide text-gray-400">CRM</span>
                   <span class="text-xs text-blue-600 font-medium">Open →</span>
                 </div>
                 <p class="mt-2 text-2xl font-bold text-gray-900">{{ crmStats.active }}</p>
@@ -227,7 +227,7 @@
           <!-- Header + Add -->
           <div class="flex items-center justify-between mb-4">
             <div>
-              <h2 class="text-xl font-semibold">Pipeline</h2>
+              <h2 class="text-xl font-semibold">CRM</h2>
               <p class="text-sm text-gray-500">Your investor pipeline — MatCap-sent intros and investors you're tracking yourself.</p>
             </div>
             <div class="flex gap-2">
@@ -1362,7 +1362,7 @@
         <!-- Momentum: weekly intro-request pace + how to grow it -->
         <div v-if="activeTab === 'treadmill'">
           <div class="mb-6">
-            <h2 class="text-xl font-semibold text-gray-900">Your Momentum</h2>
+            <h2 class="text-xl font-semibold text-gray-900">Your Pace</h2>
             <p class="text-sm text-gray-500 mt-1 max-w-2xl">
               This is how many <strong>intro requests</strong> we send on your behalf each week. Do the
               work — sharpen your pitch in the gym — and your pace picks up.
@@ -1539,8 +1539,8 @@
         const tabs = computed(() => {
           const t = [
             { id: 'overview', label: 'Overview' },
-            { id: 'pipeline', label: 'Pipeline' },
-            { id: 'treadmill', label: 'Momentum' },
+            { id: 'pipeline', label: 'CRM' },
+            { id: 'treadmill', label: 'Pace' },
             { id: 'comms', label: 'Investor Comms' },
             { id: 'connect', label: 'Connect AI' },
           ];

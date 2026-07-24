@@ -21,6 +21,9 @@ import {
 import * as esign from '../services/esign.js';
 import * as googleDrive from '../services/google-drive.js';
 import * as onboardingEmails from '../services/onboarding-emails.js';
+import * as lob from '../services/lob.js';
+import * as election83b from '../services/election-83b.js';
+import type { Filer } from '../services/election-83b.js';
 
 const app = new Hono();
 
@@ -858,6 +861,207 @@ app.post('/:id/file-83b', async (c) => {
   );
 
   return c.json({ success: true, message: '83(b) filed, certificate request sent to founder' });
+});
+
+// ============== 83(b) GENERATE + FILE VIA LOB ==============
+
+// The date the restricted stock was transferred to MatCap — starts the hard
+// 30-day §83(b) clock. Prefer the recorded purchase date, fall back to the
+// equity-agreement signing date.
+function transferDateOf(workflow: any): string {
+  return workflow.sharePurchaseDate || (workflow.equityAgreementSignedAt || '').split('T')[0] || '';
+}
+
+function build83bInput(workflow: any, profile: election83b.TaxpayerProfile): election83b.ElectionInput {
+  const founder = workflow.portfolioCompany.founder;
+  const shareCount = workflow.authorizedShares && workflow.offerEquityPercent
+    ? calculateShareCount(workflow.offerEquityPercent, workflow.authorizedShares)
+    : 0;
+  const pricePerShare = parseFloat(workflow.sharePrice || '0.0001') || 0.0001;
+  const entityType = /llc|limited liability/i.test(workflow.entityType || '')
+    ? 'limited liability company'
+    : 'corporation';
+  return {
+    taxpayer: profile,
+    companyName: workflow.entityName || founder.companyName || 'the Company',
+    entityState: workflow.entityState || 'Delaware',
+    entityType,
+    shareCount,
+    pricePerShare,
+    // Stock purchased at FMV → $0 includible. Adjust fmvPerShare if the grant
+    // price differs from FMV at transfer.
+    fmvPerShare: pricePerShare,
+    transferDate: transferDateOf(workflow),
+  };
+}
+
+// Read-only: deadline countdown + config readiness + existing filings.
+app.get('/:id/83b-info', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+
+  const transferDate = transferDateOf(workflow);
+  const configured = election83b.configuredFilers();
+  let filings: any[] = [];
+  try { filings = workflow.election83bFilings ? JSON.parse(workflow.election83bFilings) : []; } catch { filings = []; }
+
+  return c.json({
+    transferDate,
+    deadline: election83b.electionDeadline(transferDate),
+    daysRemaining: transferDate ? election83b.daysUntilDeadline(transferDate, new Date().toISOString()) : null,
+    configuredFilers: configured,
+    unconfiguredFilers: (['entity', 'personal'] as Filer[]).filter((f) => !configured.includes(f)),
+    lobConfigured: lob.isConfigured(),
+    lobLiveKey: lob.isConfigured() ? lob.isLiveKey() : false,
+    irsConfigured: election83b.getIrsAddress() !== null,
+    filings: Array.isArray(filings) ? filings : [],
+  });
+});
+
+// Generate the election PDFs (one per configured filer) for review + signing.
+// Does not change status or file anything.
+app.post('/:id/generate-83b', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+
+  const filers = election83b.configuredFilers();
+  if (!filers.length) {
+    return c.json({ error: 'No taxpayer profiles configured. Set MATCAP_83B_ENTITY_* and/or MATCAP_83B_PERSONAL_* secrets.' }, 400);
+  }
+
+  const transferDate = transferDateOf(workflow);
+  const elections: any[] = [];
+  for (const filer of filers) {
+    const profile = election83b.getTaxpayerProfile(filer)!;
+    const input = build83bInput(workflow, profile);
+    const pdf = await election83b.generate83bPdf(input);
+    const fileName = `83b Election - ${filer === 'entity' ? 'Entity' : 'Personal'} - ${input.companyName}.pdf`;
+    let driveUrl: string | null = null;
+    if (googleDrive.isConfigured() && workflow.driveFolderId) {
+      try {
+        const f = await googleDrive.uploadDocument(workflow.driveFolderId, fileName, pdf, 'application/pdf');
+        driveUrl = f.webViewLink;
+      } catch (e) {
+        console.error('[83b] Drive upload failed, returning inline:', (e as Error).message);
+      }
+    }
+    elections.push({
+      filer,
+      fileName,
+      driveUrl,
+      dataUrl: `data:application/pdf;base64,${pdf.toString('base64')}`,
+      shareCount: input.shareCount,
+      transferDate: input.transferDate,
+    });
+  }
+
+  await logEvent(workflowId, OnboardingEventType.DOCUMENT_UPLOADED, OnboardingActor.ADMIN, undefined, {
+    documentType: '83b_election_generated',
+    filers,
+  });
+
+  return c.json({
+    success: true,
+    elections,
+    deadline: election83b.electionDeadline(transferDate),
+    daysRemaining: transferDate ? election83b.daysUntilDeadline(transferDate, new Date().toISOString()) : null,
+    unconfiguredFilers: (['entity', 'personal'] as Filer[]).filter((f) => !filers.includes(f)),
+    lobConfigured: lob.isConfigured(),
+    irsConfigured: election83b.getIrsAddress() !== null,
+  });
+});
+
+// Mail signed election PDFs to the IRS via Lob Certified Mail. Multipart:
+// `entitySigned` and/or `personalSigned` files. Records tracking as proof and
+// advances status once every configured filer has been filed.
+app.post('/:id/file-83b-via-lob', async (c) => {
+  const workflowId = parseInt(c.req.param('id'));
+  const workflow = await getWorkflowWithDetails(workflowId);
+  if (!workflow) return c.json({ error: 'Workflow not found' }, 404);
+
+  if (!lob.isConfigured()) return c.json({ error: 'Lob is not configured (set LOB_API_KEY).' }, 400);
+  const irs = election83b.getIrsAddress();
+  if (!irs) return c.json({ error: 'IRS mailing address not configured (set MATCAP_83B_IRS_* secrets).' }, 400);
+  if (workflow.status !== OnboardingStatus.SHARES_PURCHASED) {
+    return c.json({ error: `Cannot file 83(b) in status: ${workflow.status}` }, 400);
+  }
+
+  const body = await c.req.parseBody();
+  const now = new Date().toISOString();
+  let filings: any[] = [];
+  try { filings = workflow.election83bFilings ? JSON.parse(workflow.election83bFilings) : []; } catch { filings = []; }
+  if (!Array.isArray(filings)) filings = [];
+
+  const toSend: { filer: Filer; file: any }[] = [];
+  for (const filer of ['entity', 'personal'] as Filer[]) {
+    const key = filer === 'entity' ? 'entitySigned' : 'personalSigned';
+    const f = (body as any)[key];
+    if (f && typeof f === 'object' && typeof f.arrayBuffer === 'function') toSend.push({ filer, file: f });
+  }
+  if (!toSend.length) return c.json({ error: 'No signed election PDFs provided (entitySigned / personalSigned).' }, 400);
+
+  const sent: any[] = [];
+  for (const { filer, file } of toSend) {
+    const profile = election83b.getTaxpayerProfile(filer);
+    if (!profile) return c.json({ error: `Taxpayer profile for '${filer}' is not configured.` }, 400);
+    const pdf = Buffer.from(await file.arrayBuffer());
+    const from = election83b.getReturnAddress(profile);
+    const companyName = workflow.entityName || workflow.portfolioCompany.founder.companyName;
+
+    const result = await lob.sendCertifiedLetter({
+      description: `83(b) election — ${filer} — ${companyName}`,
+      to: { name: irs.name, addressLine1: irs.addressLine1, addressLine2: irs.addressLine2, city: irs.city, state: irs.state, zip: irs.zip },
+      from: { name: from.name, addressLine1: from.addressLine1, addressLine2: from.addressLine2, city: from.city, state: from.state, zip: from.zip },
+      pdf,
+      fileName: `83b-${filer}.pdf`,
+    });
+
+    let driveUrl: string | null = null;
+    if (googleDrive.isConfigured() && workflow.driveFolderId) {
+      try {
+        const df = await googleDrive.uploadDocument(workflow.driveFolderId, `83b Election SIGNED - ${filer}.pdf`, pdf, 'application/pdf');
+        driveUrl = df.webViewLink;
+      } catch { /* non-fatal */ }
+    }
+
+    const record = { filer, lobId: result.id, trackingNumber: result.trackingNumber, proofUrl: result.proofUrl, expectedDeliveryDate: result.expectedDeliveryDate, mailedAt: now, driveUrl };
+    const idx = filings.findIndex((r: any) => r.filer === filer);
+    if (idx >= 0) filings[idx] = record; else filings.push(record);
+    sent.push(record);
+
+    await logEvent(workflowId, OnboardingEventType.DOCUMENT_UPLOADED, OnboardingActor.ADMIN, undefined, {
+      documentType: '83b_filed_via_lob', filer, lobId: result.id, trackingNumber: result.trackingNumber,
+    });
+  }
+
+  const configured = election83b.configuredFilers();
+  const allFiled = configured.length > 0 && configured.every((f) => filings.some((r: any) => r.filer === f));
+
+  if (allFiled) {
+    await updateWorkflowStatus(workflowId, OnboardingStatus.ELECTION_83B_FILED, {
+      election83bFilings: JSON.stringify(filings),
+      election83bFiledAt: now,
+      election83bProofUrl: filings[0]?.proofUrl || null,
+    });
+    await logEvent(workflowId, OnboardingEventType.ELECTION_83B_FILED, OnboardingActor.ADMIN, undefined, { via: 'lob', count: filings.length });
+    await updateWorkflowStatus(workflowId, OnboardingStatus.CERTIFICATE_PENDING);
+
+    const founder = workflow.portfolioCompany.founder;
+    const shareCount = workflow.authorizedShares && workflow.offerEquityPercent
+      ? calculateShareCount(workflow.offerEquityPercent, workflow.authorizedShares) : 0;
+    try {
+      await onboardingEmails.sendCertificateRequestEmail(
+        { name: founder.name, email: founder.email, companyName: founder.companyName },
+        { equityPercent: workflow.offerEquityPercent || '', sharePrice: workflow.sharePrice || '0.0001', shareCount, totalAmount: workflow.sharePurchaseAmount || '', grantDate: workflow.sharePurchaseDate || '' }
+      );
+    } catch (e) { console.error('[83b] certificate email failed:', (e as Error).message); }
+  } else {
+    await updateWorkflowStatus(workflowId, OnboardingStatus.SHARES_PURCHASED, { election83bFilings: JSON.stringify(filings) });
+  }
+
+  return c.json({ success: true, filed: sent, allFiled, pendingFilers: configured.filter((f) => !filings.some((r: any) => r.filer === f)) });
 });
 
 // ============== VERIFY CERTIFICATE ==============

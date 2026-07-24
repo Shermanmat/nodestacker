@@ -860,6 +860,10 @@ export const onboardingWorkflows = sqliteTable('onboarding_workflows', {
   // 83(b) election
   election83bFiledAt: text('election_83b_filed_at'),
   election83bProofUrl: text('election_83b_proof_url'),
+  // Per-filer filing records (entity + personal), JSON array of
+  // { filer, driveUrl, lobId, trackingNumber, proofUrl, mailedAt }. MatCap
+  // files two elections per deal (the MatCapital entity and Mat personally).
+  election83bFilings: text('election_83b_filings'),
 
   // Stock certificate (founder issues to MatCap)
   certificateReceivedAt: text('certificate_received_at'),

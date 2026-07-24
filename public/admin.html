@@ -954,6 +954,54 @@
             </div>
           </div>
 
+          <!-- 83(b) Elections -->
+          <div v-if="e83bInfo && ['shares_purchased','83b_filed','certificate_pending','completed'].includes(workflowDetails.workflow?.status)" class="mb-6 p-4 bg-amber-50 rounded-lg">
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="font-medium">83(b) Elections</h4>
+              <span v-if="e83bInfo.transferDate"
+                :class="['px-2 py-0.5 rounded text-xs font-medium', e83bInfo.daysRemaining == null ? 'bg-gray-100 text-gray-600' : e83bInfo.daysRemaining < 0 ? 'bg-red-100 text-red-800' : e83bInfo.daysRemaining <= 7 ? 'bg-red-100 text-red-800' : e83bInfo.daysRemaining <= 15 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800']">
+                {{ e83bInfo.daysRemaining == null ? '—' : e83bInfo.daysRemaining < 0 ? ('OVERDUE ' + (-e83bInfo.daysRemaining) + 'd') : (e83bInfo.daysRemaining + 'd left') }}
+              </span>
+            </div>
+            <div class="text-sm text-gray-600 space-y-1">
+              <div v-if="e83bInfo.deadline">Deadline (30 days from transfer): <span class="font-medium">{{ e83bInfo.deadline }}</span> <span class="text-gray-400">(transfer {{ e83bInfo.transferDate || '—' }})</span></div>
+              <div v-else class="text-amber-700">No transfer date yet — mark shares purchased to start the 30-day clock.</div>
+              <div class="flex flex-wrap gap-2 mt-2">
+                <span :class="['px-2 py-0.5 rounded text-xs', e83bInfo.configuredFilers.includes('entity') ? 'bg-green-100 text-green-700':'bg-gray-100 text-gray-500']">Entity profile {{ e83bInfo.configuredFilers.includes('entity') ? '✓':'—' }}</span>
+                <span :class="['px-2 py-0.5 rounded text-xs', e83bInfo.configuredFilers.includes('personal') ? 'bg-green-100 text-green-700':'bg-gray-100 text-gray-500']">Personal profile {{ e83bInfo.configuredFilers.includes('personal') ? '✓':'—' }}</span>
+                <span :class="['px-2 py-0.5 rounded text-xs', e83bInfo.irsConfigured ? 'bg-green-100 text-green-700':'bg-gray-100 text-gray-500']">IRS address {{ e83bInfo.irsConfigured ? '✓':'—' }}</span>
+                <span :class="['px-2 py-0.5 rounded text-xs', e83bInfo.lobConfigured ? (e83bInfo.lobLiveKey ? 'bg-green-100 text-green-700':'bg-amber-100 text-amber-700'):'bg-gray-100 text-gray-500']">Lob {{ e83bInfo.lobConfigured ? (e83bInfo.lobLiveKey ? '✓ live':'test key') : '—' }}</span>
+              </div>
+              <div v-if="e83bInfo.filings && e83bInfo.filings.length" class="mt-2 space-y-1 border-t pt-2">
+                <div v-for="f in e83bInfo.filings" :key="f.filer" class="text-xs">
+                  <span class="font-medium capitalize">{{ f.filer }}</span> mailed {{ (f.mailedAt||'').split('T')[0] }}
+                  <span v-if="f.trackingNumber">· tracking <span class="font-mono">{{ f.trackingNumber }}</span></span>
+                  <a v-if="f.proofUrl" :href="f.proofUrl" target="_blank" class="text-blue-600 hover:underline ml-1">proof</a>
+                  <a v-if="f.driveUrl" :href="f.driveUrl" target="_blank" class="text-blue-600 hover:underline ml-1">signed PDF</a>
+                </div>
+              </div>
+              <div v-if="e83bResult && e83bResult.length" class="mt-2 space-y-1 border-t pt-2">
+                <div class="text-xs font-medium text-gray-700">Generated drafts — review with counsel, then sign:</div>
+                <div v-for="el in e83bResult" :key="el.filer" class="text-xs">
+                  <a :href="el.driveUrl || el.dataUrl" :download="el.driveUrl ? null : el.fileName" target="_blank" class="text-blue-600 hover:underline">{{ el.fileName }}</a>
+                  <span class="text-gray-400">({{ Number(el.shareCount).toLocaleString() }} shares)</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 mt-3">
+              <button @click="generate83b(workflowDetails.workflow.id)" :disabled="e83bBusy || !e83bInfo.configuredFilers.length"
+                class="px-3 py-1.5 rounded text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40">
+                {{ e83bBusy ? 'Working…' : 'Generate elections' }}
+              </button>
+              <button @click="file83bViaLob(workflowDetails.workflow.id)" :disabled="e83bBusy || !e83bInfo.lobConfigured || !e83bInfo.irsConfigured || workflowDetails.workflow.status !== 'shares_purchased'"
+                class="px-3 py-1.5 rounded text-xs font-medium bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-40"
+                title="Upload the signed PDFs — sends certified mail to the IRS via Lob">
+                File via Lob (certified)
+              </button>
+            </div>
+            <p v-if="e83bInfo.configuredFilers.length < 2" class="text-xs text-amber-700 mt-2">Set MATCAP_83B_ENTITY_* and MATCAP_83B_PERSONAL_* secrets to enable both elections.</p>
+          </div>
+
           <!-- Incorporation Status -->
           <div v-if="workflowDetails.workflow?.incorporated !== null && workflowDetails.workflow?.incorporated !== undefined" class="mb-6 p-4 bg-orange-50 rounded-lg">
             <h4 class="font-medium mb-2">Incorporation Status</h4>
@@ -8215,6 +8263,67 @@
           offerTermsForm.introRequestsRevisitDate = w?.introRequestsRevisitDate || '';
           issuedSharesEdit.value = (w?.issuedShares ?? '') === null ? '' : (w?.issuedShares ?? '');
           showWorkflowModal.value = true;
+          load83bInfo(workflow.id);
+        };
+
+        // ===== 83(b) elections (generate + file via Lob) =====
+        const e83bInfo = ref(null);
+        const e83bResult = ref(null);
+        const e83bBusy = ref(false);
+
+        const load83bInfo = async (wid) => {
+          e83bResult.value = null;
+          e83bInfo.value = null;
+          try { e83bInfo.value = await api(`/onboarding/${wid}/83b-info`); } catch (e) { /* handled */ }
+        };
+
+        const generate83b = async (wid) => {
+          e83bBusy.value = true;
+          try {
+            const r = await api(`/onboarding/${wid}/generate-83b`, { method: 'POST' });
+            e83bResult.value = r.elections || [];
+            if (e83bInfo.value) { e83bInfo.value.deadline = r.deadline; e83bInfo.value.daysRemaining = r.daysRemaining; }
+            // Open each generated draft for review.
+            (r.elections || []).forEach(el => { const u = el.driveUrl || el.dataUrl; if (u) window.open(u, '_blank'); });
+          } catch (e) { /* handled by api() */ }
+          finally { e83bBusy.value = false; }
+        };
+
+        const file83bViaLob = async (wid) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'application/pdf';
+          input.multiple = true;
+          input.onchange = async () => {
+            const files = Array.from(input.files || []);
+            if (!files.length) return;
+            // Map files to filers by filename hint (generated names include Entity/Personal).
+            const fd = new FormData();
+            let entity = false, personal = false;
+            for (const f of files) {
+              const n = f.name.toLowerCase();
+              if (n.includes('entity') && !entity) { fd.append('entitySigned', f); entity = true; }
+              else if ((n.includes('personal') || n.includes('mat')) && !personal) { fd.append('personalSigned', f); personal = true; }
+              else if (!entity) { fd.append('entitySigned', f); entity = true; }
+              else if (!personal) { fd.append('personalSigned', f); personal = true; }
+            }
+            if (!confirm('This sends CERTIFIED MAIL to the IRS via Lob for the selected signed election(s). This is a real, billable filing. Continue?')) return;
+            e83bBusy.value = true;
+            try {
+              const res = await fetch(`/api/onboarding/${wid}/file-83b-via-lob`, {
+                method: 'POST',
+                headers: { 'X-Admin-Session': adminSessionId.value },
+                body: fd,
+              });
+              const data = await res.json();
+              if (!res.ok) { alert(typeof data.error === 'string' ? data.error : JSON.stringify(data.error)); return; }
+              alert('Filed via Lob. ' + (data.allFiled ? 'All elections filed.' : ('Still pending: ' + (data.pendingFilers || []).join(', '))));
+              loadOnboardingWorkflows();
+              openWorkflowModal({ id: wid });
+            } catch (e) { alert('Filing failed: ' + e.message); }
+            finally { e83bBusy.value = false; }
+          };
+          input.click();
         };
 
         const issuedSharesEdit = ref('');
@@ -9326,6 +9435,7 @@
           issuedSharesEdit, savingIssuedShares, saveIssuedShares, backupDocUrl,
           ONBOARDING_STATUSES, manualStatusEdit, savingStatus, setManualStatus, wfStepDone,
           signEquityAgreement, markSharesPurchased, file83b, verifyCertificate, sendReminder,
+          e83bInfo, e83bResult, e83bBusy, load83bInfo, generate83b, file83bViaLob,
           formatOnboardingStatus, formatVestingSchedule, onboardingStatusClass, getNextOnboardingAction, toggleApprovedForLawFirm,
           // Network Health
           networkHealth, healthFilter, healthSort, loadNetworkHealth, filteredHealthInvestors, toggleHealthSort,

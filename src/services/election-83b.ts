@@ -197,6 +197,39 @@ export async function generate83bPdf(input: ElectionInput): Promise<Buffer> {
     y -= lh + 8;
   };
 
+  // ---- Cover / title page ----
+  const center = (text: string, yy: number, size: number, f = font, color = rgb(0.1, 0.1, 0.1)) => {
+    const w = f.widthOfTextAtSize(text, size);
+    page.drawText(text, { x: (PAGE_W - w) / 2, y: yy, size, font: f, color });
+  };
+  let ty = PAGE_H - 220;
+  center('SECTION 83(b) ELECTION', ty, 26, bold); ty -= 34;
+  center('Election to Include in Gross Income in the Year of Transfer', ty, 12); ty -= 18;
+  center('Pursuant to Section 83(b) of the Internal Revenue Code', ty, 12); ty -= 40;
+  page.drawLine({ start: { x: MARGIN + 120, y: ty }, end: { x: PAGE_W - MARGIN - 120, y: ty }, thickness: 1, color: rgb(0.75, 0.75, 0.75) });
+  ty -= 46;
+  const coverRows: [string, string][] = [
+    ['Taxpayer', t.name],
+    ['Taxpayer ID', t.tin],
+    ['Company', input.companyName],
+    ['Shares', input.shareCount.toLocaleString('en-US')],
+    ['Date of Transfer', fmtDateLong(input.transferDate)],
+    ['Taxable Year', taxableYear],
+  ];
+  const coverLabelW = 150;
+  const coverX = (PAGE_W - 360) / 2;
+  for (const [label, val] of coverRows) {
+    page.drawText(label + ':', { x: coverX, y: ty, size: 11, font: bold, color: rgb(0.35, 0.35, 0.35) });
+    page.drawText(val, { x: coverX + coverLabelW, y: ty, size: 11, font, color: rgb(0.1, 0.1, 0.1) });
+    ty -= 22;
+  }
+  ty -= 34;
+  center('Submitted to the Internal Revenue Service via USPS Certified Mail', ty, 9, font, rgb(0.45, 0.45, 0.45));
+
+  // Election statement begins on the next page.
+  page = doc.addPage([PAGE_W, PAGE_H]);
+  y = PAGE_H - MARGIN;
+
   // Title
   draw('ELECTION TO INCLUDE IN GROSS INCOME IN YEAR OF TRANSFER', { size: 13, f: bold, gap: 4 });
   draw('PURSUANT TO SECTION 83(b) OF THE INTERNAL REVENUE CODE', { size: 13, f: bold, gap: 16 });
